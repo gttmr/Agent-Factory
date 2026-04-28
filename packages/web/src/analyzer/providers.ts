@@ -17,23 +17,21 @@ export class MockAnalyzerProvider implements AnalyzerProvider {
 }
 
 export interface OpenAICompatibleAnalyzerOptions {
-  baseUrl?: string;
-  model?: string;
-  apiKeyEnvVar?: string;
+  endpoint?: "/api/analyze-requirement";
 }
 
 export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
-  readonly id = "openai-compatible-placeholder";
-  readonly label = "OpenAI-compatible analyzer placeholder";
+  readonly id = "secure-backend-analyzer-placeholder";
+  readonly label = "Secure backend analyzer placeholder";
   readonly options: OpenAICompatibleAnalyzerOptions;
 
-  constructor(options: OpenAICompatibleAnalyzerOptions = {}) {
+  constructor(options: OpenAICompatibleAnalyzerOptions = { endpoint: "/api/analyze-requirement" }) {
     this.options = options;
   }
 
   async analyze(): Promise<AnalysisResult> {
     throw new Error(
-      "OpenAI-compatible analysis is intentionally disabled in this public workbench. Configure a restricted or offline deployment before enabling network calls."
+      "Live analysis is intentionally disabled in this public workbench. Future use must call POST /api/analyze-requirement from a trusted backend that validates schemas, applies policy gates, preserves audit logs, rejects invalid module_category values, and blocks Remote A2A approval without independent owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details."
     );
   }
 }

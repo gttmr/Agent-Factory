@@ -1,31 +1,27 @@
 # Target Agent Architecture
 
-This reference describes the target shape assumed by the public skill.
+The workbench does not assume every requirement becomes one deployable agent. It decomposes reviewed requirements into explicit module categories.
 
-## Boundary Layers
+## Categories
 
-- `Specialist Agent`: narrow domain task with a clear input/output contract.
-- `Shared Agent`: reusable higher-level agent capability used by multiple specialists.
-- `Tool/Adapter`: deterministic API, service, data, or transformation binding.
-- `Metadata Registry`: declarative capability, schema, policy, or routing metadata.
-- `Internal Workflow`: ADK composition inside an agent boundary.
-- `Remote A2A`: protocol interaction with an independent external agent boundary.
+- `agent`: reasoning responsibility such as judgment, summarization, classification, recommendation, or triage.
+- `workflow`: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
+- `adapter`: callable capability used by agents or workflows.
+- `remote_a2a`: independent remote agent boundary with protocol-level contract.
 
-## Default Shape
+## Adapter Subtypes
 
-Generated work should prefer:
+Adapters preserve the kind of callable capability through `adapter_kind`:
 
-```text
-agents/<agent_name>/
-  agent.py
-  README.md
-  tests/
-```
+- `legacy_api`
+- `retrieval`
+- `rule_registry`
+- `data_query`
+- `template`
+- `computation`
+- `external_service`
+- `unknown`
 
-The exact language and framework version can vary by target repository. The public skill describes the decision process and scaffold shape, not a private runtime.
+## Remote A2A Boundary
 
-## Important Distinction
-
-Internal ADK workflow is not the same as A2A.
-
-Use ADK workflow agents for deterministic control flow inside one runtime. Use A2A when an agent needs to discover and communicate with another independent agent over the protocol boundary.
+Remote A2A requires independent owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details. Local orchestration or fan-out/fan-in alone remains Workflow.

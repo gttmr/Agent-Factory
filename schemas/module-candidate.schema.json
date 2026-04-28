@@ -8,7 +8,7 @@
     "id",
     "source_requirement_id",
     "name",
-    "recommended_type",
+    "module_category",
     "confidence",
     "rationale",
     "inputs",
@@ -31,8 +31,24 @@
       "type": "string",
       "minLength": 1
     },
-    "recommended_type": {
-      "$ref": "#/$defs/moduleType"
+    "module_category": {
+      "$ref": "#/$defs/moduleCategory"
+    },
+    "agent_kind": {
+      "anyOf": [{ "$ref": "#/$defs/agentKind" }, { "type": "null" }]
+    },
+    "workflow_kind": {
+      "anyOf": [{ "$ref": "#/$defs/workflowKind" }, { "type": "null" }]
+    },
+    "adapter_kind": {
+      "anyOf": [{ "$ref": "#/$defs/adapterKind" }, { "type": "null" }]
+    },
+    "remote_contract_kind": {
+      "anyOf": [{ "$ref": "#/$defs/remoteContractKind" }, { "type": "null" }]
+    },
+    "legacy_recommended_type": {
+      "type": "string",
+      "description": "Optional migration metadata for artifacts emitted before module_category became primary."
     },
     "confidence": {
       "type": "number",
@@ -65,20 +81,118 @@
     "status": {
       "type": "string",
       "enum": ["needs_review", "approved", "deferred", "rejected"]
+    },
+    "side_effect": {
+      "$ref": "#/$defs/sideEffect"
+    },
+    "auth_required": {
+      "type": "boolean"
+    },
+    "audit_required": {
+      "type": "boolean"
+    },
+    "citation_required": {
+      "type": "boolean"
+    },
+    "grounding_required": {
+      "type": "boolean"
+    },
+    "source_acl_required": {
+      "type": "boolean"
+    },
+    "versioned": {
+      "type": "boolean"
+    },
+    "effective_date_required": {
+      "type": "boolean"
+    },
+    "owner_domain": {
+      "type": "string",
+      "minLength": 1
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "module_category": { "const": "agent" }
+        },
+        "required": ["module_category"]
+      },
+      "then": {
+        "required": ["agent_kind"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "module_category": { "const": "workflow" }
+        },
+        "required": ["module_category"]
+      },
+      "then": {
+        "required": ["workflow_kind"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "module_category": { "const": "adapter" }
+        },
+        "required": ["module_category"]
+      },
+      "then": {
+        "required": ["adapter_kind"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "module_category": { "const": "remote_a2a" }
+        },
+        "required": ["module_category"]
+      },
+      "then": {
+        "required": ["remote_contract_kind"],
+        "properties": {
+          "risk_level": { "const": "high" }
+        }
+      }
+    }
+  ],
   "$defs": {
-    "moduleType": {
+    "moduleCategory": {
+      "type": "string",
+      "enum": ["agent", "workflow", "adapter", "remote_a2a"]
+    },
+    "agentKind": {
+      "type": "string",
+      "enum": ["specialist", "shared"]
+    },
+    "workflowKind": {
+      "type": "string",
+      "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"]
+    },
+    "adapterKind": {
       "type": "string",
       "enum": [
-        "tool_adapter",
-        "knowledge_retrieval",
-        "internal_workflow",
-        "specialist_agent",
-        "shared_agent",
-        "metadata_registry",
-        "remote_a2a_contract"
+        "legacy_api",
+        "retrieval",
+        "rule_registry",
+        "data_query",
+        "template",
+        "computation",
+        "external_service",
+        "unknown"
       ]
+    },
+    "remoteContractKind": {
+      "type": "string",
+      "enum": ["a2a", "unknown"]
+    },
+    "sideEffect": {
+      "type": "string",
+      "enum": ["none", "read", "write", "read_write", "unknown"]
     },
     "field": {
       "type": "object",
@@ -99,5 +213,109 @@
         }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "name": "customer_profile_lookup",
+      "module_category": "adapter",
+      "adapter_kind": "legacy_api",
+      "legacy_recommended_type": "tool_adapter",
+      "confidence": 0.82,
+      "rationale": "The module calls an existing profile API through a reviewed contract.",
+      "inputs": [{ "name": "customer_id", "type": "string", "required": true }],
+      "outputs": [{ "name": "customer_profile", "type": "object" }],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "status": "needs_review",
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true
+    },
+    {
+      "id": "mod-002",
+      "source_requirement_id": "req-001",
+      "name": "guidance_retrieval",
+      "module_category": "adapter",
+      "adapter_kind": "retrieval",
+      "legacy_recommended_type": "knowledge_retrieval",
+      "confidence": 0.78,
+      "rationale": "The module retrieves grounded policy or FAQ evidence.",
+      "inputs": [{ "name": "knowledge_query", "type": "text", "required": true }],
+      "outputs": [
+        { "name": "guidance_summary", "type": "text" },
+        { "name": "citations", "type": "array" }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "status": "needs_review",
+      "citation_required": true,
+      "grounding_required": true,
+      "source_acl_required": true
+    },
+    {
+      "id": "mod-003",
+      "source_requirement_id": "req-001",
+      "name": "routing_rules_registry",
+      "module_category": "adapter",
+      "adapter_kind": "rule_registry",
+      "legacy_recommended_type": "metadata_registry",
+      "confidence": 0.72,
+      "rationale": "The module exposes managed routing thresholds as a callable capability.",
+      "inputs": [{ "name": "classification", "type": "string", "required": true }],
+      "outputs": [{ "name": "routing_decision", "type": "object" }],
+      "reuse_candidate": true,
+      "risk_level": "low",
+      "status": "needs_review",
+      "versioned": true,
+      "effective_date_required": true,
+      "audit_required": true
+    },
+    {
+      "id": "mod-004",
+      "source_requirement_id": "req-001",
+      "name": "requirement_review_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.8,
+      "rationale": "The module owns a narrow judgment responsibility.",
+      "inputs": [{ "name": "review_context", "type": "object", "required": true }],
+      "outputs": [{ "name": "recommendation", "type": "object" }],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "status": "needs_review"
+    },
+    {
+      "id": "mod-005",
+      "source_requirement_id": "req-001",
+      "name": "requirement_handling_workflow",
+      "module_category": "workflow",
+      "workflow_kind": "sequential",
+      "legacy_recommended_type": "internal_workflow",
+      "confidence": 0.76,
+      "rationale": "The module coordinates ordered local steps.",
+      "inputs": [{ "name": "raw_requirement_text", "type": "text", "required": true }],
+      "outputs": [{ "name": "workflow_context", "type": "object" }],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "status": "needs_review"
+    },
+    {
+      "id": "mod-006",
+      "source_requirement_id": "req-001",
+      "name": "remote_specialist_contract",
+      "module_category": "remote_a2a",
+      "remote_contract_kind": "a2a",
+      "legacy_recommended_type": "remote_a2a_contract",
+      "confidence": 0.7,
+      "rationale": "The module represents an independent remote agent boundary.",
+      "inputs": [{ "name": "delegated_task", "type": "object", "required": true }],
+      "outputs": [{ "name": "remote_agent_result", "type": "object" }],
+      "reuse_candidate": false,
+      "risk_level": "high",
+      "status": "needs_review"
+    }
+  ]
 }

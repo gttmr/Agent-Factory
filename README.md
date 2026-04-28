@@ -1,40 +1,68 @@
-# ADK A2A Agent Skill Notes
+# Agent Factory Workbench
 
-This repository is a public extract of a Codex skill for planning Google ADK-based agent scaffolds and A2A interaction boundaries.
+Agent Factory is a local-first workbench for turning raw requirements into reviewed planning artifacts. It is the source of truth for requirement intake, normalized requirement structure, module classification, process-flow review, reuse/commonization notes, export artifacts, and a later scaffold bridge.
 
-It is intentionally documentation-focused. It does not include private runner datasets, company deployment scripts, or organization-specific runtime code.
+This repository contains the workbench application and shared schemas. It is not a banking deployment, does not include private endpoints or credentials, and does not generate runnable business logic directly from raw user requests.
 
-## What Is Included
+## Repository Scope
 
-- `.agents/skills/adk-a2a-agent-generate/`: a concise Codex skill contract
-- `references/`: decision rules for specialist boundaries, shared reuse, ADK internal workflow, and A2A interaction boundaries
-- `assets/`: small prompt and scaffold-shape templates
-- `docs/`: human-facing notes about the design tradeoffs behind the skill
+- `packages/web`: React/Vite requirement intake workbench.
+- `schemas`: JSON Schemas for normalized requirements, module candidates, and process flow artifacts.
+- `templates`: generic artifact templates for reviewed handoff and scaffold planning.
+- `docs`: workbench design notes, validation guidance, and scaffold bridge documentation.
+- `.agents/skills`: skill material that may be synchronized later, but is not the primary edit target for this workbench refactor.
 
-## Core Idea
+## Workbench Flow
 
-The skill handles one agent request at a time:
+1. Capture a raw requirement with requester and system context.
+2. Normalize the requirement into reviewable structured data.
+3. Classify module candidates with the approved taxonomy.
+4. Review process flow and remote-boundary friction.
+5. Mark modules as approved, deferred, rejected, or needing review.
+6. Export approved artifacts for downstream implementation planning.
+7. Feed only approved `scaffold-plan.json` and `implementation-handoff.md` into any future scaffold bridge.
 
-1. Read a requirement or short specialist-agent request.
-2. Extract compact evidence before designing code.
-3. Decide whether the request should be a specialist agent, shared agent, tool adapter, or metadata registry.
-4. Decide whether internal ADK workflow composition is needed inside the same boundary.
-5. Decide whether remote A2A interaction is actually required.
-6. Produce a handoff with TODO business logic instead of pretending the agent is complete.
+Raw requirements must never create code directly. Scaffolding consumes approved artifacts only.
 
-The default is specialist-first. Use A2A only when there is an independent remote agent boundary, not merely because a workflow has multiple steps.
+## Taxonomy
 
-## Public Scope
+Top-level `module_category` values:
 
-This extract keeps only public, portable ADK/A2A design material. It excludes:
+- `agent`
+- `workflow`
+- `adapter`
+- `remote_a2a`
 
-- private deployment environments
-- private datasets and regression fixtures
-- organization-specific naming
+Adapter `adapter_kind` values:
 
-## Useful Links
+- `legacy_api`
+- `retrieval`
+- `rule_registry`
+- `data_query`
+- `template`
+- `computation`
+- `external_service`
+- `unknown`
 
-- [Docs index](./docs/README.md)
-- [Agent generation concept](./docs/concepts/adk-a2a-agent-generation.md)
-- [Target agent architecture](./docs/reference/target-agent-architecture/README.md)
-- [Skill contract](./.agents/skills/adk-a2a-agent-generate/SKILL.md)
+Definitions:
+
+- Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
+- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
+- Adapter: callable capability used by agents or workflows, including legacy API, retrieval, rule registry, data query, template, computation, or external service.
+- Remote A2A: independent remote agent boundary with protocol-level contract.
+
+Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and managed rule registries remain visible as Adapter subtypes through `adapter_kind`.
+
+## Remote A2A Policy
+
+Remote A2A is separate from Adapter. It should be proposed only when the requirement indicates an independent remote agent boundary with its own owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details. Multi-step workflow alone is not enough to create Remote A2A.
+
+## Development
+
+```bash
+cd packages/web
+npm install
+npm run build
+```
+
+The web package build runs `tsc --noEmit && vite build`.

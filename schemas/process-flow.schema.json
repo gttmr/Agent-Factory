@@ -24,19 +24,9 @@
     }
   },
   "$defs": {
-    "moduleType": {
+    "nodeType": {
       "type": "string",
-      "enum": [
-        "input",
-        "output",
-        "tool_adapter",
-        "knowledge_retrieval",
-        "internal_workflow",
-        "specialist_agent",
-        "shared_agent",
-        "metadata_registry",
-        "remote_a2a_contract"
-      ]
+      "enum": ["input", "output", "agent", "workflow", "adapter", "remote_a2a"]
     },
     "node": {
       "type": "object",
@@ -52,7 +42,11 @@
           "minLength": 1
         },
         "type": {
-          "$ref": "#/$defs/moduleType"
+          "$ref": "#/$defs/nodeType"
+        },
+        "subtype": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

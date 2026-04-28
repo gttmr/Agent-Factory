@@ -1,4 +1,4 @@
-import { moduleTypeLabels } from "../analyzer/classificationRules";
+import { moduleCategoryLabels } from "../analyzer/classificationRules";
 import type { FlowNode, FlowNodeType, ModuleCandidate, ProcessFlow } from "../analyzer/types";
 
 interface ProcessFlowViewProps {
@@ -44,7 +44,7 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
                   const candidate = candidateById.get(node.id);
                   return (
                     <div className="flow-node" key={node.id}>
-                      <span>{formatNodeType(node.type)}</span>
+                      <span>{formatNodeType(node.type, node.subtype)}</span>
                       <strong>{node.label}</strong>
                       {candidate && <em>{candidate.rationale}</em>}
                     </div>
@@ -75,16 +75,20 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
           </div>
           <ul className="judgment-list">
             <li>
-              <strong>ParallelAgent</strong>
-              <span>독립적인 `tool_adapter`와 `knowledge_retrieval` 조회는 fan-out/fan-in 후보로 검토합니다.</span>
+              <strong>Adapter</strong>
+              <span>Adapter is any callable capability used by an agent or workflow.</span>
             </li>
             <li>
-              <strong>SequentialAgent</strong>
-              <span>분류, 검토, 권장안 생성처럼 순서가 고정된 단계는 deterministic handoff 후보로 봅니다.</span>
+              <strong>Retrieval</strong>
+              <span>Retrieval is an Adapter subtype and should carry citation, grounding, and source ACL review fields.</span>
             </li>
             <li>
-              <strong>LoopAgent</strong>
-              <span>반복 종료 조건이 확인될 때만 별도 후보로 승격합니다. 현재 rule analyzer는 기본 후보로 만들지 않습니다.</span>
+              <strong>Rule Registry</strong>
+              <span>Managed rules or metadata registries are Adapter subtype rule_registry.</span>
+            </li>
+            <li>
+              <strong>Remote A2A</strong>
+              <span>Remote A2A is only for independent remote agent boundaries, not ordinary multi-step workflows.</span>
             </li>
           </ul>
           {customSignals.length ? (
@@ -138,8 +142,10 @@ function buildFlowStages(processFlow: ProcessFlow): FlowStage[] {
   const inputNodes = processFlow.nodes.filter((node) => node.type === "input");
   const outputNodes = processFlow.nodes.filter((node) => node.type === "output");
   const moduleNodes = processFlow.nodes.filter((node) => node.type !== "input" && node.type !== "output");
-  const branchNodes = moduleNodes.filter((node) => node.type === "tool_adapter" || node.type === "knowledge_retrieval");
-  const reviewNodes = moduleNodes.filter((node) => node.type !== "tool_adapter" && node.type !== "knowledge_retrieval");
+  const branchNodes = moduleNodes.filter(
+    (node) => node.type === "adapter" && (node.subtype === "legacy_api" || node.subtype === "retrieval")
+  );
+  const reviewNodes = moduleNodes.filter((node) => !branchNodes.some((branchNode) => branchNode.id === node.id));
 
   return [
     {
@@ -153,18 +159,18 @@ function buildFlowStages(processFlow: ProcessFlow): FlowStage[] {
       ? [
           {
             id: "parallel-branches",
-            title: "조회/검색 분기",
-            agentType: "ParallelAgent candidate",
-            detail: "서로 의존하지 않는 lookup/retrieval 작업은 병렬 실행 가능성을 먼저 검토합니다.",
+            title: "Adapter calls",
+            agentType: "Parallel workflow candidate",
+            detail: "Independent legacy API or retrieval adapters can be reviewed as local parallel branches.",
             nodes: branchNodes
           }
         ]
       : []),
     {
       id: "ordered-review",
-      title: "순차 검토/판단",
-      agentType: "SequentialAgent candidate",
-      detail: "컨텍스트 수집 이후의 handoff, review, recommendation 단계는 고정 순서 후보입니다.",
+      title: "Local review and orchestration",
+      agentType: "Workflow / Agent review",
+      detail: "After context collection, local handoff, review, and recommendation remain workflow or agent nodes.",
       nodes: reviewNodes.length ? reviewNodes : moduleNodes
     },
     {
@@ -189,10 +195,10 @@ function detectCustomAgentSignals(processFlow: ProcessFlow, moduleCandidates: Mo
   if (/\b(dynamic|select|selection|delegate)\b/.test(combined)) {
     signals.push("dynamic agent selection 또는 delegated task 흐름이 보이면 predefined workflow만으로 충분한지 확인합니다.");
   }
-  if (processFlow.nodes.some((node) => node.type === "remote_a2a_contract")) {
+  if (processFlow.nodes.some((node) => node.type === "remote_a2a")) {
     signals.push("독립 remote boundary가 포함되면 external integration flow control을 별도로 검토합니다.");
   }
-  if (processFlow.nodes.some((node) => node.type === "internal_workflow") && processFlow.edges.length > processFlow.nodes.length) {
+  if (processFlow.nodes.some((node) => node.type === "workflow") && processFlow.edges.length > processFlow.nodes.length) {
     signals.push("fan-in/fan-out이 많은 internal workflow는 complex state management 여부를 확인합니다.");
   }
 
@@ -200,7 +206,10 @@ function detectCustomAgentSignals(processFlow: ProcessFlow, moduleCandidates: Mo
 }
 
 function toMermaid(processFlow: ProcessFlow): string {
-  const nodeLines = processFlow.nodes.map((node) => `  ${safeId(node.id)}["${node.label} (${node.type})"]`);
+  const nodeLines = processFlow.nodes.map((node) => {
+    const subtype = node.subtype ? `: ${node.subtype}` : "";
+    return `  ${safeId(node.id)}["${node.label} (${node.type}${subtype})"]`;
+  });
   const edgeLines = processFlow.edges.map((edge) => {
     const label = edge.edge_type === "remote_a2a" ? `remote_a2a: ${edge.data}` : edge.data;
     return `  ${safeId(edge.from)} -->|"${label}"| ${safeId(edge.to)}`;
@@ -213,9 +222,9 @@ function safeId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_]/g, "_");
 }
 
-function formatNodeType(type: FlowNodeType): string {
+function formatNodeType(type: FlowNodeType, subtype?: string): string {
   if (type === "input" || type === "output") {
     return type;
   }
-  return moduleTypeLabels[type];
+  return subtype ? `${moduleCategoryLabels[type]}: ${subtype}` : moduleCategoryLabels[type];
 }

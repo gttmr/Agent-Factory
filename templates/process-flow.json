@@ -14,27 +14,32 @@
     {
       "id": "mod-001",
       "label": "customer_profile_lookup",
-      "type": "tool_adapter"
+      "type": "adapter",
+      "subtype": "legacy_api"
     },
     {
       "id": "mod-002",
       "label": "response_guidance_retrieval",
-      "type": "knowledge_retrieval"
+      "type": "adapter",
+      "subtype": "retrieval"
     },
     {
       "id": "mod-003",
       "label": "complaint_triage_workflow",
-      "type": "internal_workflow"
+      "type": "workflow",
+      "subtype": "sequential"
     },
     {
       "id": "mod-004",
       "label": "complaint_triage_specialist",
-      "type": "specialist_agent"
+      "type": "agent",
+      "subtype": "specialist"
     },
     {
       "id": "mod-005",
       "label": "support_routing_rules",
-      "type": "metadata_registry"
+      "type": "adapter",
+      "subtype": "rule_registry"
     },
     {
       "id": "recommended_next_step",

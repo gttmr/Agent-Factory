@@ -3,7 +3,9 @@
     "id": "mod-001",
     "source_requirement_id": "req-001",
     "name": "customer_profile_lookup",
-    "recommended_type": "tool_adapter",
+    "module_category": "adapter",
+    "adapter_kind": "legacy_api",
+    "legacy_recommended_type": "tool_adapter",
     "confidence": 0.82,
     "rationale": "Checking a customer profile is a deterministic system lookup with clear input and output data.",
     "inputs": [
@@ -21,13 +23,18 @@
     ],
     "reuse_candidate": true,
     "risk_level": "medium",
-    "status": "needs_review"
+    "status": "needs_review",
+    "side_effect": "read",
+    "auth_required": true,
+    "audit_required": true
   },
   {
     "id": "mod-002",
     "source_requirement_id": "req-001",
     "name": "response_guidance_retrieval",
-    "recommended_type": "knowledge_retrieval",
+    "module_category": "adapter",
+    "adapter_kind": "retrieval",
+    "legacy_recommended_type": "knowledge_retrieval",
     "confidence": 0.78,
     "rationale": "Looking up response guidance is a retrieval capability over reusable support knowledge.",
     "inputs": [
@@ -49,13 +56,18 @@
     ],
     "reuse_candidate": true,
     "risk_level": "medium",
-    "status": "needs_review"
+    "status": "needs_review",
+    "citation_required": true,
+    "grounding_required": true,
+    "source_acl_required": true
   },
   {
     "id": "mod-003",
     "source_requirement_id": "req-001",
     "name": "complaint_triage_workflow",
-    "recommended_type": "internal_workflow",
+    "module_category": "workflow",
+    "workflow_kind": "sequential",
+    "legacy_recommended_type": "internal_workflow",
     "confidence": 0.76,
     "rationale": "The request describes ordered steps inside one triage boundary.",
     "inputs": [
@@ -89,7 +101,9 @@
     "id": "mod-004",
     "source_requirement_id": "req-001",
     "name": "complaint_triage_specialist",
-    "recommended_type": "specialist_agent",
+    "module_category": "agent",
+    "agent_kind": "specialist",
+    "legacy_recommended_type": "specialist_agent",
     "confidence": 0.8,
     "rationale": "The capability combines context, retrieval, and judgment to recommend a next step.",
     "inputs": [
@@ -117,9 +131,11 @@
     "id": "mod-005",
     "source_requirement_id": "req-001",
     "name": "support_routing_rules",
-    "recommended_type": "metadata_registry",
+    "module_category": "adapter",
+    "adapter_kind": "rule_registry",
+    "legacy_recommended_type": "metadata_registry",
     "confidence": 0.72,
-    "rationale": "Reusable priority thresholds and routing rules are structured operating metadata.",
+    "rationale": "Reusable priority thresholds and routing rules are structured operating metadata exposed as a callable adapter.",
     "inputs": [
       {
         "name": "triage_category",
@@ -135,6 +151,9 @@
     ],
     "reuse_candidate": true,
     "risk_level": "low",
-    "status": "needs_review"
+    "status": "needs_review",
+    "versioned": true,
+    "effective_date_required": true,
+    "audit_required": true
   }
 ]

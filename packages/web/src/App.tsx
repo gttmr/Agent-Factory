@@ -159,6 +159,7 @@ export default function App() {
         {activeStep === "export" && analysis && processFlow && (
           <ExportArtifacts
             normalizedRequirement={analysis.normalizedRequirement}
+            evidence={analysis.evidence}
             moduleCandidates={moduleCandidates}
             processFlow={processFlow}
             acceptedMissing={acceptedMissing}

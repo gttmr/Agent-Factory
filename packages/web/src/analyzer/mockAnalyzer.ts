@@ -93,7 +93,8 @@ export function buildProcessFlow(
   const moduleNodes = moduleCandidates.map((candidate) => ({
     id: candidate.id,
     label: candidate.name,
-    type: candidate.recommended_type
+    type: candidate.module_category,
+    subtype: getCandidateSubtypeValue(candidate) ?? undefined
   }));
   const outputNodes = normalizedRequirement.outputs.map((field) => ({
     id: field.name,
@@ -124,8 +125,8 @@ export function buildProcessFlow(
         to: next.id,
         data: summarizeEdgeData(candidate.outputs),
         edge_type:
-          candidate.recommended_type === "remote_a2a_contract" ||
-          next.recommended_type === "remote_a2a_contract"
+          candidate.module_category === "remote_a2a" ||
+          next.module_category === "remote_a2a"
             ? ("remote_a2a" as const)
             : ("local" as const)
       });
@@ -328,14 +329,19 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "customer_profile_lookup",
-      recommended_type: "tool_adapter",
+      module_category: "adapter",
+      adapter_kind: lowerText.includes("query") ? "data_query" : "legacy_api",
+      legacy_recommended_type: "tool_adapter",
       confidence: 0.82,
       rationale: "The request describes a deterministic lookup with clear input and output data.",
       inputs: [{ name: "customer_id", type: "string", required: true }],
       outputs: [{ name: "customer_profile", type: "object" }],
       reuse_candidate: true,
       risk_level: "medium",
-      status: "needs_review"
+      status: "needs_review",
+      side_effect: "read",
+      auth_required: true,
+      audit_required: true
     });
   }
 
@@ -349,7 +355,9 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "guidance_retrieval",
-      recommended_type: "knowledge_retrieval",
+      module_category: "adapter",
+      adapter_kind: "retrieval",
+      legacy_recommended_type: "knowledge_retrieval",
       confidence: 0.78,
       rationale: "The request needs grounded information from reusable knowledge sources.",
       inputs: [{ name: "knowledge_query", type: "text", required: true }],
@@ -359,16 +367,26 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       ],
       reuse_candidate: true,
       risk_level: "medium",
-      status: "needs_review"
+      status: "needs_review",
+      citation_required: true,
+      grounding_required: true,
+      source_acl_required: true
     });
   }
 
-  if (requirement.current_process.length > 2 || lowerText.includes("workflow") || lowerText.includes("handoff")) {
+  if (
+    requirement.current_process.length > 2 ||
+    lowerText.includes("workflow") ||
+    lowerText.includes("handoff") ||
+    lowerText.includes("approval flow")
+  ) {
     modules.push({
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "requirement_handling_workflow",
-      recommended_type: "internal_workflow",
+      module_category: "workflow",
+      workflow_kind: lowerText.includes("approval") || lowerText.includes("human review") ? "human_review" : "sequential",
+      legacy_recommended_type: "internal_workflow",
       confidence: 0.76,
       rationale: "The request describes ordered steps inside one work boundary.",
       inputs: requirement.inputs,
@@ -383,7 +401,9 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
     id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
     source_requirement_id: requirement.id,
     name: "requirement_review_specialist",
-    recommended_type: "specialist_agent",
+    module_category: "agent",
+    agent_kind: "specialist",
+    legacy_recommended_type: "specialist_agent",
     confidence: 0.8,
     rationale: "The request needs narrow judgment over gathered context to produce a recommendation.",
     inputs: [{ name: "workflow_context", type: "object", required: true }],
@@ -398,7 +418,9 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "shared_review_capability",
-      recommended_type: "shared_agent",
+      module_category: "agent",
+      agent_kind: "shared",
+      legacy_recommended_type: "shared_agent",
       confidence: 0.64,
       rationale: "The requirement hints that multiple specialists may need the same higher-level capability.",
       inputs: [{ name: "review_context", type: "object", required: true }],
@@ -414,14 +436,19 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "routing_rules_registry",
-      recommended_type: "metadata_registry",
+      module_category: "adapter",
+      adapter_kind: "rule_registry",
+      legacy_recommended_type: "metadata_registry",
       confidence: 0.72,
       rationale: "Routing rules and thresholds are structured operating metadata.",
       inputs: [{ name: "classification", type: "string", required: true }],
       outputs: [{ name: "routing_decision", type: "object" }],
       reuse_candidate: true,
       risk_level: "low",
-      status: "needs_review"
+      status: "needs_review",
+      versioned: true,
+      effective_date_required: true,
+      audit_required: true
     });
   }
 
@@ -430,7 +457,9 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       id: `mod-${String(modules.length + 1).padStart(3, "0")}`,
       source_requirement_id: requirement.id,
       name: "remote_specialist_contract",
-      recommended_type: "remote_a2a_contract",
+      module_category: "remote_a2a",
+      remote_contract_kind: "a2a",
+      legacy_recommended_type: "remote_a2a_contract",
       confidence: 0.7,
       rationale: "The request references an independent remote agent boundary.",
       inputs: [{ name: "delegated_task", type: "object", required: true }],
@@ -453,6 +482,16 @@ function parseList(value: string): string[] {
 
 function summarizeEdgeData(fields: FieldSpec[]): string {
   return fields.map((field) => field.name).join(", ") || "module output";
+}
+
+function getCandidateSubtypeValue(candidate: ModuleCandidate): string | null {
+  return (
+    candidate.adapter_kind ??
+    candidate.agent_kind ??
+    candidate.workflow_kind ??
+    candidate.remote_contract_kind ??
+    null
+  );
 }
 
 function uniqueFields(fields: FieldSpec[]): FieldSpec[] {

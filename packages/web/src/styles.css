@@ -398,7 +398,7 @@ td {
 }
 
 .module-table {
-  min-width: 1690px;
+  min-width: 1760px;
   table-layout: fixed;
 }
 
@@ -407,11 +407,19 @@ td {
 }
 
 .module-type-col {
-  width: 220px;
+  width: 180px;
+}
+
+.module-subtype-col {
+  width: 190px;
+}
+
+.module-confidence-col {
+  width: 110px;
 }
 
 .module-rationale-col {
-  width: 330px;
+  width: 300px;
 }
 
 .module-fields-col {
@@ -428,6 +436,10 @@ td {
 
 .module-status-col {
   width: 160px;
+}
+
+.module-action-col {
+  width: 300px;
 }
 
 .module-table th,
@@ -502,6 +514,38 @@ td {
   border-color: #f0aaa4;
   background: #fff1f0;
   color: var(--red);
+}
+
+.legacy-chip {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f8faf8;
+  color: var(--text-muted);
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.remote-review-row {
+  background: #fffafa;
+}
+
+.remote-select {
+  border-color: #f0aaa4;
+}
+
+.next-action {
+  display: grid;
+  gap: 8px;
+}
+
+.next-action strong {
+  color: #26313d;
+  font-size: 0.84rem;
 }
 
 .flow-workspace {

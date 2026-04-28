@@ -1,24 +1,34 @@
 # Documentation Index
 
-This directory contains human-facing notes for the public ADK/A2A skill extract.
+This directory contains human-facing notes for the Agent Factory workbench.
+
+## Workbench Plans
+
+- [Implementation plan](./agent-factory-implementation-plan.md)
+- [Phase 1 requirement intake workbench plan](./phase-1-requirement-intake-workbench-plan.md)
+- [Evolution plan](./banking-agent-factory-evolution-plan.md)
 
 ## Concepts
 
 - [ADK A2A agent generation](./concepts/adk-a2a-agent-generation.md)
-  Explains the reasoning model behind the skill: specialist-first boundaries, shared reuse, ADK workflow composition, and A2A escalation.
+  Explains why local workflow and independent Remote A2A boundaries are reviewed separately.
 
 ## References
 
 - [Target agent architecture](./reference/target-agent-architecture/README.md)
-  Describes the target package shape and boundary taxonomy used by the skill.
+  Describes the Agent, Workflow, Adapter, and Remote A2A module categories.
 
 ## Playbooks
 
 - [Requirement intake workbench](./playbooks/requirement-intake-workbench.md)
-  Describes the Phase 1 local-first workbench for normalizing stakeholder requirements, reviewing module candidates, and exporting registry-ready artifacts.
+  Describes the local-first workbench for normalizing requirements, reviewing module candidates, and exporting artifacts.
+
+## Validation And Scaffolding
+
+- [Artifact validation](./validation.md)
+- [Scaffold bridge](./scaffolding/scaffold-bridge.md)
 
 ## Canonical Sources
 
 - Model-facing working index: [../AGENTS.md](../AGENTS.md)
 - Human-facing overview: [../README.md](../README.md)
-- Skill contract: [../.agents/skills/adk-a2a-agent-generate/SKILL.md](../.agents/skills/adk-a2a-agent-generate/SKILL.md)

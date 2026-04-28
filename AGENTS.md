@@ -2,29 +2,67 @@
 
 ## Repository Role
 
-- This is a public skill-source extract, not a runnable multi-agent application.
-- Keep the repository focused on Codex skill instructions, reference notes, and small templates.
-- Do not add private datasets, deployment scripts, or organization-specific runtime code.
-
-## Read First
-
-- Human overview: `README.md`
-- Documentation index: `docs/README.md`
-- Skill contract: `.agents/skills/adk-a2a-agent-generate/SKILL.md`
-- Target architecture notes: `docs/reference/target-agent-architecture/README.md`
+- This is the primary Agent Factory workbench repository.
+- Treat `packages/web`, `schemas`, `templates`, and `docs` as the active workbench source of truth.
+- Do not treat this repository as only a public skill-source extract.
+- Do not add private banking data, private endpoints, credentials, deployment scripts, or organization-specific runtime code.
+- Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
 
 ## Source Of Truth Map
 
+- `README.md`: human-facing workbench overview and taxonomy contract.
 - `AGENTS.md`: model-facing repository index and working rules.
-- `.agents/skills/adk-a2a-agent-generate/SKILL.md`: executable workflow contract.
-- `.agents/skills/adk-a2a-agent-generate/references/`: detailed skill-local rules.
-- `.agents/skills/adk-a2a-agent-generate/assets/`: prompt and scaffold shape assets.
-- `docs/`: human-facing concept and architecture notes.
+- `packages/web`: requirement intake, analysis review, process flow, and artifact export UI.
+- `schemas`: normalized requirement, module candidate, and process-flow schemas.
+- `templates`: generic artifact and scaffold-plan templates.
+- `docs`: validation, scaffold bridge, and design notes.
+
+## Current Taxonomy
+
+Top-level `module_category` values:
+
+- `agent`
+- `workflow`
+- `adapter`
+- `remote_a2a`
+
+Adapter `adapter_kind` values:
+
+- `legacy_api`
+- `retrieval`
+- `rule_registry`
+- `data_query`
+- `template`
+- `computation`
+- `external_service`
+- `unknown`
+
+Definitions:
+
+- Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
+- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
+- Adapter: callable capability used by agents or workflows.
+- Remote A2A: independent remote agent boundary with protocol-level contract.
+
+Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
 
 ## Editing Rules
 
-- Keep `SKILL.md` concise.
-- Put detailed decision rules in `references/`.
-- Keep public examples generic and domain-neutral.
-- Use Google ADK and A2A terminology only when it maps to public documentation.
-- Do not introduce private environment names, private endpoints, or vendor-specific internal tooling.
+- Keep changes scoped to the requested workbench behavior.
+- Do not introduce abstractions, configuration, or extensibility unless the present task requires it.
+- Preserve legacy migration data with `legacy_recommended_type`; do not use it as the primary classifier.
+- Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
+- Scaffolding must consume approved artifacts, not raw user requests.
+- Future scaffold work should use approved `scaffold-plan.json` and `implementation-handoff.md` only.
+
+## Verification
+
+- After TypeScript, React, analyzer, or export changes, run:
+
+```bash
+cd packages/web
+npm run build
+```
+
+- If dependency installation is needed, run `npm install` in `packages/web` before the build.
+- Do not call work complete without observable verification.
