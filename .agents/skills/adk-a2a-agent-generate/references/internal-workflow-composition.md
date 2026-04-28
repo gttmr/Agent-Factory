@@ -1,6 +1,6 @@
 # Internal Workflow Composition
 
-Use internal ADK workflow when the selected boundary needs deterministic control flow.
+Use workflow fields when the selected boundary needs deterministic control flow.
 
 Patterns:
 
@@ -10,7 +10,7 @@ Patterns:
 
 Rules:
 
-- Keep internal workflow inside the selected agent boundary.
-- Do not convert internal workflow into remote A2A unless the dependency is independently owned or hosted.
-- Record the workflow in `classification.internal_workflow`.
+- If `module_category` is `agent`, keep deterministic workflow inside the selected agent boundary and record it in `classification.internal_workflow`.
+- If `module_category` is `workflow`, the workflow itself is the selected deliverable. Record its pattern and reuse bindings without inventing a new reasoning owner.
+- Do not convert workflow into remote A2A unless the dependency is independently owned or hosted.
 - Preserve TODOs for business logic that is not implemented yet.

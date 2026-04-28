@@ -7,7 +7,7 @@ Convert a requirement into artifacts in this order:
 3. Boundary classification
 4. Commonization notes
 5. Implementation handoff
-6. Optional scaffold files
+6. Optional scaffold-plan and implementation-handoff artifacts
 
 Do not start by writing application code. First make the boundary, reuse, workflow, and A2A decisions explicit.
 

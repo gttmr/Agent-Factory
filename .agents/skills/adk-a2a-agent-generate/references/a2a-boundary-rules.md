@@ -14,7 +14,7 @@ Evidence against A2A:
 
 - the dependency is just a local function or API call
 - the workflow is only a sequence of local steps
-- the reusable unit is better modeled as a tool adapter
+- the reusable unit is better modeled as an adapter
 - the target has no independent lifecycle
 
 When A2A is required, record:
