@@ -1,8 +1,12 @@
 {
-  "template_id": "adk-a2a-main-model-classification-v1",
-  "purpose": "Classify one agent request into an ADK/A2A boundary decision.",
+  "template_id": "adk-a2a-main-model-classification-v2",
+  "purpose": "Classify one boundary request into an ADK/A2A module decision.",
   "required_output_fields": [
-    "recommended_shape",
+    "module_category",
+    "agent_kind",
+    "adapter_kind",
+    "registry_kind",
+    "legacy_recommended_type",
     "reuse_bindings",
     "shared_registration_proposals",
     "retrofit_actions",
@@ -12,10 +16,50 @@
     "reasoning_summary",
     "todo"
   ],
-  "shape_options": [
-    "Specialist Agent",
-    "Shared Agent",
-    "Tool/Adapter",
-    "Metadata Registry"
+  "module_category_options": [
+    "agent",
+    "workflow",
+    "adapter",
+    "remote_a2a"
+  ],
+  "agent_kind_options": [
+    "specialist",
+    "shared",
+    null
+  ],
+  "adapter_kind_options": [
+    "legacy_api",
+    "retrieval",
+    "rule_registry",
+    "data_query",
+    "template",
+    "computation",
+    "external_service",
+    "unknown",
+    null
+  ],
+  "registry_kind_options": [
+    "routing_table",
+    "capability_catalog",
+    "schema_registry",
+    "policy_metadata",
+    "configuration",
+    "unknown",
+    null
+  ],
+  "legacy_recommended_type_options": [
+    "specialist_agent",
+    "shared_agent",
+    "tool_adapter",
+    "knowledge_retrieval",
+    "metadata_registry",
+    "internal_workflow",
+    "remote_a2a_contract",
+    null
+  ],
+  "guardrails": [
+    "Use remote_a2a only when crossing an independent remote agent boundary.",
+    "Treat legacy APIs, retrieval, rule registries, data queries, templates, computation, and external services as adapter capabilities.",
+    "Use registry_kind only when adapter_kind is rule_registry; otherwise set registry_kind to null."
   ]
 }
