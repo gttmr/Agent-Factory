@@ -240,6 +240,6 @@ After a loan consultation, prepare a follow-up checklist, identify missing docum
 
 The rule registry only stores checklist policy. It should not decide how to communicate with the customer or interpret consultation context.
 
-## remote_a2a_contract Decision
+## Remote A2A Decision
 
-remote_a2a_contract is required for the document-review dependency because it is independently exposed as a remote agent with its own owner, lifecycle, and Agent Card. Reminder drafting remains local to the shared follow-up agent.
+Remote A2A is required for the document-review dependency because it is independently exposed as a remote agent with its own owner, lifecycle, and Agent Card. Reminder drafting remains local to the shared follow-up agent.

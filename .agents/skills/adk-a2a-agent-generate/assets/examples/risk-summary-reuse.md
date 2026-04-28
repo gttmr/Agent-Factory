@@ -174,6 +174,6 @@ Define a reusable public risk indicator adapter that can feed case review workfl
 
 The adapter fetches public indicators and the template formats output. Neither has independent reasoning ownership or a lifecycle that justifies an agent boundary.
 
-## remote_a2a_contract Decision
+## Remote A2A Decision
 
-remote_a2a_contract is not required because this module is a local adapter. If a separately hosted risk-analysis agent later exposes an Agent Card and protocol contract, this decision should be revisited.
+Remote A2A is not required because this module is a local adapter. If a separately hosted risk-analysis agent later exposes an Agent Card and protocol contract, this decision should be revisited.

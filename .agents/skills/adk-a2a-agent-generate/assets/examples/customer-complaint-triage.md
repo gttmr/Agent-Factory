@@ -137,6 +137,6 @@ Define a deterministic complaint triage workflow that summarizes a customer comp
 
 The FAQ lookup does not own judgment, memory, lifecycle, or policy. It retrieves supporting evidence for the triage workflow.
 
-## remote_a2a_contract Decision
+## Remote A2A Decision
 
-remote_a2a_contract is not required because the dependency is a local retrieval adapter, and no independent remote agent boundary is identified.
+Remote A2A is not required because the dependency is a local retrieval adapter, and no independent remote agent boundary is identified.
