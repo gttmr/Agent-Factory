@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/module-candidate.schema.json",
+  "title": "Module Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source_requirement_id",
+    "name",
+    "recommended_type",
+    "confidence",
+    "rationale",
+    "inputs",
+    "outputs",
+    "reuse_candidate",
+    "risk_level",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^mod-[a-z0-9-]+$",
+      "examples": ["mod-001"]
+    },
+    "source_requirement_id": {
+      "type": "string",
+      "pattern": "^req-[a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recommended_type": {
+      "$ref": "#/$defs/moduleType"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "reuse_candidate": {
+      "type": "boolean"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["needs_review", "approved", "deferred", "rejected"]
+    }
+  },
+  "$defs": {
+    "moduleType": {
+      "type": "string",
+      "enum": [
+        "tool_adapter",
+        "knowledge_retrieval",
+        "internal_workflow",
+        "specialist_agent",
+        "shared_agent",
+        "metadata_registry",
+        "remote_a2a_contract"
+      ]
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "req-001",
+  "title": "Customer complaint triage agent",
+  "raw_text": "We need a customer complaint triage agent that reads incoming complaint text, checks the customer profile when an identifier is present, looks up response guidance, classifies the issue, and recommends the next step. The team also wants reusable routing rules because other support workflows may need the same priority thresholds later. The exact complaint taxonomy is not final. System access is still unknown.",
+  "domain": "customer-service",
+  "requester": {
+    "team": "example-operations",
+    "role": "business-user"
+  },
+  "business_goal": "Reduce manual effort and inconsistency in complaint triage.",
+  "current_process": [
+    "Read incoming complaint text",
+    "Check customer profile when an identifier is available",
+    "Look up response guidance",
+    "Classify the issue type",
+    "Recommend the next step"
+  ],
+  "inputs": [
+    {
+      "name": "complaint_text",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "customer_id",
+      "type": "string",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "triage_category",
+      "type": "string"
+    },
+    {
+      "name": "recommended_next_step",
+      "type": "string"
+    },
+    {
+      "name": "draft_response_outline",
+      "type": "text"
+    }
+  ],
+  "systems": [
+    {
+      "name": "customer_profile_system",
+      "access": "unknown"
+    },
+    {
+      "name": "response_template_library",
+      "access": "unknown"
+    }
+  ],
+  "risk_signals": [
+    "customer_impact",
+    "personal_data"
+  ],
+  "missing_information": [
+    "Exact complaint category taxonomy",
+    "Customer profile system access method"
+  ],
+  "contradictions": [],
+  "status": "draft"
+}

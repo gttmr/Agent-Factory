@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/normalized-requirement.schema.json",
+  "title": "Normalized Requirement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "raw_text",
+    "domain",
+    "requester",
+    "business_goal",
+    "current_process",
+    "inputs",
+    "outputs",
+    "systems",
+    "risk_signals",
+    "missing_information",
+    "contradictions",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^req-[a-z0-9-]+$",
+      "examples": ["req-001"]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "examples": ["Customer complaint triage workbench"]
+    },
+    "raw_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "examples": ["customer-service"]
+    },
+    "requester": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team", "role"],
+      "properties": {
+        "team": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["example-operations"]
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["business-user"]
+        }
+      }
+    },
+    "business_goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "current_process": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "systems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/system"
+      }
+    },
+    "risk_signals": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [["customer_impact", "personal_data"]]
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "reviewed", "approved", "rejected"],
+      "default": "draft"
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["text", "string", "object"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "access"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "access": {
+          "type": "string",
+          "enum": ["unknown", "read", "write", "read_write", "not_required"]
+        }
+      }
+    }
+  }
+}

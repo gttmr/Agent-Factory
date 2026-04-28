@@ -1,0 +1,140 @@
+[
+  {
+    "id": "mod-001",
+    "source_requirement_id": "req-001",
+    "name": "customer_profile_lookup",
+    "recommended_type": "tool_adapter",
+    "confidence": 0.82,
+    "rationale": "Checking a customer profile is a deterministic system lookup with clear input and output data.",
+    "inputs": [
+      {
+        "name": "customer_id",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "customer_profile",
+        "type": "object"
+      }
+    ],
+    "reuse_candidate": true,
+    "risk_level": "medium",
+    "status": "needs_review"
+  },
+  {
+    "id": "mod-002",
+    "source_requirement_id": "req-001",
+    "name": "response_guidance_retrieval",
+    "recommended_type": "knowledge_retrieval",
+    "confidence": 0.78,
+    "rationale": "Looking up response guidance is a retrieval capability over reusable support knowledge.",
+    "inputs": [
+      {
+        "name": "complaint_text",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "guidance_summary",
+        "type": "text"
+      },
+      {
+        "name": "citations",
+        "type": "array"
+      }
+    ],
+    "reuse_candidate": true,
+    "risk_level": "medium",
+    "status": "needs_review"
+  },
+  {
+    "id": "mod-003",
+    "source_requirement_id": "req-001",
+    "name": "complaint_triage_workflow",
+    "recommended_type": "internal_workflow",
+    "confidence": 0.76,
+    "rationale": "The request describes ordered steps inside one triage boundary.",
+    "inputs": [
+      {
+        "name": "complaint_text",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "customer_profile",
+        "type": "object",
+        "required": false
+      },
+      {
+        "name": "guidance_summary",
+        "type": "text",
+        "required": false
+      }
+    ],
+    "outputs": [
+      {
+        "name": "triage_context",
+        "type": "object"
+      }
+    ],
+    "reuse_candidate": false,
+    "risk_level": "medium",
+    "status": "needs_review"
+  },
+  {
+    "id": "mod-004",
+    "source_requirement_id": "req-001",
+    "name": "complaint_triage_specialist",
+    "recommended_type": "specialist_agent",
+    "confidence": 0.8,
+    "rationale": "The capability combines context, retrieval, and judgment to recommend a next step.",
+    "inputs": [
+      {
+        "name": "triage_context",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "triage_category",
+        "type": "string"
+      },
+      {
+        "name": "recommended_next_step",
+        "type": "string"
+      }
+    ],
+    "reuse_candidate": false,
+    "risk_level": "medium",
+    "status": "needs_review"
+  },
+  {
+    "id": "mod-005",
+    "source_requirement_id": "req-001",
+    "name": "support_routing_rules",
+    "recommended_type": "metadata_registry",
+    "confidence": 0.72,
+    "rationale": "Reusable priority thresholds and routing rules are structured operating metadata.",
+    "inputs": [
+      {
+        "name": "triage_category",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "routing_decision",
+        "type": "object"
+      }
+    ],
+    "reuse_candidate": true,
+    "risk_level": "low",
+    "status": "needs_review"
+  }
+]

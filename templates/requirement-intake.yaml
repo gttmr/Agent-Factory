@@ -1,0 +1,17 @@
+title: Customer complaint triage agent
+domain_hint: customer-service
+requester:
+  team: example-operations
+  role: business-user
+known_systems:
+  - customer_profile_system
+  - response_template_library
+expected_output: triage category, recommended next step, and draft response outline
+raw_text: |
+  We need a customer complaint triage agent that reads incoming complaint text,
+  checks the customer profile when an identifier is present, looks up response
+  guidance, classifies the issue, and recommends the next step. The team also
+  wants reusable routing rules because other support workflows may need the same
+  priority thresholds later.
+
+  The exact complaint taxonomy is not final. System access is still unknown.

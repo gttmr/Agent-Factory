@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/process-flow.schema.json",
+  "title": "Process Flow",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requirement_id", "nodes", "edges"],
+  "properties": {
+    "requirement_id": {
+      "type": "string",
+      "pattern": "^req-[a-z0-9-]+$"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    }
+  },
+  "$defs": {
+    "moduleType": {
+      "type": "string",
+      "enum": [
+        "input",
+        "output",
+        "tool_adapter",
+        "knowledge_retrieval",
+        "internal_workflow",
+        "specialist_agent",
+        "shared_agent",
+        "metadata_registry",
+        "remote_a2a_contract"
+      ]
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "$ref": "#/$defs/moduleType"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "data"],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_type": {
+          "type": "string",
+          "enum": ["local", "remote_a2a"],
+          "default": "local"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "requirement_id": "req-001",
+  "nodes": [
+    {
+      "id": "complaint_text",
+      "label": "complaint_text",
+      "type": "input"
+    },
+    {
+      "id": "customer_id",
+      "label": "customer_id",
+      "type": "input"
+    },
+    {
+      "id": "mod-001",
+      "label": "customer_profile_lookup",
+      "type": "tool_adapter"
+    },
+    {
+      "id": "mod-002",
+      "label": "response_guidance_retrieval",
+      "type": "knowledge_retrieval"
+    },
+    {
+      "id": "mod-003",
+      "label": "complaint_triage_workflow",
+      "type": "internal_workflow"
+    },
+    {
+      "id": "mod-004",
+      "label": "complaint_triage_specialist",
+      "type": "specialist_agent"
+    },
+    {
+      "id": "mod-005",
+      "label": "support_routing_rules",
+      "type": "metadata_registry"
+    },
+    {
+      "id": "recommended_next_step",
+      "label": "recommended_next_step",
+      "type": "output"
+    }
+  ],
+  "edges": [
+    {
+      "from": "customer_id",
+      "to": "mod-001",
+      "data": "lookup key",
+      "edge_type": "local"
+    },
+    {
+      "from": "complaint_text",
+      "to": "mod-002",
+      "data": "retrieval query",
+      "edge_type": "local"
+    },
+    {
+      "from": "complaint_text",
+      "to": "mod-003",
+      "data": "raw complaint text",
+      "edge_type": "local"
+    },
+    {
+      "from": "mod-001",
+      "to": "mod-003",
+      "data": "customer profile",
+      "edge_type": "local"
+    },
+    {
+      "from": "mod-002",
+      "to": "mod-003",
+      "data": "response guidance",
+      "edge_type": "local"
+    },
+    {
+      "from": "mod-003",
+      "to": "mod-004",
+      "data": "triage context",
+      "edge_type": "local"
+    },
+    {
+      "from": "mod-004",
+      "to": "mod-005",
+      "data": "triage category",
+      "edge_type": "local"
+    },
+    {
+      "from": "mod-005",
+      "to": "recommended_next_step",
+      "data": "routing decision",
+      "edge_type": "local"
+    }
+  ]
+}
