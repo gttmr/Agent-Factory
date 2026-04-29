@@ -55,8 +55,75 @@ const codexMcpOverrides = [
   "-c",
   "mcp_servers.adk-docs-mcp.enabled=true"
 ];
+const defaultAnalyzerTimeoutMs = 600_000;
 
 type MiddlewareNext = (error?: unknown) => void;
+type AnalyzerProgressPhase = "started" | "cli_event" | "diagnostic" | "completed" | "failed" | "timeout";
+type AnalyzerTraceKind =
+  | "tool_call"
+  | "tool_result"
+  | "assistant_message"
+  | "reasoning_summary"
+  | "lifecycle"
+  | "diagnostic";
+type AnalyzerTraceStatus = "running" | "completed" | "failed" | "timeout" | "info";
+
+interface AnalyzerProgressEvent {
+  phase: AnalyzerProgressPhase;
+  message: string;
+  at: string;
+  elapsedMs: number;
+  model?: string;
+  timeoutMs?: number;
+  inputChars?: number;
+  promptChars?: number;
+  eventCount?: number;
+  eventType?: string;
+  lastEventType?: string;
+  eventTypeCounts?: Record<string, number>;
+  traceKind?: AnalyzerTraceKind;
+  title?: string;
+  snippet?: string;
+  toolName?: string;
+  status?: AnalyzerTraceStatus;
+  durationMs?: number;
+  rawEventType?: string;
+  sequence?: number;
+  lastTraceTitle?: string;
+  lastTraceSnippet?: string;
+}
+
+interface AnalyzerDiagnostics {
+  elapsedMs: number;
+  eventCount: number;
+  lastEventType?: string;
+  eventTypeCounts: Record<string, number>;
+  lastTraceTitle?: string;
+  lastTraceSnippet?: string;
+}
+
+interface ProcessRunResult {
+  stdout: string;
+  stderr: string;
+  diagnostics: AnalyzerDiagnostics;
+}
+
+interface CodexAnalyzerRun {
+  output: unknown;
+  diagnostics: AnalyzerDiagnostics;
+  promptChars: number;
+  timeoutMs: number;
+}
+
+type CodexAnalyzerError = Error & {
+  analyzerPhase: "failed" | "timeout";
+  analyzerDiagnostics: AnalyzerDiagnostics;
+  inputChars?: number;
+  promptChars?: number;
+  timeoutMs?: number;
+  lastTraceTitle?: string;
+  lastTraceSnippet?: string;
+};
 
 export function createCodexAnalyzerMiddleware(repoRoot: string) {
   const schemaPath = resolve(repoRoot, "schemas/analysis-result.schema.json");
@@ -81,6 +148,7 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
         sendJson(res, 400, { error: "허용되지 않은 Codex 모델입니다." });
         return;
       }
+      const streamProgress = shouldStreamProgress(req, body);
       if (isAnalyzing) {
         sendJson(res, 409, { error: "이미 Codex CLI 분석이 진행 중입니다. 완료 후 다시 실행하세요." });
         return;
@@ -88,7 +156,13 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
 
       isAnalyzing = true;
       try {
-        const result = normalizeAnalysisResult(await runCodexAnalyzer({ repoRoot, schemaPath, input, model }));
+        if (streamProgress) {
+          await runStreamingAnalysis({ repoRoot, schemaPath, input, model, res });
+          return;
+        }
+
+        const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model });
+        const result = normalizeAnalysisResult(run.output);
         const errors = validateAnalysisResult(result);
         if (errors.length) {
           console.error("[codex-analyzer] 응답 검증 실패:", errors);
@@ -96,6 +170,13 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
           return;
         }
 
+        logAnalyzerDiagnostics("completed", {
+          model,
+          inputChars: countInputChars(input),
+          promptChars: run.promptChars,
+          timeoutMs: run.timeoutMs,
+          diagnostics: run.diagnostics
+        });
         sendJson(res, 200, result);
       } finally {
         isAnalyzing = false;
@@ -115,24 +196,139 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
   };
 }
 
-async function runCodexAnalyzer({
+async function runStreamingAnalysis({
   repoRoot,
   schemaPath,
   input,
-  model
+  model,
+  res
 }: {
   repoRoot: string;
   schemaPath: string;
   input: Record<string, unknown>;
   model: string;
+  res: ServerResponse;
 }) {
+  const writeProgress = createProgressStream(res);
+
+  try {
+    const run = await runCodexAnalyzer({
+      repoRoot,
+      schemaPath,
+      input,
+      model,
+      onProgress: writeProgress
+    });
+    const result = normalizeAnalysisResult(run.output);
+    const errors = validateAnalysisResult(result);
+    if (errors.length) {
+      console.error("[codex-analyzer] 응답 검증 실패:", errors);
+      writeProgress({
+        phase: "failed",
+        message: `Codex CLI 응답 검증 실패: ${errors.join("; ")}`,
+        at: new Date().toISOString(),
+        elapsedMs: run.diagnostics.elapsedMs,
+        model,
+        timeoutMs: run.timeoutMs,
+        eventCount: run.diagnostics.eventCount,
+        lastEventType: run.diagnostics.lastEventType,
+        eventTypeCounts: run.diagnostics.eventTypeCounts,
+        traceKind: "diagnostic",
+        title: "검증 실패",
+        snippet: run.diagnostics.lastTraceSnippet,
+        status: "failed",
+        lastTraceTitle: run.diagnostics.lastTraceTitle,
+        lastTraceSnippet: run.diagnostics.lastTraceSnippet
+      });
+      return;
+    }
+
+    const completed: AnalyzerProgressEvent & { result: unknown } = {
+      phase: "completed",
+      message: "Codex CLI 분석이 완료되었습니다.",
+      at: new Date().toISOString(),
+      elapsedMs: run.diagnostics.elapsedMs,
+      model,
+      timeoutMs: run.timeoutMs,
+      promptChars: run.promptChars,
+      inputChars: countInputChars(input),
+      eventCount: run.diagnostics.eventCount,
+      lastEventType: run.diagnostics.lastEventType,
+      eventTypeCounts: run.diagnostics.eventTypeCounts,
+      traceKind: "lifecycle",
+      title: "분석 완료",
+      status: "completed",
+      lastTraceTitle: run.diagnostics.lastTraceTitle,
+      lastTraceSnippet: run.diagnostics.lastTraceSnippet,
+      result
+    };
+    logAnalyzerDiagnostics("completed", {
+      model,
+      inputChars: completed.inputChars,
+      promptChars: run.promptChars,
+      timeoutMs: run.timeoutMs,
+      diagnostics: run.diagnostics
+    });
+    writeProgress(completed);
+  } catch (error) {
+    const progress = progressFromError(error, model);
+    console.error("[codex-analyzer] 분석 실패:", error);
+    logAnalyzerDiagnostics(progress.phase, {
+      model,
+      inputChars: countInputChars(input),
+      timeoutMs: progress.timeoutMs,
+      promptChars: progress.promptChars,
+      diagnostics: {
+        elapsedMs: progress.elapsedMs,
+        eventCount: progress.eventCount ?? 0,
+        lastEventType: progress.lastEventType,
+        eventTypeCounts: progress.eventTypeCounts ?? {},
+        lastTraceTitle: progress.lastTraceTitle,
+        lastTraceSnippet: progress.lastTraceSnippet
+      }
+    });
+    writeProgress(progress);
+  } finally {
+    res.end();
+  }
+}
+
+async function runCodexAnalyzer({
+  repoRoot,
+  schemaPath,
+  input,
+  model,
+  onProgress
+}: {
+  repoRoot: string;
+  schemaPath: string;
+  input: Record<string, unknown>;
+  model: string;
+  onProgress?: (event: AnalyzerProgressEvent) => void;
+}): Promise<CodexAnalyzerRun> {
   const runDir = join(tmpdir(), `agent-factory-codex-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await mkdir(runDir, { recursive: true });
   const outputPath = join(runDir, "analysis-result.json");
   const prompt = buildPrompt(input);
+  const timeoutMs = getAnalyzerTimeoutMs();
+  const startedAt = Date.now();
+
+  onProgress?.({
+    phase: "started",
+    message: "Codex CLI 분석을 시작했습니다.",
+    at: new Date().toISOString(),
+    elapsedMs: 0,
+    model,
+    timeoutMs,
+    inputChars: countInputChars(input),
+    promptChars: prompt.length,
+    traceKind: "lifecycle",
+    title: "분석 시작",
+    status: "running"
+  });
 
   try {
-    const { stdout, stderr } = await runProcess(
+    const { stdout, stderr, diagnostics } = await runProcess(
       "codex",
       [
         ...codexMcpOverrides,
@@ -146,6 +342,7 @@ async function runCodexAnalyzer({
         "never",
         "exec",
         "--ephemeral",
+        "--json",
         "--output-schema",
         schemaPath,
         "--output-last-message",
@@ -153,15 +350,57 @@ async function runCodexAnalyzer({
         "-"
       ],
       prompt,
-      180_000
+      {
+        timeoutMs,
+        startedAt,
+        model,
+        onProgress
+      }
     );
 
     const outputText = await readFile(outputPath, "utf8").catch(() => stdout);
     try {
-      return parseJsonObject(outputText);
+      const output = parseJsonObject(outputText);
+      onProgress?.({
+        phase: "diagnostic",
+        message: "Codex CLI 실행 계측을 수집했습니다.",
+        at: new Date().toISOString(),
+        elapsedMs: diagnostics.elapsedMs,
+        model,
+        timeoutMs,
+        inputChars: countInputChars(input),
+        promptChars: prompt.length,
+        eventCount: diagnostics.eventCount,
+        lastEventType: diagnostics.lastEventType,
+        eventTypeCounts: diagnostics.eventTypeCounts,
+        traceKind: "diagnostic",
+        title: "실행 계측 수집",
+        status: "info",
+        lastTraceTitle: diagnostics.lastTraceTitle,
+        lastTraceSnippet: diagnostics.lastTraceSnippet
+      });
+      return {
+        output,
+        diagnostics,
+        promptChars: prompt.length,
+        timeoutMs
+      };
     } catch {
-      throw new Error(`Codex CLI가 JSON 응답을 반환하지 않았습니다. ${stderr || stdout}`.trim());
+      throw createAnalyzerError(
+        "failed",
+        `Codex CLI가 JSON 응답을 반환하지 않았습니다. ${stderr || stdout}`.trim(),
+        {
+          ...diagnostics,
+          timeoutMs
+        }
+      );
     }
+  } catch (error) {
+    if (isAnalyzerError(error)) {
+      error.inputChars = countInputChars(input);
+      error.promptChars = prompt.length;
+    }
+    throw error;
   } finally {
     await rm(runDir, { recursive: true, force: true });
   }
@@ -206,34 +445,593 @@ function buildPrompt(input: Record<string, unknown>): string {
   ].join("\n");
 }
 
-function runProcess(command: string, args: string[], input: string, timeoutMs: number) {
-  return new Promise<{ stdout: string; stderr: string }>((resolvePromise, reject) => {
+function runProcess(
+  command: string,
+  args: string[],
+  input: string,
+  {
+    timeoutMs,
+    startedAt,
+    model,
+    onProgress
+  }: {
+    timeoutMs: number;
+    startedAt: number;
+    model: string;
+    onProgress?: (event: AnalyzerProgressEvent) => void;
+  }
+) {
+  return new Promise<ProcessRunResult>((resolvePromise, reject) => {
     const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
+    const eventTypeCounts: Record<string, number> = {};
+    let stdoutBuffer = "";
+    let eventCount = 0;
+    let lastEventType: string | undefined;
+    let lastTraceTitle: string | undefined;
+    let lastTraceSnippet: string | undefined;
+    let settled = false;
+
+    const emitCliLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return;
+      }
+      eventCount += 1;
+      const event = summarizeCliEvent(trimmed, eventCount);
+      lastEventType = event.rawEventType;
+      eventTypeCounts[event.rawEventType] = (eventTypeCounts[event.rawEventType] ?? 0) + 1;
+      if (!event.traceKind) {
+        return;
+      }
+      lastTraceTitle = event.title;
+      lastTraceSnippet = event.snippet;
+      onProgress?.({
+        phase: "cli_event",
+        message: event.message,
+        at: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt,
+        model,
+        timeoutMs,
+        eventCount,
+        eventType: event.rawEventType,
+        lastEventType,
+        eventTypeCounts: { ...eventTypeCounts },
+        traceKind: event.traceKind,
+        title: event.title,
+        snippet: event.snippet,
+        toolName: event.toolName,
+        status: event.status,
+        durationMs: event.durationMs,
+        rawEventType: event.rawEventType,
+        sequence: event.sequence,
+        lastTraceTitle,
+        lastTraceSnippet
+      });
+    };
+
+    const flushStdoutBuffer = () => {
+      const remaining = stdoutBuffer.trim();
+      stdoutBuffer = "";
+      if (remaining) {
+        emitCliLine(remaining);
+      }
+    };
+
     const timer = setTimeout(() => {
+      settled = true;
       child.kill("SIGTERM");
-      reject(new Error("Codex CLI 분석 시간이 초과되었습니다."));
+      reject(
+        createAnalyzerError(
+          "timeout",
+          `Codex CLI 분석 시간이 초과되었습니다. 제한 ${formatDuration(timeoutMs)}, 경과 ${formatDuration(
+            Date.now() - startedAt
+          )}, 마지막 활동 ${lastTraceTitle ?? lastEventType ?? "없음"}.`,
+          {
+            elapsedMs: Date.now() - startedAt,
+            timeoutMs,
+            eventCount,
+            lastEventType,
+            eventTypeCounts: { ...eventTypeCounts },
+            lastTraceTitle,
+            lastTraceSnippet
+          }
+        )
+      );
     }, timeoutMs);
 
-    child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
+      stdoutBuffer += chunk.toString("utf8");
+      let newlineIndex = stdoutBuffer.indexOf("\n");
+      while (newlineIndex !== -1) {
+        const line = stdoutBuffer.slice(0, newlineIndex);
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        emitCliLine(line);
+        newlineIndex = stdoutBuffer.indexOf("\n");
+      }
+    });
     child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
     child.on("error", (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       clearTimeout(timer);
       reject(error);
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      const stdout = Buffer.concat(stdoutChunks).toString("utf8");
-      const stderr = Buffer.concat(stderrChunks).toString("utf8");
-      if (code === 0) {
-        resolvePromise({ stdout, stderr });
+      if (settled) {
         return;
       }
-      reject(new Error(`Codex CLI 분석 실패(code ${code ?? "unknown"}): ${stderr || stdout}`.trim()));
+      settled = true;
+      clearTimeout(timer);
+      flushStdoutBuffer();
+      const stdout = Buffer.concat(stdoutChunks).toString("utf8");
+      const stderr = Buffer.concat(stderrChunks).toString("utf8");
+      const diagnostics = {
+        elapsedMs: Date.now() - startedAt,
+        eventCount,
+        lastEventType,
+        eventTypeCounts: { ...eventTypeCounts },
+        lastTraceTitle,
+        lastTraceSnippet
+      };
+      if (code === 0) {
+        resolvePromise({ stdout, stderr, diagnostics });
+        return;
+      }
+      reject(
+        createAnalyzerError(
+          "failed",
+          `Codex CLI 분석 실패(code ${code ?? "unknown"}): ${stderr || stdout}`.trim(),
+          {
+            ...diagnostics,
+            timeoutMs
+          }
+        )
+      );
     });
 
     child.stdin.end(input);
+  });
+}
+
+interface CliTraceEvent {
+  rawEventType: string;
+  message: string;
+  traceKind?: AnalyzerTraceKind;
+  title?: string;
+  snippet?: string;
+  toolName?: string;
+  status?: AnalyzerTraceStatus;
+  durationMs?: number;
+  sequence: number;
+}
+
+function summarizeCliEvent(line: string, sequence: number): CliTraceEvent {
+  const parsed = parseJsonLine(line);
+  const rawEventType = getCliEventType(parsed);
+  const trace = normalizeCliTrace(parsed, rawEventType);
+  return {
+    rawEventType,
+    sequence,
+    message: trace?.message ?? getCliEventMessage(rawEventType),
+    ...trace
+  };
+}
+
+function parseJsonLine(line: string): unknown {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return null;
+  }
+}
+
+function getCliEventType(value: unknown): string {
+  if (!isRecord(value)) {
+    return "stdout";
+  }
+  for (const key of ["type", "event", "phase"]) {
+    if (typeof value[key] === "string" && value[key]) {
+      return value[key];
+    }
+  }
+  return "unknown";
+}
+
+function getCliEventMessage(eventType: string): string {
+  const normalized = eventType.toLowerCase();
+  if (normalized.includes("session") && normalized.includes("start")) return "Codex CLI 세션을 시작했습니다.";
+  if (normalized.includes("turn") && normalized.includes("start")) return "분석 턴을 시작했습니다.";
+  if (normalized.includes("tool") || normalized.includes("mcp") || normalized.includes("exec")) {
+    return "분석에 필요한 도구 이벤트를 처리했습니다.";
+  }
+  if (normalized.includes("message") || normalized.includes("response")) return "모델 응답 이벤트를 수신했습니다.";
+  if (normalized.includes("complete") || normalized.includes("finish")) return "Codex CLI 이벤트가 완료 상태를 보고했습니다.";
+  if (eventType === "stdout") return "Codex CLI 텍스트 출력을 수신했습니다.";
+  return `Codex CLI 이벤트를 수신했습니다: ${eventType}`;
+}
+
+function normalizeCliTrace(
+  parsed: unknown,
+  rawEventType: string
+): Omit<CliTraceEvent, "rawEventType" | "sequence"> | null {
+  if (!isRecord(parsed)) {
+    return {
+      traceKind: "diagnostic",
+      title: "CLI 텍스트 출력",
+      snippet: summarizeText(String(parsed ?? "")),
+      message: "Codex CLI 텍스트 출력을 수신했습니다.",
+      status: "info"
+    };
+  }
+
+  const normalizedType = rawEventType.toLowerCase();
+  const item = getRecordField(parsed, "item") ?? getRecordField(parsed, "payload") ?? getRecordField(parsed, "data");
+  const hasStructuredItem = Boolean(item);
+  const candidate = isRecord(item) ? item : parsed;
+  const candidateType = getFirstString(candidate, ["type", "kind", "name"]).toLowerCase();
+
+  const toolTrace = normalizeToolTrace(parsed, candidate, normalizedType, candidateType);
+  if (toolTrace) {
+    return toolTrace;
+  }
+
+  const summaryText = findReasoningSummarySnippet(parsed);
+  if (summaryText) {
+    return {
+      traceKind: "reasoning_summary",
+      title: "Reasoning 요약",
+      snippet: summaryText,
+      message: "Reasoning 요약을 수신했습니다.",
+      status: normalizedType.includes("completed") ? "completed" : "info"
+    };
+  }
+  if (normalizedType.includes("reasoning")) {
+    return null;
+  }
+
+  if (normalizedType.includes("error") || normalizedType.includes("failed")) {
+    return {
+      traceKind: "diagnostic",
+      title: "CLI 오류",
+      snippet: summarizeText(getFirstString(parsed, ["message", "error", "details"])),
+      message: "Codex CLI 오류 이벤트를 수신했습니다.",
+      status: "failed"
+    };
+  }
+
+  if (!hasStructuredItem && (normalizedType.includes("complete") || normalizedType.includes("finish"))) {
+    return {
+      traceKind: "lifecycle",
+      title: "내부 단계 완료",
+      message: "Codex CLI 내부 단계가 완료되었습니다.",
+      status: "completed"
+    };
+  }
+
+  if (!hasStructuredItem && normalizedType.includes("started")) {
+    return {
+      traceKind: "lifecycle",
+      title: "내부 단계 진행 중",
+      message: "Codex CLI 내부 단계가 진행 중입니다.",
+      status: "running"
+    };
+  }
+
+  const assistantText = findAssistantSnippet(parsed);
+  if (assistantText) {
+    return {
+      traceKind: "assistant_message",
+      title: "모델 메모",
+      snippet: assistantText,
+      message: "모델 메시지를 수신했습니다.",
+      status: normalizedType.includes("completed") ? "completed" : "info"
+    };
+  }
+
+  return null;
+}
+
+function normalizeToolTrace(
+  parsed: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+  normalizedType: string,
+  candidateType: string
+): Omit<CliTraceEvent, "rawEventType" | "sequence"> | null {
+  const looksLikeTool =
+    normalizedType.includes("tool") ||
+    normalizedType.includes("mcp") ||
+    normalizedType.includes("exec") ||
+    normalizedType.includes("dynamic_tool_call") ||
+    candidateType.includes("tool") ||
+    candidateType.includes("function_call") ||
+    candidateType.includes("exec");
+
+  if (!looksLikeTool) {
+    return null;
+  }
+
+  const isResult =
+    normalizedType.includes("completed") ||
+    normalizedType.includes("result") ||
+    normalizedType.includes("output") ||
+    candidateType.includes("output") ||
+    candidateType.includes("result");
+  const toolName = findToolName(parsed) || "tool";
+  const snippetSource = isResult ? findToolResultText(parsed) : findToolInputText(parsed);
+  const status: AnalyzerTraceStatus = normalizedType.includes("failed")
+    ? "failed"
+    : isResult
+      ? "completed"
+      : "running";
+
+  return {
+    traceKind: isResult ? "tool_result" : "tool_call",
+    title: isResult ? "툴 결과" : "툴 호출",
+    snippet: summarizeText(snippetSource),
+    toolName,
+    message: isResult ? `${toolName} 결과를 수신했습니다.` : `${toolName} 호출을 시작했습니다.`,
+    status,
+    durationMs: getDurationMs(parsed)
+  };
+}
+
+function findToolName(value: unknown): string {
+  const direct = findFirstStringByKey(value, new Set(["toolName", "tool_name", "name", "command"]));
+  if (direct && direct.length <= 80) {
+    return direct;
+  }
+  return "";
+}
+
+function findToolInputText(value: unknown): string {
+  return (
+    stringifyTraceField(value, new Set(["input", "arguments", "args", "params", "parameters", "command", "cmd"])) ||
+    stringifyTraceField(value, new Set(["item", "payload", "data"]))
+  );
+}
+
+function findToolResultText(value: unknown): string {
+  return (
+    stringifyTraceField(value, new Set(["output", "result", "content", "stdout", "stderr", "error"])) ||
+    stringifyTraceField(value, new Set(["item", "payload", "data"]))
+  );
+}
+
+function findAssistantSnippet(value: unknown): string {
+  return summarizeText(findFirstStringByKey(value, new Set(["message", "text", "delta", "content"]), (key) => {
+    const normalized = key.toLowerCase();
+    return !normalized.includes("reasoning") && !normalized.includes("summary");
+  }));
+}
+
+function findReasoningSummarySnippet(value: unknown): string {
+  return summarizeText(findFirstStringByKey(value, new Set(["reasoning_summary", "summaryTextDelta", "summary_text_delta"])));
+}
+
+function findFirstStringByKey(
+  value: unknown,
+  keys: Set<string>,
+  keyAllowed: (key: string) => boolean = () => true
+): string {
+  if (typeof value === "string") {
+    return "";
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstStringByKey(item, keys, keyAllowed);
+      if (found) return found;
+    }
+    return "";
+  }
+  if (!isRecord(value)) {
+    return "";
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (keys.has(key) && keyAllowed(key)) {
+      if (typeof nested === "string") return nested;
+      if (typeof nested === "number" || typeof nested === "boolean") return String(nested);
+      if (nested !== null && typeof nested === "object") return stringifyForTrace(nested);
+    }
+  }
+  for (const nested of Object.values(value)) {
+    const found = findFirstStringByKey(nested, keys, keyAllowed);
+    if (found) return found;
+  }
+  return "";
+}
+
+function stringifyTraceField(value: unknown, keys: Set<string>): string {
+  const found = findFirstStringByKey(value, keys);
+  return found ? stringifyForTrace(found) : "";
+}
+
+function stringifyForTrace(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function summarizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 360);
+}
+
+function getRecordField(value: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const field = value[key];
+  return isRecord(field) ? field : null;
+}
+
+function getFirstString(value: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    if (typeof value[key] === "string") {
+      return value[key];
+    }
+  }
+  return "";
+}
+
+function getDurationMs(value: Record<string, unknown>): number | undefined {
+  for (const key of ["durationMs", "duration_ms", "elapsedMs", "elapsed_ms"]) {
+    if (typeof value[key] === "number" && Number.isFinite(value[key])) {
+      return value[key];
+    }
+  }
+  return undefined;
+}
+
+function shouldStreamProgress(req: IncomingMessage, body: unknown): boolean {
+  const accept = typeof req.headers.accept === "string" ? req.headers.accept : "";
+  return accept.includes("text/event-stream") || (isRecord(body) && body.streamProgress === true);
+}
+
+function createProgressStream(res: ServerResponse) {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  return (event: AnalyzerProgressEvent & { result?: unknown }) => {
+    res.write(`event: ${event.phase}\n`);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+}
+
+function getAnalyzerTimeoutMs(): number {
+  const raw = process.env.CODEX_ANALYZER_TIMEOUT_MS;
+  if (!raw) {
+    return defaultAnalyzerTimeoutMs;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 1_000) {
+    return defaultAnalyzerTimeoutMs;
+  }
+  return Math.floor(value);
+}
+
+function countInputChars(input: Record<string, unknown>): number {
+  return [
+    input.title,
+    input.domainHint,
+    input.rawText,
+    input.requesterTeam,
+    input.requesterRole,
+    input.knownSystems,
+    input.expectedOutput
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .reduce((total, value) => total + value.length, 0);
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1_000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.round(ms / 1_000);
+  if (seconds < 60) {
+    return `${seconds}초`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds ? `${minutes}분 ${remainingSeconds}초` : `${minutes}분`;
+}
+
+function createAnalyzerError(
+  phase: "failed" | "timeout",
+  message: string,
+  diagnostics: AnalyzerDiagnostics & { timeoutMs?: number }
+) {
+  const error = new Error(message) as CodexAnalyzerError;
+  error.analyzerPhase = phase;
+  error.analyzerDiagnostics = {
+    elapsedMs: diagnostics.elapsedMs,
+    eventCount: diagnostics.eventCount,
+    lastEventType: diagnostics.lastEventType,
+    eventTypeCounts: diagnostics.eventTypeCounts
+  };
+  error.timeoutMs = diagnostics.timeoutMs;
+  error.lastTraceTitle = diagnostics.lastTraceTitle;
+  error.lastTraceSnippet = diagnostics.lastTraceSnippet;
+  return error;
+}
+
+function progressFromError(error: unknown, model: string): AnalyzerProgressEvent {
+  if (isAnalyzerError(error)) {
+    return {
+      phase: error.analyzerPhase,
+      message: error.message,
+      at: new Date().toISOString(),
+      elapsedMs: error.analyzerDiagnostics.elapsedMs,
+      model,
+      timeoutMs: error.timeoutMs,
+      inputChars: error.inputChars,
+      promptChars: error.promptChars,
+      eventCount: error.analyzerDiagnostics.eventCount,
+      lastEventType: error.analyzerDiagnostics.lastEventType,
+      eventTypeCounts: error.analyzerDiagnostics.eventTypeCounts,
+      traceKind: error.analyzerPhase === "timeout" ? "diagnostic" : "diagnostic",
+      title: error.analyzerPhase === "timeout" ? "분석 타임아웃" : "분석 실패",
+      snippet: error.lastTraceSnippet,
+      status: error.analyzerPhase === "timeout" ? "timeout" : "failed",
+      lastTraceTitle: error.lastTraceTitle,
+      lastTraceSnippet: error.lastTraceSnippet
+    };
+  }
+  return {
+    phase: "failed",
+    message: error instanceof Error ? error.message : "Codex CLI 분석을 완료하지 못했습니다.",
+    at: new Date().toISOString(),
+    elapsedMs: 0,
+    model
+  };
+}
+
+function isAnalyzerError(
+  error: unknown
+): error is CodexAnalyzerError {
+  return (
+    error instanceof Error &&
+    isRecord(error) &&
+    (error.analyzerPhase === "failed" || error.analyzerPhase === "timeout") &&
+    isRecord(error.analyzerDiagnostics)
+  );
+}
+
+function logAnalyzerDiagnostics(
+  status: string,
+  {
+    model,
+    inputChars,
+    promptChars,
+    timeoutMs,
+    diagnostics
+  }: {
+    model: string;
+    inputChars?: number;
+    promptChars?: number;
+    timeoutMs?: number;
+    diagnostics: AnalyzerDiagnostics;
+  }
+) {
+  console.info("[codex-analyzer] run diagnostics", {
+    status,
+    model,
+    inputChars,
+    promptChars,
+    timeoutMs,
+    elapsedMs: diagnostics.elapsedMs,
+    eventCount: diagnostics.eventCount,
+    lastEventType: diagnostics.lastEventType,
+    lastTraceTitle: diagnostics.lastTraceTitle,
+    eventTypeCounts: diagnostics.eventTypeCounts
   });
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { AnalysisResult } from "./components/AnalysisResult";
 import { DomainCapabilityMap } from "./components/DomainCapabilityMap";
 import { ExportArtifacts } from "./components/ExportArtifacts";
@@ -6,9 +6,15 @@ import { ModuleReview } from "./components/ModuleReview";
 import { ProcessFlowView } from "./components/ProcessFlowView";
 import { RequirementIntake } from "./components/RequirementIntake";
 import { ReuseHeatmap } from "./components/ReuseHeatmap";
-import { buildProcessFlow, getExampleRequirement } from "./analyzer/mockAnalyzer";
+import { getExampleRequirement } from "./analyzer/mockAnalyzer";
 import { defaultAnalyzerProvider } from "./analyzer/providers";
-import type { AnalysisResult as AnalyzerResult, ModuleCandidate, RequirementIntakeInput } from "./analyzer/types";
+import type {
+  AnalysisResult as AnalyzerResult,
+  AnalyzerProgressEvent,
+  CodexAnalyzerModel,
+  ModuleCandidate,
+  RequirementIntakeInput
+} from "./analyzer/types";
 
 type StepId = "intake" | "analysis" | "modules" | "flow" | "reuse" | "domainMap" | "export";
 
@@ -40,26 +46,34 @@ export default function App() {
   const [acceptedMissing, setAcceptedMissing] = useState<string[]>([]);
   const [validationMessage, setValidationMessage] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzerModel, setAnalyzerModel] = useState<CodexAnalyzerModel>("gpt-5.3-codex-spark");
+  const [analysisProgress, setAnalysisProgress] = useState<AnalyzerProgressEvent[]>([]);
+  const analysisRequestInFlight = useRef(false);
 
-  const processFlow = useMemo(() => {
-    if (!analysis) {
-      return null;
-    }
-    return buildProcessFlow(analysis.normalizedRequirement, moduleCandidates);
-  }, [analysis, moduleCandidates]);
+  const processFlow = analysis?.processFlow ?? null;
 
   const canReview = analysis !== null;
 
   async function runAnalysis() {
+    if (analysisRequestInFlight.current) {
+      return;
+    }
     if (!input.rawText.trim()) {
       setValidationMessage("분석 전에 원문 요구사항을 입력해야 합니다.");
       setActiveStep("intake");
       return;
     }
 
+    analysisRequestInFlight.current = true;
     setIsAnalyzing(true);
+    setAnalysisProgress([]);
     try {
-      const result = await defaultAnalyzerProvider.analyze(input);
+      const result = await defaultAnalyzerProvider.analyze(input, {
+        model: analyzerModel,
+        onProgress: (event) => {
+          setAnalysisProgress((current) => [...current.slice(-59), compactProgressEvent(event)]);
+        }
+      });
       setAnalysis(result);
       setModuleCandidates(result.moduleCandidates);
       setAcceptedMissing([]);
@@ -69,6 +83,7 @@ export default function App() {
       setValidationMessage(error instanceof Error ? error.message : "분석을 완료하지 못했습니다.");
       setActiveStep("intake");
     } finally {
+      analysisRequestInFlight.current = false;
       setIsAnalyzing(false);
     }
   }
@@ -84,6 +99,7 @@ export default function App() {
     setModuleCandidates([]);
     setAcceptedMissing([]);
     setValidationMessage("");
+    setAnalysisProgress([]);
     setActiveStep("intake");
   }
 
@@ -101,7 +117,7 @@ export default function App() {
           <h1>Agent Factory</h1>
         </div>
         <div className="status-strip" aria-label="워크벤치 상태">
-          <span>{analysis ? "초안 분석 완료" : "분석 전"}</span>
+          <span>{isAnalyzing ? "Codex CLI 분석 중" : analysis ? "초안 분석 완료" : "분석 전"}</span>
           <span>{moduleCandidates.length}개 모듈</span>
           <span>{defaultAnalyzerProvider.label}</span>
         </div>
@@ -131,6 +147,9 @@ export default function App() {
             onClear={clearAll}
             validationMessage={validationMessage}
             isAnalyzing={isAnalyzing}
+            analysisProgress={analysisProgress}
+            analyzerModel={analyzerModel}
+            onAnalyzerModelChange={setAnalyzerModel}
           />
         )}
 
@@ -186,4 +205,9 @@ export default function App() {
       </section>
     </main>
   );
+}
+
+function compactProgressEvent(event: AnalyzerProgressEvent): AnalyzerProgressEvent {
+  const { result: _result, ...progress } = event;
+  return progress;
 }

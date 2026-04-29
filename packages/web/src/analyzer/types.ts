@@ -233,3 +233,39 @@ export interface AnalysisResult {
   moduleCandidates: ModuleCandidate[];
   processFlow: ProcessFlow;
 }
+
+export type AnalyzerProgressPhase = "started" | "cli_event" | "diagnostic" | "completed" | "failed" | "timeout";
+export type AnalyzerTraceKind =
+  | "tool_call"
+  | "tool_result"
+  | "assistant_message"
+  | "reasoning_summary"
+  | "lifecycle"
+  | "diagnostic";
+export type AnalyzerTraceStatus = "running" | "completed" | "failed" | "timeout" | "info";
+
+export interface AnalyzerProgressEvent {
+  phase: AnalyzerProgressPhase;
+  message: string;
+  at: string;
+  elapsedMs: number;
+  model?: string;
+  timeoutMs?: number;
+  inputChars?: number;
+  promptChars?: number;
+  eventCount?: number;
+  eventType?: string;
+  lastEventType?: string;
+  eventTypeCounts?: Record<string, number>;
+  traceKind?: AnalyzerTraceKind;
+  title?: string;
+  snippet?: string;
+  toolName?: string;
+  status?: AnalyzerTraceStatus;
+  durationMs?: number;
+  rawEventType?: string;
+  sequence?: number;
+  lastTraceTitle?: string;
+  lastTraceSnippet?: string;
+  result?: AnalysisResult;
+}
