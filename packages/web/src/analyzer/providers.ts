@@ -1,10 +1,15 @@
 import { analyzeRequirement } from "./mockAnalyzer";
-import type { AnalysisResult, RequirementIntakeInput } from "./types";
+import type { AnalysisResult, AnalyzerProgressEvent, CodexAnalyzerModel, RequirementIntakeInput } from "./types";
+
+export interface AnalyzerRunOptions {
+  model: CodexAnalyzerModel;
+  onProgress?: (event: AnalyzerProgressEvent) => void;
+}
 
 export interface AnalyzerProvider {
   readonly id: string;
   readonly label: string;
-  analyze(input: RequirementIntakeInput): Promise<AnalysisResult>;
+  analyze(input: RequirementIntakeInput, options: AnalyzerRunOptions): Promise<AnalysisResult>;
 }
 
 export class MockAnalyzerProvider implements AnalyzerProvider {
@@ -21,19 +26,117 @@ export interface OpenAICompatibleAnalyzerOptions {
 }
 
 export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
-  readonly id = "secure-backend-analyzer-placeholder";
-  readonly label = "Secure backend analyzer placeholder";
+  readonly id = "codex-cli-live-analyzer";
+  readonly label = "Codex CLI live analyzer";
   readonly options: OpenAICompatibleAnalyzerOptions;
 
   constructor(options: OpenAICompatibleAnalyzerOptions = { endpoint: "/api/analyze-requirement" }) {
     this.options = options;
   }
 
-  async analyze(): Promise<AnalysisResult> {
-    throw new Error(
-      "이 공개 workbench에서는 live analysis가 의도적으로 비활성화되어 있습니다. 이후 사용 시에는 trusted backend에서 POST /api/analyze-requirement를 호출하고, schema validation, policy gate, audit log 보존, 잘못된 module_category 값 거부, owner/lifecycle/contract/auth/timeout/retry/fallback/audit 세부 정보가 없는 Remote A2A 승인을 차단해야 합니다."
-    );
+  async analyze(input: RequirementIntakeInput, options: AnalyzerRunOptions): Promise<AnalysisResult> {
+    const response = await fetch(this.options.endpoint ?? "/api/analyze-requirement", {
+      method: "POST",
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ input, model: options.model, streamProgress: true })
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message =
+        payload && typeof payload.error === "string"
+          ? payload.error
+          : "Codex CLI live 분석을 완료하지 못했습니다.";
+      throw new Error(message);
+    }
+
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (!contentType.includes("text/event-stream") || !response.body) {
+      const payload = await response.json().catch(() => null);
+      return payload as AnalysisResult;
+    }
+
+    return readProgressStream(response.body, options.onProgress);
   }
 }
 
-export const defaultAnalyzerProvider: AnalyzerProvider = new MockAnalyzerProvider();
+export const defaultAnalyzerProvider: AnalyzerProvider = new OpenAICompatibleAnalyzerProvider();
+
+async function readProgressStream(
+  body: ReadableStream<Uint8Array>,
+  onProgress?: (event: AnalyzerProgressEvent) => void
+): Promise<AnalysisResult> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: AnalysisResult | null = null;
+
+  const consumeBlock = (block: string) => {
+    const parsed = parseSseBlock(block);
+    if (!parsed) {
+      return;
+    }
+    onProgress?.(parsed.payload);
+    if (parsed.event === "completed") {
+      if (!parsed.payload.result) {
+        throw new Error("Codex CLI 분석 결과가 스트림에 포함되지 않았습니다.");
+      }
+      result = parsed.payload.result;
+      return;
+    }
+    if (parsed.event === "failed" || parsed.event === "timeout") {
+      throw new Error(parsed.payload.message || "Codex CLI live 분석을 완료하지 못했습니다.");
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    let boundaryIndex = buffer.indexOf("\n\n");
+    while (boundaryIndex !== -1) {
+      const block = buffer.slice(0, boundaryIndex);
+      buffer = buffer.slice(boundaryIndex + 2);
+      consumeBlock(block);
+      boundaryIndex = buffer.indexOf("\n\n");
+    }
+  }
+
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    consumeBlock(buffer);
+  }
+
+  if (!result) {
+    throw new Error("Codex CLI 분석 스트림이 결과 없이 종료되었습니다.");
+  }
+  return result;
+}
+
+function parseSseBlock(block: string): { event: string; payload: AnalyzerProgressEvent } | null {
+  const lines = block.split(/\r?\n/);
+  let event = "message";
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      event = line.slice("event:".length).trim();
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+
+  if (!dataLines.length) {
+    return null;
+  }
+
+  const payload = JSON.parse(dataLines.join("\n")) as AnalyzerProgressEvent;
+  return { event, payload };
+}

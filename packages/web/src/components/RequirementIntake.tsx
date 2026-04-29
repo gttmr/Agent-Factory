@@ -1,5 +1,10 @@
 import type { ChangeEvent } from "react";
-import type { RequirementIntakeInput } from "../analyzer/types";
+import {
+  codexAnalyzerModels,
+  type AnalyzerProgressEvent,
+  type CodexAnalyzerModel,
+  type RequirementIntakeInput
+} from "../analyzer/types";
 
 interface RequirementIntakeProps {
   input: RequirementIntakeInput;
@@ -9,6 +14,9 @@ interface RequirementIntakeProps {
   onClear: () => void;
   validationMessage: string;
   isAnalyzing: boolean;
+  analysisProgress: AnalyzerProgressEvent[];
+  analyzerModel: CodexAnalyzerModel;
+  onAnalyzerModelChange: (model: CodexAnalyzerModel) => void;
 }
 
 export function RequirementIntake({
@@ -18,8 +26,13 @@ export function RequirementIntake({
   onLoadExample,
   onClear,
   validationMessage,
-  isAnalyzing
+  isAnalyzing,
+  analysisProgress,
+  analyzerModel,
+  onAnalyzerModelChange
 }: RequirementIntakeProps) {
+  const latestProgress = analysisProgress.length ? analysisProgress[analysisProgress.length - 1] : null;
+
   function updateField(field: keyof RequirementIntakeInput, value: string) {
     onInputChange({ ...input, [field]: value });
   }
@@ -99,6 +112,21 @@ export function RequirementIntake({
         </label>
 
         <label>
+          <span>분석 모델</span>
+          <select
+            value={analyzerModel}
+            onChange={(event) => onAnalyzerModelChange(event.target.value as CodexAnalyzerModel)}
+            disabled={isAnalyzing}
+          >
+            {codexAnalyzerModels.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
           <span>원문 요구사항</span>
           <textarea
             value={input.rawText}
@@ -139,6 +167,75 @@ export function RequirementIntake({
             <dd>{countOptionalFields(input)} / 6</dd>
           </div>
         </dl>
+        {latestProgress && (
+          <div className={`analysis-progress progress-${latestProgress.phase}`} aria-live="polite">
+            <div className="progress-head">
+              <strong>분석 진행 Trace</strong>
+              <span>{formatElapsed(latestProgress.elapsedMs)}</span>
+            </div>
+            <p>{latestProgress.lastTraceTitle ?? latestProgress.title ?? latestProgress.message}</p>
+            <dl className="progress-metrics">
+              <div>
+                <dt>현재 단계</dt>
+                <dd>{progressPhaseLabel(latestProgress.phase)}</dd>
+              </div>
+              <div>
+                <dt>툴 호출</dt>
+                <dd>{countToolCalls(analysisProgress)}</dd>
+              </div>
+              <div>
+                <dt>이벤트</dt>
+                <dd>{latestProgress.eventCount ?? 0}</dd>
+              </div>
+              <div>
+                <dt>모델</dt>
+                <dd>{latestProgress.model ?? analyzerModel}</dd>
+              </div>
+            </dl>
+            <ol className="trace-list">
+              {traceEvents(analysisProgress).map((event, index) => (
+                <li
+                  key={`${event.phase}-${event.sequence ?? event.elapsedMs}-${event.eventCount ?? index}`}
+                  className={`trace-${event.traceKind ?? "diagnostic"}`}
+                >
+                  <span className="trace-time">{formatElapsed(event.elapsedMs)}</span>
+                  <div className="trace-body">
+                    <div className="trace-row">
+                      <strong>{traceLabel(event)}</strong>
+                      <span>{traceStatusLabel(event.status)}</span>
+                    </div>
+                    {event.snippet && <p>{event.snippet}</p>}
+                    {event.snippet && event.snippet.length >= 180 && (
+                      <details>
+                        <summary>요약 더보기</summary>
+                        <p>{event.snippet}</p>
+                      </details>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {latestProgress.eventTypeCounts && (
+              <details className="progress-diagnostics">
+                <summary>진단 카운터</summary>
+                <dl>
+                  <div>
+                    <dt>입력</dt>
+                    <dd>{latestProgress.inputChars ?? input.rawText.length}</dd>
+                  </div>
+                  <div>
+                    <dt>프롬프트</dt>
+                    <dd>{latestProgress.promptChars ?? "-"}</dd>
+                  </div>
+                  <div>
+                    <dt>raw event types</dt>
+                    <dd>{Object.keys(latestProgress.eventTypeCounts).length}</dd>
+                  </div>
+                </dl>
+              </details>
+            )}
+          </div>
+        )}
       </aside>
     </div>
   );
@@ -153,4 +250,82 @@ function countOptionalFields(input: RequirementIntakeInput): number {
     input.knownSystems,
     input.expectedOutput
   ].filter((value) => value.trim()).length;
+}
+
+function progressPhaseLabel(phase: AnalyzerProgressEvent["phase"]): string {
+  switch (phase) {
+    case "started":
+      return "시작";
+    case "cli_event":
+      return "진행";
+    case "diagnostic":
+      return "계측";
+    case "completed":
+      return "완료";
+    case "timeout":
+      return "타임아웃";
+    case "failed":
+      return "실패";
+  }
+}
+
+function traceEvents(events: AnalyzerProgressEvent[]): AnalyzerProgressEvent[] {
+  const traces = events.filter((event) => event.traceKind && event.traceKind !== "lifecycle");
+  const lifecycle = events.filter((event) => event.traceKind === "lifecycle").slice(-1);
+  const visible = traces.length ? traces : lifecycle;
+  return visible.slice(-10);
+}
+
+function countToolCalls(events: AnalyzerProgressEvent[]): number {
+  return events.filter((event) => event.traceKind === "tool_call").length;
+}
+
+function traceLabel(event: AnalyzerProgressEvent): string {
+  const label = (() => {
+    switch (event.traceKind) {
+      case "tool_call":
+        return "툴 호출";
+      case "tool_result":
+        return "툴 결과";
+      case "assistant_message":
+        return "모델 메모";
+      case "reasoning_summary":
+        return "Reasoning 요약";
+      case "lifecycle":
+        return event.phase === "completed" ? "완료" : "내부 단계";
+      case "diagnostic":
+      default:
+        return event.phase === "failed" || event.phase === "timeout" ? progressPhaseLabel(event.phase) : "진단";
+    }
+  })();
+  return event.toolName ? `${label}: ${event.toolName}` : event.title ?? label;
+}
+
+function traceStatusLabel(status: AnalyzerProgressEvent["status"]): string {
+  switch (status) {
+    case "running":
+      return "진행 중";
+    case "completed":
+      return "완료";
+    case "failed":
+      return "실패";
+    case "timeout":
+      return "타임아웃";
+    case "info":
+    default:
+      return "기록";
+  }
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 1_000) {
+    return `${ms}ms`;
+  }
+  const seconds = Math.round(ms / 1_000);
+  if (seconds < 60) {
+    return `${seconds}초`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds ? `${minutes}분 ${remainingSeconds}초` : `${minutes}분`;
 }

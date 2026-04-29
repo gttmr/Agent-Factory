@@ -40,6 +40,14 @@ export const legacyRecommendedTypes = [
   "remote_a2a_contract"
 ] as const;
 
+export const codexAnalyzerModels = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.3-codex-spark"
+] as const;
+
 export type ModuleCategory = (typeof moduleCategories)[number];
 export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
@@ -48,6 +56,7 @@ export type RemoteContractKind = (typeof remoteContractKinds)[number];
 export type BankDomain = (typeof bankDomains)[number];
 export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
+export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
 export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
 
 export type RiskLevel = "low" | "medium" | "high";
@@ -205,4 +214,40 @@ export interface AnalysisResult {
   evidence: EvidenceSummary;
   moduleCandidates: ModuleCandidate[];
   processFlow: ProcessFlow;
+}
+
+export type AnalyzerProgressPhase = "started" | "cli_event" | "diagnostic" | "completed" | "failed" | "timeout";
+export type AnalyzerTraceKind =
+  | "tool_call"
+  | "tool_result"
+  | "assistant_message"
+  | "reasoning_summary"
+  | "lifecycle"
+  | "diagnostic";
+export type AnalyzerTraceStatus = "running" | "completed" | "failed" | "timeout" | "info";
+
+export interface AnalyzerProgressEvent {
+  phase: AnalyzerProgressPhase;
+  message: string;
+  at: string;
+  elapsedMs: number;
+  model?: string;
+  timeoutMs?: number;
+  inputChars?: number;
+  promptChars?: number;
+  eventCount?: number;
+  eventType?: string;
+  lastEventType?: string;
+  eventTypeCounts?: Record<string, number>;
+  traceKind?: AnalyzerTraceKind;
+  title?: string;
+  snippet?: string;
+  toolName?: string;
+  status?: AnalyzerTraceStatus;
+  durationMs?: number;
+  rawEventType?: string;
+  sequence?: number;
+  lastTraceTitle?: string;
+  lastTraceSnippet?: string;
+  result?: AnalysisResult;
 }
