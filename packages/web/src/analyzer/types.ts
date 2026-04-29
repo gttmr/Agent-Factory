@@ -40,6 +40,14 @@ export const legacyRecommendedTypes = [
   "remote_a2a_contract"
 ] as const;
 
+export const codexAnalyzerModels = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.3-codex-spark"
+] as const;
+
 export type ModuleCategory = (typeof moduleCategories)[number];
 export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
@@ -48,6 +56,7 @@ export type RemoteContractKind = (typeof remoteContractKinds)[number];
 export type BankDomain = (typeof bankDomains)[number];
 export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
+export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
 export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
 
 export type RiskLevel = "low" | "medium" | "high";
@@ -109,6 +118,14 @@ export interface EvidenceSummary {
   assumptions: string[];
 }
 
+export interface AdkHints {
+  state_memory?: string;
+  callbacks?: string;
+  artifacts_events?: string;
+  mcp_a2a?: string;
+  streaming_grounding?: string;
+}
+
 export interface ModuleCandidate {
   id: string;
   source_requirement_id: string;
@@ -121,6 +138,7 @@ export interface ModuleCandidate {
   legacy_recommended_type?: LegacyRecommendedType | string;
   confidence: number;
   rationale: string;
+  adk_hints?: AdkHints;
   inputs: FieldSpec[];
   outputs: FieldSpec[];
   reuse_candidate: boolean;
@@ -136,6 +154,15 @@ export interface ModuleCandidate {
   versioned?: boolean;
   effective_date_required?: boolean;
   owner_domain?: string;
+  owner?: string;
+  agent_card?: string;
+  auth?: string;
+  task_lifecycle?: string;
+  timeout?: string;
+  retry?: string;
+  fallback?: string;
+  audit?: string;
+  data_policy?: string;
 }
 
 export type FlowNodeType = "input" | "output" | ModuleCategory;

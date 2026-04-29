@@ -37,6 +37,14 @@ const riskLabels = {
   high: "높음"
 } as const;
 
+const adkHintRows = [
+  ["state_memory", "Session/State"],
+  ["callbacks", "Callbacks/Guardrail"],
+  ["artifacts_events", "Artifacts/Events"],
+  ["mcp_a2a", "MCP↔A2A"],
+  ["streaming_grounding", "Streaming/Grounding"]
+] as const;
+
 interface ModuleReviewProps {
   moduleCandidates: ModuleCandidate[];
   onModuleCandidatesChange: (candidates: ModuleCandidate[]) => void;
@@ -171,7 +179,10 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                     ))}
                   </select>
                 </td>
-                <td className="rationale-cell">{candidate.rationale}</td>
+                <td className="rationale-cell">
+                  {candidate.rationale}
+                  <AdkHintsBlock candidate={candidate} />
+                </td>
                 <td>
                   <NextAction candidate={candidate} />
                 </td>
@@ -203,6 +214,36 @@ function formatRiskSignal(signal: string): string {
   };
 
   return labels[signal] ?? signal;
+}
+
+function AdkHintsBlock({ candidate }: { candidate: ModuleCandidate }) {
+  const hintRows = getAdkHintRows(candidate);
+  if (!hintRows.length) {
+    return null;
+  }
+
+  return (
+    <details className="flow-node-hints">
+      <summary>ADK 구현 힌트</summary>
+      {hintRows.map((hint) => (
+        <div className="adk-hint-row" key={hint.key}>
+          <span className="adk-hint-key">{hint.label}</span>
+          <span className="adk-hint-value">{hint.value}</span>
+        </div>
+      ))}
+    </details>
+  );
+}
+
+function getAdkHintRows(candidate: ModuleCandidate) {
+  const hints = candidate.adk_hints;
+  if (!hints) {
+    return [];
+  }
+  return adkHintRows.flatMap(([key, label]) => {
+    const value = hints[key];
+    return typeof value === "string" && value.trim() ? [{ key, label, value }] : [];
+  });
 }
 
 function SubtypeControl({

@@ -60,6 +60,22 @@
       "type": "string",
       "minLength": 1
     },
+    "adk_hints": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "state_memory": { "$ref": "#/$defs/nullableHintString" },
+            "callbacks": { "$ref": "#/$defs/nullableHintString" },
+            "artifacts_events": { "$ref": "#/$defs/nullableHintString" },
+            "mcp_a2a": { "$ref": "#/$defs/nullableHintString" },
+            "streaming_grounding": { "$ref": "#/$defs/nullableHintString" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
     "inputs": {
       "type": "array",
       "items": {
@@ -116,6 +132,42 @@
     "owner_domain": {
       "type": "string",
       "minLength": 1
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_card": {
+      "type": "string",
+      "minLength": 1
+    },
+    "auth": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_lifecycle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retry": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fallback": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data_policy": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "allOf": [
@@ -160,7 +212,18 @@
         "required": ["module_category"]
       },
       "then": {
-        "required": ["remote_contract_kind"],
+        "required": [
+          "remote_contract_kind",
+          "owner",
+          "agent_card",
+          "auth",
+          "task_lifecycle",
+          "timeout",
+          "retry",
+          "fallback",
+          "audit",
+          "data_policy"
+        ],
         "properties": {
           "risk_level": { "const": "high" }
         }
@@ -168,6 +231,9 @@
     }
   ],
   "$defs": {
+    "nullableHintString": {
+      "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+    },
     "moduleCategory": {
       "type": "string",
       "enum": ["agent", "workflow", "adapter", "remote_a2a"]
