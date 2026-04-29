@@ -118,6 +118,14 @@ export interface EvidenceSummary {
   assumptions: string[];
 }
 
+export interface AdkHints {
+  state_memory?: string;
+  callbacks?: string;
+  artifacts_events?: string;
+  mcp_a2a?: string;
+  streaming_grounding?: string;
+}
+
 export interface ModuleCandidate {
   id: string;
   source_requirement_id: string;
@@ -130,6 +138,7 @@ export interface ModuleCandidate {
   legacy_recommended_type?: LegacyRecommendedType | string;
   confidence: number;
   rationale: string;
+  adk_hints?: AdkHints;
   inputs: FieldSpec[];
   outputs: FieldSpec[];
   reuse_candidate: boolean;
@@ -145,6 +154,15 @@ export interface ModuleCandidate {
   versioned?: boolean;
   effective_date_required?: boolean;
   owner_domain?: string;
+  owner?: string;
+  agent_card?: string;
+  auth?: string;
+  task_lifecycle?: string;
+  timeout?: string;
+  retry?: string;
+  fallback?: string;
+  audit?: string;
+  data_policy?: string;
 }
 
 export type FlowNodeType = "input" | "output" | ModuleCategory;

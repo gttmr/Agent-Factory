@@ -1015,6 +1015,46 @@ td {
   background: var(--cat-output);
 }
 
+.flow-node.cat-agent,
+.row-cat-agent {
+  --adk-hint-bg: var(--cat-agent-soft);
+  --adk-hint-line: var(--cat-agent-line);
+  --adk-hint-accent: var(--cat-agent);
+}
+
+.flow-node.cat-workflow,
+.row-cat-workflow {
+  --adk-hint-bg: var(--cat-workflow-soft);
+  --adk-hint-line: var(--cat-workflow-line);
+  --adk-hint-accent: var(--cat-workflow);
+}
+
+.flow-node.cat-adapter,
+.row-cat-adapter {
+  --adk-hint-bg: var(--cat-adapter-soft);
+  --adk-hint-line: var(--cat-adapter-line);
+  --adk-hint-accent: var(--cat-adapter);
+}
+
+.flow-node.cat-remote_a2a,
+.row-cat-remote {
+  --adk-hint-bg: var(--cat-remote-soft);
+  --adk-hint-line: var(--cat-remote-line);
+  --adk-hint-accent: var(--cat-remote);
+}
+
+.flow-node.cat-input {
+  --adk-hint-bg: var(--cat-input-soft);
+  --adk-hint-line: var(--cat-input-line);
+  --adk-hint-accent: var(--cat-input);
+}
+
+.flow-node.cat-output {
+  --adk-hint-bg: var(--cat-output-soft);
+  --adk-hint-line: var(--cat-output-line);
+  --adk-hint-accent: var(--cat-output);
+}
+
 .flow-node.cat-remote_a2a {
   background: #fffafa;
   border-color: var(--cat-remote-line);
@@ -1091,6 +1131,59 @@ td {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.flow-node-hints {
+  margin-top: 2px;
+  border: 1px solid var(--adk-hint-line, var(--line));
+  border-radius: 8px;
+  background: var(--adk-hint-bg, var(--surface-muted));
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  overflow: hidden;
+}
+
+.rationale-cell .flow-node-hints {
+  margin-top: 8px;
+}
+
+.flow-node-hints summary {
+  cursor: pointer;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.flow-node-hints[open] summary {
+  border-bottom: 1px solid var(--adk-hint-line, var(--line));
+  color: var(--adk-hint-accent, var(--accent));
+}
+
+.adk-hint-row {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.adk-hint-row + .adk-hint-row {
+  border-top: 1px solid var(--adk-hint-line, var(--line));
+}
+
+.adk-hint-key {
+  color: var(--adk-hint-accent, var(--accent));
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.adk-hint-value {
+  color: inherit;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .flow-node-meta {

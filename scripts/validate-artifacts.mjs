@@ -20,7 +20,18 @@ const adapterKinds = new Set([
 const agentKinds = new Set(["specialist", "shared"]);
 const workflowKinds = new Set(["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"]);
 const remoteKinds = new Set(["a2a", "unknown"]);
-const remoteRequiredFields = ["owner", "agent_card", "auth", "task_lifecycle", "timeout", "retry", "fallback", "audit"];
+const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
+const remoteRequiredFields = [
+  "owner",
+  "agent_card",
+  "auth",
+  "task_lifecycle",
+  "timeout",
+  "retry",
+  "fallback",
+  "audit",
+  "data_policy"
+];
 
 validateModuleCandidates();
 validateScaffoldPlan();
@@ -52,6 +63,7 @@ function validateModuleCandidates() {
     if ("recommended_type" in candidate) {
       errors.push(`${label} uses recommended_type as a classifier; use module_category instead.`);
     }
+    validateAdkHints(candidate.adk_hints, label);
     if (candidate.module_category === "adapter" && !adapterKinds.has(candidate.adapter_kind)) {
       errors.push(`${label} is adapter but has invalid or missing adapter_kind.`);
     }
@@ -72,6 +84,28 @@ function validateModuleCandidates() {
       if (missing.length) {
         errors.push(`${label} is remote_a2a and is missing contract fields: ${missing.join(", ")}.`);
       }
+    }
+  });
+}
+
+function validateAdkHints(value, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    errors.push(`${label} adk_hints must be an object or null.`);
+    return;
+  }
+  Object.entries(value).forEach(([key, hint]) => {
+    if (!adkHintKeys.has(key)) {
+      errors.push(`${label} adk_hints has unknown key: ${key}.`);
+      return;
+    }
+    if (hint === null) {
+      return;
+    }
+    if (typeof hint !== "string" || !hint.trim()) {
+      errors.push(`${label} adk_hints.${key} must be a non-empty string or null.`);
     }
   });
 }
