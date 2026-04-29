@@ -1,27 +1,20 @@
 # Target Agent Architecture
 
-The workbench does not assume every requirement becomes one deployable agent. It decomposes reviewed requirements into explicit module categories.
+이 참조는 분석 결과가 어떤 구현 경계로 이어질 수 있는지 설명한다.
+활성 taxonomy 값은 [Taxonomy](../../workbench/taxonomy.md)를 따른다.
 
-## Categories
+## 설계 관점
 
-- `agent`: reasoning responsibility such as judgment, summarization, classification, recommendation, or triage.
-- `workflow`: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
-- `adapter`: callable capability used by agents or workflows.
-- `remote_a2a`: independent remote agent boundary with protocol-level contract.
+- Agent는 reasoning owner다. 판단, 요약, 분류, 추천, triage를 맡는다.
+- Workflow는 local control flow다. 순서, 병렬성, 반복, 사람 검토, 조율을 설명한다.
+- Adapter는 callable capability다. API, retrieval, rule registry, data query, template, computation, external service를 감싼다.
+- Remote A2A는 독립 원격 agent와의 protocol boundary다.
 
-## Adapter Subtypes
+## 기본 우선순위
 
-Adapters preserve the kind of callable capability through `adapter_kind`:
+1. 요구사항의 reasoning 책임을 Agent 후보로 분리한다.
+2. 실행 순서와 반복, 병렬성은 Workflow 후보로 표현한다.
+3. 시스템 호출과 지식 조회는 Adapter 후보로 둔다.
+4. 독립 owner, lifecycle, protocol contract가 증명될 때만 Remote A2A 후보로 올린다.
 
-- `legacy_api`
-- `retrieval`
-- `rule_registry`
-- `data_query`
-- `template`
-- `computation`
-- `external_service`
-- `unknown`
-
-## Remote A2A Boundary
-
-Remote A2A requires independent owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details. Local orchestration or fan-out/fan-in alone remains Workflow.
+Local orchestration, fan-out/fan-in, human review만으로는 Remote A2A가 아니다.

@@ -1,7 +1,7 @@
 # Repository Strategy
 
 이 문서는 Agent Factory 작업 저장소를 어떻게 취급할지 정리한다.
-기준은 `README.md`, `AGENTS.md`, `docs/agent-factory-v1-goal.md`의 현재 정책이다.
+기준은 `README.md`, `AGENTS.md`, `docs/README.md`의 현재 정책이다.
 
 ## 단일 source of truth
 

@@ -36,7 +36,7 @@ Reuse Heatmap은 여러 유스케이스에서 반복되는 capability를 드러�
 - `rejected`
 - `needs_info`
 
-`approved` 후보만 downstream scaffold artifact에 들어갈 수 있다.
+`approved` 후보만 downstream export artifact에 들어갈 수 있다.
 `deferred`, `rejected`, `needs_info` 후보는 재사용 압력이 보여도 별도 승인 없이 승격하지 않는다.
 
 ## 지원하는 결정

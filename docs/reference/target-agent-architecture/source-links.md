@@ -1,6 +1,6 @@
 # Source Links
 
-Public source material used by this extract:
+Public source material used by the workbench reference notes:
 
 - Google ADK documentation: https://adk.dev/
 - Google ADK agents: https://adk.dev/agents/
