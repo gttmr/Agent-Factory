@@ -21,6 +21,7 @@ import {
   type RemoteContractKind,
   type WorkflowKind
 } from "../analyzer/types";
+import { CategoryBadge, SubtypeBadge, categoryClass, getSubtypeValue } from "./CategoryBadge";
 
 const statuses: ModuleStatus[] = ["needs_info", "approved", "deferred", "rejected"];
 const statusLabels: Record<ModuleStatus, string> = {
@@ -102,8 +103,9 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
           </thead>
           <tbody>
             {moduleCandidates.map((candidate) => (
-              <tr key={candidate.id} className={candidate.module_category === "remote_a2a" ? "remote-review-row" : ""}>
-                <td>
+              <tr key={candidate.id} className={`row-${categoryClass(candidate.module_category)} ${candidate.module_category === "remote_a2a" ? "remote-review-row" : ""}`}>
+                <td className="row-name-cell">
+                  <span className={`row-stripe ${categoryClass(candidate.module_category)}`} aria-hidden="true" />
                   <textarea
                     className="table-name-field"
                     value={candidate.name}
@@ -112,20 +114,26 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                   />
                 </td>
                 <td>
-                  <select
-                    className="table-select"
-                    value={candidate.module_category}
-                    onChange={(event) => updateCategory(candidate, event.target.value as ModuleCategory)}
-                  >
-                    {moduleCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {moduleCategoryLabels[category]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="cell-stack">
+                    <CategoryBadge category={candidate.module_category} />
+                    <select
+                      className="table-select"
+                      value={candidate.module_category}
+                      onChange={(event) => updateCategory(candidate, event.target.value as ModuleCategory)}
+                    >
+                      {moduleCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {moduleCategoryLabels[category]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </td>
                 <td>
-                  <SubtypeControl candidate={candidate} onChange={(changes) => updateCandidate(candidate.id, changes)} />
+                  <div className="cell-stack">
+                    {getSubtypeValue(candidate) ? <SubtypeBadge value={getSubtypeValue(candidate)!} /> : null}
+                    <SubtypeControl candidate={candidate} onChange={(changes) => updateCandidate(candidate.id, changes)} />
+                  </div>
                 </td>
                 <td>{Math.round(candidate.confidence * 100)}%</td>
                 <td>

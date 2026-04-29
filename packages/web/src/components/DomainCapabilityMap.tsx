@@ -1,6 +1,6 @@
-import { moduleCategoryLabels } from "../analyzer/classificationRules";
 import { buildDomainCapabilityMap } from "../analyzer/commonization";
 import { bankDomains, type ModuleCandidate } from "../analyzer/types";
+import { CategoryBadge, SubtypeBadge } from "./CategoryBadge";
 
 interface DomainCapabilityMapProps {
   moduleCandidates: ModuleCandidate[];
@@ -33,12 +33,16 @@ export function DomainCapabilityMap({ moduleCandidates, onContinue }: DomainCapa
               {rows.map((row) => (
                 <tr key={row.capability}>
                   <td>
-                    <strong>{row.capability}</strong>
-                    {row.subtype && <span>{row.subtype}</span>}
+                    <strong className="capability-name">{row.capability}</strong>
                   </td>
-                  <td>{moduleCategoryLabels[row.module_category]}</td>
+                  <td>
+                    <div className="cell-stack">
+                      <CategoryBadge category={row.module_category} />
+                      {row.subtype ? <SubtypeBadge value={row.subtype} /> : null}
+                    </div>
+                  </td>
                   {bankDomains.map((domain) => (
-                    <td key={domain}>
+                    <td key={domain} className="affinity-cell">
                       <span className={`affinity ${affinityClass(row.domains[domain])}`}>{row.domains[domain]}</span>
                     </td>
                   ))}

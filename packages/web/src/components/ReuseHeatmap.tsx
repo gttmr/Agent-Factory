@@ -1,6 +1,6 @@
-import { moduleCategoryLabels } from "../analyzer/classificationRules";
 import { buildReuseHeatmap } from "../analyzer/commonization";
 import type { ModuleCandidate } from "../analyzer/types";
+import { CategoryBadge, SubtypeBadge, categoryClass } from "./CategoryBadge";
 
 interface ReuseHeatmapProps {
   moduleCandidates: ModuleCandidate[];
@@ -13,6 +13,13 @@ const statusLabels = {
   deferred: "보류",
   rejected: "반려"
 } as const;
+
+const statusClass: Record<keyof typeof statusLabels, string> = {
+  needs_info: "status-needs-info",
+  approved: "status-approved",
+  deferred: "status-deferred",
+  rejected: "status-rejected"
+};
 
 export function ReuseHeatmap({ moduleCandidates, onContinue }: ReuseHeatmapProps) {
   const heatmapItems = buildReuseHeatmap(moduleCandidates);
@@ -27,17 +34,21 @@ export function ReuseHeatmap({ moduleCandidates, onContinue }: ReuseHeatmapProps
       {heatmapItems.length ? (
         <div className="heatmap-list">
           {heatmapItems.map((item) => (
-            <article className="heatmap-row" key={item.capability}>
-              <div>
-                <span>
-                  {moduleCategoryLabels[item.module_category]}
-                  {item.subtype ? ` / ${item.subtype}` : ""}
-                </span>
-                <strong>{item.capability}</strong>
+            <article className={`heatmap-row ${categoryClass(item.module_category)}`} key={item.capability}>
+              <span className={`row-stripe ${categoryClass(item.module_category)}`} aria-hidden="true" />
+              <div className="heatmap-row-main">
+                <div className="heatmap-row-head">
+                  <CategoryBadge category={item.module_category} />
+                  {item.subtype ? <SubtypeBadge value={item.subtype} /> : null}
+                </div>
+                <strong className="heatmap-row-name">{item.capability}</strong>
                 <em>{item.rationale}</em>
               </div>
-              <div className="heatmap-score" aria-label={`${item.capability} reuse score`}>
-                <span style={{ inlineSize: `${item.reuse_score}%` }} />
+              <div className="heatmap-score-block">
+                <div className={`heatmap-score ${categoryClass(item.module_category)}`} aria-label={`${item.capability} reuse score`}>
+                  <span style={{ inlineSize: `${item.reuse_score}%` }} />
+                </div>
+                <span className="heatmap-score-label">{item.reuse_score}점</span>
               </div>
               <div className="domain-chip-row">
                 {item.domains.map((domain) => (
@@ -46,7 +57,9 @@ export function ReuseHeatmap({ moduleCandidates, onContinue }: ReuseHeatmapProps
                   </span>
                 ))}
               </div>
-              <strong className="status-badge">{statusLabels[item.candidate_status]}</strong>
+              <span className={`status-badge ${statusClass[item.candidate_status]}`}>
+                {statusLabels[item.candidate_status]}
+              </span>
             </article>
           ))}
         </div>

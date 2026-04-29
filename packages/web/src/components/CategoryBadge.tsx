@@ -1,0 +1,89 @@
+import {
+  adapterKindLabels,
+  agentKindLabels,
+  moduleCategoryLabels,
+  remoteContractKindLabels,
+  workflowKindLabels
+} from "../analyzer/classificationRules";
+import type { ModuleCandidate, ModuleCategory } from "../analyzer/types";
+
+export const categoryGlyph: Record<ModuleCategory, string> = {
+  agent: "◆",
+  workflow: "▶",
+  adapter: "⚙",
+  remote_a2a: "⇨"
+};
+
+export const subtypeGlyph: Record<string, string> = {
+  parallel: "⇉",
+  loop: "↻",
+  human_review: "✓",
+  sequential: "→",
+  orchestration: "⋈",
+  retrieval: "🔎",
+  rule_registry: "§",
+  legacy_api: "API",
+  data_query: "?",
+  template: "T",
+  computation: "Σ",
+  external_service: "↗",
+  specialist: "S",
+  shared: "★",
+  a2a: "A2A",
+  unknown: "·"
+};
+
+export function categoryClass(category: ModuleCategory): string {
+  if (category === "remote_a2a") return "cat-remote";
+  return `cat-${category}`;
+}
+
+export function CategoryBadge({ category }: { category: ModuleCategory }) {
+  return (
+    <span className={`category-badge ${categoryClass(category)}`}>
+      <span className="cat-glyph" aria-hidden="true">
+        {categoryGlyph[category]}
+      </span>
+      {moduleCategoryLabels[category]}
+    </span>
+  );
+}
+
+export function SubtypeBadge({ value }: { value: string }) {
+  return (
+    <span className="subtype-badge">
+      <span className="cat-glyph subtype-glyph" aria-hidden="true">
+        {subtypeGlyph[value] ?? "·"}
+      </span>
+      {formatSubtypeLabel(value)}
+    </span>
+  );
+}
+
+export function CandidateCategoryBadge({ candidate }: { candidate: ModuleCandidate }) {
+  const subtypeValue = getSubtypeValue(candidate);
+  return (
+    <div className="candidate-cat-row">
+      <CategoryBadge category={candidate.module_category} />
+      {subtypeValue ? <SubtypeBadge value={subtypeValue} /> : null}
+    </div>
+  );
+}
+
+export function getSubtypeValue(candidate: ModuleCandidate): string | null {
+  if (candidate.module_category === "adapter") return candidate.adapter_kind ?? null;
+  if (candidate.module_category === "agent") return candidate.agent_kind ?? null;
+  if (candidate.module_category === "workflow") return candidate.workflow_kind ?? null;
+  if (candidate.module_category === "remote_a2a") return candidate.remote_contract_kind ?? null;
+  return null;
+}
+
+export function formatSubtypeLabel(value: string): string {
+  return (
+    adapterKindLabels[value as keyof typeof adapterKindLabels] ??
+    workflowKindLabels[value as keyof typeof workflowKindLabels] ??
+    agentKindLabels[value as keyof typeof agentKindLabels] ??
+    remoteContractKindLabels[value as keyof typeof remoteContractKindLabels] ??
+    value
+  );
+}
