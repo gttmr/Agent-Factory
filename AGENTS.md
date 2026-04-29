@@ -16,7 +16,13 @@
 - `schemas`: normalized requirement, module candidate, and process-flow schemas.
 - `catalog`: initial YAML catalogs for reusable capabilities, domain owners, and risk gates.
 - `templates`: generic artifact and scaffold-plan templates.
-- `docs`: validation, scaffold bridge, and design notes.
+- `docs`: active workbench analysis, taxonomy, workflow-decision, validation, and reference notes.
+
+## Markdown Documentation Ownership
+
+- `docs/README.md` indexes human-facing workbench documentation under `docs/`.
+- `.agents/skills/**` Markdown is governed by the nearest `SKILL.md` and should not be moved or linked from `docs/README.md` unless the task explicitly asks for a skill-sync step.
+- Historical review records belong under `docs/archive/` and must not override the canonical policy files listed above.
 
 ## Current Taxonomy
 

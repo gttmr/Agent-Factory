@@ -1,45 +1,48 @@
 # Documentation Index
 
-This directory contains human-facing notes for the Agent Factory workbench.
+이 디렉터리는 Agent Factory 분석 워크벤치 문서의 진입점이다.
+Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로”만 프롬프트에 넣고, 필요한 경우에만 참조 문서를 추가로 읽는다.
 
-## Workbench Plans
+## 기본 읽기 경로
 
-- [Agent Factory v1.0 goal](./agent-factory-v1-goal.md)
-- [Implementation plan](./agent-factory-implementation-plan.md)
-- [Phase 1 requirement intake workbench plan](./phase-1-requirement-intake-workbench-plan.md)
-- [Evolution plan](./banking-agent-factory-evolution-plan.md)
-- [Repository strategy](./repository-strategy.md)
+1. [Analysis guide](./workbench/analysis-guide.md)
+   Raw requirement를 정규화하고 evidence, module candidate, process flow, review decision으로 바꾸는 순서를 설명한다.
+2. [Taxonomy](./workbench/taxonomy.md)
+   `module_category`와 subtype enum의 단일 활성 기준이다.
+3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
+   안정적인 ADK workflow agent 기준으로 `sequential`, `parallel`, `loop`, `human_review`, `orchestration`을 판단한다.
+4. [Process Flow](./workbench/process-flow.md)
+   분석 결과를 어떤 node와 edge로 그릴지 설명한다.
+5. [Review Board](./workbench/review-board.md)
+   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다.
+6. [Validation](./workbench/validation.md)
+   export artifact와 문서 구조를 검증하는 기준이다.
 
-## Concepts
-
-- [Taxonomy](./taxonomy.md)
-  Authoritative reference for `module_category` and the agent, workflow, adapter, and remote_contract subtype enums.
-- [ADK A2A agent generation](./concepts/adk-a2a-agent-generation.md)
-  Explains why local workflow and independent Remote A2A boundaries are reviewed separately.
-
-## References
+## 보조 참조
 
 - [Target agent architecture](./reference/target-agent-architecture/README.md)
-  Describes the Agent, Workflow, Adapter, and Remote A2A module categories.
+  Agent, Workflow, Adapter, Remote A2A의 target architecture 관점 참조다.
+- [Protocol profile](./reference/target-agent-architecture/protocol-profile.md)
+  local ADK boundary와 Remote A2A boundary를 구분한다.
+- [Source links](./reference/target-agent-architecture/source-links.md)
+  공개 참고 링크 목록이다.
 
-## Playbooks
+## 시각화 참조
 
-- [Requirement intake workbench](./playbooks/requirement-intake-workbench.md)
-  Describes the local-first workbench for normalizing requirements, reviewing module candidates, and exporting artifacts.
-
-## Visualization
-
-- [Module Review Board](./visualization/review-board.md)
-- [Process Flow](./visualization/process-flow.md)
+- [Design system](./visualization/design-system.md)
 - [Reuse Heatmap](./visualization/reuse-heatmap.md)
 - [Domain Capability Map](./visualization/domain-capability-map.md)
 
-## Validation And Scaffolding
+## Archive
 
-- [Artifact validation](./validation.md)
-- [Scaffold bridge](./scaffolding/scaffold-bridge.md)
+`archive/` 아래 문서는 기본 프롬프트 경로가 아니다.
+과거 계획, 리뷰 기록, 스캐폴딩 노트, 스킬 노트, 유지보수 프롬프트를 보존하기 위한 위치다.
 
 ## Canonical Sources
 
 - Model-facing working index: [../AGENTS.md](../AGENTS.md)
 - Human-facing overview: [../README.md](../README.md)
+- Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
+- Shared schemas: [../schemas](../schemas)
+- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
+- Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files and are not indexed as active workbench docs here.

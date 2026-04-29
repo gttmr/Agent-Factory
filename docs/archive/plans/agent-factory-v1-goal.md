@@ -71,7 +71,7 @@ When the live analyzer is added, the backend must enforce schema validation, pol
 
 Scaffolding work is not part of the v1.0 MVP. The MVP stops at exporting `scaffold-plan.json` and `implementation-handoff.md`. A scaffold generator is built only after the commonization catalog is stable, the Module Review Board produces consistent `approved` decisions, and `scaffold-plan.json` validates against the workbench schema.
 
-The detailed scaffold contract (per-category outputs, no-runnable-business-logic rule) lives in [scaffolding/scaffold-bridge.md](./scaffolding/scaffold-bridge.md).
+The detailed scaffold contract (per-category outputs, no-runnable-business-logic rule) lives in [scaffolding/scaffold-bridge.md](../scaffolding/scaffold-bridge.md).
 
 ## Catalog Management
 

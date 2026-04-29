@@ -21,7 +21,7 @@ v1.0의 임시 domain 이름은 다음과 같다.
 - `카드`
 - `리스크`
 
-이 이름은 v1.0 §3의 placeholder다.
+이 이름은 v1.0 분석 워크벤치의 임시 placeholder다.
 실제 domain 이름이 확정되면 표시 이름은 교체될 수 있다.
 하지만 `module_category`, subtype, schema 구조는 domain 이름에 의존하지 않는다.
 

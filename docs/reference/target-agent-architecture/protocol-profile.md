@@ -23,6 +23,8 @@ Treat ADK as the local construction layer for an agent. Internal composition may
 - custom agents for specialized control logic
 - tools for deterministic external actions
 
+Use the stable workflow-agent model for active workbench documentation.
+
 ## Escalation Rule
 
 Do not use A2A merely because a task has multiple steps. First decide whether the steps can remain local ADK workflow or local tool calls.

@@ -71,7 +71,7 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 
 ### UI design system
 
-`DESIGN.md` (repo root) is the authoritative spec for the web workbench UI: category color tokens, glyph mapping, shared components, Process Flow stage model, and CSS pitfalls. Read it before changing anything visual.
+`docs/visualization/design-system.md` is the authoritative spec for the web workbench UI: category color tokens, glyph mapping, shared components, Process Flow stage model, and CSS pitfalls. Read it before changing anything visual.
 
 Key contracts:
 
@@ -101,4 +101,4 @@ Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take
 - Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.
 - The UI labels are in Korean (`App.tsx`, components). Preserve that when editing copy.
-- Visual changes must follow `DESIGN.md` and be verified with a chrome-devtools MCP screenshot before being reported as done.
+- Visual changes must follow `docs/visualization/design-system.md` and be verified with a chrome-devtools MCP screenshot before being reported as done.
