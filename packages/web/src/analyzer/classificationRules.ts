@@ -39,13 +39,13 @@ export const remoteContractKindLabels: Record<RemoteContractKind, string> = {
 
 export const classificationRules: Record<ModuleCategory, string> = {
   agent:
-    "Use for a reasoning responsibility such as judgment, summarization, classification, recommendation, or triage.",
+    "판단, 요약, 분류, 추천, triage처럼 reasoning responsibility가 있는 단위에 사용합니다.",
   workflow:
-    "Use for deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.",
+    "sequential, parallel, loop, orchestration, human review처럼 결정적이거나 반결정적인 control flow에 사용합니다.",
   adapter:
-    "Use for any callable capability used by agents or workflows, including API calls, retrieval, managed rules, data queries, templates, computation, or external services.",
+    "API call, retrieval, managed rules, data query, template, computation, external service처럼 Agent나 Workflow가 호출하는 capability에 사용합니다.",
   remote_a2a:
-    "Use only for an independently owned remote agent boundary with protocol-level contract, lifecycle, auth, timeout, retry, fallback, and audit details."
+    "독립 소유 remote agent boundary가 있고 protocol contract, lifecycle, auth, timeout, retry, fallback, audit 세부 정보가 있을 때만 사용합니다."
 };
 
 export function getCandidateSubtype(candidate: ModuleCandidate): string | null {

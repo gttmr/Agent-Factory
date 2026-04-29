@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import { AnalysisResult } from "./components/AnalysisResult";
+import { DomainCapabilityMap } from "./components/DomainCapabilityMap";
 import { ExportArtifacts } from "./components/ExportArtifacts";
 import { ModuleReview } from "./components/ModuleReview";
 import { ProcessFlowView } from "./components/ProcessFlowView";
 import { RequirementIntake } from "./components/RequirementIntake";
+import { ReuseHeatmap } from "./components/ReuseHeatmap";
 import { buildProcessFlow, getExampleRequirement } from "./analyzer/mockAnalyzer";
 import { defaultAnalyzerProvider } from "./analyzer/providers";
 import type { AnalysisResult as AnalyzerResult, ModuleCandidate, RequirementIntakeInput } from "./analyzer/types";
 
-type StepId = "intake" | "analysis" | "modules" | "flow" | "export";
+type StepId = "intake" | "analysis" | "modules" | "flow" | "reuse" | "domainMap" | "export";
 
 const emptyInput: RequirementIntakeInput = {
   title: "",
@@ -25,6 +27,8 @@ const steps: Array<{ id: StepId; label: string }> = [
   { id: "analysis", label: "분석 결과" },
   { id: "modules", label: "모듈 검토" },
   { id: "flow", label: "프로세스 플로우" },
+  { id: "reuse", label: "재사용 히트맵" },
+  { id: "domainMap", label: "도메인 맵" },
   { id: "export", label: "아티팩트 내보내기" }
 ];
 
@@ -93,17 +97,17 @@ export default function App() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Local-first planning workbench</p>
-          <h1>요구사항 접수</h1>
+          <p className="eyebrow">은행 요구사항 분석 워크벤치</p>
+          <h1>Agent Factory</h1>
         </div>
-        <div className="status-strip" aria-label="Workbench state">
+        <div className="status-strip" aria-label="워크벤치 상태">
           <span>{analysis ? "초안 분석 완료" : "분석 전"}</span>
-          <span>{moduleCandidates.length} modules</span>
+          <span>{moduleCandidates.length}개 모듈</span>
           <span>{defaultAnalyzerProvider.label}</span>
         </div>
       </header>
 
-      <nav className="stepper" aria-label="Workbench steps">
+      <nav className="stepper" aria-label="워크벤치 단계">
         {steps.map((step) => (
           <button
             key={step.id}
@@ -151,6 +155,20 @@ export default function App() {
         {activeStep === "flow" && analysis && processFlow && (
           <ProcessFlowView
             processFlow={processFlow}
+            moduleCandidates={moduleCandidates}
+            onContinue={() => setActiveStep("reuse")}
+          />
+        )}
+
+        {activeStep === "reuse" && analysis && (
+          <ReuseHeatmap
+            moduleCandidates={moduleCandidates}
+            onContinue={() => setActiveStep("domainMap")}
+          />
+        )}
+
+        {activeStep === "domainMap" && analysis && (
+          <DomainCapabilityMap
             moduleCandidates={moduleCandidates}
             onContinue={() => setActiveStep("export")}
           />

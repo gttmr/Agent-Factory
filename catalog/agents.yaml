@@ -1,0 +1,13 @@
+agents:
+  - name: requirement_review_specialist
+    agent_kind: specialist
+    owner_domain: 공통
+    status: proposed
+    responsibility: classify requirement context and draft review recommendations
+    scaffold_output: agent_shell_only
+  - name: shared_review_capability
+    agent_kind: shared
+    owner_domain: 공통
+    status: candidate
+    responsibility: reusable reasoning support after repeated use cases prove reuse pressure
+    scaffold_output: agent_shell_only

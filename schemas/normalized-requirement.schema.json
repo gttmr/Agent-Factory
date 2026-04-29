@@ -89,8 +89,7 @@
     "risk_signals": {
       "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1
+        "$ref": "#/$defs/riskSignal"
       },
       "examples": [["customer_impact", "personal_data"]]
     },
@@ -149,6 +148,19 @@
           "enum": ["unknown", "read", "write", "read_write", "not_required"]
         }
       }
+    },
+    "riskSignal": {
+      "type": "string",
+      "enum": [
+        "personal_data",
+        "financial_data",
+        "credit_decision_support",
+        "customer_impact",
+        "external_message",
+        "transaction_write",
+        "human_approval_required",
+        "audit_required"
+      ]
     }
   }
 }

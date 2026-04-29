@@ -15,6 +15,7 @@
     "outputs",
     "reuse_candidate",
     "risk_level",
+    "risk_signals",
     "status"
   ],
   "properties": {
@@ -80,7 +81,13 @@
     },
     "status": {
       "type": "string",
-      "enum": ["needs_review", "approved", "deferred", "rejected"]
+      "enum": ["needs_info", "approved", "deferred", "rejected"]
+    },
+    "risk_signals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/riskSignal"
+      }
     },
     "side_effect": {
       "$ref": "#/$defs/sideEffect"
@@ -194,6 +201,19 @@
       "type": "string",
       "enum": ["none", "read", "write", "read_write", "unknown"]
     },
+    "riskSignal": {
+      "type": "string",
+      "enum": [
+        "personal_data",
+        "financial_data",
+        "credit_decision_support",
+        "customer_impact",
+        "external_message",
+        "transaction_write",
+        "human_approval_required",
+        "audit_required"
+      ]
+    },
     "field": {
       "type": "object",
       "additionalProperties": false,
@@ -228,7 +248,8 @@
       "outputs": [{ "name": "customer_profile", "type": "object" }],
       "reuse_candidate": true,
       "risk_level": "medium",
-      "status": "needs_review",
+      "risk_signals": ["personal_data", "financial_data", "audit_required"],
+      "status": "needs_info",
       "side_effect": "read",
       "auth_required": true,
       "audit_required": true
@@ -249,7 +270,8 @@
       ],
       "reuse_candidate": true,
       "risk_level": "medium",
-      "status": "needs_review",
+      "risk_signals": ["audit_required"],
+      "status": "needs_info",
       "citation_required": true,
       "grounding_required": true,
       "source_acl_required": true
@@ -267,7 +289,8 @@
       "outputs": [{ "name": "routing_decision", "type": "object" }],
       "reuse_candidate": true,
       "risk_level": "low",
-      "status": "needs_review",
+      "risk_signals": ["audit_required"],
+      "status": "needs_info",
       "versioned": true,
       "effective_date_required": true,
       "audit_required": true
@@ -285,7 +308,8 @@
       "outputs": [{ "name": "recommendation", "type": "object" }],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "status": "needs_review"
+      "risk_signals": ["human_approval_required", "audit_required"],
+      "status": "needs_info"
     },
     {
       "id": "mod-005",
@@ -300,7 +324,8 @@
       "outputs": [{ "name": "workflow_context", "type": "object" }],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "status": "needs_review"
+      "risk_signals": ["human_approval_required", "audit_required"],
+      "status": "needs_info"
     },
     {
       "id": "mod-006",
@@ -315,7 +340,8 @@
       "outputs": [{ "name": "remote_agent_result", "type": "object" }],
       "reuse_candidate": false,
       "risk_level": "high",
-      "status": "needs_review"
+      "risk_signals": ["human_approval_required", "audit_required"],
+      "status": "needs_info"
     }
   ]
 }

@@ -7,7 +7,8 @@ This repository contains the workbench application and shared schemas. It is not
 ## Repository Scope
 
 - `packages/web`: React/Vite requirement intake workbench.
-- `schemas`: JSON Schemas for normalized requirements, module candidates, and process flow artifacts.
+- `schemas`: JSON Schemas for normalized requirements, module candidates, process flow, classification, commonization, and scaffold-plan artifacts.
+- `catalog`: MVP YAML catalogs for reusable agents, workflows, adapters, remote A2A placeholders, domain owners, and risk gates.
 - `templates`: generic artifact templates for reviewed handoff and scaffold planning.
 - `docs`: workbench design notes, validation guidance, and scaffold bridge documentation.
 - `.agents/skills`: skill material that may be synchronized later, but is not the primary edit target for this workbench refactor.
@@ -18,9 +19,10 @@ This repository contains the workbench application and shared schemas. It is not
 2. Normalize the requirement into reviewable structured data.
 3. Classify module candidates with the approved taxonomy.
 4. Review process flow and remote-boundary friction.
-5. Mark modules as approved, deferred, rejected, or needing review.
-6. Export approved artifacts for downstream implementation planning.
-7. Feed only approved `scaffold-plan.json` and `implementation-handoff.md` into any future scaffold bridge.
+5. Mark modules as approved, deferred, rejected, or `needs_info`.
+6. Review reuse pressure and domain capability coverage.
+7. Export approved artifacts for downstream implementation planning.
+8. Feed only approved `scaffold-plan.json` and `implementation-handoff.md` into any future scaffold bridge.
 
 Raw requirements must never create code directly. Scaffolding consumes approved artifacts only.
 

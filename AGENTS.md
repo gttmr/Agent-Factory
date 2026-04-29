@@ -3,7 +3,7 @@
 ## Repository Role
 
 - This is the primary Agent Factory workbench repository.
-- Treat `packages/web`, `schemas`, `templates`, and `docs` as the active workbench source of truth.
+- Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active workbench source of truth.
 - Do not treat this repository as only a public skill-source extract.
 - Do not add private banking data, private endpoints, credentials, deployment scripts, or organization-specific runtime code.
 - Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
@@ -14,6 +14,7 @@
 - `AGENTS.md`: model-facing repository index and working rules.
 - `packages/web`: requirement intake, analysis review, process flow, and artifact export UI.
 - `schemas`: normalized requirement, module candidate, and process-flow schemas.
+- `catalog`: initial YAML catalogs for reusable capabilities, domain owners, and risk gates.
 - `templates`: generic artifact and scaffold-plan templates.
 - `docs`: validation, scaffold bridge, and design notes.
 

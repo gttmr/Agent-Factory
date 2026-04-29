@@ -4,6 +4,7 @@ This directory contains human-facing notes for the Agent Factory workbench.
 
 ## Workbench Plans
 
+- [Agent Factory v1.0 goal](./agent-factory-v1-goal.md)
 - [Implementation plan](./agent-factory-implementation-plan.md)
 - [Phase 1 requirement intake workbench plan](./phase-1-requirement-intake-workbench-plan.md)
 - [Evolution plan](./banking-agent-factory-evolution-plan.md)

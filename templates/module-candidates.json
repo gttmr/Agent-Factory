@@ -23,7 +23,8 @@
     ],
     "reuse_candidate": true,
     "risk_level": "medium",
-    "status": "needs_review",
+    "risk_signals": ["personal_data", "financial_data", "audit_required"],
+    "status": "needs_info",
     "side_effect": "read",
     "auth_required": true,
     "audit_required": true
@@ -56,7 +57,8 @@
     ],
     "reuse_candidate": true,
     "risk_level": "medium",
-    "status": "needs_review",
+    "risk_signals": ["audit_required"],
+    "status": "needs_info",
     "citation_required": true,
     "grounding_required": true,
     "source_acl_required": true
@@ -95,7 +97,8 @@
     ],
     "reuse_candidate": false,
     "risk_level": "medium",
-    "status": "needs_review"
+    "risk_signals": ["human_approval_required", "audit_required"],
+    "status": "needs_info"
   },
   {
     "id": "mod-004",
@@ -125,7 +128,8 @@
     ],
     "reuse_candidate": false,
     "risk_level": "medium",
-    "status": "needs_review"
+    "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+    "status": "needs_info"
   },
   {
     "id": "mod-005",
@@ -151,7 +155,8 @@
     ],
     "reuse_candidate": true,
     "risk_level": "low",
-    "status": "needs_review",
+    "risk_signals": ["audit_required"],
+    "status": "needs_info",
     "versioned": true,
     "effective_date_required": true,
     "audit_required": true

@@ -41,7 +41,7 @@ export function RequirementIntake({
     <div className="two-column">
       <section className="panel intake-panel">
         <div className="section-heading">
-          <p className="eyebrow">Source</p>
+          <p className="eyebrow">원천 입력</p>
           <h2>요구사항 접수</h2>
         </div>
 
@@ -50,7 +50,7 @@ export function RequirementIntake({
           <input
             value={input.title}
             onChange={(event) => updateField("title", event.target.value)}
-            placeholder="Customer complaint triage agent"
+            placeholder="복잡한 고객 불만 처리 흐름"
           />
         </label>
 
@@ -60,7 +60,7 @@ export function RequirementIntake({
             <input
               value={input.domainHint}
               onChange={(event) => updateField("domainHint", event.target.value)}
-              placeholder="customer-service"
+              placeholder="고객 / 수신 / 여신 / 카드 / 리스크"
             />
           </label>
           <label>
@@ -68,7 +68,7 @@ export function RequirementIntake({
             <input
               value={input.requesterTeam}
               onChange={(event) => updateField("requesterTeam", event.target.value)}
-              placeholder="example-operations"
+              placeholder="예시 운영팀"
             />
           </label>
           <label>
@@ -76,7 +76,7 @@ export function RequirementIntake({
             <input
               value={input.requesterRole}
               onChange={(event) => updateField("requesterRole", event.target.value)}
-              placeholder="business-user"
+              placeholder="업무 사용자"
             />
           </label>
           <label>
@@ -84,7 +84,7 @@ export function RequirementIntake({
             <input
               value={input.knownSystems}
               onChange={(event) => updateField("knownSystems", event.target.value)}
-              placeholder="system_a, system_b"
+              placeholder="시스템 A, 시스템 B"
             />
           </label>
         </div>
@@ -94,7 +94,7 @@ export function RequirementIntake({
           <input
             value={input.expectedOutput}
             onChange={(event) => updateField("expectedOutput", event.target.value)}
-            placeholder="classification, recommendation, draft response"
+            placeholder="분류, 추천, 응답 초안"
           />
         </label>
 
@@ -125,7 +125,7 @@ export function RequirementIntake({
 
       <aside className="panel side-panel">
         <div className="section-heading">
-          <p className="eyebrow">Import</p>
+          <p className="eyebrow">가져오기</p>
           <h2>텍스트 파일</h2>
         </div>
         <input className="file-input" type="file" accept=".txt,.md,.yaml,.yml" onChange={handleUpload} />

@@ -1,0 +1,7 @@
+workflows:
+  - name: requirement_handling_workflow
+    workflow_kind: orchestration
+    owner_domain: 공통
+    status: proposed
+    scaffold_output: orchestration_shell_only
+    notes: local orchestration unless an independent remote agent boundary is proven

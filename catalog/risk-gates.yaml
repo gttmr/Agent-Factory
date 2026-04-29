@@ -1,0 +1,15 @@
+risk_gates:
+  - personal_data
+  - financial_data
+  - credit_decision_support
+  - customer_impact
+  - external_message
+  - transaction_write
+  - human_approval_required
+  - audit_required
+
+default_policy:
+  customer_impact: draft_or_recommendation_only
+  credit_decision_support: human_approval_required
+  transaction_write: not_allowed_in_mvp
+  audit_required: retain_review_artifact

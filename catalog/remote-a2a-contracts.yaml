@@ -1,0 +1,15 @@
+remote_a2a_contracts:
+  - name: remote_specialist_contract
+    status: placeholder
+    required_before_approval:
+      - remote_owner
+      - agent_card_or_discovery
+      - request_schema
+      - response_schema
+      - task_lifecycle
+      - auth
+      - timeout
+      - retry
+      - fallback
+      - audit
+      - data_policy

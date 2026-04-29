@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/classification.schema.json",
+  "title": "Classification Summary",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["module_id", "name", "selected_category", "subtype"],
+    "properties": {
+      "module_id": {
+        "type": "string",
+        "pattern": "^mod-[a-z0-9-]+$"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "selected_category": {
+        "type": "string",
+        "enum": ["agent", "workflow", "adapter", "remote_a2a"]
+      },
+      "subtype": {
+        "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+      },
+      "why_agent": {
+        "type": "string"
+      },
+      "why_adapter": {
+        "type": "string"
+      },
+      "why_workflow": {
+        "type": "string"
+      },
+      "why_not_remote_a2a": {
+        "type": "string"
+      },
+      "why_remote_a2a": {
+        "type": "string"
+      }
+    }
+  }
+}

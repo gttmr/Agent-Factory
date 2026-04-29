@@ -21,7 +21,7 @@ export function AnalysisResult({
     <div className="stack">
       <section className="panel">
         <div className="section-heading">
-          <p className="eyebrow">Evidence</p>
+          <p className="eyebrow">근거</p>
           <h2>분석 결과</h2>
         </div>
         <div className="evidence-grid">
@@ -39,7 +39,7 @@ export function AnalysisResult({
       <div className="two-column">
         <section className="panel">
           <div className="section-heading">
-            <p className="eyebrow">Review</p>
+            <p className="eyebrow">검토</p>
             <h2>검토 항목</h2>
           </div>
           <div className="review-list">
@@ -52,7 +52,7 @@ export function AnalysisResult({
                     checked={acceptedMissing.includes(item)}
                     onChange={() => onToggleAcceptedMissing(item)}
                   />
-                  <span>{item}</span>
+                  <span>{formatDisplayValue(item)}</span>
                 </label>
               ))
             ) : (
@@ -64,7 +64,7 @@ export function AnalysisResult({
             {evidence.contradictions.length ? (
               <ul className="plain-list">
                 {evidence.contradictions.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item}>{formatDisplayValue(item)}</li>
                 ))}
               </ul>
             ) : (
@@ -74,7 +74,7 @@ export function AnalysisResult({
           <div className="tag-row">
             {evidence.risk_signals.map((risk) => (
               <span className="tag risk" key={risk}>
-                {risk}
+                {formatDisplayValue(risk)}
               </span>
             ))}
           </div>
@@ -90,7 +90,7 @@ export function AnalysisResult({
 
         <section className="panel">
           <div className="section-heading">
-            <p className="eyebrow">Draft</p>
+            <p className="eyebrow">초안</p>
             <h2>정규화된 요구사항</h2>
           </div>
           <pre className="json-preview">{JSON.stringify(normalizedRequirement, null, 2)}</pre>
@@ -104,7 +104,39 @@ function EvidenceBlock({ label, values }: { label: string; values: string[] }) {
   return (
     <div className="evidence-block">
       <span>{label}</span>
-      <strong>{values.filter(Boolean).join(", ") || "unknown"}</strong>
+      <strong>{values.filter(Boolean).map(formatDisplayValue).join(", ") || "알 수 없음"}</strong>
     </div>
   );
+}
+
+function formatDisplayValue(value: string): string {
+  const labels: Record<string, string> = {
+    raw_requirement_text: "원문 요구사항 텍스트",
+    complaint_text: "불만 텍스트",
+    customer_id: "고객 ID",
+    knowledge_query: "지식 검색어",
+    classification: "분류",
+    recommended_next_step: "추천 다음 단계",
+    draft_response_outline: "응답 초안 개요",
+    normalized_recommendation: "정규화된 추천",
+    customer_profile_system: "고객 프로필 시스템",
+    response_template_library: "응답 템플릿 라이브러리",
+    capability_registry: "역량 레지스트리",
+    personal_data: "personal_data",
+    financial_data: "financial_data",
+    customer_impact: "customer_impact",
+    credit_decision_support: "credit_decision_support",
+    external_message: "external_message",
+    transaction_write: "transaction_write",
+    human_approval_required: "human_approval_required",
+    audit_required: "audit_required",
+    "System access method": "System access method",
+    "Final classification taxonomy": "Final classification taxonomy",
+    "Success metric": "Success metric",
+    "Domain boundary": "도메인 경계",
+    "Requester team": "요청 팀",
+    "Expected output contract": "예상 출력 계약"
+  };
+
+  return labels[value] ?? value;
 }

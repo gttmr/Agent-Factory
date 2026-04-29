@@ -1,13 +1,33 @@
 import { useMemo, useState } from "react";
-import { getCandidateSubtypeValue, moduleCategoryLabels } from "../analyzer/classificationRules";
+import { getCandidateSubtype, moduleCategoryLabels } from "../analyzer/classificationRules";
+import {
+  buildCatalogDeltaYaml,
+  buildCommonizationNotes,
+  buildDomainCapabilityMap,
+  buildMermaidProcessFlow,
+  buildReuseHeatmap
+} from "../analyzer/commonization";
 import type {
   ClassificationSummary,
-  CommonizationNotes,
   EvidenceSummary,
   ModuleCandidate,
   NormalizedRequirement,
   ProcessFlow
 } from "../analyzer/types";
+
+const statusLabels = {
+  needs_info: "정보 필요",
+  approved: "승인됨",
+  deferred: "보류",
+  rejected: "반려"
+} as const;
+
+const requirementStatusLabels = {
+  draft: "초안",
+  reviewed: "검토됨",
+  approved: "승인됨",
+  rejected: "반려"
+} as const;
 
 interface ExportArtifactsProps {
   normalizedRequirement: NormalizedRequirement;
@@ -29,14 +49,20 @@ export function ExportArtifacts({
     const classification = buildClassification(moduleCandidates);
     const commonizationNotes = buildCommonizationNotes(moduleCandidates);
     const scaffoldPlan = buildScaffoldPlan(normalizedRequirement, moduleCandidates);
+    const reuseHeatmap = buildReuseHeatmap(moduleCandidates);
+    const domainCapabilityMap = buildDomainCapabilityMap(moduleCandidates);
 
     return {
       "normalized-requirement.json": JSON.stringify(normalizedRequirement, null, 2),
       "evidence-summary.json": JSON.stringify(evidence, null, 2),
-      "module-candidates.json": JSON.stringify(moduleCandidates, null, 2),
+      "module-candidates.json": JSON.stringify(moduleCandidates.map(stripLegacyCandidate), null, 2),
       "process-flow.json": JSON.stringify(processFlow, null, 2),
+      "process-flow.mmd": buildMermaidProcessFlow(processFlow),
       "classification.json": JSON.stringify(classification, null, 2),
       "commonization-notes.json": JSON.stringify(commonizationNotes, null, 2),
+      "reuse-heatmap.json": JSON.stringify(reuseHeatmap, null, 2),
+      "domain-capability-map.json": JSON.stringify(domainCapabilityMap, null, 2),
+      "catalog-delta.yaml": buildCatalogDeltaYaml(moduleCandidates),
       "implementation-handoff.md": buildImplementationHandoff(
         normalizedRequirement,
         moduleCandidates,
@@ -62,7 +88,7 @@ export function ExportArtifacts({
   }
 
   function downloadArtifact(name: string, content: string) {
-    const blob = new Blob([content], { type: name.endsWith(".json") ? "application/json" : "text/markdown" });
+    const blob = new Blob([content], { type: artifactMimeType(name) });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -77,7 +103,7 @@ export function ExportArtifacts({
         <section className="panel" key={name}>
           <div className="artifact-header">
             <div className="section-heading">
-              <p className="eyebrow">Artifact</p>
+              <p className="eyebrow">아티팩트</p>
               <h2>{name}</h2>
             </div>
             <div className="actions compact">
@@ -101,37 +127,28 @@ function buildClassification(moduleCandidates: ModuleCandidate[]): Classificatio
     module_id: candidate.id,
     name: candidate.name,
     selected_category: candidate.module_category,
-    subtype: getCandidateSubtypeValue(candidate),
-    why_adapter_not_agent:
+    subtype: getCandidateSubtype(candidate),
+    why_agent:
+      candidate.module_category === "agent"
+        ? "요약, 분류, 판단, 권고처럼 LLM reasoning responsibility를 소유하므로 Agent로 분류했습니다."
+        : undefined,
+    why_adapter:
       candidate.module_category === "adapter"
-        ? "Selected as Adapter because it exposes callable capability or data access without owning reasoning responsibility."
+        ? "reasoning responsibility를 소유하지 않고 callable capability 또는 data access만 제공하므로 Adapter로 선택했습니다."
         : undefined,
-    why_workflow_not_remote_a2a:
+    why_workflow:
       candidate.module_category === "workflow"
-        ? "Selected as Workflow because it coordinates local steps and does not prove an independent remote agent owner or lifecycle."
+        ? "실행 순서, 분기, 반복, 승인 같은 local orchestration 책임을 가지므로 Workflow로 분류했습니다."
         : undefined,
-    remote_a2a_decision:
+    why_not_remote_a2a:
+      candidate.module_category !== "remote_a2a"
+        ? "independent remote agent owner, lifecycle, discovery, task contract가 확인되지 않았으므로 Remote A2A로 보지 않습니다."
+        : undefined,
+    why_remote_a2a:
       candidate.module_category === "remote_a2a"
-        ? "Accepted only as a contract placeholder until owner, lifecycle, auth, timeout, retry, fallback, and audit details are reviewed."
-        : "Deferred because the module does not require an independent remote agent boundary."
+        ? "owner, lifecycle, auth, timeout, retry, fallback, audit 세부 정보가 검토될 때까지 contract placeholder로만 허용합니다."
+        : undefined
   }));
-}
-
-function buildCommonizationNotes(moduleCandidates: ModuleCandidate[]): CommonizationNotes {
-  return {
-    reusable_adapters: moduleCandidates
-      .filter((candidate) => candidate.module_category === "adapter" && candidate.reuse_candidate)
-      .map((candidate) => candidate.name),
-    shared_agent_candidates: moduleCandidates
-      .filter((candidate) => candidate.module_category === "agent" && candidate.agent_kind === "shared")
-      .map((candidate) => candidate.name),
-    workflow_reuse_candidates: moduleCandidates
-      .filter((candidate) => candidate.module_category === "workflow" && candidate.reuse_candidate)
-      .map((candidate) => candidate.name),
-    remote_a2a_contracts: moduleCandidates
-      .filter((candidate) => candidate.module_category === "remote_a2a")
-      .map((candidate) => candidate.name)
-  };
 }
 
 function buildScaffoldPlan(normalizedRequirement: NormalizedRequirement, moduleCandidates: ModuleCandidate[]) {
@@ -149,7 +166,6 @@ function buildScaffoldPlan(normalizedRequirement: NormalizedRequirement, moduleC
       workflow_kind: candidate.workflow_kind ?? null,
       adapter_kind: candidate.adapter_kind ?? null,
       remote_contract_kind: candidate.remote_contract_kind ?? null,
-      legacy_recommended_type: candidate.legacy_recommended_type ?? null,
       scaffold_output: scaffoldOutputFor(candidate),
       no_runnable_business_logic: true,
       inputs: candidate.inputs,
@@ -198,47 +214,67 @@ function buildImplementationHandoff(
   const review = moduleCandidates.filter((candidate) => candidate.status !== "approved");
 
   return [
-    `# Implementation Handoff: ${normalizedRequirement.title}`,
+    `# 구현 인계: ${normalizedRequirement.title}`,
     "",
-    `Requirement: ${normalizedRequirement.id}`,
-    `Status: ${normalizedRequirement.status}`,
+    `요구사항: ${normalizedRequirement.id}`,
+    `상태: ${requirementStatusLabels[normalizedRequirement.status]}`,
     "",
-    "## Accepted Missing Information",
-    ...(acceptedMissing.length ? acceptedMissing.map((item) => `- ${item}`) : ["- None"]),
+    "## 확인된 부족 정보",
+    ...(acceptedMissing.length ? acceptedMissing.map((item) => `- ${item}`) : ["- 없음"]),
     "",
-    "## Approved Module Candidates",
+    "## 승인된 모듈 후보",
     ...(approved.length
       ? approved.map(
           (candidate) =>
             `- ${candidate.name}: ${moduleCategoryLabels[candidate.module_category]}${
-              getCandidateSubtypeValue(candidate) ? ` / ${getCandidateSubtypeValue(candidate)}` : ""
+              getCandidateSubtype(candidate) ? ` / ${getCandidateSubtype(candidate)}` : ""
             }`
         )
-      : ["- None"]),
+      : ["- 없음"]),
     "",
-    "## Classification Notes",
+    "## 분류 메모",
     ...classification.map((item) => {
       const reasons = [
-        item.why_adapter_not_agent,
-        item.why_workflow_not_remote_a2a,
-        item.remote_a2a_decision
+        item.why_agent,
+        item.why_adapter,
+        item.why_workflow,
+        item.why_not_remote_a2a,
+        item.why_remote_a2a
       ].filter(Boolean);
-      return `- ${item.name}: ${item.selected_category}${item.subtype ? ` / ${item.subtype}` : ""}. ${reasons.join(" ")}`;
+      return `- ${item.name}: ${moduleCategoryLabels[item.selected_category]}${item.subtype ? ` / ${item.subtype}` : ""}. ${reasons.join(" ")}`;
     }),
     "",
-    "## Remaining Review Items",
-    ...(review.length ? review.map((candidate) => `- ${candidate.name}: ${candidate.status}`) : ["- None"]),
+    "## 남은 검토 항목",
+    ...(review.length ? review.map((candidate) => `- ${candidate.name}: ${statusLabels[candidate.status]}`) : ["- 없음"]),
     "",
     "## Scaffold Guardrails",
-    "- Raw user requirements must not drive code generation directly.",
-    "- Adapter modules produce contracts or stubs only.",
-    "- Agent modules produce agent shells only.",
-    "- Workflow modules produce orchestration shells only.",
-    "- Remote A2A modules produce contract placeholders only until remote boundary details are approved.",
-    "- No runnable business logic is included in scaffold output.",
+    "- 원문 사용자 요구사항이 코드 생성을 직접 구동하면 안 됩니다.",
+    "- Adapter module은 contract 또는 stub만 생성합니다.",
+    "- Agent module은 agent shell만 생성합니다.",
+    "- Workflow module은 orchestration shell만 생성합니다.",
+    "- Remote A2A module은 remote boundary detail이 승인될 때까지 contract placeholder만 생성합니다.",
+    "- runnable business logic은 scaffold output에 포함하지 않습니다.",
     "",
-    "## Public Safety",
-    "- Artifacts use generic examples only.",
-    "- No credentials, private endpoints, private datasets, or deployment details are included."
+    "## 공개 안전 기준",
+    "- 아티팩트에는 일반 예시만 사용합니다.",
+    "- 자격 증명, 비공개 엔드포인트, 비공개 데이터셋, 배포 세부 정보는 포함하지 않습니다."
   ].join("\n");
+}
+
+function stripLegacyCandidate(candidate: ModuleCandidate): Omit<ModuleCandidate, "legacy_recommended_type"> {
+  const { legacy_recommended_type: _legacyRecommendedType, ...visibleCandidate } = candidate;
+  return visibleCandidate;
+}
+
+function artifactMimeType(name: string): string {
+  if (name.endsWith(".json")) {
+    return "application/json";
+  }
+  if (name.endsWith(".md")) {
+    return "text/markdown";
+  }
+  if (name.endsWith(".yaml") || name.endsWith(".yml")) {
+    return "application/yaml";
+  }
+  return "text/plain";
 }

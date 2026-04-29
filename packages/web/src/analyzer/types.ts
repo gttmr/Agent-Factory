@@ -17,6 +17,19 @@ export const workflowKinds = ["sequential", "parallel", "loop", "human_review", 
 
 export const remoteContractKinds = ["a2a", "unknown"] as const;
 
+export const bankDomains = ["고객", "수신", "여신", "카드", "리스크"] as const;
+
+export const riskSignals = [
+  "personal_data",
+  "financial_data",
+  "credit_decision_support",
+  "customer_impact",
+  "external_message",
+  "transaction_write",
+  "human_approval_required",
+  "audit_required"
+] as const;
+
 export const legacyRecommendedTypes = [
   "tool_adapter",
   "knowledge_retrieval",
@@ -32,11 +45,13 @@ export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
 export type WorkflowKind = (typeof workflowKinds)[number];
 export type RemoteContractKind = (typeof remoteContractKinds)[number];
+export type BankDomain = (typeof bankDomains)[number];
+export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
 export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
 
 export type RiskLevel = "low" | "medium" | "high";
-export type ModuleStatus = "needs_review" | "approved" | "deferred" | "rejected";
+export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
 
 export interface FieldSpec {
@@ -74,7 +89,7 @@ export interface NormalizedRequirement {
   inputs: FieldSpec[];
   outputs: FieldSpec[];
   systems: SystemSpec[];
-  risk_signals: string[];
+  risk_signals: RiskSignal[];
   missing_information: string[];
   contradictions: string[];
   status: RequirementStatus;
@@ -88,7 +103,7 @@ export interface EvidenceSummary {
   output_data: string[];
   systems_mentioned: string[];
   decisions_implied: string[];
-  risk_signals: string[];
+  risk_signals: RiskSignal[];
   missing_information: string[];
   contradictions: string[];
   assumptions: string[];
@@ -110,6 +125,7 @@ export interface ModuleCandidate {
   outputs: FieldSpec[];
   reuse_candidate: boolean;
   risk_level: RiskLevel;
+  risk_signals: RiskSignal[];
   status: ModuleStatus;
   side_effect?: SideEffect;
   auth_required?: boolean;
@@ -150,16 +166,38 @@ export interface ClassificationSummary {
   name: string;
   selected_category: ModuleCategory;
   subtype: string | null;
-  why_adapter_not_agent?: string;
-  why_workflow_not_remote_a2a?: string;
-  remote_a2a_decision?: string;
+  why_agent?: string;
+  why_adapter?: string;
+  why_workflow?: string;
+  why_not_remote_a2a?: string;
+  why_remote_a2a?: string;
 }
 
 export interface CommonizationNotes {
-  reusable_adapters: string[];
-  shared_agent_candidates: string[];
-  workflow_reuse_candidates: string[];
+  confirmed_reuse_bindings: string[];
+  proposed_shared_agents: string[];
+  proposed_adapter_catalog_entries: string[];
+  proposed_workflow_reuse: string[];
   remote_a2a_contracts: string[];
+  deferred_reuse: string[];
+  rejected_reuse: string[];
+}
+
+export interface ReuseHeatmapItem {
+  capability: string;
+  module_category: ModuleCategory;
+  subtype: string | null;
+  reuse_score: number;
+  domains: BankDomain[];
+  candidate_status: ModuleStatus;
+  rationale: string;
+}
+
+export interface DomainCapabilityMapRow {
+  capability: string;
+  module_category: ModuleCategory;
+  subtype: string | null;
+  domains: Record<BankDomain, "낮음" | "중간" | "높음">;
 }
 
 export interface AnalysisResult {

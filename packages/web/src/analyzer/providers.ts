@@ -31,7 +31,7 @@ export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
 
   async analyze(): Promise<AnalysisResult> {
     throw new Error(
-      "Live analysis is intentionally disabled in this public workbench. Future use must call POST /api/analyze-requirement from a trusted backend that validates schemas, applies policy gates, preserves audit logs, rejects invalid module_category values, and blocks Remote A2A approval without independent owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details."
+      "이 공개 workbench에서는 live analysis가 의도적으로 비활성화되어 있습니다. 이후 사용 시에는 trusted backend에서 POST /api/analyze-requirement를 호출하고, schema validation, policy gate, audit log 보존, 잘못된 module_category 값 거부, owner/lifecycle/contract/auth/timeout/retry/fallback/audit 세부 정보가 없는 Remote A2A 승인을 차단해야 합니다."
     );
   }
 }

@@ -53,7 +53,8 @@
   ],
   "risk_signals": [
     "customer_impact",
-    "personal_data"
+    "personal_data",
+    "audit_required"
   ],
   "missing_information": [
     "Exact complaint category taxonomy",

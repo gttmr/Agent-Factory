@@ -22,7 +22,19 @@ import {
   type WorkflowKind
 } from "../analyzer/types";
 
-const statuses: ModuleStatus[] = ["needs_review", "approved", "deferred", "rejected"];
+const statuses: ModuleStatus[] = ["needs_info", "approved", "deferred", "rejected"];
+const statusLabels: Record<ModuleStatus, string> = {
+  needs_info: "정보 필요",
+  approved: "승인됨",
+  deferred: "보류",
+  rejected: "반려"
+};
+
+const riskLabels = {
+  low: "낮음",
+  medium: "중간",
+  high: "높음"
+} as const;
 
 interface ModuleReviewProps {
   moduleCandidates: ModuleCandidate[];
@@ -44,14 +56,19 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
       workflow_kind: module_category === "workflow" ? candidate.workflow_kind ?? "sequential" : null,
       adapter_kind: module_category === "adapter" ? candidate.adapter_kind ?? "unknown" : null,
       remote_contract_kind: module_category === "remote_a2a" ? candidate.remote_contract_kind ?? "a2a" : null,
-      risk_level: module_category === "remote_a2a" ? "high" : candidate.risk_level
+      risk_level: module_category === "remote_a2a" ? "high" : candidate.risk_level,
+      risk_signals:
+        module_category === "remote_a2a"
+          ? Array.from(new Set([...candidate.risk_signals, "human_approval_required", "audit_required"]))
+          : candidate.risk_signals,
+      status: module_category === "remote_a2a" && candidate.status === "approved" ? "needs_info" : candidate.status
     });
   }
 
   return (
     <section className="panel module-review-panel">
       <div className="section-heading">
-        <p className="eyebrow">Architecture taxonomy</p>
+        <p className="eyebrow">아키텍처 분류</p>
         <h2>모듈 검토</h2>
       </div>
 
@@ -64,21 +81,23 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
             <col className="module-confidence-col" />
             <col className="module-reuse-col" />
             <col className="module-risk-col" />
+            <col className="module-risk-signal-col" />
             <col className="module-status-col" />
             <col className="module-rationale-col" />
             <col className="module-action-col" />
           </colgroup>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>module_category</th>
-              <th>Subtype</th>
-              <th>Confidence</th>
-              <th>Reuse</th>
-              <th>Risk</th>
-              <th>Status</th>
-              <th>Rationale</th>
-              <th>next_action</th>
+              <th>이름</th>
+              <th>모듈 분류</th>
+              <th>세부 유형</th>
+              <th>신뢰도</th>
+              <th>재사용</th>
+              <th>위험도</th>
+              <th>Risk Gate</th>
+              <th>상태</th>
+              <th>판단 근거</th>
+              <th>후속 검토 항목</th>
             </tr>
           </thead>
           <tbody>
@@ -91,9 +110,6 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                     onChange={(event) => updateCandidate(candidate.id, { name: event.target.value })}
                     rows={2}
                   />
-                  {candidate.legacy_recommended_type && (
-                    <span className="legacy-chip">legacy_recommended_type: {candidate.legacy_recommended_type}</span>
-                  )}
                 </td>
                 <td>
                   <select
@@ -119,11 +135,20 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                       checked={candidate.reuse_candidate}
                       onChange={(event) => updateCandidate(candidate.id, { reuse_candidate: event.target.checked })}
                     />
-                    <span>{candidate.reuse_candidate ? "Yes" : "No"}</span>
+                    <span>{candidate.reuse_candidate ? "예" : "아니요"}</span>
                   </label>
                 </td>
                 <td>
-                  <span className={`risk-pill ${candidate.risk_level}`}>{candidate.risk_level}</span>
+                  <span className={`risk-pill ${candidate.risk_level}`}>{riskLabels[candidate.risk_level]}</span>
+                </td>
+                <td>
+                  <div className="risk-signal-list">
+                    {candidate.risk_signals.map((signal) => (
+                      <span className="tag compact-tag" key={signal}>
+                        {formatRiskSignal(signal)}
+                      </span>
+                    ))}
+                  </div>
                 </td>
                 <td>
                   <select
@@ -133,7 +158,7 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                   >
                     {statuses.map((status) => (
                       <option key={status} value={status}>
-                        {status}
+                        {statusLabels[status]}
                       </option>
                     ))}
                   </select>
@@ -155,6 +180,21 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
       </div>
     </section>
   );
+}
+
+function formatRiskSignal(signal: string): string {
+  const labels: Record<string, string> = {
+    personal_data: "개인정보",
+    financial_data: "금융정보",
+    credit_decision_support: "신용판단 보조",
+    customer_impact: "고객 영향",
+    external_message: "외부 메시지",
+    transaction_write: "거래 쓰기",
+    human_approval_required: "사람 승인",
+    audit_required: "감사"
+  };
+
+  return labels[signal] ?? signal;
 }
 
 function SubtypeControl({
@@ -243,46 +283,46 @@ function candidateNextFields(candidate: ModuleCandidate): FieldSpec[] {
   if (candidate.module_category === "adapter") {
     if (candidate.adapter_kind === "retrieval") {
       return [
-        { name: "citations", type: "required" },
-        { name: "grounding", type: "required" },
-        { name: "source ACL", type: "required" }
+        { name: "출처 표기", type: "required" },
+        { name: "근거 연결", type: "required" },
+        { name: "원천 접근 권한", type: "required" }
       ];
     }
     if (candidate.adapter_kind === "rule_registry") {
       return [
-        { name: "owner", type: "required" },
-        { name: "version", type: "required" },
-        { name: "effective date", type: "required" },
-        { name: "audit", type: "required" }
+        { name: "소유자", type: "required" },
+        { name: "버전", type: "required" },
+        { name: "적용일", type: "required" },
+        { name: "감사", type: "required" }
       ];
     }
     return [
-      { name: "contract", type: "required" },
-      { name: "auth", type: "review" },
-      { name: "side effect", type: "review" }
+      { name: "계약", type: "required" },
+      { name: "인증", type: "review" },
+      { name: "부수 효과", type: "review" }
     ];
   }
   if (candidate.module_category === "workflow") {
     return [
-      { name: "step order", type: "required" },
-      { name: "handoff", type: "required" }
+      { name: "단계 순서", type: "required" },
+      { name: "인계", type: "required" }
     ];
   }
   return [
-    { name: "input contract", type: "required" },
+    { name: "입력 계약", type: "required" },
     { name: "eval placeholder", type: "required" }
   ];
 }
 
 const remoteA2AFields: FieldSpec[] = [
-  { name: "owner", type: "required" },
-  { name: "lifecycle", type: "required" },
-  { name: "contract", type: "required" },
-  { name: "auth", type: "required" },
-  { name: "timeout", type: "required" },
-  { name: "retry", type: "required" },
-  { name: "fallback", type: "required" },
-  { name: "audit", type: "required" }
+  { name: "소유자", type: "required" },
+  { name: "생명주기", type: "required" },
+  { name: "계약", type: "required" },
+  { name: "인증", type: "required" },
+  { name: "타임아웃", type: "required" },
+  { name: "재시도", type: "required" },
+  { name: "폴백", type: "required" },
+  { name: "감사", type: "required" }
 ];
 
 function FieldList({ fields }: { fields: FieldSpec[] }) {

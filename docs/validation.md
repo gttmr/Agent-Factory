@@ -11,6 +11,8 @@ For `module-candidates.json`:
 - Agent modules must include `agent_kind`.
 - Workflow modules must include `workflow_kind`.
 - Remote A2A modules must include `remote_contract_kind`.
+- Status must be one of `approved`, `deferred`, `rejected`, or `needs_info`.
+- Risk signals should use the banking risk gates from `catalog/risk-gates.yaml`.
 - `legacy_recommended_type` is migration metadata only and must not be used as the primary classifier.
 - Remote A2A modules are high-friction. Incomplete remote contract placeholders must call out missing owner, agent card, auth, task lifecycle, timeout, retry, fallback, and audit fields before implementation.
 

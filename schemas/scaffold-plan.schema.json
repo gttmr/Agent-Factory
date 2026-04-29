@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/scaffold-plan.schema.json",
+  "title": "Scaffold Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requirement_id", "source", "raw_requirement_to_code", "modules"],
+  "properties": {
+    "requirement_id": {
+      "type": "string",
+      "pattern": "^req-[a-z0-9-]+$"
+    },
+    "source": {
+      "type": "string",
+      "const": "approved_workbench_artifact"
+    },
+    "raw_requirement_to_code": {
+      "type": "boolean",
+      "const": false
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/module"
+      }
+    }
+  },
+  "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "module_category",
+        "agent_kind",
+        "workflow_kind",
+        "adapter_kind",
+        "remote_contract_kind",
+        "scaffold_output",
+        "no_runnable_business_logic",
+        "inputs",
+        "outputs",
+        "required_review_fields"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^mod-[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module_category": {
+          "type": "string",
+          "enum": ["agent", "workflow", "adapter", "remote_a2a"]
+        },
+        "agent_kind": {
+          "anyOf": [{ "type": "string", "enum": ["specialist", "shared"] }, { "type": "null" }]
+        },
+        "workflow_kind": {
+          "anyOf": [
+            { "type": "string", "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "adapter_kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "legacy_api",
+                "retrieval",
+                "rule_registry",
+                "data_query",
+                "template",
+                "computation",
+                "external_service",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "remote_contract_kind": {
+          "anyOf": [{ "type": "string", "enum": ["a2a", "unknown"] }, { "type": "null" }]
+        },
+        "scaffold_output": {
+          "type": "string",
+          "enum": ["contract_or_stub_only", "agent_shell_only", "orchestration_shell_only", "contract_placeholder_only"]
+        },
+        "no_runnable_business_logic": {
+          "type": "boolean",
+          "const": true
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "required_review_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

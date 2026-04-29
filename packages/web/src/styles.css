@@ -434,6 +434,10 @@ td {
   width: 112px;
 }
 
+.module-risk-signal-col {
+  width: 260px;
+}
+
 .module-status-col {
   width: 160px;
 }
@@ -514,6 +518,18 @@ td {
   border-color: #f0aaa4;
   background: #fff1f0;
   color: var(--red);
+}
+
+.risk-signal-list,
+.domain-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.compact-tag {
+  padding: 5px 8px;
+  font-size: 0.74rem;
 }
 
 .legacy-chip {
@@ -756,6 +772,106 @@ td {
   align-items: start;
 }
 
+.heatmap-list {
+  display: grid;
+  gap: 10px;
+}
+
+.heatmap-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.5fr) minmax(200px, 0.5fr) auto;
+  gap: 16px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.heatmap-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.heatmap-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.heatmap-row span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.heatmap-row strong {
+  color: #1a202c;
+}
+
+.heatmap-row em {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.heatmap-score {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.heatmap-score span {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.status-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.domain-map-table {
+  min-width: 1040px;
+}
+
+.domain-map-table td strong,
+.domain-map-table td span {
+  display: block;
+}
+
+.domain-map-table td span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.affinity {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 800;
+}
+
+.affinity.high {
+  background: #e8f6ee;
+  color: #17633b;
+}
+
+.affinity.medium {
+  background: #fff8e8;
+  color: var(--amber);
+}
+
+.affinity.low {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
 @media (max-width: 980px) {
   .topbar,
   .artifact-header {
@@ -777,6 +893,10 @@ td {
   }
 
   .flow-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .heatmap-row {
     grid-template-columns: 1fr;
   }
 

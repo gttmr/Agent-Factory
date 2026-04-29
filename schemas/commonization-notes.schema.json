@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/commonization-notes.schema.json",
+  "title": "Commonization Notes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "confirmed_reuse_bindings",
+    "proposed_shared_agents",
+    "proposed_adapter_catalog_entries",
+    "proposed_workflow_reuse",
+    "remote_a2a_contracts",
+    "deferred_reuse",
+    "rejected_reuse"
+  ],
+  "properties": {
+    "confirmed_reuse_bindings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proposed_shared_agents": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proposed_adapter_catalog_entries": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proposed_workflow_reuse": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "remote_a2a_contracts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "deferred_reuse": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rejected_reuse": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

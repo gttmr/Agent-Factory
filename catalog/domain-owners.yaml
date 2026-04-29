@@ -1,0 +1,11 @@
+domains:
+  - name: 고객
+    owner: placeholder-development-leader
+  - name: 수신
+    owner: placeholder-development-leader
+  - name: 여신
+    owner: placeholder-development-leader
+  - name: 카드
+    owner: placeholder-development-leader
+  - name: 리스크
+    owner: placeholder-development-leader

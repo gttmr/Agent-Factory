@@ -11,7 +11,6 @@
       "agent_kind": null,
       "workflow_kind": null,
       "remote_contract_kind": null,
-      "legacy_recommended_type": "tool_adapter",
       "scaffold_output": "contract_or_stub_only",
       "no_runnable_business_logic": true,
       "inputs": [
@@ -37,7 +36,6 @@
       "workflow_kind": null,
       "adapter_kind": null,
       "remote_contract_kind": null,
-      "legacy_recommended_type": "specialist_agent",
       "scaffold_output": "agent_shell_only",
       "no_runnable_business_logic": true,
       "inputs": [
