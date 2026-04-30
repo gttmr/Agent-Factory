@@ -167,17 +167,20 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                   </div>
                 </td>
                 <td>
-                  <select
-                    className="status-select"
-                    value={candidate.status}
-                    onChange={(event) => updateCandidate(candidate.id, { status: event.target.value as ModuleStatus })}
-                  >
-                    {statuses.map((status) => (
-                      <option key={status} value={status}>
-                        {statusLabels[status]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="status-cell">
+                    <select
+                      className="status-select"
+                      value={candidate.status}
+                      onChange={(event) => updateCandidate(candidate.id, { status: event.target.value as ModuleStatus })}
+                    >
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabels[status]}
+                        </option>
+                      ))}
+                    </select>
+                    <MissingInformationBlock candidate={candidate} />
+                  </div>
                 </td>
                 <td className="rationale-cell">
                   {candidate.rationale}
@@ -232,6 +235,23 @@ function AdkHintsBlock({ candidate }: { candidate: ModuleCandidate }) {
         </div>
       ))}
     </details>
+  );
+}
+
+function MissingInformationBlock({ candidate }: { candidate: ModuleCandidate }) {
+  if (candidate.status !== "needs_info" || !candidate.missing_information.length) {
+    return null;
+  }
+
+  return (
+    <div className="status-missing-info">
+      <span className="status-missing-info-title">필요 정보</span>
+      <ul>
+        {candidate.missing_information.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

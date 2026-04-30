@@ -11,6 +11,7 @@ Agent Factory export artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `adapter`는 `adapter_kind`를 포함한다.
 - `remote_a2a`는 `remote_contract_kind`를 포함한다.
 - `status`는 `approved`, `deferred`, `rejected`, `needs_info` 중 하나다.
+- `missing_information`은 후보별로 승인 전 필요한 정보를 담는 문자열 배열이다.
 - `legacy_recommended_type`은 migration metadata로만 사용한다.
 - risk signal은 analyzer enum과 `catalog/risk-gates.yaml`의 의도에 맞아야 한다.
 

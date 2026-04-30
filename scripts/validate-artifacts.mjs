@@ -63,6 +63,12 @@ function validateModuleCandidates() {
     if ("recommended_type" in candidate) {
       errors.push(`${label} uses recommended_type as a classifier; use module_category instead.`);
     }
+    if (
+      !Array.isArray(candidate.missing_information) ||
+      candidate.missing_information.some((item) => typeof item !== "string" || !item.trim())
+    ) {
+      errors.push(`${label} missing_information must be an array of non-empty strings.`);
+    }
     validateAdkHints(candidate.adk_hints, label);
     if (candidate.module_category === "adapter" && !adapterKinds.has(candidate.adapter_kind)) {
       errors.push(`${label} is adapter but has invalid or missing adapter_kind.`);

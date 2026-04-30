@@ -428,6 +428,7 @@ function buildPrompt(input: Record<string, unknown>): string {
     "- Edge edge_type must be \"remote_a2a\" iff at least one endpoint is a remote_a2a node; all other edges are local.",
     "- Include branch:, parallel:, or loop: prefixes in edge data only when those structures are supported by the requirement.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
+    "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
     "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all.",
     "- Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
     "",
@@ -1146,6 +1147,7 @@ function validateModuleCandidates(value: unknown, errors: string[]) {
     validateFields(candidate.inputs, `${label}.inputs`, errors);
     validateFields(candidate.outputs, `${label}.outputs`, errors);
     validateRiskSignals(candidate.risk_signals, `${label}.risk_signals`, errors);
+    expectStringArray(candidate.missing_information, `${label}.missing_information`, errors);
     validateAdkHints(candidate.adk_hints, `${label}.adk_hints`, errors);
 
     if (typeof candidate.module_category !== "string" || !moduleCategories.has(candidate.module_category)) {

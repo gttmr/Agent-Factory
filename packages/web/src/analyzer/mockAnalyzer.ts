@@ -403,6 +403,7 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       risk_level: "medium",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["personal_data", "financial_data", "audit_required"]),
       status: "needs_info",
+      missing_information: ["검토된 API 계약", "인증 방식", "timeout/retry 정책"],
       side_effect: "read",
       auth_required: true,
       audit_required: true
@@ -430,6 +431,7 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       risk_level: "medium",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["audit_required"]),
       status: "needs_info",
+      missing_information: ["승인된 지식 원천 목록", "출처 표기 정책", "원천 접근 권한"],
       citation_required: true,
       grounding_required: true,
       source_acl_required: true
@@ -454,7 +456,8 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       reuse_candidate: false,
       risk_level: "medium",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["human_approval_required", "audit_required"]),
-      status: "needs_info"
+      status: "needs_info",
+      missing_information: ["단계 순서", "단계 간 인계 계약", "실패 또는 escalation 규칙"]
     });
   }
 
@@ -472,7 +475,8 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
     reuse_candidate: false,
     risk_level: requirement.risk_signals.includes("credit_decision_support") ? "high" : requirement.risk_signals.includes("personal_data") ? "medium" : "low",
     risk_signals: mergeRiskSignals(requirement.risk_signals, ["human_approval_required", "audit_required"]),
-    status: "needs_info"
+    status: "needs_info",
+    missing_information: ["입력 계약", "eval placeholder"]
   });
 
   if (hasAny(lowerText, ["reusable", "shared capability", "재사용", "공유 역량"])) {
@@ -490,7 +494,8 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       reuse_candidate: true,
       risk_level: "medium",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["human_approval_required", "audit_required"]),
-      status: "needs_info"
+      status: "needs_info",
+      missing_information: ["공유 책임 범위", "재사용 가능한 입력/출력 계약", "eval placeholder"]
     });
   }
 
@@ -510,6 +515,7 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       risk_level: "low",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["audit_required"]),
       status: "needs_info",
+      missing_information: ["registry 소유자", "버전 관리 규칙", "적용일 정책"],
       versioned: true,
       effective_date_required: true,
       audit_required: true
@@ -531,7 +537,18 @@ function inferModuleCandidates(requirement: NormalizedRequirement, lowerText: st
       reuse_candidate: false,
       risk_level: "high",
       risk_signals: mergeRiskSignals(requirement.risk_signals, ["human_approval_required", "audit_required"]),
-      status: "needs_info"
+      status: "needs_info",
+      missing_information: [
+        "remote owner",
+        "agent card 또는 discovery 방식",
+        "auth",
+        "task lifecycle",
+        "timeout",
+        "retry",
+        "fallback",
+        "audit",
+        "data policy"
+      ]
     });
   }
 

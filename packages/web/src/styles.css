@@ -638,7 +638,7 @@ td {
 }
 
 .module-status-col {
-  width: 160px;
+  width: 220px;
 }
 
 .module-action-col {
@@ -674,6 +674,34 @@ td {
 .module-table .table-select,
 .module-table .status-select {
   white-space: nowrap;
+}
+
+.status-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.status-missing-info {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #edcf8f;
+  border-radius: 8px;
+  background: #fff8e8;
+  padding: 8px;
+  color: #5d420b;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.status-missing-info-title {
+  font-weight: 800;
+}
+
+.status-missing-info ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
 }
 
 .rationale-cell {

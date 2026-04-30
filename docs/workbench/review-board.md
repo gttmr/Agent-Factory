@@ -19,6 +19,7 @@ Analyzer가 제안한 값은 초안이며, 불명확한 경우 새 값을 만들
 - `risk_level`
 - `risk_signals`
 - `status`
+- `missing_information`
 - `rationale`
 
 Subtype은 `module_category`에 맞는 한 필드만 의미를 갖는다.
@@ -31,6 +32,9 @@ Subtype은 `module_category`에 맞는 한 필드만 의미를 갖는다.
 - `deferred`: 판단은 유효하지만 이번 범위에서 보류한다.
 - `rejected`: 후보로 쓰지 않는다.
 - `needs_info`: 승인 전 추가 정보가 필요하다.
+
+`needs_info` 후보는 `missing_information`에 승인 전 필요한 후보별 정보를 적어야 한다.
+요구사항 전체의 부족 정보와 달리, 이 필드는 특정 module candidate를 승인하지 못하는 직접 이유다.
 
 ## 위험 신호
 

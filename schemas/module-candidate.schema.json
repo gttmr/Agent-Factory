@@ -16,7 +16,8 @@
     "reuse_candidate",
     "risk_level",
     "risk_signals",
-    "status"
+    "status",
+    "missing_information"
   ],
   "properties": {
     "id": {
@@ -98,6 +99,13 @@
     "status": {
       "type": "string",
       "enum": ["needs_info", "approved", "deferred", "rejected"]
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "risk_signals": {
       "type": "array",
@@ -316,6 +324,7 @@
       "risk_level": "medium",
       "risk_signals": ["personal_data", "financial_data", "audit_required"],
       "status": "needs_info",
+      "missing_information": ["reviewed API contract", "auth method", "timeout and retry policy"],
       "side_effect": "read",
       "auth_required": true,
       "audit_required": true
@@ -338,6 +347,7 @@
       "risk_level": "medium",
       "risk_signals": ["audit_required"],
       "status": "needs_info",
+      "missing_information": ["approved source list", "citation policy", "source access control"],
       "citation_required": true,
       "grounding_required": true,
       "source_acl_required": true
@@ -357,6 +367,7 @@
       "risk_level": "low",
       "risk_signals": ["audit_required"],
       "status": "needs_info",
+      "missing_information": ["registry owner", "versioning rule", "effective date policy"],
       "versioned": true,
       "effective_date_required": true,
       "audit_required": true
@@ -375,7 +386,8 @@
       "reuse_candidate": false,
       "risk_level": "medium",
       "risk_signals": ["human_approval_required", "audit_required"],
-      "status": "needs_info"
+      "status": "needs_info",
+      "missing_information": ["input contract", "evaluation placeholder"]
     },
     {
       "id": "mod-005",
@@ -391,7 +403,8 @@
       "reuse_candidate": false,
       "risk_level": "medium",
       "risk_signals": ["human_approval_required", "audit_required"],
-      "status": "needs_info"
+      "status": "needs_info",
+      "missing_information": ["step order", "handoff contract", "failure or escalation rule"]
     },
     {
       "id": "mod-006",
@@ -407,7 +420,18 @@
       "reuse_candidate": false,
       "risk_level": "high",
       "risk_signals": ["human_approval_required", "audit_required"],
-      "status": "needs_info"
+      "status": "needs_info",
+      "missing_information": [
+        "remote owner",
+        "agent card or discovery method",
+        "auth",
+        "task lifecycle",
+        "timeout",
+        "retry",
+        "fallback",
+        "audit",
+        "data policy"
+      ]
     }
   ]
 }

@@ -223,6 +223,7 @@
         "risk_level",
         "risk_signals",
         "status",
+        "missing_information",
         "side_effect",
         "auth_required",
         "audit_required",
@@ -303,6 +304,10 @@
         "status": {
           "type": "string",
           "enum": ["needs_info", "deferred", "rejected"]
+        },
+        "missing_information": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "side_effect": {
           "anyOf": [

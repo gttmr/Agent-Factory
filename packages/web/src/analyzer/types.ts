@@ -145,6 +145,7 @@ export interface ModuleCandidate {
   risk_level: RiskLevel;
   risk_signals: RiskSignal[];
   status: ModuleStatus;
+  missing_information: string[];
   side_effect?: SideEffect;
   auth_required?: boolean;
   audit_required?: boolean;

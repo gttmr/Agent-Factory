@@ -190,7 +190,7 @@ function scaffoldOutputFor(candidate: ModuleCandidate): string {
 
 function requiredReviewFields(candidate: ModuleCandidate): string[] {
   if (candidate.module_category === "remote_a2a") {
-    return ["owner", "agent_card", "auth", "task_lifecycle", "timeout", "retry", "fallback", "audit"];
+    return ["owner", "agent_card", "auth", "task_lifecycle", "timeout", "retry", "fallback", "audit", "data_policy"];
   }
   if (candidate.adapter_kind === "retrieval") {
     return ["citation_required", "grounding_required", "source_acl_required"];
@@ -245,7 +245,7 @@ function buildImplementationHandoff(
     }),
     "",
     "## 남은 검토 항목",
-    ...(review.length ? review.map((candidate) => `- ${candidate.name}: ${statusLabels[candidate.status]}`) : ["- 없음"]),
+    ...(review.length ? review.map(formatReviewCandidate) : ["- 없음"]),
     "",
     "## Scaffold Guardrails",
     "- 원문 사용자 요구사항이 코드 생성을 직접 구동하면 안 됩니다.",
@@ -259,6 +259,13 @@ function buildImplementationHandoff(
     "- 아티팩트에는 일반 예시만 사용합니다.",
     "- 자격 증명, 비공개 엔드포인트, 비공개 데이터셋, 배포 세부 정보는 포함하지 않습니다."
   ].join("\n");
+}
+
+function formatReviewCandidate(candidate: ModuleCandidate): string {
+  const missingInformation = candidate.missing_information.length
+    ? ` - 필요 정보: ${candidate.missing_information.join(", ")}`
+    : "";
+  return `- ${candidate.name}: ${statusLabels[candidate.status]}${missingInformation}`;
 }
 
 function stripLegacyCandidate(candidate: ModuleCandidate): Omit<ModuleCandidate, "legacy_recommended_type"> {
