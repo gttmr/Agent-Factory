@@ -94,7 +94,6 @@ export default function App() {
       setModuleCandidates(result.moduleCandidates);
       setAcceptedMissing([]);
       setValidationMessage("");
-      setActiveStep("analysis");
     } catch (error) {
       setValidationMessage(error instanceof Error ? error.message : "분석을 완료하지 못했습니다.");
       setActiveStep("intake");

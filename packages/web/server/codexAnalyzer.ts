@@ -93,6 +93,7 @@ interface AnalyzerProgressEvent {
   traceKind?: AnalyzerTraceKind;
   title?: string;
   snippet?: string;
+  snippetFull?: string;
   toolName?: string;
   status?: AnalyzerTraceStatus;
   durationMs?: number;
@@ -599,6 +600,7 @@ function runProcess(
         traceKind: event.traceKind,
         title: event.title,
         snippet: event.snippet,
+        snippetFull: event.snippetFull,
         toolName: event.toolName,
         status: event.status,
         durationMs: event.durationMs,
@@ -702,6 +704,7 @@ interface CliTraceEvent {
   traceKind?: AnalyzerTraceKind;
   title?: string;
   snippet?: string;
+  snippetFull?: string;
   toolName?: string;
   status?: AnalyzerTraceStatus;
   durationMs?: number;
@@ -758,10 +761,12 @@ function normalizeCliTrace(
   rawEventType: string
 ): Omit<CliTraceEvent, "rawEventType" | "sequence"> | null {
   if (!isRecord(parsed)) {
+    const raw = String(parsed ?? "");
     return {
       traceKind: "diagnostic",
       title: "CLI 텍스트 출력",
-      snippet: summarizeText(String(parsed ?? "")),
+      snippet: summarizeText(raw),
+      snippetFull: summarizeFull(raw),
       message: "Codex CLI 텍스트 출력을 수신했습니다.",
       status: "info"
     };
@@ -778,12 +783,13 @@ function normalizeCliTrace(
     return toolTrace;
   }
 
-  const summaryText = findReasoningSummarySnippet(parsed);
-  if (summaryText) {
+  const summaryRaw = findReasoningSummaryRaw(parsed);
+  if (summaryRaw) {
     return {
       traceKind: "reasoning_summary",
       title: "Reasoning 요약",
-      snippet: summaryText,
+      snippet: summarizeText(summaryRaw),
+      snippetFull: summarizeFull(summaryRaw),
       message: "Reasoning 요약을 수신했습니다.",
       status: normalizedType.includes("completed") ? "completed" : "info"
     };
@@ -793,10 +799,12 @@ function normalizeCliTrace(
   }
 
   if (normalizedType.includes("error") || normalizedType.includes("failed")) {
+    const errorRaw = getFirstString(parsed, ["message", "error", "details"]);
     return {
       traceKind: "diagnostic",
       title: "CLI 오류",
-      snippet: summarizeText(getFirstString(parsed, ["message", "error", "details"])),
+      snippet: summarizeText(errorRaw),
+      snippetFull: summarizeFull(errorRaw),
       message: "Codex CLI 오류 이벤트를 수신했습니다.",
       status: "failed"
     };
@@ -820,12 +828,13 @@ function normalizeCliTrace(
     };
   }
 
-  const assistantText = findAssistantSnippet(parsed);
-  if (assistantText) {
+  const assistantRaw = findAssistantRaw(parsed);
+  if (assistantRaw) {
     return {
       traceKind: "assistant_message",
       title: "모델 메모",
-      snippet: assistantText,
+      snippet: summarizeText(assistantRaw),
+      snippetFull: summarizeFull(assistantRaw),
       message: "모델 메시지를 수신했습니다.",
       status: normalizedType.includes("completed") ? "completed" : "info"
     };
@@ -871,6 +880,7 @@ function normalizeToolTrace(
     traceKind: isResult ? "tool_result" : "tool_call",
     title: isResult ? "툴 결과" : "툴 호출",
     snippet: summarizeText(snippetSource),
+    snippetFull: summarizeFull(snippetSource),
     toolName,
     message: isResult ? `${toolName} 결과를 수신했습니다.` : `${toolName} 호출을 시작했습니다.`,
     status,
@@ -900,15 +910,15 @@ function findToolResultText(value: unknown): string {
   );
 }
 
-function findAssistantSnippet(value: unknown): string {
-  return summarizeText(findFirstStringByKey(value, new Set(["message", "text", "delta", "content"]), (key) => {
+function findAssistantRaw(value: unknown): string {
+  return findFirstStringByKey(value, new Set(["message", "text", "delta", "content"]), (key) => {
     const normalized = key.toLowerCase();
     return !normalized.includes("reasoning") && !normalized.includes("summary");
-  }));
+  });
 }
 
-function findReasoningSummarySnippet(value: unknown): string {
-  return summarizeText(findFirstStringByKey(value, new Set(["reasoning_summary", "summaryTextDelta", "summary_text_delta"])));
+function findReasoningSummaryRaw(value: unknown): string {
+  return findFirstStringByKey(value, new Set(["reasoning_summary", "summaryTextDelta", "summary_text_delta"]));
 }
 
 function findFirstStringByKey(
@@ -960,6 +970,14 @@ function stringifyForTrace(value: unknown): string {
 
 function summarizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 360);
+}
+
+function summarizeFull(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= 4000) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 4000)}\n…(${trimmed.length - 4000} more chars truncated)`;
 }
 
 function getRecordField(value: Record<string, unknown>, key: string): Record<string, unknown> | null {
