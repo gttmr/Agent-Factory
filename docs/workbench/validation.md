@@ -38,7 +38,7 @@ Agent Factory export artifact는 구현 계획이나 후속 작업에 쓰기 전
 ## 문서 구조
 
 - 활성 워크벤치 문서는 `docs/workbench/` 아래에 둔다.
-- ADK 공식 설명은 repo에 복제하지 않고 `adk-docs-mcp`에서 확인한다.
+- ADK 공식 설명은 repo에 복제하지 않고 `adk-docs-mcp`에서 확인한다 (ADK 2.0 Beta 섹션 우선; 1.14는 legacy compat).
 - ADK component와 Agent Factory taxonomy의 연결 규칙은 `docs/workbench/workflow-decision-guide.md`에 둔다.
 - 스캐폴딩 노트, 과거 계획, 리뷰 기록, 스킬 노트, 유지보수 프롬프트는 `docs/archive/` 아래에 둔다.
 - `docs/README.md`가 기본 프롬프트 경로를 설명해야 한다.

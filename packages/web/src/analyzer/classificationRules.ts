@@ -1,4 +1,12 @@
-import type { AdapterKind, AgentKind, ModuleCandidate, ModuleCategory, RemoteContractKind, WorkflowKind } from "./types";
+import type {
+  AccessProtocol,
+  AdapterKind,
+  AgentKind,
+  ModuleCandidate,
+  ModuleCategory,
+  RemoteContractKind,
+  WorkflowKind
+} from "./types";
 
 export const moduleCategoryLabels: Record<ModuleCategory, string> = {
   agent: "Agent",
@@ -29,11 +37,22 @@ export const workflowKindLabels: Record<WorkflowKind, string> = {
   loop: "Loop",
   human_review: "Human Review",
   orchestration: "Orchestration",
+  graph: "Graph",
+  dynamic: "Dynamic",
   unknown: "Unknown"
 };
 
 export const remoteContractKindLabels: Record<RemoteContractKind, string> = {
   a2a: "A2A",
+  unknown: "Unknown"
+};
+
+export const accessProtocolLabels: Record<AccessProtocol, string> = {
+  local: "Local",
+  http_rest: "HTTP REST",
+  mcp: "MCP",
+  grpc: "gRPC",
+  message_queue: "Message Queue",
   unknown: "Unknown"
 };
 

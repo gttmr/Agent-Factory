@@ -33,10 +33,17 @@ Agent는 판단, 요약, 분류, 추천, triage처럼 추론 책임을 가진 �
 - `loop`
 - `human_review`
 - `orchestration`
+- `graph`
+- `dynamic`
 - `unknown`
 
 Workflow는 로컬 경계 안의 결정적 또는 준결정적 제어 흐름이다.
 상세 판단은 [Workflow decision guide](./workflow-decision-guide.md)를 따른다.
+
+ADK 2.0 (Beta)을 기본 baseline으로 두고 분석한다.
+`graph`는 2.0 graph workflow(노드/엣지가 명시된 결정적 라우팅), `dynamic`은 2.0 dynamic workflow(파이썬 코드 기반 제어)에 대응한다.
+`sequential`, `parallel`, `loop`는 2.0에서도 유효하며, 1.14 환경에서는 각각 `SequentialAgent`, `ParallelAgent`, `LoopAgent`로 매핑되는 legacy compat 표현이다.
+`workflow_kind`는 ADK runtime 버전과 1:1로 묶이지 않는다. 같은 분류 값이 2.0 graph 노드로도 1.14 stable agent로도 구현될 수 있다.
 
 ## adapter_kind
 

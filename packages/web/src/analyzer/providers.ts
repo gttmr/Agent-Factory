@@ -1,8 +1,14 @@
-import { analyzeRequirement } from "./mockAnalyzer";
-import type { AnalysisResult, AnalyzerProgressEvent, CodexAnalyzerModel, RequirementIntakeInput } from "./types";
+import type {
+  AnalysisResult,
+  AnalyzerProgressEvent,
+  CatalogReference,
+  CodexAnalyzerModel,
+  RequirementIntakeInput
+} from "./types";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
+  catalog?: CatalogReference[];
   onProgress?: (event: AnalyzerProgressEvent) => void;
 }
 
@@ -10,15 +16,6 @@ export interface AnalyzerProvider {
   readonly id: string;
   readonly label: string;
   analyze(input: RequirementIntakeInput, options: AnalyzerRunOptions): Promise<AnalysisResult>;
-}
-
-export class MockAnalyzerProvider implements AnalyzerProvider {
-  readonly id = "mock-rule-analyzer";
-  readonly label = "Rule-based mock analyzer";
-
-  async analyze(input: RequirementIntakeInput): Promise<AnalysisResult> {
-    return analyzeRequirement(input);
-  }
 }
 
 export interface OpenAICompatibleAnalyzerOptions {
@@ -41,7 +38,12 @@ export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
         Accept: "text/event-stream",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ input, model: options.model, streamProgress: true })
+      body: JSON.stringify({
+        input,
+        model: options.model,
+        catalog: options.catalog ?? [],
+        streamProgress: true
+      })
     });
 
     if (!response.ok) {

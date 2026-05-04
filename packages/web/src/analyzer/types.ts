@@ -13,9 +13,20 @@ export const adapterKinds = [
 
 export const agentKinds = ["specialist", "shared"] as const;
 
-export const workflowKinds = ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"] as const;
+export const workflowKinds = [
+  "sequential",
+  "parallel",
+  "loop",
+  "human_review",
+  "orchestration",
+  "graph",
+  "dynamic",
+  "unknown"
+] as const;
 
 export const remoteContractKinds = ["a2a", "unknown"] as const;
+
+export const accessProtocols = ["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"] as const;
 
 export const bankDomains = ["고객", "수신", "여신", "카드", "리스크"] as const;
 
@@ -53,6 +64,7 @@ export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
 export type WorkflowKind = (typeof workflowKinds)[number];
 export type RemoteContractKind = (typeof remoteContractKinds)[number];
+export type AccessProtocol = (typeof accessProtocols)[number];
 export type BankDomain = (typeof bankDomains)[number];
 export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
@@ -135,6 +147,11 @@ export interface ModuleCandidate {
   workflow_kind?: WorkflowKind | null;
   adapter_kind?: AdapterKind | null;
   remote_contract_kind?: RemoteContractKind | null;
+  access_protocol?: AccessProtocol | null;
+  mcp_server?: string;
+  mcp_tool_name?: string;
+  mcp_schema_ref?: string;
+  mcp_auth_mode?: string;
   legacy_recommended_type?: LegacyRecommendedType | string;
   confidence: number;
   rationale: string;
@@ -233,6 +250,20 @@ export interface AnalysisResult {
   evidence: EvidenceSummary;
   moduleCandidates: ModuleCandidate[];
   processFlow: ProcessFlow;
+}
+
+export interface CatalogReference {
+  id: string;
+  name: string;
+  module_category: ModuleCategory;
+  subtype: string | null;
+  access_protocol?: AccessProtocol | null;
+  mcp_server?: string | null;
+  mcp_tool_name?: string | null;
+  owner_domain?: string | null;
+  status?: string | null;
+  responsibility?: string | null;
+  risk_signals?: RiskSignal[];
 }
 
 export type AnalyzerProgressPhase = "started" | "cli_event" | "diagnostic" | "completed" | "failed" | "timeout";

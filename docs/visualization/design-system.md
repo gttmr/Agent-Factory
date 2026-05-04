@@ -36,7 +36,7 @@
 - output → `⇤`
 
 **서브타입 (workflow_kind / adapter_kind / agent_kind / remote_contract_kind):**
-- parallel → `⇉`, loop → `↻`, human_review → `✓`, sequential → `→`, orchestration → `⋈`
+- parallel → `⇉`, loop → `↻`, human_review → `✓`, sequential → `→`, orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
 - retrieval → `🔎`, rule_registry → `§`, legacy_api → `API`, data_query → `?`, template → `T`, computation → `Σ`, external_service → `↗`
 - specialist → `S`, shared → `★`, a2a → `A2A`, unknown → `·`
 

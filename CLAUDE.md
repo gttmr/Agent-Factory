@@ -41,21 +41,21 @@ State flows top-down from `App.tsx`: `RequirementIntakeInput` → `AnalysisResul
 
 ### Analyzer provider boundary
 
-`src/analyzer/providers.ts` defines an `AnalyzerProvider` interface with two implementations:
+`src/analyzer/providers.ts` defines the `AnalyzerProvider` interface and `OpenAICompatibleAnalyzerProvider`, which posts to the local `/api/analyze-requirement` SSE endpoint served by `packages/web/server/codexAnalyzer.ts`. That middleware shells out to the Codex CLI to do the real analysis. `defaultAnalyzerProvider` is the single export consumed by `App.tsx` and is the live Codex CLI provider — there is no in-browser fallback analyzer.
 
-- `MockAnalyzerProvider` — the default; runs `analyzeRequirement` locally with rule-based logic in `mockAnalyzer.ts` and `classificationRules.ts`.
-- `OpenAICompatibleAnalyzerProvider` — a **placeholder that intentionally throws**. Its error message documents the hardening required before a real backend is wired in (schema validation, policy gates, audit log, rejection of invalid `module_category`, blocking incomplete Remote A2A). Do not silently replace this with a live call.
-
-`defaultAnalyzerProvider` is the single export consumed by `App.tsx`.
+The example requirement preloaded by `예시 불러오기` lives in `src/analyzer/exampleRequirement.ts` (`getExampleRequirement`). It exercises every category and the parallel/loop/human_review markers when run through the live analyzer.
 
 ### Taxonomy contract (load-bearing)
 
 Top-level `module_category`: `agent`, `workflow`, `adapter`, `remote_a2a`.
 
+Workflow `workflow_kind`: `sequential`, `parallel`, `loop`, `human_review`, `orchestration`, `graph`, `dynamic`, `unknown`.
+
 Adapter `adapter_kind`: `legacy_api`, `retrieval`, `rule_registry`, `data_query`, `template`, `computation`, `external_service`, `unknown`.
 
 Rules baked into the schemas, validator, and analyzer:
 
+- ADK runtime baseline: ADK 2.0 (Beta). `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. 1.14 stable agents (`SequentialAgent`/`ParallelAgent`/`LoopAgent`) are legacy compat targets, not the default mental model.
 - Tool/Adapter, Knowledge Retrieval, and Metadata Registry are **no longer** top-level categories. Retrieval and rule registries appear only as `adapter_kind` subtypes.
 - `legacy_recommended_type` is migration metadata; never use it as the primary classifier.
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.
@@ -92,7 +92,7 @@ For UI changes, run the dev server and verify visually with the chrome-devtools 
 cd packages/web && npm run dev    # background; serves on http://localhost:5173
 ```
 
-Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow already in `mockAnalyzer.ts` exercises every category and the parallel/loop/human_review markers — load it with `예시 불러오기` then `요구사항 분석`.
+Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow lives in `src/analyzer/exampleRequirement.ts` and exercises every category and the parallel/loop/human_review markers — load it with `예시 불러오기` then `요구사항 분석`.
 
 ## Editing Rules (from AGENTS.md)
 

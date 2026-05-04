@@ -1,11 +1,12 @@
 import {
+  accessProtocolLabels,
   adapterKindLabels,
   agentKindLabels,
   moduleCategoryLabels,
   remoteContractKindLabels,
   workflowKindLabels
 } from "../analyzer/classificationRules";
-import type { ModuleCandidate, ModuleCategory } from "../analyzer/types";
+import type { AccessProtocol, ModuleCandidate, ModuleCategory } from "../analyzer/types";
 
 export const categoryGlyph: Record<ModuleCategory, string> = {
   agent: "◆",
@@ -20,6 +21,8 @@ export const subtypeGlyph: Record<string, string> = {
   human_review: "✓",
   sequential: "→",
   orchestration: "⋈",
+  graph: "⬢",
+  dynamic: "λ",
   retrieval: "🔎",
   rule_registry: "§",
   legacy_api: "API",
@@ -32,6 +35,26 @@ export const subtypeGlyph: Record<string, string> = {
   a2a: "A2A",
   unknown: "·"
 };
+
+export const protocolGlyph: Record<AccessProtocol, string> = {
+  local: "·",
+  http_rest: "≡",
+  mcp: "M",
+  grpc: "g",
+  message_queue: "Q",
+  unknown: "?"
+};
+
+export function ProtocolBadge({ value }: { value: AccessProtocol }) {
+  return (
+    <span className={`protocol-badge protocol-${value}`}>
+      <span className="cat-glyph protocol-glyph" aria-hidden="true">
+        {protocolGlyph[value]}
+      </span>
+      {accessProtocolLabels[value]}
+    </span>
+  );
+}
 
 export function categoryClass(category: ModuleCategory): string {
   if (category === "remote_a2a") return "cat-remote";

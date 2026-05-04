@@ -10,7 +10,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 2. [Taxonomy](./workbench/taxonomy.md)
    `module_category`와 subtype enum의 단일 활성 기준이다.
 3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
-   안정적인 ADK workflow agent 기준으로 `sequential`, `parallel`, `loop`, `human_review`, `orchestration`을 판단한다.
+   ADK 2.0 (Beta) baseline으로 `sequential`, `parallel`, `loop`, `human_review`, `orchestration`, `graph`, `dynamic`을 판단한다 (1.14 stable agent 매핑은 legacy compat 메모로 표시).
 4. [Process Flow](./workbench/process-flow.md)
    분석 결과를 어떤 node와 edge로 그릴지 설명한다.
 5. [Review Board](./workbench/review-board.md)
@@ -44,5 +44,5 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 - Human-facing overview: [../README.md](../README.md)
 - Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
 - Shared schemas: [../schemas](../schemas)
-- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
+- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. ADK 2.0 (Beta) 섹션을 우선 조회하고 1.14 stable agent 페이지는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
 - Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files and are not indexed as active workbench docs here.

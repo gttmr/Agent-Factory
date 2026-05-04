@@ -7,6 +7,8 @@ import {
   buildMermaidProcessFlow,
   buildReuseHeatmap
 } from "../analyzer/commonization";
+import { buildCatalogChangesYaml, buildChangeSet } from "../catalog/diff";
+import type { CatalogEntry } from "../catalog/types";
 import type {
   ClassificationSummary,
   EvidenceSummary,
@@ -35,6 +37,7 @@ interface ExportArtifactsProps {
   moduleCandidates: ModuleCandidate[];
   processFlow: ProcessFlow;
   acceptedMissing: string[];
+  catalogEntries: CatalogEntry[];
 }
 
 export function ExportArtifacts({
@@ -42,7 +45,8 @@ export function ExportArtifacts({
   evidence,
   moduleCandidates,
   processFlow,
-  acceptedMissing
+  acceptedMissing,
+  catalogEntries
 }: ExportArtifactsProps) {
   const [copiedKey, setCopiedKey] = useState("");
   const artifacts = useMemo(() => {
@@ -52,6 +56,7 @@ export function ExportArtifacts({
     const reuseHeatmap = buildReuseHeatmap(moduleCandidates);
     const domainCapabilityMap = buildDomainCapabilityMap(moduleCandidates);
 
+    const catalogChanges = buildChangeSet(catalogEntries);
     return {
       "normalized-requirement.json": JSON.stringify(normalizedRequirement, null, 2),
       "evidence-summary.json": JSON.stringify(evidence, null, 2),
@@ -63,6 +68,7 @@ export function ExportArtifacts({
       "reuse-heatmap.json": JSON.stringify(reuseHeatmap, null, 2),
       "domain-capability-map.json": JSON.stringify(domainCapabilityMap, null, 2),
       "catalog-delta.yaml": buildCatalogDeltaYaml(moduleCandidates),
+      "catalog-changes.yaml": buildCatalogChangesYaml(catalogChanges),
       "implementation-handoff.md": buildImplementationHandoff(
         normalizedRequirement,
         moduleCandidates,
@@ -71,7 +77,7 @@ export function ExportArtifacts({
       ),
       "scaffold-plan.json": JSON.stringify(scaffoldPlan, null, 2)
     };
-  }, [acceptedMissing, evidence, moduleCandidates, normalizedRequirement, processFlow]);
+  }, [acceptedMissing, catalogEntries, evidence, moduleCandidates, normalizedRequirement, processFlow]);
 
   async function copyArtifact(name: string, content: string) {
     if (navigator.clipboard) {
