@@ -18,8 +18,18 @@ const adapterKinds = new Set([
   "unknown"
 ]);
 const agentKinds = new Set(["specialist", "shared"]);
-const workflowKinds = new Set(["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"]);
+const workflowKinds = new Set([
+  "sequential",
+  "parallel",
+  "loop",
+  "human_review",
+  "orchestration",
+  "graph",
+  "dynamic",
+  "unknown"
+]);
 const remoteKinds = new Set(["a2a", "unknown"]);
+const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -89,6 +99,16 @@ function validateModuleCandidates() {
       const missing = remoteRequiredFields.filter((field) => !candidate[field]);
       if (missing.length) {
         errors.push(`${label} is remote_a2a and is missing contract fields: ${missing.join(", ")}.`);
+      }
+    }
+    if (candidate.access_protocol !== undefined && candidate.access_protocol !== null) {
+      if (!accessProtocols.has(candidate.access_protocol)) {
+        errors.push(`${label} has invalid access_protocol.`);
+      }
+      if (candidate.access_protocol === "mcp") {
+        if (!candidate.mcp_server || !candidate.mcp_tool_name) {
+          errors.push(`${label} access_protocol mcp requires mcp_server and mcp_tool_name.`);
+        }
       }
     }
   });

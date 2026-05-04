@@ -48,6 +48,25 @@
     "remote_contract_kind": {
       "anyOf": [{ "$ref": "#/$defs/remoteContractKind" }, { "type": "null" }]
     },
+    "access_protocol": {
+      "anyOf": [{ "$ref": "#/$defs/accessProtocol" }, { "type": "null" }]
+    },
+    "mcp_server": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mcp_tool_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mcp_schema_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mcp_auth_mode": {
+      "type": "string",
+      "minLength": 1
+    },
     "legacy_recommended_type": {
       "type": "string",
       "description": "Optional migration metadata for artifacts emitted before module_category became primary."
@@ -236,6 +255,17 @@
           "risk_level": { "const": "high" }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "access_protocol": { "const": "mcp" }
+        },
+        "required": ["access_protocol"]
+      },
+      "then": {
+        "required": ["mcp_server", "mcp_tool_name"]
+      }
     }
   ],
   "$defs": {
@@ -252,7 +282,16 @@
     },
     "workflowKind": {
       "type": "string",
-      "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"]
+      "enum": [
+        "sequential",
+        "parallel",
+        "loop",
+        "human_review",
+        "orchestration",
+        "graph",
+        "dynamic",
+        "unknown"
+      ]
     },
     "adapterKind": {
       "type": "string",
@@ -270,6 +309,10 @@
     "remoteContractKind": {
       "type": "string",
       "enum": ["a2a", "unknown"]
+    },
+    "accessProtocol": {
+      "type": "string",
+      "enum": ["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]
     },
     "sideEffect": {
       "type": "string",

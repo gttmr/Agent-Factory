@@ -9,7 +9,15 @@ const webRoot = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(webRoot, "../..");
 
 export default defineConfig({
-  plugins: [react(), codexAnalyzerPlugin()]
+  plugins: [react(), codexAnalyzerPlugin()],
+  server: {
+    host: true,
+    allowedHosts: true
+  },
+  preview: {
+    host: true,
+    allowedHosts: true
+  }
 });
 
 function codexAnalyzerPlugin(): Plugin {

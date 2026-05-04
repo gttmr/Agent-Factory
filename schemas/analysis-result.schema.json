@@ -256,7 +256,19 @@
         },
         "workflow_kind": {
           "anyOf": [
-            { "type": "string", "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"] },
+            {
+              "type": "string",
+              "enum": [
+                "sequential",
+                "parallel",
+                "loop",
+                "human_review",
+                "orchestration",
+                "graph",
+                "dynamic",
+                "unknown"
+              ]
+            },
             { "type": "null" }
           ]
         },

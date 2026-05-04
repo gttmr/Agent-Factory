@@ -40,8 +40,10 @@ Process Flow는 정규화된 requirement가 어떤 module 조합으로 처리되
 - `sequential`: `input -> step A -> step B -> output`처럼 고정 순서로 연결한다.
 - `parallel`: 공통 input에서 독립 branch로 fan-out하고 merge/review module로 fan-in한다.
 - `loop`: 반복되는 edge data에 `loop:` prefix를 붙이고 종료 조건을 rationale에 남긴다.
-- `human_review`: 사람 승인 또는 보완 요청 gate를 workflow node로 둔다.
+- `human_review`: 사람 승인 또는 보완 요청 gate를 workflow node로 둔다 (ADK 2.0에서는 first-class human-input 노드, 1.14에서는 워크벤치 gate 개념).
 - `orchestration`: 여러 pattern을 조합하는 상위 workflow node로 표현한다.
+- `graph`: ADK 2.0 graph workflow처럼 분기/병렬/머지/loop가 한 그래프 안에 명시적으로 묶일 때 사용한다. 워크벤치의 process flow 자체가 노드/엣지 그래프이므로, `graph` 후보는 이 토폴로지를 agent 단위에서 명시적으로 소유한다고 표시한다.
+- `dynamic`: ADK 2.0 dynamic workflow처럼 코드가 런타임 분기를 결정할 때 사용한다. 외부에서 관찰 가능한 분기는 process flow에 노출하고, 동적 차원이 핵심이면 단일 workflow node + rationale로 표현한다.
 
 세부 판단은 [Workflow decision guide](./workflow-decision-guide.md)를 따른다.
 

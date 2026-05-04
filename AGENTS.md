@@ -47,11 +47,13 @@ Adapter `adapter_kind` values:
 Definitions:
 
 - Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
-- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
+- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, human review, graph, or dynamic.
 - Adapter: callable capability used by agents or workflows.
 - Remote A2A: independent remote agent boundary with protocol-level contract.
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
+
+ADK runtime baseline: ADK 2.0 (Beta). 1.14 stable agents (`SequentialAgent`, `ParallelAgent`, `LoopAgent`) remain valid as legacy compat targets but are not the default mental model. `graph` maps to ADK 2.0 graph workflow; `dynamic` maps to ADK 2.0 dynamic workflow; `human_review` maps to the 2.0 first-class human-input node (1.14 fallback: workbench gate concept only).
 
 ## Editing Rules
 

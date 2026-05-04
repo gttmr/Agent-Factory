@@ -17,7 +17,16 @@ const adapterKinds = new Set([
   "unknown"
 ]);
 const agentKinds = new Set(["specialist", "shared"]);
-const workflowKinds = new Set(["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"]);
+const workflowKinds = new Set([
+  "sequential",
+  "parallel",
+  "loop",
+  "human_review",
+  "orchestration",
+  "graph",
+  "dynamic",
+  "unknown"
+]);
 const remoteContractKinds = new Set(["a2a", "unknown"]);
 const riskLevels = new Set(["low", "medium", "high"]);
 const moduleStatuses = new Set(["needs_info", "deferred", "rejected"]);
@@ -139,6 +148,7 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
       const body = await readJsonBody(req);
       const input = isRecord(body) ? body.input : null;
       const model = isRecord(body) ? body.model : null;
+      const catalog = isRecord(body) ? sanitizeCatalogPayload(body.catalog) : [];
 
       if (!isRecord(input) || typeof input.rawText !== "string" || !input.rawText.trim()) {
         sendJson(res, 400, { error: "원문 요구사항이 필요합니다." });
@@ -157,11 +167,11 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
       isAnalyzing = true;
       try {
         if (streamProgress) {
-          await runStreamingAnalysis({ repoRoot, schemaPath, input, model, res });
+          await runStreamingAnalysis({ repoRoot, schemaPath, input, model, catalog, res });
           return;
         }
 
-        const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model });
+        const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model, catalog });
         const result = normalizeAnalysisResult(run.output);
         const errors = validateAnalysisResult(result);
         if (errors.length) {
@@ -201,12 +211,14 @@ async function runStreamingAnalysis({
   schemaPath,
   input,
   model,
+  catalog,
   res
 }: {
   repoRoot: string;
   schemaPath: string;
   input: Record<string, unknown>;
   model: string;
+  catalog: SanitizedCatalogEntry[];
   res: ServerResponse;
 }) {
   const writeProgress = createProgressStream(res);
@@ -217,6 +229,7 @@ async function runStreamingAnalysis({
       schemaPath,
       input,
       model,
+      catalog,
       onProgress: writeProgress
     });
     const result = normalizeAnalysisResult(run.output);
@@ -298,18 +311,20 @@ async function runCodexAnalyzer({
   schemaPath,
   input,
   model,
+  catalog,
   onProgress
 }: {
   repoRoot: string;
   schemaPath: string;
   input: Record<string, unknown>;
   model: string;
+  catalog: SanitizedCatalogEntry[];
   onProgress?: (event: AnalyzerProgressEvent) => void;
 }): Promise<CodexAnalyzerRun> {
   const runDir = join(tmpdir(), `agent-factory-codex-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await mkdir(runDir, { recursive: true });
   const outputPath = join(runDir, "analysis-result.json");
-  const prompt = buildPrompt(input);
+  const prompt = buildPrompt(input, catalog);
   const timeoutMs = getAnalyzerTimeoutMs();
   const startedAt = Date.now();
 
@@ -336,11 +351,8 @@ async function runCodexAnalyzer({
         model,
         "--cd",
         repoRoot,
-        "--sandbox",
-        "read-only",
-        "--ask-for-approval",
-        "never",
         "exec",
+        "--dangerously-bypass-approvals-and-sandbox",
         "--ephemeral",
         "--json",
         "--output-schema",
@@ -406,16 +418,76 @@ async function runCodexAnalyzer({
   }
 }
 
-function buildPrompt(input: Record<string, unknown>): string {
-  return [
+interface SanitizedCatalogEntry {
+  id: string;
+  name: string;
+  module_category: string;
+  subtype: string | null;
+  access_protocol?: string;
+  mcp_server?: string;
+  mcp_tool_name?: string;
+  owner_domain?: string;
+  status?: string;
+  responsibility?: string;
+  risk_signals?: string[];
+}
+
+function sanitizeCatalogPayload(value: unknown): SanitizedCatalogEntry[] {
+  if (!Array.isArray(value)) return [];
+  const limit = 200;
+  const stringField = (record: Record<string, unknown>, key: string, max = 240): string | undefined => {
+    const raw = record[key];
+    if (typeof raw !== "string") return undefined;
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    return trimmed.slice(0, max);
+  };
+  const sanitized: SanitizedCatalogEntry[] = [];
+  for (const item of value) {
+    if (sanitized.length >= limit) break;
+    if (!isRecord(item)) continue;
+    const name = stringField(item, "name", 120);
+    const moduleCategory = stringField(item, "module_category", 32);
+    if (!name || !moduleCategory || !moduleCategories.has(moduleCategory)) continue;
+    const id = stringField(item, "id", 120) ?? `catalog-${sanitized.length + 1}`;
+    const subtypeRaw = stringField(item, "subtype", 48);
+    const riskSignalsRaw = item.risk_signals;
+    const risk_signals = Array.isArray(riskSignalsRaw)
+      ? riskSignalsRaw
+          .filter((signal): signal is string => typeof signal === "string" && riskSignals.has(signal))
+          .slice(0, 8)
+      : undefined;
+    sanitized.push({
+      id,
+      name,
+      module_category: moduleCategory,
+      subtype: subtypeRaw ?? null,
+      access_protocol: stringField(item, "access_protocol", 32),
+      mcp_server: stringField(item, "mcp_server", 120),
+      mcp_tool_name: stringField(item, "mcp_tool_name", 120),
+      owner_domain: stringField(item, "owner_domain", 120),
+      status: stringField(item, "status", 80),
+      responsibility: stringField(item, "responsibility", 320),
+      risk_signals: risk_signals && risk_signals.length ? risk_signals : undefined
+    });
+  }
+  return sanitized;
+}
+
+function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEntry[]): string {
+  const sections: string[] = [
     "You are the live requirement analyzer for the Agent Factory workbench.",
     "Return only JSON matching schemas/analysis-result.schema.json. No markdown, no commentary.",
     "",
+    "ADK runtime baseline:",
+    "- ADK 2.0 (Beta) is the default mental model: graph-based deterministic workflows with explicit nodes/edges, dynamic (Python-driven) workflows, built-in parallel/merge, first-class human-input nodes, and trace/token observability.",
+    "- ADK 1.14 stable agents (SequentialAgent / ParallelAgent / LoopAgent) remain valid as a legacy compat fallback when a target deployment cannot run 2.0. Do not invent new top-level categories for either runtime.",
+    "",
     "Authoritative references - consult these before deciding:",
-    "- docs/workbench/taxonomy.md (module_category, *_kind enums, Remote A2A conditions) — read from the working tree.",
-    "- docs/workbench/workflow-decision-guide.md (sequential/parallel/loop/human_review/orchestration rules).",
+    "- docs/workbench/taxonomy.md (module_category, *_kind enums including graph/dynamic, Remote A2A conditions) — read from the working tree.",
+    "- docs/workbench/workflow-decision-guide.md (sequential/parallel/loop/human_review/orchestration/graph/dynamic rules; ADK 2.0 baseline with 1.14 compat notes).",
     "- docs/workbench/process-flow.md and docs/visualization/design-system.md (process flow stage, edge, and marker rules).",
-    "- adk-docs-mcp — use list_doc_sources/fetch_docs for ADK component facts: Sessions/State/Memory, Callbacks, Artifacts/Events, Apps/Plugins, MCP, A2A, Streaming, Grounding. This is the source of truth for adk_hints; consult it whenever a candidate touches state, guardrails, audit/artifact retention, MCP↔A2A boundary, or live latency.",
+    "- adk-docs-mcp — use list_doc_sources/fetch_docs for ADK 2.0 component facts (graph workflow, dynamic workflow, human-input node, trace/token observability) and for the version-neutral component set: Sessions/State/Memory, Callbacks, Artifacts/Events, Apps/Plugins, MCP, A2A, Streaming, Grounding. This is the source of truth for adk_hints; prefer 2.0 sections, fall back to 1.14 only for legacy compat questions.",
     "",
     "Do not paraphrase the docs into long output. Use them only to ground classification, adk_hints, and processFlow shape.",
     "",
@@ -429,21 +501,46 @@ function buildPrompt(input: Record<string, unknown>): string {
     "- Include branch:, parallel:, or loop: prefixes in edge data only when those structures are supported by the requirement.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
     "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
-    "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all.",
+    "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all. Route 2.0 trace/token observability hints into artifacts_events (event/token retention) and callbacks (instrumentation hooks); do not invent new hint keys.",
     "- Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
     "",
     "Taxonomy guardrails:",
     "- Use module_category only from agent, workflow, adapter, remote_a2a.",
+    "- Allowed workflow_kind values: sequential, parallel, loop, human_review, orchestration, graph, dynamic, unknown.",
+    "- Pick graph when the requirement implies an explicit node/edge orchestration with deterministic routing and built-in merge/parallel (ADK 2.0 graph workflow). Distinguishes from orchestration by the explicit graph topology rather than ad-hoc composition.",
+    "- Pick dynamic when control flow is code-driven (Python conditionals/loops/custom logic) rather than declarative — for example, when the dynamic dimension dominates over the declarative graph (ADK 2.0 dynamic workflow).",
+    "- For human_review: on ADK 2.0 this maps to the first-class human-input node; on 1.14 it remains a workbench gate concept only. The workbench classification is the same in both cases.",
     "- Retrieval and Rule Registry are adapter_kind values, not top-level categories.",
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
     "",
     "Korean prose for human-visible fields; keep engineering terms in English (Agent, Workflow, Adapter, Remote A2A, module_category, adapter_kind, Session/State, placeholder).",
-    "Preserve important rawText terms and make rationales specific enough that a reviewer can explain why each module exists.",
-    "",
-    "RequirementIntakeInput JSON:",
-    JSON.stringify(input, null, 2)
-  ].join("\n");
+    "Preserve important rawText terms and make rationales specific enough that a reviewer can explain why each module exists."
+  ];
+
+  if (catalog.length) {
+    sections.push(
+      "",
+      "Registered shared catalog (already-approved reusable agents/workflows/adapters/remote contracts):",
+      "- Treat this list as the source of truth for what already exists in the workbench. Prefer reuse over inventing a new module.",
+      "- When a candidate's responsibility, subtype, owner_domain, and access protocol match an existing entry, set the candidate's name to the catalog entry's name verbatim, set reuse_candidate to true, and explain the binding in rationale (mention the catalog entry name and id).",
+      "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name; copy them onto the candidate exactly. Do not invent server or tool names.",
+      "- For partial matches, still emit a candidate but flag the gap in missing_information (e.g. owner mismatch, narrower scope).",
+      "- Do not duplicate a catalog entry as a separate new candidate — collapse it into the matching reuse candidate.",
+      "- Never fabricate catalog entries that are not in this list.",
+      "Catalog JSON:",
+      JSON.stringify(catalog, null, 2)
+    );
+  } else {
+    sections.push(
+      "",
+      "Registered shared catalog: (empty — no reusable entries are currently registered in this session)."
+    );
+  }
+
+  sections.push("", "RequirementIntakeInput JSON:", JSON.stringify(input, null, 2));
+
+  return sections.join("\n");
 }
 
 function runProcess(
