@@ -292,6 +292,7 @@ export interface AnalyzerProgressEvent {
   traceKind?: AnalyzerTraceKind;
   title?: string;
   snippet?: string;
+  snippetFull?: string;
   toolName?: string;
   status?: AnalyzerTraceStatus;
   durationMs?: number;
