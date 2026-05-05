@@ -21,6 +21,7 @@ import {
   type RemoteContractKind,
   type WorkflowKind
 } from "../analyzer/types";
+import type { CatalogEntry } from "../catalog/types";
 import { CategoryBadge, SubtypeBadge, categoryClass, getSubtypeValue } from "./CategoryBadge";
 
 const statuses: ModuleStatus[] = ["needs_info", "approved", "deferred", "rejected"];
@@ -47,11 +48,12 @@ const adkHintRows = [
 
 interface ModuleReviewProps {
   moduleCandidates: ModuleCandidate[];
+  catalogEntries: CatalogEntry[];
   onModuleCandidatesChange: (candidates: ModuleCandidate[]) => void;
   onContinue: () => void;
 }
 
-export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onContinue }: ModuleReviewProps) {
+export function ModuleReview({ moduleCandidates, catalogEntries, onModuleCandidatesChange, onContinue }: ModuleReviewProps) {
   function updateCandidate(id: string, changes: Partial<ModuleCandidate>) {
     onModuleCandidatesChange(
       moduleCandidates.map((candidate) => (candidate.id === id ? { ...candidate, ...changes } : candidate))
@@ -180,6 +182,7 @@ export function ModuleReview({ moduleCandidates, onModuleCandidatesChange, onCon
                       ))}
                     </select>
                     <MissingInformationBlock candidate={candidate} />
+                    <ApprovalReadinessBlock candidate={candidate} catalogEntries={catalogEntries} />
                   </div>
                 </td>
                 <td className="rationale-cell">
@@ -253,6 +256,59 @@ function MissingInformationBlock({ candidate }: { candidate: ModuleCandidate }) 
       </ul>
     </div>
   );
+}
+
+function ApprovalReadinessBlock({
+  candidate,
+  catalogEntries
+}: {
+  candidate: ModuleCandidate;
+  catalogEntries: CatalogEntry[];
+}) {
+  if (candidate.status !== "approved") {
+    return null;
+  }
+  const issues = approvalReadinessIssues(candidate, catalogEntries);
+  if (!issues.length) {
+    return <p className="status-missing-info-title">Scaffold 준비됨</p>;
+  }
+  return (
+    <div className="status-missing-info">
+      <span className="status-missing-info-title">Scaffold 확인</span>
+      <ul>
+        {issues.map((issue) => (
+          <li key={issue}>{issue}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function approvalReadinessIssues(candidate: ModuleCandidate, catalogEntries: CatalogEntry[]): string[] {
+  const issues: string[] = [];
+  if (!candidate.inputs.length) issues.push("입력 계약 필요");
+  if (!candidate.outputs.length) issues.push("출력 계약 필요");
+  const binding = catalogEntries.find(
+    (entry) =>
+      entry.provenance !== "session_deleted" &&
+      entry.module_category === candidate.module_category &&
+      entry.name.trim().toLowerCase() === candidate.name.trim().toLowerCase()
+  );
+  if (!binding) {
+    issues.push("신규 구현 TODO로 생성됨");
+    return issues;
+  }
+  const source =
+    binding.component_source ??
+    (binding.package_name || binding.import_path || binding.callable_name
+      ? "python_package"
+      : binding.access_protocol === "mcp"
+        ? "mcp"
+        : "stub");
+  if (source === "python_package" && (!binding.package_name || !binding.import_path || !binding.callable_name)) {
+    issues.push("Python package import 계약 필요");
+  }
+  return issues;
 }
 
 function getAdkHintRows(candidate: ModuleCandidate) {

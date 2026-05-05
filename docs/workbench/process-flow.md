@@ -27,6 +27,18 @@ Process Flow는 정규화된 requirement가 어떤 module 조합으로 처리되
 `local`은 같은 workbench 설계 경계 안의 연결이다.
 `remote_a2a`는 독립 원격 agent 계약을 통과하는 연결이며, `remote_a2a` node가 관련될 때만 사용한다.
 
+## Edge data channel
+
+ADK 2.0 graph workflow에서는 node 사이 데이터가 `Event`로 전달된다. 따라서 edge는 기존 `data` 설명 외에 다음 선택 필드를 가질 수 있다.
+
+- `data_channel`: `event_output`, `event_message`, `session_state`, `temp_state`, `user_state`, `app_state`, `artifact`, `route`, `control`, `unknown`
+- `state_key`: `Event.state` 또는 `Session.state`에 저장·조회되는 키. `temp:`, `user:`, `app:` prefix를 의도적으로 쓴다.
+- `artifact_key`: `ArtifactService`에 저장·조회되는 named artifact 키.
+- `schema_ref`: edge payload의 구조를 설명하는 schema/model 이름.
+- `route_condition`: branch route 값, 승인/반려 결과, loop 종료 조건 같은 routing 조건.
+
+기본 전달은 `event_output`이다. 사용자에게 보이거나 human-input node로 들어가는 텍스트는 `event_message`로 표시한다. 작은 진행 상태와 branch 중간값은 `session_state` 또는 prefix가 붙은 state channel로 표시하고, 큰 파일형·버전형 결과는 `artifact`로 분리한다.
+
 ## 그리는 순서
 
 1. `input` node에 raw requirement와 핵심 context를 둔다.

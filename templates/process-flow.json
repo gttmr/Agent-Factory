@@ -52,49 +52,65 @@
       "from": "customer_id",
       "to": "mod-001",
       "data": "lookup key",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "event_output",
+      "schema_ref": "CustomerLookupInput"
     },
     {
       "from": "complaint_text",
       "to": "mod-002",
       "data": "retrieval query",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "event_output",
+      "schema_ref": "RetrievalQuery"
     },
     {
       "from": "complaint_text",
       "to": "mod-003",
       "data": "raw complaint text",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "session_state",
+      "state_key": "complaint_context"
     },
     {
       "from": "mod-001",
       "to": "mod-003",
       "data": "customer profile",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "temp_state",
+      "state_key": "temp:customer_profile"
     },
     {
       "from": "mod-002",
       "to": "mod-003",
       "data": "response guidance",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "temp_state",
+      "state_key": "temp:response_guidance"
     },
     {
       "from": "mod-003",
       "to": "mod-004",
       "data": "triage context",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "event_output",
+      "schema_ref": "ComplaintTriageContext"
     },
     {
       "from": "mod-004",
       "to": "mod-005",
       "data": "triage category",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "route",
+      "route_condition": "priority route"
     },
     {
       "from": "mod-005",
       "to": "recommended_next_step",
       "data": "routing decision",
-      "edge_type": "local"
+      "edge_type": "local",
+      "data_channel": "event_output",
+      "schema_ref": "RoutingDecision"
     }
   ]
 }

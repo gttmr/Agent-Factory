@@ -6,6 +6,7 @@ import {
   workflowKindLabels
 } from "../analyzer/classificationRules";
 import type {
+  FlowDataChannel,
   FlowEdge,
   FlowNode,
   FlowNodeType,
@@ -29,6 +30,28 @@ interface FlowStage {
   nodes: FlowNode[];
 }
 
+interface GraphEdgeView {
+  edge: FlowEdge;
+  from: FlowNode | null;
+  to: FlowNode | null;
+  channel: FlowDataChannel;
+  marker: "branch" | "parallel" | "loop" | "remote" | "local";
+}
+
+interface GraphInsightModel {
+  edges: GraphEdgeView[];
+  stateEdges: GraphEdgeView[];
+  artifactEdges: GraphEdgeView[];
+  stats: {
+    nodeCount: number;
+    edgeCount: number;
+    branchCount: number;
+    mergeCount: number;
+    loopCount: number;
+    parallelCount: number;
+  };
+}
+
 const categoryGlyph: Record<string, string> = {
   input: "⇥",
   output: "⇤",
@@ -44,6 +67,8 @@ const subtypeGlyph: Record<string, string> = {
   human_review: "✓",
   sequential: "→",
   orchestration: "⋈",
+  graph: "⬢",
+  dynamic: "λ",
   retrieval: "🔎",
   rule_registry: "§",
   legacy_api: "API",
@@ -72,12 +97,39 @@ const adkHintRows = [
   ["streaming_grounding", "Streaming/Grounding"]
 ] as const;
 
+const dataChannelLabels: Record<FlowDataChannel, string> = {
+  event_output: "Event.output",
+  event_message: "Event.message",
+  session_state: "Session State",
+  temp_state: "temp: State",
+  user_state: "user: State",
+  app_state: "app: State",
+  artifact: "Artifact",
+  route: "Route",
+  control: "Control",
+  unknown: "미정"
+};
+
+const dataChannelGlyph: Record<FlowDataChannel, string> = {
+  event_output: "O",
+  event_message: "M",
+  session_state: "S",
+  temp_state: "T",
+  user_state: "U",
+  app_state: "A",
+  artifact: "F",
+  route: "R",
+  control: "C",
+  unknown: "?"
+};
+
 export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: ProcessFlowViewProps) {
   const stages = buildFlowStages(processFlow, moduleCandidates);
   const customSignals = detectCustomAgentSignals(processFlow, moduleCandidates);
   const candidateById = new Map(moduleCandidates.map((candidate) => [candidate.id, candidate]));
   const interStageEdges = buildInterStageEdges(stages, processFlow.edges);
   const remoteEdgeCount = processFlow.edges.filter((edge) => edge.edge_type === "remote_a2a").length;
+  const graphModel = buildGraphInsightModel(processFlow);
   const graphText = toMermaid(processFlow);
 
   return (
@@ -90,6 +142,8 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
           </div>
           <FlowLegend remoteCount={remoteEdgeCount} />
         </div>
+
+        <GraphOverview model={graphModel} />
 
         <div className="staged-flow" aria-label="단계별 프로세스 플로우">
           {stages.map((stage, index) => (
@@ -126,6 +180,8 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
             </div>
           ))}
         </div>
+
+        <GraphRouteBoard model={graphModel} />
       </section>
 
       <aside className="flow-inspector">
@@ -177,16 +233,13 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
         <section className="panel">
           <div className="section-heading">
             <p className="eyebrow">Session/State</p>
-            <h2>Session/State 계획</h2>
+            <h2>전달 데이터 저장 위치</h2>
           </div>
-          <div className="state-key-grid">
-            {["current_step", "temp:branch_results", "user:preferred_language", "app:taxonomy_version"].map((key) => (
-              <span key={key}>{key}</span>
-            ))}
-          </div>
+          <DataLedger model={graphModel} />
           <p className="state-note">
-            이 화면은 ADK <code>Session</code>, <code>State</code>, <code>Event</code>, <code>SessionService</code>{" "}
-            설계 검토용 정보만 표시합니다. 실제 ADK runtime 통합은 포함하지 않습니다.
+            ADK 2.0 graph workflow는 node 사이 값을 <code>Event.output</code>으로 넘기고, 작은 진행 값은{" "}
+            <code>Event.state</code>와 <code>SessionService</code>로 보존합니다. 큰 파일형 결과는{" "}
+            <code>Artifact</code>로 분리합니다.
           </p>
         </section>
 
@@ -225,6 +278,96 @@ function FlowLegend({ remoteCount }: { remoteCount: number }) {
       <span className="legend-chip cat-remote-chip">
         <span className="cat-glyph">⇨</span>Remote A2A {remoteCount ? `(${remoteCount})` : ""}
       </span>
+    </div>
+  );
+}
+
+function GraphOverview({ model }: { model: GraphInsightModel }) {
+  const { stats } = model;
+  return (
+    <div className="graph-overview" aria-label="ADK 2.0 graph workflow topology summary">
+      <GraphStat label="Nodes" value={stats.nodeCount} />
+      <GraphStat label="Edges" value={stats.edgeCount} />
+      <GraphStat label="Branch" value={stats.branchCount} />
+      <GraphStat label="Merge" value={stats.mergeCount} />
+      <GraphStat label="Parallel" value={stats.parallelCount} />
+      <GraphStat label="Loop" value={stats.loopCount} />
+    </div>
+  );
+}
+
+function GraphStat({ label, value }: { label: string; value: number }) {
+  return (
+    <span className={`graph-stat ${value > 0 ? "active" : ""}`}>
+      <strong>{value}</strong>
+      {label}
+    </span>
+  );
+}
+
+function GraphRouteBoard({ model }: { model: GraphInsightModel }) {
+  return (
+    <section className="graph-route-board" aria-label="Graph route and data transfer inspection">
+      <header className="graph-route-head">
+        <div>
+          <p className="eyebrow">ADK 2.0 Graph Routes</p>
+          <h3>Edge별 데이터 전달</h3>
+        </div>
+        <span>{model.edges.length}개 edge</span>
+      </header>
+      <div className="graph-edge-list">
+        {model.edges.map((edgeView, index) => (
+          <GraphEdgeCard edgeView={edgeView} key={`${edgeView.edge.from}-${edgeView.edge.to}-${index}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GraphEdgeCard({ edgeView }: { edgeView: GraphEdgeView }) {
+  const { edge, from, to, channel, marker } = edgeView;
+  const storageRefs = getEdgeStorageRefs(edge);
+  return (
+    <article className={`graph-edge-card marker-${marker}`}>
+      <div className="graph-edge-path">
+        <strong>{from?.label ?? edge.from}</strong>
+        <span>{markerGlyph(marker)}</span>
+        <strong>{to?.label ?? edge.to}</strong>
+      </div>
+      <div className="graph-edge-data">
+        <span className={`data-channel channel-${channel}`}>
+          <span className="cat-glyph" aria-hidden="true">
+            {dataChannelGlyph[channel]}
+          </span>
+          {dataChannelLabels[channel]}
+        </span>
+        <span className="graph-edge-payload">{simplifyEdgeData(edge.data)}</span>
+      </div>
+      {storageRefs.length ? (
+        <div className="graph-edge-storage">
+          {storageRefs.map((ref) => (
+            <span key={ref}>{ref}</span>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function DataLedger({ model }: { model: GraphInsightModel }) {
+  const ledgerEdges = [...model.stateEdges, ...model.artifactEdges];
+  if (!ledgerEdges.length) {
+    return <p className="empty-state">State/Artifact edge metadata가 아직 없습니다.</p>;
+  }
+  return (
+    <div className="data-ledger">
+      {ledgerEdges.map((edgeView, index) => (
+        <div className="data-ledger-row" key={`${edgeView.edge.from}-${edgeView.edge.to}-${index}`}>
+          <span>{dataChannelLabels[edgeView.channel]}</span>
+          <strong>{getPrimaryStorageRef(edgeView.edge)}</strong>
+          <em>{edgeView.from?.label ?? edgeView.edge.from} → {edgeView.to?.label ?? edgeView.edge.to}</em>
+        </div>
+      ))}
     </div>
   );
 }
@@ -325,6 +468,111 @@ function simplifyEdgeData(data: string): string {
   if (data.startsWith("loop:")) return `↻ ${data.replace("loop:", "").trim()}`;
   if (data.startsWith("branch:")) return `⋔ ${data.replace("branch:", "").trim()}`;
   return data;
+}
+
+function buildGraphInsightModel(processFlow: ProcessFlow): GraphInsightModel {
+  const nodeById = new Map(processFlow.nodes.map((node) => [node.id, node]));
+  const incoming = new Map<string, number>();
+  const outgoing = new Map<string, number>();
+  processFlow.nodes.forEach((node) => {
+    incoming.set(node.id, 0);
+    outgoing.set(node.id, 0);
+  });
+  processFlow.edges.forEach((edge) => {
+    outgoing.set(edge.from, (outgoing.get(edge.from) ?? 0) + 1);
+    incoming.set(edge.to, (incoming.get(edge.to) ?? 0) + 1);
+  });
+
+  const edges = processFlow.edges.map((edge): GraphEdgeView => {
+    const marker = inferEdgeMarker(edge, outgoing.get(edge.from) ?? 0);
+    return {
+      edge,
+      from: nodeById.get(edge.from) ?? null,
+      to: nodeById.get(edge.to) ?? null,
+      channel: inferDataChannel(edge),
+      marker
+    };
+  });
+
+  const branchNodes = new Set(
+    processFlow.nodes
+      .filter((node) => (outgoing.get(node.id) ?? 0) > 1)
+      .map((node) => node.id)
+  );
+  const mergeNodes = new Set(
+    processFlow.nodes
+      .filter((node) => (incoming.get(node.id) ?? 0) > 1)
+      .map((node) => node.id)
+  );
+
+  return {
+    edges,
+    stateEdges: edges.filter((edgeView) => isStateChannel(edgeView.channel) || Boolean(edgeView.edge.state_key)),
+    artifactEdges: edges.filter((edgeView) => edgeView.channel === "artifact" || Boolean(edgeView.edge.artifact_key)),
+    stats: {
+      nodeCount: processFlow.nodes.length,
+      edgeCount: processFlow.edges.length,
+      branchCount: branchNodes.size + edges.filter((edgeView) => edgeView.marker === "branch").length,
+      mergeCount: mergeNodes.size,
+      loopCount: edges.filter((edgeView) => edgeView.marker === "loop").length,
+      parallelCount: edges.filter((edgeView) => edgeView.marker === "parallel").length
+    }
+  };
+}
+
+function inferDataChannel(edge: FlowEdge): FlowDataChannel {
+  if (edge.data_channel) {
+    return edge.data_channel;
+  }
+  const data = edge.data.toLowerCase();
+  if (edge.artifact_key || data.includes("artifact") || data.includes("file") || data.includes("report")) {
+    return "artifact";
+  }
+  if (edge.state_key) {
+    if (edge.state_key.startsWith("temp:")) return "temp_state";
+    if (edge.state_key.startsWith("user:")) return "user_state";
+    if (edge.state_key.startsWith("app:")) return "app_state";
+    return "session_state";
+  }
+  if (data.startsWith("branch:")) return "route";
+  if (data.startsWith("loop:") || data.includes("escalate") || data.includes("retry")) return "control";
+  if (data.includes("approval") || data.includes("human") || data.includes("message") || data.includes("사용자")) {
+    return "event_message";
+  }
+  return "event_output";
+}
+
+function inferEdgeMarker(edge: FlowEdge, outgoingCount: number): GraphEdgeView["marker"] {
+  if (edge.edge_type === "remote_a2a") return "remote";
+  if (edge.data.startsWith("loop:")) return "loop";
+  if (edge.data.startsWith("branch:") || edge.route_condition) return "branch";
+  if (edge.data.startsWith("parallel:") || outgoingCount > 1) return "parallel";
+  return "local";
+}
+
+function isStateChannel(channel: FlowDataChannel): boolean {
+  return channel === "session_state" || channel === "temp_state" || channel === "user_state" || channel === "app_state";
+}
+
+function getEdgeStorageRefs(edge: FlowEdge): string[] {
+  return [
+    edge.route_condition ? `route=${edge.route_condition}` : "",
+    edge.state_key ? `state=${edge.state_key}` : "",
+    edge.artifact_key ? `artifact=${edge.artifact_key}` : "",
+    edge.schema_ref ? `schema=${edge.schema_ref}` : ""
+  ].filter(Boolean);
+}
+
+function getPrimaryStorageRef(edge: FlowEdge): string {
+  return edge.state_key ?? edge.artifact_key ?? edge.schema_ref ?? edge.route_condition ?? edge.data;
+}
+
+function markerGlyph(marker: GraphEdgeView["marker"]): string {
+  if (marker === "branch") return "⋔";
+  if (marker === "parallel") return "⇉";
+  if (marker === "loop") return "↻";
+  if (marker === "remote") return "⇨";
+  return "→";
 }
 
 function buildFlowStages(processFlow: ProcessFlow, moduleCandidates: ModuleCandidate[]): FlowStage[] {

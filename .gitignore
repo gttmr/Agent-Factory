@@ -3,3 +3,7 @@ dist/
 .env
 .env.*
 .codex
+__pycache__/
+.pytest_cache/
+generated/**/.venv/
+generated/**/.adk/

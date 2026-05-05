@@ -102,6 +102,20 @@
 
 **Stage connector** — stage 사이에 화살표와 edge data chip 을 표시한다. `buildInterStageEdges()` 가 stage 간 edge 를 모은다. 같은 stage 내부의 edge 는 표시하지 않는다 (stage 자체가 그 묶음을 의미). 한 connector 는 데이터 라벨을 최대 4 개까지만 표시한다.
 
+**Graph route board** — stage view 아래에서 모든 edge 를 한 번 더 펼쳐 보여준다. 목적은 ADK 2.0 graph workflow 의 node/edge routing, fan-out/fan-in, branch/loop, Remote A2A 경계를 stage 묶음 밖에서도 검토하는 것이다. 각 edge 는 출발 node, 도착 node, route marker, `data_channel`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip 을 표시한다.
+
+`data_channel` 라벨은 다음처럼 표시한다.
+
+- `event_output` → `Event.output`
+- `event_message` → `Event.message`
+- `session_state` / `temp_state` / `user_state` / `app_state` → ADK State scope
+- `artifact` → `Artifact`
+- `route` → `Route`
+- `control` → `Control`
+- `unknown` → `미정`
+
+**Data ledger** — 오른쪽 inspector 에서 state/artifact edge 만 모아 표시한다. edge metadata 가 아직 없으면 대표 placeholder key 를 보여주되, live analyzer 결과가 들어오면 실제 `state_key` / `artifact_key`를 우선한다.
+
 ## `adk_hints` UI 블록
 
 `adk_hints` 는 Process Flow 의 `FlowNodeCard` 와 Module Review 카드의 판단 근거 아래에만 접이식 블록으로 표시한다.

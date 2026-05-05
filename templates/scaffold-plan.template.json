@@ -13,6 +13,22 @@
       "remote_contract_kind": null,
       "scaffold_output": "contract_or_stub_only",
       "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-adapter-customer_profile_lookup",
+        "name": "customer_profile_lookup",
+        "component_source": "python_package"
+      },
+      "import_contract": {
+        "package_name": "agent-factory-shared-components",
+        "package_version": "0.1.0",
+        "import_path": "agent_factory_shared.adapters",
+        "callable_name": "lookup_customer_profile"
+      },
+      "developer_todos": [
+        "Map ADK node_input into the shared component input contract.",
+        "Handle component exceptions and timeout policy without leaking private data.",
+        "Validate component output against the reviewed output contract."
+      ],
       "inputs": [
         {
           "name": "customer_id",
@@ -26,6 +42,7 @@
           "type": "object"
         }
       ],
+      "risk_signals": ["personal_data", "audit_required"],
       "required_review_fields": ["auth_required", "timeout", "retry", "side_effect"]
     },
     {
@@ -38,6 +55,10 @@
       "remote_contract_kind": null,
       "scaffold_output": "agent_shell_only",
       "no_runnable_business_logic": true,
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
+        "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
+      ],
       "inputs": [
         {
           "name": "review_context",
@@ -51,7 +72,47 @@
           "type": "object"
         }
       ],
+      "risk_signals": [],
       "required_review_fields": ["input_contract", "output_contract", "eval_placeholders"]
     }
-  ]
+  ],
+  "excluded_modules": [
+    {
+      "id": "mod-003",
+      "name": "unapproved_example",
+      "status": "needs_info",
+      "reason": "status is needs_info; only approved modules are eligible for scaffold generation"
+    }
+  ],
+  "manifest": {
+    "imported_components": [
+      {
+        "module_id": "mod-001",
+        "module_name": "customer_profile_lookup",
+        "catalog_id": "seed-adapter-customer_profile_lookup",
+        "package_name": "agent-factory-shared-components",
+        "package_version": "0.1.0",
+        "import_path": "agent_factory_shared.adapters",
+        "callable_name": "lookup_customer_profile"
+      }
+    ],
+    "new_code_required": [
+      {
+        "module_id": "mod-002",
+        "module_name": "requirement_review_specialist",
+        "reason": "no catalog binding was selected for this approved module",
+        "developer_todos": [
+          "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
+          "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "can_generate_source": true,
+    "blockers": [],
+    "warnings": [
+      "requirement_review_specialist: generated as new-code TODO boundary because no python package import is available"
+    ]
+  }
 }

@@ -4,7 +4,7 @@
   "title": "Scaffold Plan",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requirement_id", "source", "raw_requirement_to_code", "modules"],
+  "required": ["requirement_id", "source", "raw_requirement_to_code", "modules", "excluded_modules", "manifest", "validation"],
   "properties": {
     "requirement_id": {
       "type": "string",
@@ -22,6 +22,37 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/module"
+      }
+    },
+    "excluded_modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/excluded_module"
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imported_components", "new_code_required"],
+      "properties": {
+        "imported_components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/imported_component" }
+        },
+        "new_code_required": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/new_code_required" }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["can_generate_source", "blockers", "warnings"],
+      "properties": {
+        "can_generate_source": { "type": "boolean" },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "type": "string" } }
       }
     }
   },
@@ -41,7 +72,9 @@
         "no_runnable_business_logic",
         "inputs",
         "outputs",
-        "required_review_fields"
+        "required_review_fields",
+        "developer_todos",
+        "risk_signals"
       ],
       "properties": {
         "id": {
@@ -61,7 +94,7 @@
         },
         "workflow_kind": {
           "anyOf": [
-            { "type": "string", "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "unknown"] },
+            { "type": "string", "enum": ["sequential", "parallel", "loop", "human_review", "orchestration", "graph", "dynamic", "unknown"] },
             { "type": "null" }
           ]
         },
@@ -94,6 +127,16 @@
           "type": "boolean",
           "const": true
         },
+        "catalog_binding": {
+          "anyOf": [{ "$ref": "#/$defs/catalog_binding" }, { "type": "null" }]
+        },
+        "import_contract": {
+          "anyOf": [{ "$ref": "#/$defs/import_contract" }, { "type": "null" }]
+        },
+        "developer_todos": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "inputs": {
           "type": "array",
           "items": { "$ref": "#/$defs/field" }
@@ -103,6 +146,82 @@
           "items": { "$ref": "#/$defs/field" }
         },
         "required_review_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "risk_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "personal_data",
+              "financial_data",
+              "credit_decision_support",
+              "customer_impact",
+              "external_message",
+              "transaction_write",
+              "human_approval_required",
+              "audit_required"
+            ]
+          }
+        }
+      }
+    },
+    "catalog_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_id", "name", "component_source"],
+      "properties": {
+        "catalog_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "component_source": { "type": "string", "enum": ["python_package", "mcp", "stub"] }
+      }
+    },
+    "import_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_name", "import_path", "callable_name"],
+      "properties": {
+        "package_name": { "type": "string", "minLength": 1 },
+        "package_version": { "type": "string", "minLength": 1 },
+        "import_path": { "type": "string", "minLength": 1 },
+        "callable_name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "excluded_module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status", "reason"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "imported_component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_id", "module_name", "catalog_id", "package_name", "import_path", "callable_name"],
+      "properties": {
+        "module_id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
+        "module_name": { "type": "string", "minLength": 1 },
+        "catalog_id": { "type": "string", "minLength": 1 },
+        "package_name": { "type": "string", "minLength": 1 },
+        "package_version": { "type": "string", "minLength": 1 },
+        "import_path": { "type": "string", "minLength": 1 },
+        "callable_name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "new_code_required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_id", "module_name", "reason", "developer_todos"],
+      "properties": {
+        "module_id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
+        "module_name": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "developer_todos": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }

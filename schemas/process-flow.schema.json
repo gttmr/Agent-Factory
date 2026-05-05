@@ -71,8 +71,38 @@
           "type": "string",
           "enum": ["local", "remote_a2a"],
           "default": "local"
+        },
+        "data_channel": {
+          "$ref": "#/$defs/dataChannel"
+        },
+        "state_key": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "artifact_key": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "schema_ref": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+        },
+        "route_condition": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
         }
       }
+    },
+    "dataChannel": {
+      "type": "string",
+      "enum": [
+        "event_output",
+        "event_message",
+        "session_state",
+        "temp_state",
+        "user_state",
+        "app_state",
+        "artifact",
+        "route",
+        "control",
+        "unknown"
+      ]
     }
   }
 }

@@ -379,13 +379,43 @@
     "flowEdge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to", "data", "edge_type"],
+      "required": [
+        "from",
+        "to",
+        "data",
+        "edge_type",
+        "data_channel",
+        "state_key",
+        "artifact_key",
+        "schema_ref",
+        "route_condition"
+      ],
       "properties": {
         "from": { "type": "string" },
         "to": { "type": "string" },
         "data": { "type": "string" },
-        "edge_type": { "type": "string", "enum": ["local", "remote_a2a"] }
+        "edge_type": { "type": "string", "enum": ["local", "remote_a2a"] },
+        "data_channel": { "$ref": "#/$defs/flowDataChannel" },
+        "state_key": { "$ref": "#/$defs/nullableString" },
+        "artifact_key": { "$ref": "#/$defs/nullableString" },
+        "schema_ref": { "$ref": "#/$defs/nullableString" },
+        "route_condition": { "$ref": "#/$defs/nullableString" }
       }
+    },
+    "flowDataChannel": {
+      "type": "string",
+      "enum": [
+        "event_output",
+        "event_message",
+        "session_state",
+        "temp_state",
+        "user_state",
+        "app_state",
+        "artifact",
+        "route",
+        "control",
+        "unknown"
+      ]
     }
   }
 }

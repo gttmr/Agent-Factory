@@ -44,6 +44,18 @@ const riskSignals = new Set([
 const systemAccess = new Set(["unknown", "read", "write", "read_write", "not_required"]);
 const flowNodeTypes = new Set(["input", "output", "agent", "workflow", "adapter", "remote_a2a"]);
 const flowEdgeTypes = new Set(["local", "remote_a2a"]);
+const flowDataChannels = new Set([
+  "event_output",
+  "event_message",
+  "session_state",
+  "temp_state",
+  "user_state",
+  "app_state",
+  "artifact",
+  "route",
+  "control",
+  "unknown"
+]);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -427,9 +439,19 @@ interface SanitizedCatalogEntry {
   access_protocol?: string;
   mcp_server?: string;
   mcp_tool_name?: string;
+  mcp_schema_ref?: string;
+  mcp_auth_mode?: string;
+  component_source?: string;
+  package_name?: string;
+  package_version?: string;
+  import_path?: string;
+  callable_name?: string;
   owner_domain?: string;
   status?: string;
   responsibility?: string;
+  inputs?: Array<{ name: string; type: string; required?: boolean }>;
+  outputs?: Array<{ name: string; type: string; required?: boolean }>;
+  composition?: string[];
   risk_signals?: string[];
 }
 
@@ -458,6 +480,9 @@ function sanitizeCatalogPayload(value: unknown): SanitizedCatalogEntry[] {
           .filter((signal): signal is string => typeof signal === "string" && riskSignals.has(signal))
           .slice(0, 8)
       : undefined;
+    const inputs = sanitizeCatalogFields(item.inputs);
+    const outputs = sanitizeCatalogFields(item.outputs);
+    const composition = sanitizeStringList(item.composition, 16, 240);
     sanitized.push({
       id,
       name,
@@ -466,13 +491,51 @@ function sanitizeCatalogPayload(value: unknown): SanitizedCatalogEntry[] {
       access_protocol: stringField(item, "access_protocol", 32),
       mcp_server: stringField(item, "mcp_server", 120),
       mcp_tool_name: stringField(item, "mcp_tool_name", 120),
+      mcp_schema_ref: stringField(item, "mcp_schema_ref", 160),
+      mcp_auth_mode: stringField(item, "mcp_auth_mode", 80),
+      component_source: stringField(item, "component_source", 40),
+      package_name: stringField(item, "package_name", 120),
+      package_version: stringField(item, "package_version", 80),
+      import_path: stringField(item, "import_path", 160),
+      callable_name: stringField(item, "callable_name", 120),
       owner_domain: stringField(item, "owner_domain", 120),
       status: stringField(item, "status", 80),
       responsibility: stringField(item, "responsibility", 320),
+      inputs: inputs.length ? inputs : undefined,
+      outputs: outputs.length ? outputs : undefined,
+      composition: composition.length ? composition : undefined,
       risk_signals: risk_signals && risk_signals.length ? risk_signals : undefined
     });
   }
   return sanitized;
+}
+
+function sanitizeStringList(value: unknown, maxItems: number, maxLength: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().slice(0, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function sanitizeCatalogFields(value: unknown): Array<{ name: string; type: string; required?: boolean }> {
+  if (!Array.isArray(value)) return [];
+  const result: Array<{ name: string; type: string; required?: boolean }> = [];
+  for (const item of value) {
+    if (result.length >= 12) break;
+    if (!isRecord(item)) continue;
+    const rawName = item.name;
+    const rawType = item.type;
+    if (typeof rawName !== "string" || typeof rawType !== "string") continue;
+    const name = rawName.trim().slice(0, 80);
+    const type = rawType.trim().slice(0, 120);
+    if (!name || !type) continue;
+    const field: { name: string; type: string; required?: boolean } = { name, type };
+    if (typeof item.required === "boolean") field.required = item.required;
+    result.push(field);
+  }
+  return result;
 }
 
 function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEntry[]): string {
@@ -493,12 +556,17 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "Do not paraphrase the docs into long output. Use them only to ground classification, adk_hints, and processFlow shape.",
     "",
     "Output rules (engineering invariants only - non-negotiable):",
+    "- RequirementIntakeInput intentionally contains only a selected domain and rawText. Infer title, requester, systems, inputs, outputs, process, and missing details from rawText instead of expecting separate intake fields.",
+    "- Use RequirementIntakeInput.domain as the user's selected domain unless rawText clearly contradicts it; record any contradiction in normalizedRequirement.contradictions.",
     "- normalizedRequirement.id = \"req-001\"; every module source_requirement_id = \"req-001\".",
     "- Number module ids sequentially as mod-001, mod-002, mod-003, ... with no gaps.",
     "- processFlow.requirement_id = \"req-001\".",
     "- Process flow node ids may reference input field names, module ids, or output field names. Edges must refer to existing node ids.",
     "- Module node type must equal module_category. Module node subtype should be the active subtype value or null.",
     "- Edge edge_type must be \"remote_a2a\" iff at least one endpoint is a remote_a2a node; all other edges are local.",
+    "- Every processFlow edge must include data_channel, state_key, artifact_key, schema_ref, and route_condition. Use data_channel values only from event_output, event_message, session_state, temp_state, user_state, app_state, artifact, route, control, unknown. Use null for state_key, artifact_key, schema_ref, and route_condition when not applicable.",
+    "- Ground edge metadata in ADK 2.0 data handling: Event.output is the default node-to-node payload, Event.message is user-facing or human-input text, Event.state is small serializable state, artifacts hold larger/binary named versioned data, route/control represent graph routing or loop/escalation signals.",
+    "- Use state_key only when the edge writes or reads ADK Session/State. Prefix key names deliberately: temp: for invocation-scoped intermediates, user: for user-scoped state, app: for app-scoped state, or no prefix for session state. Use artifact_key only when the edge passes or stores a named artifact. Use route_condition for branch route values or human approval outcomes.",
     "- Include branch:, parallel:, or loop: prefixes in edge data only when those structures are supported by the requirement.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
     "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
@@ -524,8 +592,11 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
       "",
       "Registered shared catalog (already-approved reusable agents/workflows/adapters/remote contracts):",
       "- Treat this list as the source of truth for what already exists in the workbench. Prefer reuse over inventing a new module.",
-      "- When a candidate's responsibility, subtype, owner_domain, and access protocol match an existing entry, set the candidate's name to the catalog entry's name verbatim, set reuse_candidate to true, and explain the binding in rationale (mention the catalog entry name and id).",
-      "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name; copy them onto the candidate exactly. Do not invent server or tool names.",
+      "- When a candidate's responsibility, inputs, outputs, subtype, owner_domain, and access protocol match an existing entry, set the candidate's name to the catalog entry's name verbatim, set reuse_candidate to true, and explain the binding in rationale (mention the catalog entry name and id).",
+      "- Copy the catalog inputs and outputs onto a reused candidate unless the requirement narrows them; explain any narrowing in rationale or missing_information.",
+      "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information.",
+      "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name / mcp_schema_ref / mcp_auth_mode; copy them onto the candidate exactly. Do not invent server or tool names.",
+      "- Catalog entries may also include component_source, package_name, package_version, import_path, and callable_name. Preserve the catalog name on reused candidates so scaffold-plan generation can bind the approved module back to that package import contract.",
       "- For partial matches, still emit a candidate but flag the gap in missing_information (e.g. owner mismatch, narrower scope).",
       "- Do not duplicate a catalog entry as a separate new candidate — collapse it into the matching reuse candidate.",
       "- Never fabricate catalog entries that are not in this list.",
@@ -1034,15 +1105,7 @@ function getAnalyzerTimeoutMs(): number {
 }
 
 function countInputChars(input: Record<string, unknown>): number {
-  return [
-    input.title,
-    input.domainHint,
-    input.rawText,
-    input.requesterTeam,
-    input.requesterRole,
-    input.knownSystems,
-    input.expectedOutput
-  ]
+  return [input.domain, input.rawText]
     .filter((value): value is string => typeof value === "string")
     .reduce((total, value) => total + value.length, 0);
 }
@@ -1366,6 +1429,18 @@ function validateProcessFlow(value: unknown, errors: string[]) {
       if (typeof edge.edge_type !== "string" || !flowEdgeTypes.has(edge.edge_type)) {
         errors.push(`processFlow.edges[${index}].edge_type 값이 올바르지 않습니다.`);
       }
+      if (
+        edge.data_channel !== undefined &&
+        (typeof edge.data_channel !== "string" || !flowDataChannels.has(edge.data_channel))
+      ) {
+        errors.push(`processFlow.edges[${index}].data_channel 값이 올바르지 않습니다.`);
+      }
+      ["state_key", "artifact_key", "schema_ref", "route_condition"].forEach((key) => {
+        const field = edge[key];
+        if (field !== undefined && field !== null && !truthyString(field)) {
+          errors.push(`processFlow.edges[${index}].${key} 값은 문자열 또는 null이어야 합니다.`);
+        }
+      });
     });
   }
 }

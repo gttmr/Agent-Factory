@@ -2,13 +2,21 @@ import { useMemo, useRef, useState } from "react";
 import { AnalysisResult } from "./components/AnalysisResult";
 import { CatalogManager } from "./components/CatalogManager";
 import { DomainCapabilityMap } from "./components/DomainCapabilityMap";
-import { ExportArtifacts } from "./components/ExportArtifacts";
+import { AdkRuntimeWorkbench } from "./components/AdkRuntimeWorkbench";
 import { ModuleReview } from "./components/ModuleReview";
 import { ProcessFlowView } from "./components/ProcessFlowView";
 import { RequirementIntake } from "./components/RequirementIntake";
 import { ReuseHeatmap } from "./components/ReuseHeatmap";
+import { SavedAnalyses } from "./components/SavedAnalyses";
 import { getExampleRequirement } from "./analyzer/exampleRequirement";
 import { defaultAnalyzerProvider } from "./analyzer/providers";
+import {
+  createSavedAnalysisId,
+  deleteSavedAnalysis,
+  loadSavedAnalyses,
+  upsertSavedAnalysis,
+  type SavedAnalysisRecord
+} from "./analyzer/savedAnalyses";
 import { loadSeedCatalog } from "./catalog/seed";
 import type { CatalogEntry } from "./catalog/types";
 import type {
@@ -17,6 +25,7 @@ import type {
   CatalogReference,
   CodexAnalyzerModel,
   ModuleCandidate,
+  RequirementDomain,
   RequirementIntakeInput
 } from "./analyzer/types";
 
@@ -28,16 +37,12 @@ type StepId =
   | "reuse"
   | "domainMap"
   | "catalog"
+  | "saved"
   | "export";
 
 const emptyInput: RequirementIntakeInput = {
-  title: "",
-  domainHint: "",
-  rawText: "",
-  requesterTeam: "",
-  requesterRole: "",
-  knownSystems: "",
-  expectedOutput: ""
+  domain: "공통",
+  rawText: ""
 };
 
 const steps: Array<{ id: StepId; label: string; alwaysAvailable?: boolean }> = [
@@ -48,7 +53,8 @@ const steps: Array<{ id: StepId; label: string; alwaysAvailable?: boolean }> = [
   { id: "reuse", label: "재사용 히트맵" },
   { id: "domainMap", label: "도메인 맵" },
   { id: "catalog", label: "카탈로그", alwaysAvailable: true },
-  { id: "export", label: "아티팩트 내보내기" }
+  { id: "saved", label: "저장된 분석", alwaysAvailable: true },
+  { id: "export", label: "ADK 소스 생성" }
 ];
 
 export default function App() {
@@ -64,6 +70,8 @@ export default function App() {
   const analysisRequestInFlight = useRef(false);
   const seedEntries = useMemo(() => loadSeedCatalog(), []);
   const [catalogEntries, setCatalogEntries] = useState<CatalogEntry[]>(seedEntries);
+  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysisRecord[]>(() => loadSavedAnalyses());
+  const [currentSavedId, setCurrentSavedId] = useState<string | null>(null);
 
   const processFlow = analysis?.processFlow ?? null;
 
@@ -93,6 +101,7 @@ export default function App() {
       setAnalysis(result);
       setModuleCandidates(result.moduleCandidates);
       setAcceptedMissing([]);
+      setCurrentSavedId(null);
       setValidationMessage("");
     } catch (error) {
       setValidationMessage(error instanceof Error ? error.message : "분석을 완료하지 못했습니다.");
@@ -106,6 +115,7 @@ export default function App() {
   function loadExample() {
     setInput(getExampleRequirement());
     setValidationMessage("");
+    setCurrentSavedId(null);
   }
 
   function clearAll() {
@@ -115,7 +125,54 @@ export default function App() {
     setAcceptedMissing([]);
     setValidationMessage("");
     setAnalysisProgress([]);
+    setCurrentSavedId(null);
     setActiveStep("intake");
+  }
+
+  function saveCurrentAnalysis() {
+    if (!analysis) {
+      setValidationMessage("저장할 분석 결과가 없습니다.");
+      setActiveStep("intake");
+      return;
+    }
+    const id = currentSavedId ?? createSavedAnalysisId();
+    const savedAt = new Date().toISOString();
+    const record: SavedAnalysisRecord = {
+      id,
+      title: analysis.normalizedRequirement.title || "제목 없는 분석",
+      savedAt,
+      input,
+      analysis: {
+        ...analysis,
+        moduleCandidates
+      },
+      moduleCandidates,
+      acceptedMissing,
+      analyzerModel
+    };
+    setSavedAnalyses(upsertSavedAnalysis(record));
+    setCurrentSavedId(id);
+    setValidationMessage("현재 분석을 저장했습니다.");
+    setActiveStep("saved");
+  }
+
+  function loadSavedAnalysis(record: SavedAnalysisRecord) {
+    setInput(normalizeIntakeInput(record.input));
+    setAnalysis(record.analysis);
+    setModuleCandidates(record.moduleCandidates);
+    setAcceptedMissing(record.acceptedMissing);
+    setAnalyzerModel(record.analyzerModel);
+    setAnalysisProgress([]);
+    setCurrentSavedId(record.id);
+    setValidationMessage(`저장된 분석을 불러왔습니다: ${record.title}`);
+    setActiveStep("analysis");
+  }
+
+  function removeSavedAnalysis(id: string) {
+    setSavedAnalyses(deleteSavedAnalysis(id));
+    if (currentSavedId === id) {
+      setCurrentSavedId(null);
+    }
   }
 
   function toggleAcceptedMissing(item: string) {
@@ -134,6 +191,7 @@ export default function App() {
         <div className="status-strip" aria-label="워크벤치 상태">
           <span>{isAnalyzing ? "Codex CLI 분석 중" : analysis ? "초안 분석 완료" : "분석 전"}</span>
           <span>{moduleCandidates.length}개 모듈</span>
+          <span>{savedAnalyses.length}개 저장</span>
           <span>{defaultAnalyzerProvider.label}</span>
         </div>
       </header>
@@ -181,6 +239,7 @@ export default function App() {
         {activeStep === "modules" && analysis && (
           <ModuleReview
             moduleCandidates={moduleCandidates}
+            catalogEntries={catalogEntries}
             onModuleCandidatesChange={setModuleCandidates}
             onContinue={() => setActiveStep("flow")}
           />
@@ -217,8 +276,19 @@ export default function App() {
           />
         )}
 
+        {activeStep === "saved" && (
+          <SavedAnalyses
+            records={savedAnalyses}
+            hasCurrentAnalysis={analysis !== null}
+            currentSavedId={currentSavedId}
+            onSaveCurrent={saveCurrentAnalysis}
+            onLoad={loadSavedAnalysis}
+            onDelete={removeSavedAnalysis}
+          />
+        )}
+
         {activeStep === "export" && analysis && processFlow && (
-          <ExportArtifacts
+          <AdkRuntimeWorkbench
             normalizedRequirement={analysis.normalizedRequirement}
             evidence={analysis.evidence}
             moduleCandidates={moduleCandidates}
@@ -237,6 +307,23 @@ function compactProgressEvent(event: AnalyzerProgressEvent): AnalyzerProgressEve
   return progress;
 }
 
+function normalizeIntakeInput(input: RequirementIntakeInput | Record<string, unknown>): RequirementIntakeInput {
+  const record = input as Record<string, unknown>;
+  const rawText = typeof record.rawText === "string" ? record.rawText : "";
+  const legacyDomainHint = typeof record.domainHint === "string" ? record.domainHint : "";
+  const domain = typeof record.domain === "string" && record.domain ? record.domain : legacyDomainHint || "공통";
+  return {
+    domain: normalizeRequirementDomain(domain),
+    rawText
+  };
+}
+
+function normalizeRequirementDomain(value: string): RequirementDomain {
+  return value === "고객" || value === "수신" || value === "여신" || value === "카드" || value === "리스크"
+    ? value
+    : "공통";
+}
+
 function buildCatalogReferences(entries: CatalogEntry[]): CatalogReference[] {
   return entries
     .filter((entry) => entry.provenance !== "session_deleted")
@@ -249,9 +336,19 @@ function buildCatalogReferences(entries: CatalogEntry[]): CatalogReference[] {
       access_protocol: entry.access_protocol ?? null,
       mcp_server: entry.mcp_server ?? null,
       mcp_tool_name: entry.mcp_tool_name ?? null,
+      mcp_schema_ref: entry.mcp_schema_ref ?? null,
+      mcp_auth_mode: entry.mcp_auth_mode ?? null,
+      component_source: entry.component_source ?? null,
+      package_name: entry.package_name ?? null,
+      package_version: entry.package_version ?? null,
+      import_path: entry.import_path ?? null,
+      callable_name: entry.callable_name ?? null,
       owner_domain: entry.owner_domain ?? null,
       status: entry.status ?? null,
       responsibility: entry.responsibility ?? null,
+      inputs: entry.inputs ?? [],
+      outputs: entry.outputs ?? [],
+      composition: entry.composition ?? [],
       risk_signals: entry.risk_signals ?? []
     }));
 }

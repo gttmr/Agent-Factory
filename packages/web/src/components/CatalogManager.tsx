@@ -11,6 +11,7 @@ import {
   accessProtocols,
   adapterKinds,
   agentKinds,
+  type ComponentSource,
   moduleCategories,
   remoteContractKinds,
   workflowKinds
@@ -19,6 +20,7 @@ import type {
   AccessProtocol,
   AdapterKind,
   AgentKind,
+  FieldSpec,
   ModuleCandidate,
   ModuleCategory,
   RemoteContractKind,
@@ -50,6 +52,8 @@ const provenanceClass: Record<CatalogEntry["provenance"], string> = {
   session_edited: "prov-edited",
   session_deleted: "prov-deleted"
 };
+
+const componentSources: ComponentSource[] = ["python_package", "mcp", "stub"];
 
 export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onContinue }: CatalogManagerProps) {
   const [activeTab, setActiveTab] = useState<CatalogTab>("registered");
@@ -158,6 +162,8 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
       owner_domain: candidate.owner_domain,
       status: "candidate",
       responsibility: candidate.rationale,
+      inputs: candidate.inputs,
+      outputs: candidate.outputs,
       risk_signals: candidate.risk_signals,
       provenance: "session_added"
     };
@@ -372,10 +378,50 @@ function EntrySummary({ entry, onEdit, onDelete, onRestore }: EntrySummaryProps)
             </dd>
           </>
         ) : null}
+        {entry.component_source ? (
+          <>
+            <dt>컴포넌트 소스</dt>
+            <dd>{entry.component_source}</dd>
+          </>
+        ) : null}
+        {entry.component_source === "python_package" && (entry.package_name || entry.import_path || entry.callable_name) ? (
+          <>
+            <dt>Python import</dt>
+            <dd>
+              {entry.package_name ?? "(package 미지정)"}
+              {entry.package_version ? `==${entry.package_version}` : ""} / {entry.import_path ?? "(import path 미지정)"}
+              {entry.callable_name ? `.${entry.callable_name}` : ".(callable 미지정)"}
+            </dd>
+          </>
+        ) : null}
         {entry.contract_status ? (
           <>
             <dt>계약 상태</dt>
             <dd>{entry.contract_status}</dd>
+          </>
+        ) : null}
+        {entry.inputs?.length ? (
+          <>
+            <dt>입력</dt>
+            <dd>{formatFieldSpecs(entry.inputs)}</dd>
+          </>
+        ) : null}
+        {entry.outputs?.length ? (
+          <>
+            <dt>출력</dt>
+            <dd>{formatFieldSpecs(entry.outputs)}</dd>
+          </>
+        ) : null}
+        {entry.module_category === "workflow" && entry.composition?.length ? (
+          <>
+            <dt>조합</dt>
+            <dd>
+              <ol className="catalog-composition">
+                {entry.composition.map((step, index) => (
+                  <li key={`${entry.id}-composition-${index}`}>{step}</li>
+                ))}
+              </ol>
+            </dd>
           </>
         ) : null}
         {entry.scaffold_output ? (
@@ -456,8 +502,21 @@ function EntryForm({ draft, onChange, onCancel, onSave }: EntryFormProps) {
     onChange({ ...draft, required_before_approval: list });
   }
 
+  function updateInputs(text: string) {
+    onChange({ ...draft, inputs: parseFieldSpecLines(text) });
+  }
+
+  function updateOutputs(text: string) {
+    onChange({ ...draft, outputs: parseFieldSpecLines(text) });
+  }
+
+  function updateComposition(text: string) {
+    onChange({ ...draft, composition: parseCompositionLines(text) });
+  }
+
   const isAdapter = draft.module_category === "adapter";
   const isMcp = draft.access_protocol === "mcp";
+  const isPythonPackage = draft.component_source === "python_package";
 
   return (
     <div className="catalog-form">
@@ -577,6 +636,61 @@ function EntryForm({ draft, onChange, onCancel, onSave }: EntryFormProps) {
             placeholder="이 항목의 역할을 한 줄로 적습니다."
           />
         </label>
+        <label>
+          <span>component_source</span>
+          <select
+            value={draft.component_source ?? ""}
+            onChange={(event) => update("component_source", (event.target.value || undefined) as ComponentSource | undefined)}
+          >
+            <option value="">미지정</option>
+            {componentSources.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>package_name</span>
+          <input
+            type="text"
+            value={draft.package_name ?? ""}
+            onChange={(event) => update("package_name", event.target.value)}
+            placeholder="예: agent-factory-components"
+            disabled={!isPythonPackage}
+          />
+        </label>
+        {isPythonPackage && (
+          <>
+            <label>
+              <span>package_version</span>
+              <input
+                type="text"
+                value={draft.package_version ?? ""}
+                onChange={(event) => update("package_version", event.target.value)}
+                placeholder="예: 0.1.0"
+              />
+            </label>
+            <label>
+              <span>import_path</span>
+              <input
+                type="text"
+                value={draft.import_path ?? ""}
+                onChange={(event) => update("import_path", event.target.value)}
+                placeholder="예: agent_factory_components.vision"
+              />
+            </label>
+            <label>
+              <span>callable_name</span>
+              <input
+                type="text"
+                value={draft.callable_name ?? ""}
+                onChange={(event) => update("callable_name", event.target.value)}
+                placeholder="예: extract_text_from_image"
+              />
+            </label>
+          </>
+        )}
         {isAdapter && (
           <>
             <label>
@@ -643,6 +757,35 @@ function EntryForm({ draft, onChange, onCancel, onSave }: EntryFormProps) {
               </>
             )}
           </>
+        )}
+        <label className="span-2">
+          <span>입력 필드 (name:type:required)</span>
+          <textarea
+            rows={3}
+            value={formatFieldSpecLines(draft.inputs)}
+            onChange={(event) => updateInputs(event.target.value)}
+            placeholder="document_uri:string:true"
+          />
+        </label>
+        <label className="span-2">
+          <span>출력 필드 (name:type:required)</span>
+          <textarea
+            rows={3}
+            value={formatFieldSpecLines(draft.outputs)}
+            onChange={(event) => updateOutputs(event.target.value)}
+            placeholder="ocr_text:text:false"
+          />
+        </label>
+        {draft.module_category === "workflow" && (
+          <label className="span-2">
+            <span>워크플로우 조합 (한 줄에 한 단계)</span>
+            <textarea
+              rows={5}
+              value={formatCompositionLines(draft.composition)}
+              onChange={(event) => updateComposition(event.target.value)}
+              placeholder="parallel: ocr_text_extraction_adapter + stt_transcription_adapter"
+            />
+          </label>
         )}
         {draft.module_category === "remote_a2a" && (
           <label className="span-2">
@@ -715,6 +858,44 @@ function NewTab({ onCreate }: NewTabProps) {
       </div>
     </div>
   );
+}
+
+function formatFieldSpecs(fields: FieldSpec[]): string {
+  return fields
+    .map((field) => `${field.name}: ${field.type}${field.required ? " (required)" : ""}`)
+    .join(", ");
+}
+
+function formatFieldSpecLines(fields: FieldSpec[] | undefined): string {
+  return (fields ?? [])
+    .map((field) => `${field.name}:${field.type}:${field.required === true ? "true" : "false"}`)
+    .join("\n");
+}
+
+function parseFieldSpecLines(text: string): FieldSpec[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [rawName, rawType, rawRequired] = line.split(":");
+      const name = rawName?.trim() ?? "";
+      const type = rawType?.trim() ?? "unknown";
+      const required = rawRequired?.trim().toLowerCase() === "true";
+      return { name, type, required };
+    })
+    .filter((field) => field.name.length > 0);
+}
+
+function formatCompositionLines(composition: string[] | undefined): string {
+  return (composition ?? []).join("\n");
+}
+
+function parseCompositionLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 interface PromoteTabProps {

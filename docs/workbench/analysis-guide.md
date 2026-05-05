@@ -12,7 +12,7 @@
 5. 선택한 category에 맞는 subtype을 채운다.
 6. [Workflow decision guide](./workflow-decision-guide.md)에 따라 process flow를 그린다.
 7. 개발 리더가 Module Review Board에서 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
-8. 승인된 artifact만 export한다.
+8. 최종 단계에서 검토된 분석 결과를 ADK 2.0 graph workflow 소스로 생성한다.
 
 ## 산출물 의미
 
@@ -24,6 +24,8 @@
 - `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보.
 - `implementation-handoff.md`: 구현자가 알아야 할 결정, 미해결 질문, ADK component hint.
 - `scaffold-plan.json`: 승인 후보만 담는 export artifact. 실행 가능한 business logic을 만들라는 지시가 아니다.
+- `*_adk/agent.py`: Graph IR 검증을 통과한 뒤 생성되는 `Workflow(edges=[...])` 기반 ADK 2.0 graph workflow source. 분석된 topology와 data channel을 실행 가능한 runtime skeleton으로 보존한다.
+- `*_adk/workflow_manifest.json`: 생성 source가 raw requirement를 business logic으로 직접 변환하지 않았음을 확인하는 runtime guardrail manifest.
 
 ## 분석 원칙
 
@@ -32,7 +34,7 @@
 - MCP tool, retrieval, grounding, external service는 우선 `adapter` 후보로 본다.
 - ADK component는 category가 아니다. 필요하면 `implementation-handoff.md`의 ADK component hint로 남긴다.
 - 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
-- Raw requirement는 직접 코드 생성으로 이어지지 않는다.
+- Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK source 생성은 검토된 process flow와 candidate metadata를 Graph IR로 정규화한 뒤 실행 가능한 runtime topology로 옮기는 단계다.
 
 ## ADK 문서 사용
 

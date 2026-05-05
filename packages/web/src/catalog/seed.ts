@@ -11,7 +11,14 @@ interface AgentRow {
   owner_domain?: string;
   status?: string;
   responsibility?: string;
+  inputs?: CatalogEntry["inputs"];
+  outputs?: CatalogEntry["outputs"];
   scaffold_output?: string;
+  component_source?: string;
+  package_name?: string;
+  package_version?: string;
+  import_path?: string;
+  callable_name?: string;
   notes?: string;
 }
 
@@ -22,11 +29,18 @@ interface AdapterRow {
   status?: string;
   risk_signals?: string[];
   contract_status?: string;
+  inputs?: CatalogEntry["inputs"];
+  outputs?: CatalogEntry["outputs"];
   access_protocol?: string;
   mcp_server?: string;
   mcp_tool_name?: string;
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
+  component_source?: string;
+  package_name?: string;
+  package_version?: string;
+  import_path?: string;
+  callable_name?: string;
   notes?: string;
 }
 
@@ -35,7 +49,15 @@ interface WorkflowRow {
   workflow_kind?: string;
   owner_domain?: string;
   status?: string;
+  inputs?: CatalogEntry["inputs"];
+  outputs?: CatalogEntry["outputs"];
+  composition?: string[];
   scaffold_output?: string;
+  component_source?: string;
+  package_name?: string;
+  package_version?: string;
+  import_path?: string;
+  callable_name?: string;
   notes?: string;
 }
 
@@ -44,6 +66,13 @@ interface RemoteRow {
   status?: string;
   required_before_approval?: string[];
   owner_domain?: string;
+  inputs?: CatalogEntry["inputs"];
+  outputs?: CatalogEntry["outputs"];
+  component_source?: string;
+  package_name?: string;
+  package_version?: string;
+  import_path?: string;
+  callable_name?: string;
   notes?: string;
 }
 
@@ -70,7 +99,14 @@ export function loadSeedCatalog(): CatalogEntry[] {
       owner_domain: row.owner_domain,
       status: row.status,
       responsibility: row.responsibility,
+      inputs: row.inputs ?? [],
+      outputs: row.outputs ?? [],
       scaffold_output: row.scaffold_output,
+      component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      package_name: row.package_name,
+      package_version: row.package_version,
+      import_path: row.import_path,
+      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -86,11 +122,18 @@ export function loadSeedCatalog(): CatalogEntry[] {
       status: row.status,
       risk_signals: (row.risk_signals as CatalogEntry["risk_signals"]) ?? [],
       contract_status: row.contract_status,
+      inputs: row.inputs ?? [],
+      outputs: row.outputs ?? [],
       access_protocol: (row.access_protocol as CatalogEntry["access_protocol"]) ?? null,
       mcp_server: row.mcp_server,
       mcp_tool_name: row.mcp_tool_name,
       mcp_schema_ref: row.mcp_schema_ref,
       mcp_auth_mode: row.mcp_auth_mode,
+      component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      package_name: row.package_name,
+      package_version: row.package_version,
+      import_path: row.import_path,
+      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -104,7 +147,15 @@ export function loadSeedCatalog(): CatalogEntry[] {
       workflow_kind: (row.workflow_kind as CatalogEntry["workflow_kind"]) ?? null,
       owner_domain: row.owner_domain,
       status: row.status,
+      inputs: row.inputs ?? [],
+      outputs: row.outputs ?? [],
+      composition: row.composition ?? [],
       scaffold_output: row.scaffold_output,
+      component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      package_name: row.package_name,
+      package_version: row.package_version,
+      import_path: row.import_path,
+      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -118,6 +169,13 @@ export function loadSeedCatalog(): CatalogEntry[] {
       remote_contract_kind: "a2a",
       owner_domain: row.owner_domain,
       status: row.status,
+      inputs: row.inputs ?? [],
+      outputs: row.outputs ?? [],
+      component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      package_name: row.package_name,
+      package_version: row.package_version,
+      import_path: row.import_path,
+      callable_name: row.callable_name,
       required_before_approval: row.required_before_approval ?? [],
       notes: row.notes,
       provenance: "seeded"

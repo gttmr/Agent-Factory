@@ -1,12 +1,12 @@
 # Agent Factory Workbench
 
-Agent Factory is a local-first workbench for turning raw requirements into reviewed planning artifacts. It is the source of truth for requirement intake, normalized requirement structure, module classification, process-flow review, reuse/commonization notes, and export artifacts.
+Agent Factory is a local-first workbench for turning raw requirements into reviewed ADK handoff artifacts. It is the source of truth for requirement intake, normalized requirement structure, module classification, process-flow review, reuse/commonization notes, Graph IR validation, and ADK runtime handoff.
 
 This repository contains the workbench application and shared schemas. It is not a banking deployment, does not include private endpoints or credentials, and does not generate runnable business logic directly from raw user requests.
 
 ## Repository Scope
 
-- `packages/web`: React/Vite requirement intake workbench.
+- `packages/web`: React/Vite requirement intake, review, Graph IR, and ADK runtime handoff workbench.
 - `schemas`: JSON Schemas for normalized requirements, module candidates, process flow, classification, commonization, and scaffold-plan artifacts.
 - `catalog`: MVP YAML catalogs for reusable agents, workflows, adapters, remote A2A placeholders, domain owners, and risk gates.
 - `templates`: generic artifact templates for reviewed handoff and scaffold planning.
@@ -21,10 +21,10 @@ This repository contains the workbench application and shared schemas. It is not
 4. Review process flow and remote-boundary friction.
 5. Mark modules as approved, deferred, rejected, or `needs_info`.
 6. Review reuse pressure and domain capability coverage.
-7. Export approved artifacts for downstream implementation planning.
-8. Export only approved `scaffold-plan.json` and `implementation-handoff.md` for downstream implementation planning.
+7. Convert the reviewed process flow into Graph IR for ADK Workflow source generation.
+8. Generate and verify ADK source with `compileall`, `pytest`, `adk run --jsonl`, and ADK Web structure checks.
 
-Raw requirements must never create code directly. Downstream implementation planning consumes approved artifacts only.
+Raw requirements must never create code directly. ADK source generation consumes the reviewed process flow and Graph IR only, and generated runtime code stays a stub/placeholder handoff until business logic, model credentials, and adapter contracts are explicitly wired.
 
 ## Taxonomy
 

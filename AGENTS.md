@@ -12,7 +12,7 @@
 
 - `README.md`: human-facing workbench overview and taxonomy contract.
 - `AGENTS.md`: model-facing repository index and working rules.
-- `packages/web`: requirement intake, analysis review, process flow, and artifact export UI.
+- `packages/web`: requirement intake, analysis review, process flow, Graph IR, and ADK runtime handoff UI.
 - `schemas`: normalized requirement, module candidate, and process-flow schemas.
 - `catalog`: initial YAML catalogs for reusable capabilities, domain owners, and risk gates.
 - `templates`: generic artifact and scaffold-plan templates.

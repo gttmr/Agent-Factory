@@ -1,13 +1,148 @@
 agents:
-  - name: requirement_review_specialist
+  - name: intake_triage_specialist
     agent_kind: specialist
     owner_domain: 공통
     status: proposed
-    responsibility: classify requirement context and draft review recommendations
+    responsibility: 접수된 요청의 업무 목표, 긴급도, 누락 정보, 후속 처리 방향을 판단한다.
+    inputs:
+      - name: request_text
+        type: text
+        required: true
+      - name: intake_metadata
+        type: object
+        required: false
+    outputs:
+      - name: triage_result
+        type: object
+      - name: missing_information
+        type: array<string>
     scaffold_output: agent_shell_only
-  - name: shared_review_capability
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: intake_triage_specialist
+    notes: 여러 업무 도메인에서 공통으로 쓰는 1차 분류 Agent.
+  - name: document_quality_specialist
+    agent_kind: specialist
+    owner_domain: 공통
+    status: proposed
+    responsibility: OCR 또는 파일 추출 결과의 품질, 누락 페이지, 판독 불가 영역을 검토한다.
+    inputs:
+      - name: extracted_document
+        type: object
+        required: true
+      - name: quality_rules
+        type: object
+        required: false
+    outputs:
+      - name: document_quality_report
+        type: object
+      - name: retry_required
+        type: boolean
+    scaffold_output: agent_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: document_quality_specialist
+    notes: OCR Adapter 뒤에 붙는 공통 품질 판단 Agent.
+  - name: evidence_pack_specialist
     agent_kind: shared
     owner_domain: 공통
-    status: candidate
-    responsibility: reusable reasoning support after repeated use cases prove reuse pressure
+    status: proposed
+    responsibility: 검색, 규칙, 고객/케이스 조회 결과를 상담원 또는 승인자가 검토할 근거 묶음으로 정리한다.
+    inputs:
+      - name: evidence_sources
+        type: array<object>
+        required: true
+      - name: decision_context
+        type: object
+        required: false
+    outputs:
+      - name: evidence_pack
+        type: object
+      - name: citation_summary
+        type: array<object>
     scaffold_output: agent_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: evidence_pack_specialist
+    notes: retrieval, rule_registry, data_query Adapter 결과를 사람이 읽기 좋은 근거로 통합한다.
+  - name: compliance_review_specialist
+    agent_kind: specialist
+    owner_domain: 공통
+    status: proposed
+    responsibility: 외부 발송 문구와 자동 처리 제안이 감사, 개인정보, 고객 영향 기준을 충족하는지 검토한다.
+    inputs:
+      - name: proposed_action
+        type: object
+        required: true
+      - name: compliance_policy_refs
+        type: array<object>
+        required: false
+    outputs:
+      - name: compliance_review
+        type: object
+      - name: approval_required
+        type: boolean
+    scaffold_output: agent_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: compliance_review_specialist
+    notes: 실제 법무 판단이 아니라 워크벤치용 검토 shell이다.
+  - name: customer_reply_drafting_specialist
+    agent_kind: specialist
+    owner_domain: 공통
+    status: proposed
+    responsibility: 근거와 정책 제약을 반영해 고객에게 보낼 답변 초안을 작성한다.
+    inputs:
+      - name: customer_context
+        type: object
+        required: false
+      - name: evidence_pack
+        type: object
+        required: true
+      - name: reply_constraints
+        type: object
+        required: false
+    outputs:
+      - name: reply_draft
+        type: text
+      - name: draft_rationale
+        type: object
+    scaffold_output: agent_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: customer_reply_drafting_specialist
+    notes: Template Adapter와 함께 쓰는 공통 응답 작성 Agent.
+  - name: escalation_reasoning_specialist
+    agent_kind: specialist
+    owner_domain: 공통
+    status: proposed
+    responsibility: 위험 신호, 신뢰도, 고객 영향, 금액/기한 정보를 종합해 사람 승인 또는 원격 전문가 위임 필요성을 판단한다.
+    inputs:
+      - name: case_summary
+        type: object
+        required: true
+      - name: risk_score
+        type: object
+        required: false
+    outputs:
+      - name: escalation_decision
+        type: object
+      - name: routing_reasons
+        type: array<string>
+    scaffold_output: agent_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.agents
+    callable_name: escalation_reasoning_specialist
+    notes: 자동 라우팅 전 마지막 reasoning 경계.

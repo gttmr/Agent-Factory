@@ -30,6 +30,20 @@ const workflowKinds = new Set([
 ]);
 const remoteKinds = new Set(["a2a", "unknown"]);
 const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
+const flowNodeTypes = new Set(["input", "output", "agent", "workflow", "adapter", "remote_a2a"]);
+const flowEdgeTypes = new Set(["local", "remote_a2a"]);
+const flowDataChannels = new Set([
+  "event_output",
+  "event_message",
+  "session_state",
+  "temp_state",
+  "user_state",
+  "app_state",
+  "artifact",
+  "route",
+  "control",
+  "unknown"
+]);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -44,6 +58,7 @@ const remoteRequiredFields = [
 ];
 
 validateModuleCandidates();
+validateProcessFlow();
 validateScaffoldPlan();
 
 if (errors.length) {
@@ -111,6 +126,64 @@ function validateModuleCandidates() {
         }
       }
     }
+  });
+}
+
+function validateProcessFlow() {
+  const path = join(root, "process-flow.json");
+  if (!existsSync(path)) {
+    return;
+  }
+
+  const flow = readJson(path);
+  if (typeof flow !== "object" || flow === null || Array.isArray(flow)) {
+    errors.push("process-flow.json must contain an object.");
+    return;
+  }
+  if (!Array.isArray(flow.nodes)) {
+    errors.push("process-flow.json nodes must be an array.");
+  } else {
+    flow.nodes.forEach((node, index) => {
+      if (!node || typeof node !== "object" || Array.isArray(node)) {
+        errors.push(`process-flow.json nodes[${index}] must be an object.`);
+        return;
+      }
+      if (typeof node.id !== "string" || !node.id.trim()) {
+        errors.push(`process-flow.json nodes[${index}] requires id.`);
+      }
+      if (typeof node.label !== "string" || !node.label.trim()) {
+        errors.push(`process-flow.json nodes[${index}] requires label.`);
+      }
+      if (!flowNodeTypes.has(node.type)) {
+        errors.push(`process-flow.json nodes[${index}] has invalid type.`);
+      }
+    });
+  }
+  if (!Array.isArray(flow.edges)) {
+    errors.push("process-flow.json edges must be an array.");
+    return;
+  }
+  flow.edges.forEach((edge, index) => {
+    if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
+      errors.push(`process-flow.json edges[${index}] must be an object.`);
+      return;
+    }
+    ["from", "to", "data"].forEach((key) => {
+      if (typeof edge[key] !== "string" || !edge[key].trim()) {
+        errors.push(`process-flow.json edges[${index}] requires ${key}.`);
+      }
+    });
+    if (!flowEdgeTypes.has(edge.edge_type)) {
+      errors.push(`process-flow.json edges[${index}] has invalid edge_type.`);
+    }
+    if (edge.data_channel !== undefined && !flowDataChannels.has(edge.data_channel)) {
+      errors.push(`process-flow.json edges[${index}] has invalid data_channel.`);
+    }
+    ["state_key", "artifact_key", "schema_ref", "route_condition"].forEach((key) => {
+      if (edge[key] !== undefined && edge[key] !== null && (typeof edge[key] !== "string" || !edge[key].trim())) {
+        errors.push(`process-flow.json edges[${index}] ${key} must be a non-empty string or null.`);
+      }
+    });
   });
 }
 

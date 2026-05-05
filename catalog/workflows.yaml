@@ -1,7 +1,178 @@
 workflows:
-  - name: requirement_handling_workflow
+  - name: multimodal_intake_graph_workflow
+    workflow_kind: graph
+    owner_domain: 공통
+    status: proposed
+    responsibility: 텍스트, 문서, 음성 입력을 정규화하고 필요한 Adapter를 병렬로 호출한 뒤 하나의 intake context로 병합한다.
+    inputs:
+      - name: intake_payload
+        type: object
+        required: true
+    outputs:
+      - name: normalized_intake_context
+        type: object
+      - name: intake_artifacts
+        type: array<object>
+    composition:
+      - "input: intake_payload를 텍스트/문서/음성 payload로 분기한다."
+      - "parallel document branch: document_conversion_adapter -> ocr_text_extraction_adapter -> document_layout_classifier_adapter -> table_extraction_adapter."
+      - "parallel audio branch: stt_transcription_adapter로 transcript와 speaker_segments를 만든다."
+      - "parallel text branch: language_detection_adapter -> pii_redaction_adapter로 언어와 개인정보 마스킹 결과를 만든다."
+      - "merge: 문서/음성/텍스트 결과를 normalized_intake_context와 intake_artifacts로 합친다."
+      - "quality gate: document_quality_specialist가 문서 품질과 재시도 필요 여부를 판단한다."
+    scaffold_output: orchestration_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: multimodal_intake_graph_workflow
+    notes: OCR, STT, 언어 감지, PII 마스킹 Adapter를 조합하는 ADK 2.0 graph workflow 후보.
+  - name: document_processing_sequence_workflow
+    workflow_kind: sequential
+    owner_domain: 공통
+    status: proposed
+    responsibility: 파일 변환, OCR, 레이아웃 분류, 표 추출, 품질 검토를 순차적으로 실행한다.
+    inputs:
+      - name: document_uri
+        type: string
+        required: true
+      - name: document_metadata
+        type: object
+        required: false
+    outputs:
+      - name: processed_document
+        type: object
+      - name: quality_report
+        type: object
+    composition:
+      - "document_conversion_adapter로 원본 파일을 표준 처리 포맷으로 변환한다."
+      - "ocr_text_extraction_adapter로 텍스트와 page_blocks를 추출한다."
+      - "document_layout_classifier_adapter로 제목, 본문, 표, 서명 영역을 분류한다."
+      - "table_extraction_adapter로 표 데이터를 구조화한다."
+      - "document_quality_specialist가 processed_document와 quality_report를 생성한다."
+    scaffold_output: orchestration_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: document_processing_sequence_workflow
+    notes: 문서 기반 업무에서 반복되는 전처리 pipeline.
+  - name: customer_clarification_loop_workflow
+    workflow_kind: loop
+    owner_domain: 공통
+    status: proposed
+    responsibility: 누락 정보가 남아 있으면 추가 확인 요청을 만들고, 고객 답변을 반영해 다시 판단한다.
+    inputs:
+      - name: missing_information
+        type: array<string>
+        required: true
+      - name: current_case_state
+        type: object
+        required: true
+    outputs:
+      - name: clarified_case_state
+        type: object
+      - name: unresolved_items
+        type: array<string>
+    composition:
+      - "missing_information을 response_template_registry_adapter의 추가 확인 템플릿에 매핑한다."
+      - "customer_reply_drafting_specialist가 고객 확인 요청 문구를 작성한다."
+      - "notification_dry_run_adapter로 실제 발송 없이 payload를 검토한다."
+      - "고객 답변이 들어오면 current_case_state에 반영하고 누락 정보 판단을 반복한다."
+      - "loop 종료 조건: unresolved_items가 없거나 재시도/타임아웃 정책에 도달한다."
+    scaffold_output: orchestration_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: customer_clarification_loop_workflow
+    notes: 반복 횟수, 타임아웃, 고객 미응답 정책은 승인 전 검토 필드로 남긴다.
+  - name: human_approval_gate_workflow
+    workflow_kind: human_review
+    owner_domain: 공통
+    status: proposed
+    responsibility: 고위험 또는 외부 발송 전 단계에서 사람 승인, 반려, 보완 요청 결과를 workflow route로 변환한다.
+    inputs:
+      - name: approval_packet
+        type: object
+        required: true
+      - name: approval_policy
+        type: object
+        required: false
+    outputs:
+      - name: approval_result
+        type: object
+      - name: approval_route
+        type: string
+    composition:
+      - "evidence_pack_specialist가 approval_packet에 들어갈 근거 묶음을 정리한다."
+      - "compliance_review_specialist가 승인 필요 사유와 위험 신호를 검토한다."
+      - "ADK 2.0 human-input node가 승인자 입력을 받는다."
+      - "route: approved, rejected, needs_revision, timeout 결과를 approval_route로 변환한다."
+    scaffold_output: orchestration_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: human_approval_gate_workflow
+    notes: ADK 2.0 human-input node로 매핑되는 공통 승인 gate.
+  - name: evidence_parallel_enrichment_workflow
+    workflow_kind: parallel
+    owner_domain: 공통
+    status: proposed
+    responsibility: 정책 검색, FAQ 검색, 고객/케이스 조회, 위험 점수 계산을 병렬로 실행해 evidence pack 생성에 필요한 근거를 모은다.
+    inputs:
+      - name: case_context
+        type: object
+        required: true
+      - name: enrichment_plan
+        type: object
+        required: false
+    outputs:
+      - name: enrichment_results
+        type: array<object>
+      - name: enrichment_errors
+        type: array<object>
+    composition:
+      - "parallel: policy_retrieval_adapter와 faq_retrieval_adapter가 근거 문서를 검색한다."
+      - "parallel: customer_profile_mock_adapter와 case_history_mock_adapter가 mock data를 조회한다."
+      - "parallel: risk_score_computation_adapter가 승인 라우팅 보조 점수를 계산한다."
+      - "merge: 성공 결과는 enrichment_results로, 실패/누락은 enrichment_errors로 모은다."
+      - "evidence_pack_specialist가 후속 검토 가능한 evidence pack으로 정리한다."
+    scaffold_output: orchestration_shell_only
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: evidence_parallel_enrichment_workflow
+    notes: 실패한 Adapter는 non-fatal result로 모아 후속 Agent가 판단하게 한다.
+  - name: outbound_response_review_workflow
     workflow_kind: orchestration
     owner_domain: 공통
     status: proposed
+    responsibility: 답변 초안 생성, 컴플라이언스 검토, 템플릿 적용, 발송 dry-run까지 연결한다.
+    inputs:
+      - name: evidence_pack
+        type: object
+        required: true
+      - name: recipient_context
+        type: object
+        required: true
+    outputs:
+      - name: reviewed_response
+        type: object
+      - name: delivery_preview
+        type: object
+    composition:
+      - "response_template_registry_adapter가 채널/locale별 템플릿과 required_variables를 가져온다."
+      - "customer_reply_drafting_specialist가 evidence_pack을 반영해 reply_draft를 만든다."
+      - "compliance_review_specialist가 외부 발송 위험과 승인 필요 여부를 검토한다."
+      - "pii_redaction_adapter가 발송 전 개인정보 마스킹 필요 항목을 점검한다."
+      - "notification_dry_run_adapter가 실제 발송 없이 delivery_preview와 blocked_reason을 반환한다."
     scaffold_output: orchestration_shell_only
-    notes: local orchestration unless an independent remote agent boundary is proven
+    component_source: python_package
+    package_name: agent-factory-shared-components
+    package_version: 0.1.0
+    import_path: agent_factory_shared.workflows
+    callable_name: outbound_response_review_workflow
+    notes: 실제 외부 발송은 하지 않고 검토 가능한 산출물만 만든다.

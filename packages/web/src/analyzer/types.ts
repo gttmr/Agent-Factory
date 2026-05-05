@@ -29,6 +29,7 @@ export const remoteContractKinds = ["a2a", "unknown"] as const;
 export const accessProtocols = ["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"] as const;
 
 export const bankDomains = ["고객", "수신", "여신", "카드", "리스크"] as const;
+export const requirementDomains = ["공통", ...bankDomains] as const;
 
 export const riskSignals = [
   "personal_data",
@@ -66,6 +67,7 @@ export type WorkflowKind = (typeof workflowKinds)[number];
 export type RemoteContractKind = (typeof remoteContractKinds)[number];
 export type AccessProtocol = (typeof accessProtocols)[number];
 export type BankDomain = (typeof bankDomains)[number];
+export type RequirementDomain = (typeof requirementDomains)[number];
 export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
 export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
@@ -74,6 +76,7 @@ export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
+export type ComponentSource = "python_package" | "mcp" | "stub";
 
 export interface FieldSpec {
   name: string;
@@ -87,13 +90,8 @@ export interface SystemSpec {
 }
 
 export interface RequirementIntakeInput {
-  title: string;
-  domainHint: string;
+  domain: RequirementDomain;
   rawText: string;
-  requesterTeam: string;
-  requesterRole: string;
-  knownSystems: string;
-  expectedOutput: string;
 }
 
 export interface NormalizedRequirement {
@@ -181,10 +179,91 @@ export interface ModuleCandidate {
   fallback?: string;
   audit?: string;
   data_policy?: string;
+  developer_todos?: string[];
+}
+
+export interface CatalogBinding {
+  catalog_id: string;
+  name: string;
+  component_source: ComponentSource;
+}
+
+export interface ImportContract {
+  package_name: string;
+  package_version?: string;
+  import_path: string;
+  callable_name: string;
+}
+
+export interface ScaffoldPlanModule {
+  id: string;
+  name: string;
+  module_category: ModuleCategory;
+  agent_kind: AgentKind | null;
+  workflow_kind: WorkflowKind | null;
+  adapter_kind: AdapterKind | null;
+  remote_contract_kind: RemoteContractKind | null;
+  scaffold_output: string;
+  no_runnable_business_logic: true;
+  catalog_binding?: CatalogBinding;
+  import_contract?: ImportContract;
+  developer_todos: string[];
+  inputs: FieldSpec[];
+  outputs: FieldSpec[];
+  risk_signals: RiskSignal[];
+  required_review_fields: string[];
+}
+
+export interface ExcludedScaffoldModule {
+  id: string;
+  name: string;
+  status: ModuleStatus;
+  reason: string;
+}
+
+export interface ScaffoldPlan {
+  requirement_id: string;
+  source: "approved_workbench_artifact";
+  raw_requirement_to_code: false;
+  modules: ScaffoldPlanModule[];
+  excluded_modules: ExcludedScaffoldModule[];
+  manifest: {
+    imported_components: Array<{
+      module_id: string;
+      module_name: string;
+      catalog_id: string;
+      package_name: string;
+      package_version?: string;
+      import_path: string;
+      callable_name: string;
+    }>;
+    new_code_required: Array<{
+      module_id: string;
+      module_name: string;
+      reason: string;
+      developer_todos: string[];
+    }>;
+  };
+  validation: {
+    can_generate_source: boolean;
+    blockers: string[];
+    warnings: string[];
+  };
 }
 
 export type FlowNodeType = "input" | "output" | ModuleCategory;
 export type FlowEdgeType = "local" | "remote_a2a";
+export type FlowDataChannel =
+  | "event_output"
+  | "event_message"
+  | "session_state"
+  | "temp_state"
+  | "user_state"
+  | "app_state"
+  | "artifact"
+  | "route"
+  | "control"
+  | "unknown";
 
 export interface FlowNode {
   id: string;
@@ -198,6 +277,11 @@ export interface FlowEdge {
   to: string;
   data: string;
   edge_type: FlowEdgeType;
+  data_channel?: FlowDataChannel;
+  state_key?: string | null;
+  artifact_key?: string | null;
+  schema_ref?: string | null;
+  route_condition?: string | null;
 }
 
 export interface ProcessFlow {
@@ -260,9 +344,19 @@ export interface CatalogReference {
   access_protocol?: AccessProtocol | null;
   mcp_server?: string | null;
   mcp_tool_name?: string | null;
+  mcp_schema_ref?: string | null;
+  mcp_auth_mode?: string | null;
+  component_source?: ComponentSource | null;
+  package_name?: string | null;
+  package_version?: string | null;
+  import_path?: string | null;
+  callable_name?: string | null;
   owner_domain?: string | null;
   status?: string | null;
   responsibility?: string | null;
+  inputs?: FieldSpec[];
+  outputs?: FieldSpec[];
+  composition?: string[];
   risk_signals?: RiskSignal[];
 }
 

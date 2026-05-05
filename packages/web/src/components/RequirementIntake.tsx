@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   codexAnalyzerModels,
+  requirementDomains,
   type AnalyzerProgressEvent,
   type AnalyzerProgressPhase,
   type AnalyzerTraceKind,
   type AnalyzerTraceStatus,
   type CodexAnalyzerModel,
+  type RequirementDomain,
   type RequirementIntakeInput
 } from "../analyzer/types";
 
@@ -98,7 +100,7 @@ export function RequirementIntake({
   const activeStage = inferPipelineStage(latestProgress, timeline);
   const toolCount = useMemo(() => countTools(timeline), [timeline]);
 
-  function updateField(field: keyof RequirementIntakeInput, value: string) {
+  function updateField<K extends keyof RequirementIntakeInput>(field: K, value: RequirementIntakeInput[K]) {
     onInputChange({ ...input, [field]: value });
   }
 
@@ -124,56 +126,18 @@ export function RequirementIntake({
         </div>
 
         <label>
-          <span>제목</span>
-          <input
-            value={input.title}
-            onChange={(event) => updateField("title", event.target.value)}
-            placeholder="복잡한 고객 불만 처리 흐름"
-          />
-        </label>
-
-        <div className="field-grid">
-          <label>
-            <span>도메인 힌트</span>
-            <input
-              value={input.domainHint}
-              onChange={(event) => updateField("domainHint", event.target.value)}
-              placeholder="고객 / 수신 / 여신 / 카드 / 리스크"
-            />
-          </label>
-          <label>
-            <span>요청 팀</span>
-            <input
-              value={input.requesterTeam}
-              onChange={(event) => updateField("requesterTeam", event.target.value)}
-              placeholder="예시 운영팀"
-            />
-          </label>
-          <label>
-            <span>요청자 역할</span>
-            <input
-              value={input.requesterRole}
-              onChange={(event) => updateField("requesterRole", event.target.value)}
-              placeholder="업무 사용자"
-            />
-          </label>
-          <label>
-            <span>알려진 시스템</span>
-            <input
-              value={input.knownSystems}
-              onChange={(event) => updateField("knownSystems", event.target.value)}
-              placeholder="시스템 A, 시스템 B"
-            />
-          </label>
-        </div>
-
-        <label>
-          <span>예상 출력</span>
-          <input
-            value={input.expectedOutput}
-            onChange={(event) => updateField("expectedOutput", event.target.value)}
-            placeholder="분류, 추천, 응답 초안"
-          />
+          <span>도메인</span>
+          <select
+            value={input.domain}
+            onChange={(event) => updateField("domain", event.target.value as RequirementDomain)}
+            disabled={isAnalyzing}
+          >
+            {requirementDomains.map((domain) => (
+              <option key={domain} value={domain}>
+                {domain}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
@@ -196,8 +160,8 @@ export function RequirementIntake({
           <textarea
             value={input.rawText}
             onChange={(event) => updateField("rawText", event.target.value)}
-            placeholder="이해관계자 요구사항 원문을 붙여넣으세요."
-            rows={12}
+            placeholder="요구사항 원문을 그대로 붙여넣으세요. 목표, 현재 흐름, 입력/출력, 시스템, 예외 조건이 섞여 있어도 모델이 구조화합니다."
+            rows={18}
           />
         </label>
 
@@ -228,8 +192,8 @@ export function RequirementIntake({
             <dd>{input.rawText.length}</dd>
           </div>
           <div>
-            <dt>선택 필드</dt>
-            <dd>{countOptionalFields(input)} / 6</dd>
+            <dt>도메인</dt>
+            <dd>{input.domain}</dd>
           </div>
         </dl>
         {latestProgress && (
@@ -316,17 +280,6 @@ export function RequirementIntake({
       </aside>
     </div>
   );
-}
-
-function countOptionalFields(input: RequirementIntakeInput): number {
-  return [
-    input.title,
-    input.domainHint,
-    input.requesterTeam,
-    input.requesterRole,
-    input.knownSystems,
-    input.expectedOutput
-  ].filter((value) => value.trim()).length;
 }
 
 function buildTimeline(events: AnalyzerProgressEvent[]): TimelineRow[] {
