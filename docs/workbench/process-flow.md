@@ -93,3 +93,46 @@ validator는 이 필드가 새 Graph IR에 남아 있으면 실패시킨다.
 
 `workflow_kind`는 `orchestration`, `graph`, `dynamic`, `unknown` 중 하나만 사용한다.
 세부 흐름 이름을 `workflow_kind`로 되살리지 않는다.
+
+## Graph IR marker 규칙
+
+Analyzer는 marker 전용 stage artifact를 만들지 않는다.
+marker는 Graph IR의 node, edge, container에서 파생되는 해석이다.
+
+- `parallel`: `parallel_region`, `fan_out`, `fan_in`, `join`이 있을 때
+- `human_review`: `human_review_region`, `node_kind: human_input`, 또는 `risk_signals: human_approval_required`가 있을 때
+- `loop`: `loop_region`, `loop_control`, `loop_back`, `loop_exit`가 있을 때
+- `branch`: `edge_kind: route` 또는 `route_condition`이 있을 때
+
+새 marker가 필요하면 먼저 Graph IR에 어떤 node/container/edge semantics로 표현되는지 정의한다.
+UI의 glyph, label, 색은 `docs/visualization/design-system.md`에서 별도로 관리한다.
+
+## Stage projection 규칙
+
+Stage는 저장 artifact가 아니라 UI가 Graph IR을 읽어 만든 projection이다.
+새 analyzer output은 stage list를 내보내면 안 된다.
+
+모듈이 존재할 때 UI는 다음 순서로 Graph IR node를 묶을 수 있다.
+
+1. 입력 컨텍스트: `input` node
+2. Adapter 호출: `adapter_kind: legacy_api` 또는 `adapter_kind: retrieval`
+3. Local 검토 / Orchestration: `workflow`, `agent`, 그 외 local `adapter`
+4. Rule Registry 라우팅: `adapter_kind: rule_registry`
+5. Remote A2A 경계: `remote_a2a` node와 `remote_boundary` container
+6. 결과 산출: `output` node
+7. 추가 모듈: 위 규칙으로 배치되지 않은 잔여 node
+
+같은 stage 내부 edge는 stage가 묶음을 의미하므로 connector로 중복 표시하지 않는다.
+stage 사이 edge는 출발/도착 node, `edge_kind`, `execution_semantics`, `data_label`, `route_condition`, `state_key`, `artifact_key`, `schema_ref`를 보존해야 한다.
+
+## Edge 표시 의미
+
+UI label은 다음 Graph IR 의미를 바꾸면 안 된다.
+
+- `event_output`: machine-readable `Event.output`
+- `event_message`: user-facing 또는 human-input prompt `Event.message`
+- `session_state`, `temp_state`, `user_state`, `app_state`: ADK State scope
+- `artifact`: ADK Artifact
+- `route`: explicit route condition
+- `control`: retry, cancel, timeout, loop stop, escalation 같은 control signal
+- `remote_a2a`: `remote_boundary`를 건너는 A2A protocol edge

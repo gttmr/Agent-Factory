@@ -563,7 +563,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "Authoritative references - consult these before deciding:",
     "- docs/workbench/taxonomy.md (module_category, *_kind enums including orchestration/graph/dynamic, Remote A2A conditions) — read from the working tree.",
     "- docs/workbench/workflow-decision-guide.md (Workflow Agent classification and Graph IR representation rules).",
-    "- docs/workbench/process-flow.md and docs/visualization/design-system.md (native Graph IR node, container, edge, and marker rules).",
+    "- docs/workbench/process-flow.md (native Graph IR node, container, edge, stage projection, and marker rules).",
     "- adk-docs-mcp — use list_doc_sources/fetch_docs for ADK 2.0 component facts (graph workflow, dynamic workflow, human-input node, trace/token observability) and for the version-neutral component set: Sessions/State/Memory, Callbacks, Artifacts/Events, Apps/Plugins, MCP, A2A, Streaming, Grounding. This is the source of truth for adk_hints; do not use 1.x workflow-agent class names as classification criteria.",
     "",
     "Do not paraphrase the docs into long output. Use them only to ground classification, adk_hints, and processFlow shape.",
