@@ -20,6 +20,22 @@ raw requirement
 
 Raw requirements must not directly generate code.
 
+## Documentation impact comes first
+
+Before changing source code, check whether the change affects active `docs/` Markdown.
+
+Update docs in the same change set when a change affects:
+
+- taxonomy or enum meaning
+- catalog semantics or runtime binding
+- schemas, validator behavior, or required verification commands
+- analyzer prompts, output shape, or review flow
+- Workflow/Graph IR rules
+- UI behavior that users or future agents rely on
+- operating policy in `AGENTS.md` or `CLAUDE.md`
+
+Do not update `docs/archive/**` for current behavior unless the task explicitly asks for archival or migration work.
+
 ## Classification first
 
 Before building implementation plans, classify each requested capability into the active taxonomy.
@@ -82,11 +98,14 @@ Expected artifact families:
 - module candidates with category and subtype
 - process flow nodes and edges
 - catalog reuse decisions and registration changes
+- documentation impact decisions
 - risk gates
 - catalog change decisions
 - deferred scaffold-plan fixture when schema work touches it
 - validation output
 - decision notes when taxonomy or boundary choices change
+
+Live analyzer note: Codex CLI may return a compact draft artifact first. That draft is an internal transport contract only; the workbench must hydrate and validate the existing review artifacts before presenting or saving results.
 
 ## Local/offline-friendly assistant behavior
 
@@ -124,6 +143,8 @@ Active source-of-truth areas:
 - `docs/visualization`: visual design and graph/display guidance
 
 Archive material under `docs/archive` is historical. Do not revive old taxonomy or scaffold assumptions from archive notes unless the task explicitly asks for migration analysis.
+
+For live analyzer work, keep `schemas/analysis-draft.schema.json` aligned with the server hydration logic and keep `schemas/analysis-result.schema.json` as the final artifact contract.
 
 ## Verification expectations
 

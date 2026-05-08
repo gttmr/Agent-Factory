@@ -179,7 +179,7 @@ export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
-export type ComponentSource = "mcp" | "stub";
+export type ComponentSource = "mcp" | "remote_a2a" | "stub";
 
 export interface FieldSpec {
   name: string;
@@ -625,12 +625,14 @@ export interface CatalogReference {
   name: string;
   module_category: ModuleCategory;
   subtype: string | null;
+  runtime_binding?: string | null;
   access_protocol?: AccessProtocol | null;
   mcp_server?: string | null;
   mcp_tool_name?: string | null;
   mcp_schema_ref?: string | null;
   mcp_auth_mode?: string | null;
   component_source?: ComponentSource | null;
+  contract_status?: string | null;
   owner_domain?: string | null;
   status?: string | null;
   responsibility?: string | null;

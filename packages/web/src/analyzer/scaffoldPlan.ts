@@ -63,7 +63,7 @@ export function buildScaffoldPlan({
         module_id: module.id,
         module_name: module.name,
         reason: module.catalog_binding
-          ? "catalog binding is recorded, but runtime implementation remains a TODO boundary"
+          ? "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary"
           : "no catalog binding was selected for this approved module",
         developer_todos: module.developer_todos
       }))
@@ -121,6 +121,7 @@ function findCatalogBinding(candidate: ModuleCandidate, entries: CatalogEntry[])
 function componentSourceFor(entry: CatalogEntry | undefined): ComponentSource {
   if (!entry) return "stub";
   if (entry.component_source) return entry.component_source;
+  if (entry.runtime_binding === "remote_a2a") return "remote_a2a";
   if (entry.access_protocol === "mcp") return "mcp";
   return "stub";
 }
@@ -131,7 +132,7 @@ function developerTodosFor(
 ): string[] {
   if (catalogEntry) {
     return [
-      "Review how this catalog spec should be invoked before replacing the TODO boundary.",
+      "Review the catalog runtime contract and configure its runtime binding before invocation.",
       "Map reviewed inputs and outputs before wiring runtime behavior."
     ];
   }
@@ -184,7 +185,7 @@ function collectBlockers(modules: ScaffoldPlanModule[]): string[] {
 function collectWarnings(modules: ScaffoldPlanModule[]): string[] {
   return modules.flatMap((module) => {
     if (module.catalog_binding) {
-      return [`${module.name}: catalog binding is emitted as TODO/stub until runtime binding policy is approved`];
+      return [`${module.name}: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved`];
     }
     return [`${module.name}: generated as new-code TODO boundary because no catalog binding is selected`];
   });

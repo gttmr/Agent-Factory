@@ -128,6 +128,7 @@ stage 순서, marker 판정, edge 의미는 `docs/workbench/process-flow.md`의 
 - `parallel`, `human_review`, `loop`, `branch` marker는 `.stage-marker.marker-*` 색을 사용한다.
 - 새 marker를 추가할 때는 Graph IR 의미를 먼저 `process-flow.md`에 정의한 뒤 `markerCopy`의 glyph/label과 CSS 색을 갱신한다.
 - container overlay는 흐름의 실제 범위를 가려서는 안 된다. 점선 경계와 낮은 대비 배경으로 node/edge 읽기를 방해하지 않게 한다.
+- Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 `parallel_region`, `human_review_region`, `remote_boundary`는 포함 node의 bounding box를 감싸는 내부 region으로 표시한다.
 
 **Stage connector**
 - stage 사이 connector는 화살표와 `data_label` chip을 함께 보여준다.

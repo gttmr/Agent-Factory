@@ -162,7 +162,9 @@
         "execution_kind": { "$ref": "#/$defs/nullableString" },
         "adk_node_role": { "$ref": "#/$defs/adkNodeRole" },
         "owner_scope": { "$ref": "#/$defs/ownerScope" },
-        "container_id": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "container_id": {
+          "anyOf": [{ "type": "string", "minLength": 1, "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
+        },
         "lane_id": { "$ref": "#/$defs/laneId" },
         "input_ports": { "type": "array", "items": { "$ref": "#/$defs/port" } },
         "output_ports": { "type": "array", "items": { "$ref": "#/$defs/port" } },
@@ -190,7 +192,7 @@
         "is_remote_boundary_crossing"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "^edge-[0-9]+$" },
         "from": { "type": "string", "minLength": 1 },
         "to": { "type": "string", "minLength": 1 },
         "from_port": { "$ref": "#/$defs/nullableString" },
@@ -222,7 +224,7 @@
         "parent_container_id"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "^container-[a-z0-9-]+$" },
         "module_id": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
         "label": { "type": "string", "minLength": 1 },
         "container_kind": { "$ref": "#/$defs/containerKind" },
@@ -232,7 +234,7 @@
         "exit_node_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "layout_policy": { "$ref": "#/$defs/layoutPolicy" },
         "parent_container_id": {
-          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          "anyOf": [{ "type": "string", "minLength": 1, "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
         }
       }
     },

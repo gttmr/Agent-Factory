@@ -171,7 +171,7 @@
       "properties": {
         "catalog_id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
-        "component_source": { "type": "string", "enum": ["mcp", "stub"] }
+        "component_source": { "type": "string", "enum": ["mcp", "remote_a2a", "stub"] }
       }
     },
     "excluded_module": {
@@ -194,7 +194,7 @@
         "module_name": { "type": "string", "minLength": 1 },
         "catalog_id": { "type": "string", "minLength": 1 },
         "catalog_name": { "type": "string", "minLength": 1 },
-        "component_source": { "type": "string", "enum": ["mcp", "stub"] }
+        "component_source": { "type": "string", "enum": ["mcp", "remote_a2a", "stub"] }
       }
     },
     "new_code_required": {

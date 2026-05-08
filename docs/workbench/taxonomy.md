@@ -27,6 +27,20 @@ ADK 2.0은 Beta다. 이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 
 
 불명확하면 새 category를 만들지 말고 evidence, missing information, assumption을 남긴다.
 
+## catalog runtime binding
+
+Catalog에 등록된 개체는 mock 목록이 아니라 실제 실행을 전제로 한 reusable runtime contract다.
+로컬 테스트용 mock이나 test double 생성은 후속 기능에서 catalog contract를 입력으로 만들어야 하며, seed catalog 항목 자체를 mock으로 등록하지 않는다.
+
+`module_category`는 책임의 종류를 나타내고, `runtime_binding`은 실행/연결 방식을 나타낸다.
+
+- `runtime_binding: mcp`: MCP server/tool 계약으로 호출한다.
+- `runtime_binding: remote_a2a`: Remote A2A 방식으로 호출되는 runtime contract다.
+- `runtime_binding: unresolved`: Python import, local package, remote call 등 실행 방식이 아직 확정되지 않았다.
+
+공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
+이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
+
 ## agent_kind
 
 `module_category: agent`일 때만 사용한다.
@@ -69,6 +83,7 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 
 Adapter는 Agent나 Workflow가 호출하는 callable capability다.
 MCP tool, 외부 tool server, retrieval, grounding, rule registry는 독립 원격 agent 계약이 확인되지 않는 한 Adapter 쪽에서 먼저 검토한다.
+Catalog의 Adapter는 기본적으로 실제 MCP 계약을 가진 runtime binding으로 등록한다.
 
 ## remote_contract_kind
 

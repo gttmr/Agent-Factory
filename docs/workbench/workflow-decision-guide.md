@@ -10,6 +10,7 @@ ADK 2.0 Graph Workflow, Dynamic Workflow, Human Input 문서를 기준으로 한
 - Agent는 reasoning owner이고, Workflow는 Agent와 Adapter를 언제 실행할지 조율한다.
 - Adapter 호출이 여러 개라는 사실만으로 Workflow가 필요한 것은 아니다. 실행 순서, 라우팅, 병렬성, 반복, 승인 gate가 설계상 의미 있을 때 Workflow를 둔다.
 - Remote A2A는 workflow pattern이 아니다. 독립 원격 agent 계약이 확인될 때만 사용한다.
+- Catalog에 등록된 공통 Workflow는 `module_category: workflow`를 유지하면서 `runtime_binding: remote_a2a`로 호출될 수 있다. 이것은 실행 binding이며, 독립 원격 Agent 후보인 `module_category: remote_a2a`와 구분한다.
 
 ## orchestration
 

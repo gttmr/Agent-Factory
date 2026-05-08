@@ -483,6 +483,9 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       errors.push(`${label}.containers[${index}].id is required.`);
       return;
     }
+    if (!/^container-[a-z0-9-]+$/.test(container.id)) {
+      errors.push(`${label}.containers[${index}].id ${container.id} must match ^container-[a-z0-9-]+$.`);
+    }
     if (containerById.has(container.id)) {
       errors.push(`${label}.containers[${index}].id duplicates ${container.id}.`);
     } else {
@@ -562,6 +565,8 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
     if (typeof edge.id !== "string" || !edge.id.trim()) {
       errors.push(`${label}.edges[${index}].id is required.`);
+    } else if (!/^edge-[0-9]+$/.test(edge.id)) {
+      errors.push(`${label}.edges[${index}].id ${edge.id} must match ^edge-[0-9]+$.`);
     } else if (edgeIds.has(edge.id)) {
       errors.push(`${label}.edges[${index}].id duplicates ${edge.id}.`);
     } else {
