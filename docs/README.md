@@ -10,13 +10,15 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 2. [Taxonomy](./workbench/taxonomy.md)
    `module_category`와 subtype enum의 단일 활성 기준이다.
 3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
-   ADK 2.0 (Beta) baseline으로 `sequential`, `parallel`, `loop`, `human_review`, `orchestration`, `graph`, `dynamic`을 판단한다 (1.14 stable agent 매핑은 legacy compat 메모로 표시).
+   ADK 2.0 (Beta) baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
 4. [Process Flow](./workbench/process-flow.md)
    분석 결과를 어떤 node와 edge로 그릴지 설명한다.
 5. [Review Board](./workbench/review-board.md)
    개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다.
 6. [Validation](./workbench/validation.md)
    export artifact, ADK source 생성, 문서 구조를 검증하는 기준이다.
+7. [Agent Factory Harness](./workbench/agent-factory-harness.md)
+   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, scaffold gate, 검증 기준을 정의한다.
 
 ## 보조 참조
 
@@ -35,7 +37,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 
 ## Archive
 
-`archive/` 아래 문서는 기본 프롬프트 경로가 아니다.
+`archive/` 아래 문서는 기본 프롬프트 경로가 아니며 활성 기준이 아니다.
 과거 계획, 리뷰 기록, 스캐폴딩 노트, 스킬 노트, 유지보수 프롬프트를 보존하기 위한 위치다.
 
 ## Canonical Sources

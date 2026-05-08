@@ -8,6 +8,8 @@ This is the Agent Factory workbench — a local-first tool that turns raw requir
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
+For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, export, or review-board work.
+
 ## Common Commands
 
 The web package is the only buildable artifact. All commands run from `packages/web` unless noted.
@@ -31,6 +33,19 @@ The validator enforces taxonomy, subtype presence, Remote A2A contract completen
 
 ## Architecture
 
+### Agent Factory harness
+
+`docs/workbench/agent-factory-harness.md` is the project-specific operating harness for this repository. Apply it before non-trivial analysis, taxonomy, scaffold, export, or review-board work.
+
+Core rules:
+
+- Raw requirements must become reviewed artifacts before implementation or scaffolding.
+- Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
+- Retrieval, rule registry, and tool/adapter concepts remain adapter subtypes, not top-level categories.
+- Remote A2A is high-friction and requires explicit ownership, protocol, auth, lifecycle, timeout, retry, fallback, and audit details.
+- Scaffolding must consume approved `scaffold-plan.json` and `implementation-handoff.md`, never raw requests or unreviewed analyzer output.
+- Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flow, reuse/domain mapping, risk gates, validation output, and decision notes.
+
 ### Workbench flow (packages/web)
 
 `App.tsx` is a single-page wizard with seven steps held as React state — no router, no backend. Each step renders one component from `src/components/`:
@@ -43,19 +58,19 @@ State flows top-down from `App.tsx`: `RequirementIntakeInput` → `AnalysisResul
 
 `src/analyzer/providers.ts` defines the `AnalyzerProvider` interface and `OpenAICompatibleAnalyzerProvider`, which posts to the local `/api/analyze-requirement` SSE endpoint served by `packages/web/server/codexAnalyzer.ts`. That middleware shells out to the Codex CLI to do the real analysis. `defaultAnalyzerProvider` is the single export consumed by `App.tsx` and is the live Codex CLI provider — there is no in-browser fallback analyzer.
 
-The example requirement preloaded by `예시 불러오기` lives in `src/analyzer/exampleRequirement.ts` (`getExampleRequirement`). It exercises every category and the parallel/loop/human_review markers when run through the live analyzer.
+The example requirement preloaded by `예시 불러오기` lives in `src/analyzer/exampleRequirement.ts` (`getExampleRequirement`). It exercises every category and Graph IR markers such as fan-out/fan-in, loop control, human input, and route branches when run through the live analyzer.
 
 ### Taxonomy contract (load-bearing)
 
 Top-level `module_category`: `agent`, `workflow`, `adapter`, `remote_a2a`.
 
-Workflow `workflow_kind`: `sequential`, `parallel`, `loop`, `human_review`, `orchestration`, `graph`, `dynamic`, `unknown`.
+Workflow `workflow_kind`: `orchestration`, `graph`, `dynamic`, `unknown`.
 
 Adapter `adapter_kind`: `legacy_api`, `retrieval`, `rule_registry`, `data_query`, `template`, `computation`, `external_service`, `unknown`.
 
 Rules baked into the schemas, validator, and analyzer:
 
-- ADK runtime baseline: ADK 2.0 (Beta). `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. 1.14 stable agents (`SequentialAgent`/`ParallelAgent`/`LoopAgent`) are legacy compat targets, not the default mental model.
+- ADK runtime baseline: ADK 2.0 (Beta). `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
 - Tool/Adapter, Knowledge Retrieval, and Metadata Registry are **no longer** top-level categories. Retrieval and rule registries appear only as `adapter_kind` subtypes.
 - `legacy_recommended_type` is migration metadata; never use it as the primary classifier.
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.
@@ -78,7 +93,7 @@ Key contracts:
 - **Single source of truth for category visuals** — `packages/web/src/components/CategoryBadge.tsx` exports `CategoryBadge`, `SubtypeBadge`, `getSubtypeValue`, `categoryClass`. Never write category labels as raw `<span>` in a new view; import these instead so all four screens (Module Review, Process Flow, Reuse Heatmap, Domain Map) stay in sync.
 - **Color tokens** — `:root` in `packages/web/src/styles.css` defines `--cat-{agent,workflow,adapter,remote}-{base,soft,line}` plus `input` / `output`. New categories must add all variants together.
 - **Subtype glyphs** — `subtypeGlyph` map in `CategoryBadge.tsx` covers every value in `agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind`. Any new enum value added in `analyzer/types.ts` must be mirrored here or it falls back to `·`.
-- **Process Flow stages and markers** — `buildFlowStages()` in `ProcessFlowView.tsx` derives stages and auto-detects `parallel` / `loop` / `human_review` / `branch` markers from `workflow_kind`, `risk_signals`, and edge data. Adding a new marker requires updating the detection logic, `markerCopy`, and the matching `.stage-marker.marker-*` CSS together.
+- **Graph Workflow markers** — `GraphCanvas.tsx` renders Graph IR through `src/graph/*`. Fan-out/fan-in, loop, human input, route, and Remote A2A are detected from `container_kind`, `node_kind`, `edge_kind`, and `execution_semantics`; update `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, and `containerOverlay.tsx` together when adding a marker.
 
 ### CSS pitfall to remember
 
@@ -92,7 +107,7 @@ For UI changes, run the dev server and verify visually with the chrome-devtools 
 cd packages/web && npm run dev    # background; serves on http://localhost:5173
 ```
 
-Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow lives in `src/analyzer/exampleRequirement.ts` and exercises every category and the parallel/loop/human_review markers — load it with `예시 불러오기` then `요구사항 분석`.
+Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow lives in `src/analyzer/exampleRequirement.ts` and exercises every category and Graph IR markers — load it with `예시 불러오기` then `요구사항 분석`.
 
 ## Editing Rules (from AGENTS.md)
 

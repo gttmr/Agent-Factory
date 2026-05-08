@@ -5,7 +5,7 @@
 ## 디자인 원칙
 
 - **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Process Flow, Reuse Heatmap, Domain × Capability Map)이 동일 매핑을 사용한다.
-- **특수 흐름은 시각적으로 부각한다.** parallel / loop / human_review / branch 같은 흐름은 텍스트 라벨이 아니라 stage marker 와 점선 박스로 표시한다.
+- **특수 흐름은 시각적으로 부각한다.** fan-out/fan-in, loop, human input, branch 같은 Graph IR 흐름은 텍스트 라벨이 아니라 stage marker 와 점선 박스로 표시한다.
 - **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, stage 사이 connector 화살표와 데이터 라벨 chip 으로 통합한다.
 
 ## 색 토큰
@@ -36,7 +36,7 @@
 - output → `⇤`
 
 **서브타입 (workflow_kind / adapter_kind / agent_kind / remote_contract_kind):**
-- parallel → `⇉`, loop → `↻`, human_review → `✓`, sequential → `→`, orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
+- orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
 - retrieval → `🔎`, rule_registry → `§`, legacy_api → `API`, data_query → `?`, template → `T`, computation → `Σ`, external_service → `↗`
 - specialist → `S`, shared → `★`, a2a → `A2A`, unknown → `·`
 
@@ -56,7 +56,7 @@
 ```tsx
 <SubtypeBadge value={candidate.adapter_kind!} />
 ```
-서브타입 enum 값(`legacy_api`, `loop`, `shared` 등)을 받아 글리프와 한글/영문 라벨을 표시. 라벨 매핑은 `classificationRules.ts` 의 `*KindLabels` 를 사용한다.
+서브타입 enum 값(`legacy_api`, `graph`, `shared` 등)을 받아 글리프와 한글/영문 라벨을 표시. 라벨 매핑은 `classificationRules.ts` 의 `*KindLabels` 를 사용한다.
 
 **`getSubtypeValue(candidate)`**
 `module_category` 에 따라 올바른 서브타입 필드(`adapter_kind` / `workflow_kind` / `agent_kind` / `remote_contract_kind`)를 반환하는 헬퍼. UI 에서 어떤 필드를 봐야 할지 매번 분기하지 않도록 만든다.
@@ -81,11 +81,11 @@
 
 ## Process Flow stage 모델
 
-`packages/web/src/components/ProcessFlowView.tsx` 의 `buildFlowStages()` 가 candidate 와 process flow 로부터 stage 를 만든다.
+`packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.
 
 **Stage 순서 (모듈이 존재할 때만 표시):**
 1. **입력 컨텍스트** — `input` 노드들
-2. **Adapter 호출** — `adapter_kind` 가 `legacy_api` 또는 `retrieval` 인 노드. 2개 이상이면 layout=parallel + parallel marker
+2. **Adapter 호출** — `adapter_kind` 가 `legacy_api` 또는 `retrieval` 인 노드. 2개 이상이면 Graph IR `parallel_region` / `fan_out` / `join` marker
 3. **Local 검토 / Orchestration** — workflow / agent / 그 외 adapter (rule_registry 제외)
 4. **Rule Registry 라우팅** — `adapter_kind: rule_registry` 노드 단독
 5. **Remote A2A 경계** — `remote_a2a` 노드들
@@ -93,18 +93,18 @@
 7. (필요 시) **추가 모듈** — 위에 자동 배치되지 않은 잔여 노드 (출력 직전에 끼워 넣음)
 
 **Stage marker 자동 감지:**
-- `parallel` — Adapter 호출이 2개 이상이거나 candidate 중 `workflow_kind: parallel` 이 있을 때
-- `human_review` — candidate 중 `workflow_kind: human_review` 이거나 `risk_signals` 에 `human_approval_required` 가 있을 때
-- `loop` — candidate 중 `workflow_kind: loop` 이거나 edge data 가 `loop:` 로 시작할 때
-- `branch` — edge data 가 `branch:` 로 시작할 때
+- `parallel` — Graph IR에 `parallel_region`, `fan_out`, `fan_in`, `join`이 있을 때
+- `human_review` — Graph IR에 `human_review_region` 또는 `node_kind: human_input`이 있거나 `risk_signals` 에 `human_approval_required` 가 있을 때
+- `loop` — Graph IR에 `loop_region`, `loop_control`, `loop_back`, `loop_exit`가 있을 때
+- `branch` — `edge_kind: route` 또는 `route_condition` 이 있을 때
 
 새 marker 를 추가할 때는 stage builder 의 감지 로직과 `markerCopy` (글리프·라벨)와 `.stage-marker.marker-*` 의 CSS 색을 모두 갱신한다.
 
-**Stage connector** — stage 사이에 화살표와 edge data chip 을 표시한다. `buildInterStageEdges()` 가 stage 간 edge 를 모은다. 같은 stage 내부의 edge 는 표시하지 않는다 (stage 자체가 그 묶음을 의미). 한 connector 는 데이터 라벨을 최대 4 개까지만 표시한다.
+**Stage connector** — stage 사이에 화살표와 `data_label` chip 을 표시한다. `buildInterStageEdges()` 가 stage 간 edge 를 모은다. 같은 stage 내부의 edge 는 표시하지 않는다 (stage 자체가 그 묶음을 의미). 한 connector 는 데이터 라벨을 최대 4 개까지만 표시한다.
 
-**Graph route board** — stage view 아래에서 모든 edge 를 한 번 더 펼쳐 보여준다. 목적은 ADK 2.0 graph workflow 의 node/edge routing, fan-out/fan-in, branch/loop, Remote A2A 경계를 stage 묶음 밖에서도 검토하는 것이다. 각 edge 는 출발 node, 도착 node, route marker, `data_channel`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip 을 표시한다.
+**Graph route board** — stage view 아래에서 모든 edge 를 한 번 더 펼쳐 보여준다. 목적은 ADK 2.0 graph workflow 의 node/edge routing, fan-out/fan-in, branch/loop, Remote A2A 경계를 stage 묶음 밖에서도 검토하는 것이다. 각 edge 는 출발 node, 도착 node, route marker, `edge_kind`, `execution_semantics`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip 을 표시한다.
 
-`data_channel` 라벨은 다음처럼 표시한다.
+`edge_kind` 라벨은 다음처럼 표시한다.
 
 - `event_output` → `Event.output`
 - `event_message` → `Event.message`
@@ -112,7 +112,6 @@
 - `artifact` → `Artifact`
 - `route` → `Route`
 - `control` → `Control`
-- `unknown` → `미정`
 
 **Data ledger** — 오른쪽 inspector 에서 state/artifact edge 만 모아 표시한다. edge metadata 가 아직 없으면 대표 placeholder key 를 보여주되, live analyzer 결과가 들어오면 실제 `state_key` / `artifact_key`를 우선한다.
 

@@ -63,7 +63,7 @@ export function buildAdkSourceBundle(input: AdkSourceBundleInput): AdkSourceBund
 }
 
 function buildAgentPy(input: AdkSourceBundleInput, graphIr: AdkGraphIr): string {
-  const activeNodes = graphIr.nodes.filter((node) => node.activeInGraph && node.type !== "output");
+  const activeNodes = graphIr.nodes.filter((node) => node.activeInGraph && node.nodeKind !== "output");
   const edgeRows = buildEdgeRows(graphIr);
   const scaffoldModuleById = new Map(input.scaffoldPlan.modules.map((module) => [module.id, module]));
   const importedComponents = buildPythonImports(input.scaffoldPlan);
@@ -100,11 +100,11 @@ def capture_request_context(node_input: Any = None):
     })
 
 
-def _event_output(node_id: str, node_label: str, channel: str, node_input: Any = None):
+def _event_output(node_id: str, node_label: str, edge_kind: str, node_input: Any = None):
     return {
         "node_id": node_id,
         "node_label": node_label,
-        "data_channel": channel,
+        "edge_kind": edge_kind,
         "input": node_input,
         "status": "stubbed_runtime_contract",
     }
@@ -125,7 +125,7 @@ def ${ADK_FINAL_OUTPUT_FUNCTION}(node_input: Any = None):
     return Event(output={
         "node_id": "workflow_result",
         "node_label": "workflow_result",
-        "data_channel": "event_message",
+        "edge_kind": "event_message",
         "terminal_outputs": WORKFLOW_TERMINAL_OUTPUTS,
         "input": node_input,
         "status": "stubbed_runtime_contract",
@@ -223,7 +223,7 @@ def ${node.functionName}(node_input: Any = None):
     return Event(output=output)`;
   }
 
-  const channel = node.type === "output" ? "event_message" : "event_output";
+  const channel = node.nodeKind === "output" ? "event_message" : "event_output";
   return `def ${node.functionName}(node_input: Any = None):
     """${escapePythonString(node.label)} generated ${node.runtimeRole} node."""
     return Event(output=_event_output("${node.id}", "${escapePythonString(node.label)}", "${channel}", node_input))`;
@@ -283,11 +283,11 @@ function buildManifest(input: AdkSourceBundleInput, graphIr: AdkGraphIr) {
     nodes: graphIr.nodes.map((node) => ({
       id: node.id,
       label: node.label,
-      type: node.type,
-      subtype: node.subtype,
-      function: node.type === "output" ? ADK_FINAL_OUTPUT_FUNCTION : node.functionName,
+      node_kind: node.nodeKind,
+      execution_kind: node.executionKind,
+      function: node.nodeKind === "output" ? ADK_FINAL_OUTPUT_FUNCTION : node.functionName,
       runtime_role: node.runtimeRole,
-      active_in_graph: node.type === "output" ? false : node.activeInGraph,
+      active_in_graph: node.nodeKind === "output" ? false : node.activeInGraph,
       review_status: node.candidate?.status ?? null,
       risk_level: node.candidate?.risk_level ?? null,
       catalog_binding: scaffoldModuleById.get(node.id)?.catalog_binding ?? null,
@@ -374,7 +374,7 @@ adk web --port 8000 --host 127.0.0.1
 
 Open http://127.0.0.1:8000, select \`${graphIr.packageName}\`, run a sample message, then inspect session state and event history in the ADK web interface.
 
-The generated nodes preserve the reviewed workflow topology, data channels, route metadata, and safety guardrails without adding private system calls or domain business logic.
+The generated nodes preserve the reviewed workflow topology, Graph IR edge kinds, route metadata, and safety guardrails without adding private system calls or domain business logic.
 Approved modules with catalog package contracts are imported as shared components. Approved modules without package contracts are emitted as \`TODO_IMPLEMENT_HERE\` boundaries and listed in \`workflow_manifest.json\`.
 
 ## Graph IR

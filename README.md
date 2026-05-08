@@ -49,7 +49,7 @@ Adapter `adapter_kind` values:
 Definitions:
 
 - Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
-- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, or human review.
+- Workflow: broad Workflow Agent boundary, classified as orchestration, graph, dynamic, or unknown. Smaller sequence, fan-out/fan-in, loop, and human-input flows live inside Graph IR.
 - Adapter: callable capability used by agents or workflows, including legacy API, retrieval, rule registry, data query, template, computation, or external service.
 - Remote A2A: independent remote agent boundary with protocol-level contract.
 

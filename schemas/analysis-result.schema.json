@@ -265,16 +265,7 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": [
-                "sequential",
-                "parallel",
-                "loop",
-                "human_review",
-                "orchestration",
-                "graph",
-                "dynamic",
-                "unknown"
-              ]
+              "enum": ["orchestration", "graph", "dynamic", "unknown"]
             },
             { "type": "null" }
           ]
@@ -584,73 +575,243 @@
     "processFlow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["requirement_id", "nodes", "edges"],
+      "required": [
+        "requirement_id",
+        "graph_id",
+        "root_workflow_module_id",
+        "nodes",
+        "edges",
+        "containers",
+        "lanes",
+        "validation"
+      ],
       "properties": {
         "requirement_id": { "type": "string", "pattern": "^req-[a-z0-9-]+$" },
+        "graph_id": { "type": "string", "pattern": "^graph-[0-9]+$" },
+        "root_workflow_module_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
         "nodes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/flowNode" }
+          "items": { "$ref": "#/$defs/graphNode" }
         },
         "edges": {
           "type": "array",
-          "items": { "$ref": "#/$defs/flowEdge" }
-        }
-      }
-    },
-    "flowNode": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "label", "type", "subtype"],
-      "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "type": {
-          "type": "string",
-          "enum": ["input", "output", "agent", "workflow", "adapter", "remote_a2a"]
+          "items": { "$ref": "#/$defs/graphEdge" }
         },
-        "subtype": { "$ref": "#/$defs/nullableString" }
+        "containers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graphContainer" }
+        },
+        "lanes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graphLane" }
+        },
+        "validation": { "$ref": "#/$defs/graphValidation" }
       }
     },
-    "flowEdge": {
+    "graphNode": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "from",
-        "to",
-        "data",
-        "edge_type",
-        "data_channel",
-        "state_key",
-        "artifact_key",
-        "schema_ref",
-        "route_condition"
+        "id",
+        "module_id",
+        "label",
+        "node_kind",
+        "execution_kind",
+        "adk_node_role",
+        "owner_scope",
+        "container_id",
+        "lane_id",
+        "input_ports",
+        "output_ports",
+        "schema_refs",
+        "review_status"
       ],
       "properties": {
-        "from": { "type": "string" },
-        "to": { "type": "string" },
-        "data": { "type": "string" },
-        "edge_type": { "type": "string", "enum": ["local", "remote_a2a"] },
-        "data_channel": { "$ref": "#/$defs/flowDataChannel" },
-        "state_key": { "$ref": "#/$defs/nullableString" },
-        "artifact_key": { "$ref": "#/$defs/nullableString" },
-        "schema_ref": { "$ref": "#/$defs/nullableString" },
-        "route_condition": { "$ref": "#/$defs/nullableString" }
+        "id": { "type": "string" },
+        "module_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "label": { "type": "string" },
+        "node_kind": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output",
+            "agent",
+            "function",
+            "tool",
+            "adapter",
+            "human_input",
+            "workflow",
+            "remote_a2a",
+            "join",
+            "router",
+            "loop_control"
+          ]
+        },
+        "execution_kind": { "$ref": "#/$defs/nullableString" },
+        "adk_node_role": {
+          "anyOf": [
+            { "type": "string", "enum": ["workflow_node", "container_root", "boundary", "synthetic"] },
+            { "type": "null" }
+          ]
+        },
+        "owner_scope": { "type": "string", "enum": ["local", "remote", "external"] },
+        "container_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "lane_id": {
+          "type": "string",
+          "enum": ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"]
+        },
+        "input_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
+        "output_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
+        "schema_refs": { "type": "array", "items": { "type": "string" } },
+        "review_status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected", "n/a"] }
       }
     },
-    "flowDataChannel": {
-      "type": "string",
-      "enum": [
-        "event_output",
-        "event_message",
-        "session_state",
-        "temp_state",
-        "user_state",
-        "app_state",
-        "artifact",
-        "route",
-        "control",
-        "unknown"
-      ]
+    "graphEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "from",
+        "to",
+        "from_port",
+        "to_port",
+        "edge_kind",
+        "execution_semantics",
+        "data_label",
+        "schema_ref",
+        "route_condition",
+        "state_key",
+        "artifact_key",
+        "a2a_contract_id",
+        "is_remote_boundary_crossing"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "from_port": { "$ref": "#/$defs/nullableString" },
+        "to_port": { "$ref": "#/$defs/nullableString" },
+        "edge_kind": {
+          "type": "string",
+          "enum": [
+            "event_output",
+            "event_message",
+            "session_state",
+            "temp_state",
+            "user_state",
+            "app_state",
+            "artifact",
+            "route",
+            "control",
+            "remote_a2a"
+          ]
+        },
+        "execution_semantics": {
+          "type": "string",
+          "enum": [
+            "normal_transition",
+            "fan_out",
+            "fan_in",
+            "loop_back",
+            "loop_exit",
+            "conditional",
+            "boundary_crossing"
+          ]
+        },
+        "data_label": { "type": "string" },
+        "schema_ref": { "$ref": "#/$defs/nullableString" },
+        "route_condition": { "$ref": "#/$defs/nullableString" },
+        "state_key": { "$ref": "#/$defs/nullableString" },
+        "artifact_key": { "$ref": "#/$defs/nullableString" },
+        "a2a_contract_id": { "$ref": "#/$defs/nullableString" },
+        "is_remote_boundary_crossing": { "type": "boolean" }
+      }
+    },
+    "graphContainer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "module_id",
+        "label",
+        "container_kind",
+        "adk_mapping",
+        "contains_node_ids",
+        "entry_node_ids",
+        "exit_node_ids",
+        "layout_policy",
+        "parent_container_id"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "module_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "label": { "type": "string" },
+        "container_kind": {
+          "type": "string",
+          "enum": [
+            "graph_workflow",
+            "dynamic_workflow",
+            "parallel_region",
+            "loop_region",
+            "human_review_region",
+            "remote_boundary"
+          ]
+        },
+        "adk_mapping": { "$ref": "#/$defs/nullableString" },
+        "contains_node_ids": { "type": "array", "items": { "type": "string" } },
+        "entry_node_ids": { "type": "array", "items": { "type": "string" } },
+        "exit_node_ids": { "type": "array", "items": { "type": "string" } },
+        "layout_policy": {
+          "type": "string",
+          "enum": ["dag_with_routes", "fan_out_fan_in", "loop", "linear", "free"]
+        },
+        "parent_container_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+      }
+    },
+    "graphLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"]
+        },
+        "label": { "type": "string" }
+      }
+    },
+    "graphPort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "schema_ref"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "schema_ref": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "graphValidationIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "target_kind", "target_id"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "target_kind": { "type": "string", "enum": ["node", "edge", "container", "graph"] },
+        "target_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+      }
+    },
+    "graphValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "errors", "warnings"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "errors": { "type": "array", "items": { "$ref": "#/$defs/graphValidationIssue" } },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/graphValidationIssue" } }
+      }
     }
   }
 }

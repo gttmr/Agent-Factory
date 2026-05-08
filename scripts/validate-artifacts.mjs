@@ -20,10 +20,6 @@ const adapterKinds = new Set([
 ]);
 const agentKinds = new Set(["specialist", "shared"]);
 const workflowKinds = new Set([
-  "sequential",
-  "parallel",
-  "loop",
-  "human_review",
   "orchestration",
   "graph",
   "dynamic",
@@ -467,6 +463,11 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     if (!graphNodeKinds.has(node.node_kind)) {
       errors.push(`${label}.nodes[${index}] (${node.id}) has invalid node_kind.`);
     }
+    for (const legacyKey of ["type", "subtype"]) {
+      if (legacyKey in node) {
+        errors.push(`${label}.nodes[${index}] (${node.id}) uses legacy ${legacyKey}; emit native Graph IR fields only.`);
+      }
+    }
     if (!graphLaneIds.has(node.lane_id)) {
       errors.push(`${label}.nodes[${index}] (${node.id}) has invalid lane_id.`);
     }
@@ -577,6 +578,11 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
     if (!graphExecutionSemantics.has(edge.execution_semantics)) {
       errors.push(`${label}.edges[${index}] (${edge.id}) has invalid execution_semantics.`);
+    }
+    for (const legacyKey of ["edge_type", "data", "data_channel"]) {
+      if (legacyKey in edge) {
+        errors.push(`${label}.edges[${index}] (${edge.id}) uses legacy ${legacyKey}; emit native Graph IR fields only.`);
+      }
     }
 
     if (edge.edge_kind === "route") {

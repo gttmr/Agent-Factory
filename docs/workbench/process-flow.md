@@ -1,79 +1,95 @@
 # Process Flow
 
-Process Flow는 정규화된 requirement가 어떤 module 조합으로 처리되는지 보여주는 설계 artifact다.
-목표는 taxonomy 나열이 아니라 실행 순서, local boundary, Remote A2A boundary, 검토 gate를 설명하는 것이다.
+Process Flow는 `AnalysisResult.processFlow`에 저장되는 ADK 2.0 Graph IR artifact다.
+필드 이름은 migration compatibility 때문에 `processFlow`를 유지하지만, 내부 shape는 legacy stage-flow가 아니다.
 
-## Node type
+## Graph IR Root
 
-`FlowNodeType` 값은 다음 여섯 개뿐이다.
+필수 root 필드:
+
+- `requirement_id`
+- `graph_id`
+- `root_workflow_module_id`
+- `nodes`
+- `edges`
+- `containers`
+- `lanes`
+- `validation`
+
+새 artifact는 legacy `type`, `subtype`, `edge_type`, `data`, `data_channel` 필드를 내보내면 안 된다.
+validator는 이 필드가 새 Graph IR에 남아 있으면 실패시킨다.
+
+## Node
+
+허용되는 `node_kind`:
 
 - `input`
 - `output`
 - `agent`
-- `workflow`
+- `function`
+- `tool`
 - `adapter`
+- `human_input`
+- `workflow`
+- `remote_a2a`
+- `join`
+- `router`
+- `loop_control`
+
+`input`, `output`, `join`, `router`, `loop_control`은 synthetic node이며 `module_id: null`이어야 한다.
+`agent`, `workflow`, `adapter`, `remote_a2a`는 matching module candidate와 연결한다.
+사람 승인이나 보완 요청은 workflow subtype이 아니라 `node_kind: human_input`으로 둔다.
+
+## Container
+
+허용되는 `container_kind`:
+
+- `graph_workflow`
+- `dynamic_workflow`
+- `parallel_region`
+- `loop_region`
+- `human_review_region`
+- `remote_boundary`
+
+작은 흐름은 container와 edge semantics로 표현한다.
+병렬은 `parallel_region`, 반복은 `loop_region`, 사람 검토는 `human_review_region`, 원격 agent 경계는 `remote_boundary`다.
+
+## Edge
+
+허용되는 `edge_kind`:
+
+- `event_output`
+- `event_message`
+- `session_state`
+- `temp_state`
+- `user_state`
+- `app_state`
+- `artifact`
+- `route`
+- `control`
 - `remote_a2a`
 
-`agent`, `workflow`, `adapter`, `remote_a2a` node는 같은 candidate의 `module_category`와 맞아야 한다.
-`subtype`은 `agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind` 중 해당 category의 값을 넣는다.
+허용되는 `execution_semantics`:
 
-## Edge type
+- `normal_transition`
+- `fan_out`
+- `fan_in`
+- `loop_back`
+- `loop_exit`
+- `conditional`
+- `boundary_crossing`
 
-`edge_type` 값은 두 개뿐이다.
+`route` edge에는 `route_condition`이 필요하다.
+`artifact` edge에는 `artifact_key`가 필요하다.
+`remote_a2a` edge는 `is_remote_boundary_crossing: true`와 `a2a_contract_id`가 필요하고, local graph 복잡도만으로 만들 수 없다.
 
-- `local`
-- `remote_a2a`
+## Workflow 표현 규칙
 
-`local`은 같은 workbench 설계 경계 안의 연결이다.
-`remote_a2a`는 독립 원격 agent 계약을 통과하는 연결이며, `remote_a2a` node가 관련될 때만 사용한다.
+- 고정 순서: `normal_transition`
+- 병렬: `parallel_region` + `fan_out` + `join` + `fan_in`
+- 반복: `loop_region` + `loop_control` + `loop_back` + `loop_exit`
+- 사람 검토: `human_review_region` + `human_input` + 승인/반려 `route`
+- 동적 제어: `dynamic_workflow` container와 rationale의 runtime control 설명
 
-## Edge data channel
-
-ADK 2.0 graph workflow에서는 node 사이 데이터가 `Event`로 전달된다. 따라서 edge는 기존 `data` 설명 외에 다음 선택 필드를 가질 수 있다.
-
-- `data_channel`: `event_output`, `event_message`, `session_state`, `temp_state`, `user_state`, `app_state`, `artifact`, `route`, `control`, `unknown`
-- `state_key`: `Event.state` 또는 `Session.state`에 저장·조회되는 키. `temp:`, `user:`, `app:` prefix를 의도적으로 쓴다.
-- `artifact_key`: `ArtifactService`에 저장·조회되는 named artifact 키.
-- `schema_ref`: edge payload의 구조를 설명하는 schema/model 이름.
-- `route_condition`: branch route 값, 승인/반려 결과, loop 종료 조건 같은 routing 조건.
-
-기본 전달은 `event_output`이다. 사용자에게 보이거나 human-input node로 들어가는 텍스트는 `event_message`로 표시한다. 작은 진행 상태와 branch 중간값은 `session_state` 또는 prefix가 붙은 state channel로 표시하고, 큰 파일형·버전형 결과는 `artifact`로 분리한다.
-
-## 그리는 순서
-
-1. `input` node에 raw requirement와 핵심 context를 둔다.
-2. Evidence에서 확인된 Agent, Workflow, Adapter, Remote A2A 후보를 node로 둔다.
-3. 사용자 요구가 암시한 순서, 병렬성, 반복, 사람 검토를 edge로 표현한다.
-4. 최종 산출물, 보존 artifact, handoff 문서를 `output` node로 둔다.
-5. 불확실한 경계는 edge를 억지로 확정하지 말고 `needs_info` 근거를 남긴다.
-
-## Workflow Pattern
-
-- `sequential`: `input -> step A -> step B -> output`처럼 고정 순서로 연결한다.
-- `parallel`: 공통 input에서 독립 branch로 fan-out하고 merge/review module로 fan-in한다.
-- `loop`: 반복되는 edge data에 `loop:` prefix를 붙이고 종료 조건을 rationale에 남긴다.
-- `human_review`: 사람 승인 또는 보완 요청 gate를 workflow node로 둔다 (ADK 2.0에서는 first-class human-input 노드, 1.14에서는 워크벤치 gate 개념).
-- `orchestration`: 여러 pattern을 조합하는 상위 workflow node로 표현한다.
-- `graph`: ADK 2.0 graph workflow처럼 분기/병렬/머지/loop가 한 그래프 안에 명시적으로 묶일 때 사용한다. 워크벤치의 process flow 자체가 노드/엣지 그래프이므로, `graph` 후보는 이 토폴로지를 agent 단위에서 명시적으로 소유한다고 표시한다.
-- `dynamic`: ADK 2.0 dynamic workflow처럼 코드가 런타임 분기를 결정할 때 사용한다. 외부에서 관찰 가능한 분기는 process flow에 노출하고, 동적 차원이 핵심이면 단일 workflow node + rationale로 표현한다.
-
-세부 판단은 [Workflow decision guide](./workflow-decision-guide.md)를 따른다.
-
-## Adapter 배치
-
-Adapter는 Agent나 Workflow가 호출하는 capability다.
-retrieval, rule registry, data query, external service, MCP tool은 별도 reasoning owner가 아니라면 Adapter node로 둔다.
-Adapter result가 여러 downstream 판단에 쓰이면 flow에서 명시적으로 fan-in 지점을 둔다.
-
-## Remote A2A 배치
-
-Remote A2A는 local workflow의 branch가 아니다.
-원격 owner, lifecycle, agent card 또는 discovery, request/response schema, auth, timeout, retry, fallback, audit, data policy가 확인될 때만 `remote_a2a` node와 `remote_a2a` edge를 둔다.
-정보가 부족하면 Remote A2A 후보는 `needs_info` 또는 `deferred`로 둔다.
-
-## 검토 기준
-
-- 모든 candidate node가 Module Review Board의 status와 일치해야 한다.
-- `approved`가 아닌 후보는 downstream export에서 구현 전제로 사용하지 않는다.
-- customer-impacting, transaction-write, credit-decision-support 흐름은 사람 검토와 audit edge가 보이는지 확인한다.
-- `scaffold-plan.json`은 승인 후보를 담는 export artifact이며, process flow 자체가 runnable logic을 의미하지 않는다.
+`workflow_kind`는 `orchestration`, `graph`, `dynamic`, `unknown` 중 하나만 사용한다.
+세부 흐름 이름을 `workflow_kind`로 되살리지 않는다.

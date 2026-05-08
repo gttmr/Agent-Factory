@@ -16,10 +16,6 @@ export const categoryGlyph: Record<ModuleCategory, string> = {
 };
 
 export const subtypeGlyph: Record<string, string> = {
-  parallel: "⇉",
-  loop: "↻",
-  human_review: "✓",
-  sequential: "→",
   orchestration: "⋈",
   graph: "⬢",
   dynamic: "λ",

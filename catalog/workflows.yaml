@@ -28,7 +28,7 @@ workflows:
     callable_name: multimodal_intake_graph_workflow
     notes: OCR, STT, 언어 감지, PII 마스킹 Adapter를 조합하는 ADK 2.0 graph workflow 후보.
   - name: document_processing_sequence_workflow
-    workflow_kind: sequential
+    workflow_kind: graph
     owner_domain: 공통
     status: proposed
     responsibility: 파일 변환, OCR, 레이아웃 분류, 표 추출, 품질 검토를 순차적으로 실행한다.
@@ -58,7 +58,7 @@ workflows:
     callable_name: document_processing_sequence_workflow
     notes: 문서 기반 업무에서 반복되는 전처리 pipeline.
   - name: customer_clarification_loop_workflow
-    workflow_kind: loop
+    workflow_kind: graph
     owner_domain: 공통
     status: proposed
     responsibility: 누락 정보가 남아 있으면 추가 확인 요청을 만들고, 고객 답변을 반영해 다시 판단한다.
@@ -88,7 +88,7 @@ workflows:
     callable_name: customer_clarification_loop_workflow
     notes: 반복 횟수, 타임아웃, 고객 미응답 정책은 승인 전 검토 필드로 남긴다.
   - name: human_approval_gate_workflow
-    workflow_kind: human_review
+    workflow_kind: graph
     owner_domain: 공통
     status: proposed
     responsibility: 고위험 또는 외부 발송 전 단계에서 사람 승인, 반려, 보완 요청 결과를 workflow route로 변환한다.
@@ -117,7 +117,7 @@ workflows:
     callable_name: human_approval_gate_workflow
     notes: ADK 2.0 human-input node로 매핑되는 공통 승인 gate.
   - name: evidence_parallel_enrichment_workflow
-    workflow_kind: parallel
+    workflow_kind: graph
     owner_domain: 공통
     status: proposed
     responsibility: 정책 검색, FAQ 검색, 고객/케이스 조회, 위험 점수 계산을 병렬로 실행해 evidence pack 생성에 필요한 근거를 모은다.

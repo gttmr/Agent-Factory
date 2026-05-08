@@ -70,7 +70,7 @@
     "source_requirement_id": "req-001",
     "name": "complaint_triage_workflow",
     "module_category": "workflow",
-    "workflow_kind": "sequential",
+    "workflow_kind": "graph",
     "legacy_recommended_type": "internal_workflow",
     "confidence": 0.76,
     "rationale": "The request describes ordered steps inside one triage boundary.",

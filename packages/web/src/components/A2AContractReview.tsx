@@ -57,17 +57,24 @@ export function A2AContractReview({
 
   const pairedContracts: Array<{ contract: A2AContract; candidate: ModuleCandidate }> = [];
   const orphanContracts: A2AContract[] = [];
+  const pairedCandidateIds = new Set<string>();
 
   for (const contract of contracts) {
     const candidate = candidateById.get(contract.remote_module_id);
     if (candidate && candidate.module_category === "remote_a2a") {
       pairedContracts.push({ contract, candidate });
+      pairedCandidateIds.add(candidate.id);
     } else {
       orphanContracts.push(contract);
     }
   }
 
-  const hasNeedsInfo = contracts.some((contract) => contractHasNeedsInfo(contract));
+  const remoteCandidatesMissingContract = moduleCandidates.filter(
+    (candidate) => candidate.module_category === "remote_a2a" && !pairedCandidateIds.has(candidate.id)
+  );
+  const hasNeedsInfo =
+    contracts.some((contract) => contractReadinessIssues(contract).length > 0) ||
+    remoteCandidatesMissingContract.length > 0;
 
   function updateContract(contractId: string, changes: Partial<A2AContract>) {
     onContractsChange(
@@ -118,8 +125,33 @@ export function A2AContractReview({
         </div>
       ) : null}
 
-      {pairedContracts.length === 0 && orphanContracts.length === 0 ? (
+      {pairedContracts.length === 0 && orphanContracts.length === 0 && remoteCandidatesMissingContract.length === 0 ? (
         <p className="empty-state">검토할 Remote A2A 계약이 없습니다.</p>
+      ) : null}
+
+      {remoteCandidatesMissingContract.length > 0 ? (
+        <div className="a2a-orphan-section">
+          <h3 className="a2a-orphan-heading">계약이 없는 Remote A2A 후보</h3>
+          <p className="a2a-orphan-note">
+            Remote A2A 후보는 독립 원격 agent 경계이므로 계약 없이 승인하거나 소스 생성 대상으로 넘길 수 없습니다.
+          </p>
+          <div className="a2a-missing-list">
+            {remoteCandidatesMissingContract.map((candidate) => (
+              <article className="a2a-missing-card" key={candidate.id}>
+                <div>
+                  <CategoryBadge category="remote_a2a" />
+                  <h3>{candidate.name}</h3>
+                  <p>{candidate.rationale}</p>
+                </div>
+                <ul>
+                  {remoteA2ARequiredReviewFields.map((field) => (
+                    <li key={field}>{field}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       <div className="a2a-card-list">
@@ -196,6 +228,7 @@ function ContractCard({
   onStreamingChange,
   onArtifactContractChange
 }: ContractCardProps) {
+  const readinessIssues = contractReadinessIssues(contract);
   return (
     <article className="a2a-contract-card" data-contract-id={contract.contract_id}>
       <header className="a2a-card-header">
@@ -220,6 +253,16 @@ function ContractCard({
       </header>
 
       <div className="a2a-card-body">
+        {readinessIssues.length ? (
+          <Section title="계약 검토 필요" highlight>
+            <ul className="a2a-readiness-list">
+              {readinessIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+
         <Section title="대상 에이전트">
           <FieldRow label="이름">
             <NeedsInfoText
@@ -749,8 +792,21 @@ function isNeedsInfoValue(value: string | null | undefined): boolean {
   return value.trim() === NEEDS_INFO_TOKEN;
 }
 
-function contractHasNeedsInfo(contract: A2AContract): boolean {
-  if (contract.contract_status === "needs_info") return true;
+const remoteA2ARequiredReviewFields = [
+  "owner",
+  "agent_card",
+  "auth",
+  "task_lifecycle",
+  "timeout",
+  "retry",
+  "fallback",
+  "audit",
+  "data_policy"
+];
+
+function contractReadinessIssues(contract: A2AContract): string[] {
+  const issues: string[] = [];
+  if (contract.contract_status === "needs_info") issues.push("contract_status가 정보 필요 상태입니다.");
   const scalarFields: Array<keyof A2AContract> = [
     "target_agent_name",
     "target_agent_purpose",
@@ -768,10 +824,10 @@ function contractHasNeedsInfo(contract: A2AContract): boolean {
   ];
   for (const field of scalarFields) {
     const v = contract[field];
-    if (typeof v === "string" && isNeedsInfoValue(v)) return true;
+    if (typeof v === "string" && isNeedsInfoValue(v)) issues.push(`${String(field)} 값이 needs_info 입니다.`);
   }
   if (typeof contract.push_notification_policy === "string" && isNeedsInfoValue(contract.push_notification_policy)) {
-    return true;
+    issues.push("push_notification_policy 값이 needs_info 입니다.");
   }
   const card = contract.agent_card;
   if (
@@ -780,20 +836,46 @@ function contractHasNeedsInfo(contract: A2AContract): boolean {
     isNeedsInfoValue(card.version) ||
     isNeedsInfoValue(card.notes)
   ) {
-    return true;
+    issues.push("Agent Card discovery/version/notes 중 needs_info 값이 있습니다.");
   }
   if (
     isNeedsInfoValue(contract.task_lifecycle.input_required_followup) ||
     isNeedsInfoValue(contract.task_lifecycle.auth_required_followup)
   ) {
-    return true;
+    issues.push("TASK_STATE_INPUT_REQUIRED 또는 TASK_STATE_AUTH_REQUIRED 후속 처리가 needs_info 입니다.");
   }
-  if (isNeedsInfoValue(contract.streaming.non_streaming_fallback)) return true;
+  if (isNeedsInfoValue(contract.streaming.non_streaming_fallback)) {
+    issues.push("non_streaming_fallback 값이 needs_info 입니다.");
+  }
   if (
     isNeedsInfoValue(contract.artifact_contract.mutation_rules) ||
     isNeedsInfoValue(contract.artifact_contract.chunking_policy)
   ) {
-    return true;
+    issues.push("Artifact contract 값이 needs_info 입니다.");
+  }
+  if (hasNeedsInfoDeep(contract.supported_interfaces)) issues.push("supported_interfaces 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.input_modes)) issues.push("input_modes 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.output_modes)) issues.push("output_modes 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.security_schemes)) issues.push("security_schemes 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.security_requirements)) issues.push("security_requirements 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.skills)) issues.push("skills 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.operations)) issues.push("operations 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.http_paths)) issues.push("http_paths 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.task_lifecycle.states)) issues.push("task_lifecycle.states 안에 needs_info 값이 있습니다.");
+  if (hasNeedsInfoDeep(contract.task_lifecycle.allowed_transitions)) {
+    issues.push("task_lifecycle.allowed_transitions 안에 needs_info 값이 있습니다.");
+  }
+  if (hasNeedsInfoDeep(contract.task_lifecycle.terminal_states)) {
+    issues.push("task_lifecycle.terminal_states 안에 needs_info 값이 있습니다.");
+  }
+  return issues;
+}
+
+function hasNeedsInfoDeep(value: unknown): boolean {
+  if (isNeedsInfoValue(value as string | null | undefined)) return true;
+  if (Array.isArray(value)) return value.some(hasNeedsInfoDeep);
+  if (value && typeof value === "object") {
+    return Object.values(value).some(hasNeedsInfoDeep);
   }
   return false;
 }

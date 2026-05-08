@@ -79,13 +79,14 @@ export default function App() {
 
   const processFlow = analysis?.processFlow ?? null;
   const a2aContracts = analysis?.a2aContracts ?? [];
-  const hasA2AContracts = a2aContracts.length > 0;
+  const hasRemoteA2ACandidates = moduleCandidates.some((candidate) => candidate.module_category === "remote_a2a");
+  const hasA2AReviewStep = hasRemoteA2ACandidates || a2aContracts.length > 0;
 
   const canReview = analysis !== null;
 
   const visibleSteps = useMemo(
-    () => steps.filter((step) => (step.id === "a2aContracts" ? hasA2AContracts : true)),
-    [hasA2AContracts]
+    () => steps.filter((step) => (step.id === "a2aContracts" ? hasA2AReviewStep : true)),
+    [hasA2AReviewStep]
   );
 
   function updateA2AContracts(updated: A2AContract[]) {
@@ -265,7 +266,7 @@ export default function App() {
             catalogEntries={catalogEntries}
             onModuleCandidatesChange={setModuleCandidates}
             onContinue={() => setActiveStep("graph")}
-            onNavigateToA2AContracts={hasA2AContracts ? () => setActiveStep("a2aContracts") : undefined}
+            onNavigateToA2AContracts={hasA2AReviewStep ? () => setActiveStep("a2aContracts") : undefined}
           />
         )}
 
@@ -274,12 +275,12 @@ export default function App() {
             graphIR={processFlow}
             moduleCandidates={moduleCandidates}
             a2aContracts={a2aContracts}
-            onNavigateToA2AContracts={hasA2AContracts ? () => setActiveStep("a2aContracts") : undefined}
-            onContinue={() => setActiveStep(hasA2AContracts ? "a2aContracts" : "reuse")}
+            onNavigateToA2AContracts={hasA2AReviewStep ? () => setActiveStep("a2aContracts") : undefined}
+            onContinue={() => setActiveStep(hasA2AReviewStep ? "a2aContracts" : "reuse")}
           />
         )}
 
-        {activeStep === "a2aContracts" && analysis && hasA2AContracts && (
+        {activeStep === "a2aContracts" && analysis && hasA2AReviewStep && (
           <A2AContractReview
             contracts={a2aContracts}
             moduleCandidates={moduleCandidates}

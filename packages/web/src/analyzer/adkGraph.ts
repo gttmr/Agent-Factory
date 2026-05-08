@@ -21,14 +21,14 @@ export interface AdkGraphIssue {
   code: string;
   message: string;
   node_id?: string;
-  edge?: Pick<FlowEdge, "from" | "to" | "data" | "route_condition">;
+  edge?: Pick<FlowEdge, "from" | "to" | "data_label" | "route_condition">;
 }
 
 export interface AdkGraphNode {
   id: string;
   label: string;
-  type: FlowNode["type"];
-  subtype: string | null;
+  nodeKind: string;
+  executionKind: string | null;
   functionName: string;
   candidate: ModuleCandidate | null;
   runtimeRole: AdkRuntimeRole;
@@ -86,22 +86,25 @@ export function buildAdkGraphIr({
   const nodesById = new Map(processFlow.nodes.map((node) => [node.id, node]));
   const candidatesById = new Map(moduleCandidates.map((candidate) => [candidate.id, candidate]));
   const issues: AdkGraphIssue[] = [];
-  const outputNodeIds = new Set(processFlow.nodes.filter((node) => node.type === "output").map((node) => node.id));
+  const outputNodeIds = new Set(processFlow.nodes.filter((node) => node.node_kind === "output").map((node) => node.id));
   const rawActiveEdges = processFlow.edges.filter((edge) => isActiveEdge(edge, nodesById, new Set(processFlow.nodes.map((node) => node.id))));
   const runtimeFlowEdges = selectRuntimeEdges(rawActiveEdges, outputNodeIds);
   const routeValuesBySource = collectRouteValues(runtimeFlowEdges);
   const graphNodes = processFlow.nodes
-    .filter((node) => node.type !== "input")
+    .filter((node) => node.node_kind !== "input")
     .map((node) => {
-      const candidate = candidatesById.get(node.id) ?? null;
+      const kind = node.node_kind;
+      const candidate = (typeof node.module_id === "string" ? candidatesById.get(node.module_id) : candidatesById.get(node.id)) ?? null;
       const activeInGraph =
-        node.type === "output" || (node.type !== "remote_a2a" && candidate?.status === "approved");
+        kind === "output" ||
+        (kind !== "remote_a2a" &&
+          (candidate?.status === "approved" || ["join", "router", "loop_control", "human_input", "function", "tool"].includes(kind)));
       return {
         id: node.id,
         label: node.label,
-        type: node.type,
-        subtype: node.subtype ?? null,
-        functionName: node.type === "output" ? `emit_${toPythonIdentifier(node.id)}` : `node_${toPythonIdentifier(node.id)}`,
+        nodeKind: kind,
+        executionKind: node.execution_kind ?? null,
+        functionName: kind === "output" ? `emit_${toPythonIdentifier(node.id)}` : `node_${toPythonIdentifier(node.id)}`,
         candidate,
         runtimeRole: runtimeRoleFor(node, candidate, runtimeMode, routeValuesBySource.has(node.id)),
         activeInGraph,
@@ -115,7 +118,7 @@ export function buildAdkGraphIr({
     activeEdges
       .filter((edge) => !outputNodeIds.has(edge.to))
       .filter((edge) => isLoopEdge(edge, activeEdges.filter((candidateEdge) => !outputNodeIds.has(candidateEdge.to))))
-      .map((edge) => edgeKey(edge.from, edge.to, edge.data))
+      .map((edge) => edgeKey(edge.from, edge.to, edgeLabel(edge)))
   );
   const joinGroups = buildJoinGroups(
     activeEdges.filter((edge) => !outputNodeIds.has(edge.to)),
@@ -127,10 +130,10 @@ export function buildAdkGraphIr({
 
   const startTargets = unique(
     processFlow.edges
-      .filter((edge) => nodesById.get(edge.from)?.type === "input" && activeNodes.has(edge.to) && !joinTargets.has(edge.to))
+      .filter((edge) => nodesById.get(edge.from)?.node_kind === "input" && activeNodes.has(edge.to) && !joinTargets.has(edge.to))
       .map((edge) => edge.to)
   );
-  const fallbackStart = graphNodes.find((node) => node.activeInGraph && node.type !== "output")?.id;
+  const fallbackStart = graphNodes.find((node) => node.activeInGraph && node.nodeKind !== "output")?.id;
   (startTargets.length ? startTargets : fallbackStart ? [fallbackStart] : []).forEach((target) => {
     edges.push({ from: "START", to: target, kind: "start", routeValue: null });
   });
@@ -140,9 +143,9 @@ export function buildAdkGraphIr({
   });
 
   activeEdges.forEach((edge) => {
-    if (nodesById.get(edge.from)?.type === "input") return;
+    if (nodesById.get(edge.from)?.node_kind === "input") return;
     const routeValue = isRouteEdge(edge) ? normalizeRouteValue(edge) : null;
-    const kind: AdkGraphEdgeKind = routeValue ? "route" : loopEdgeKeys.has(edgeKey(edge.from, edge.to, edge.data)) ? "loop" : "direct";
+    const kind: AdkGraphEdgeKind = routeValue ? "route" : loopEdgeKeys.has(edgeKey(edge.from, edge.to, edgeLabel(edge))) ? "loop" : "direct";
     const target = outputNodeIds.has(edge.to) ? ADK_FINAL_OUTPUT_ID : edge.to;
     edges.push({
       from: edge.from,
@@ -154,7 +157,7 @@ export function buildAdkGraphIr({
   });
 
   graphNodes
-    .filter((node) => node.activeInGraph && node.type !== "output")
+    .filter((node) => node.activeInGraph && node.nodeKind !== "output")
     .filter((node) => !edges.some((edge) => edge.from === node.id))
     .forEach((node) => {
       edges.push({ from: node.id, to: ADK_FINAL_OUTPUT_ID, kind: "direct", routeValue: null });
@@ -166,7 +169,7 @@ export function buildAdkGraphIr({
   const fanOutGroups = buildFanOutGroups(edges);
   const loopEdges = edges.filter((edge) => edge.kind === "loop");
   const terminalOutputs = graphNodes
-    .filter((node) => node.activeInGraph && node.type === "output")
+    .filter((node) => node.activeInGraph && node.nodeKind === "output")
     .map((node) => node.id);
 
   return {
@@ -205,12 +208,13 @@ function runtimeRoleFor(
   runtimeMode: AdkRuntimeMode,
   hasRouteOutput: boolean
 ): AdkRuntimeRole {
-  if (node.type === "output") return "output";
-  if (node.type === "remote_a2a") return "remote_contract";
-  if (candidate?.workflow_kind === "human_review" || node.subtype === "human_review") return "human_input";
+  const kind = node.node_kind;
+  if (kind === "output") return "output";
+  if (kind === "remote_a2a") return "remote_contract";
+  if (kind === "human_input" || node.execution_kind === "human_review") return "human_input";
   if (hasRouteOutput) return "workflow_route";
-  if (node.type === "agent") return runtimeMode === "llm" ? "llm_agent" : "stub_function";
-  if (node.type === "adapter") return runtimeMode === "adapter" && candidate?.access_protocol === "mcp" ? "mcp_adapter" : "adapter_stub";
+  if (kind === "agent") return runtimeMode === "llm" ? "llm_agent" : "stub_function";
+  if (kind === "adapter") return runtimeMode === "adapter" && candidate?.access_protocol === "mcp" ? "mcp_adapter" : "adapter_stub";
   return "stub_function";
 }
 
@@ -224,7 +228,7 @@ function collectRouteValues(edges: FlowEdge[]): Map<string, string[]> {
 }
 
 function isActiveEdge(edge: FlowEdge, nodesById: Map<string, FlowNode>, activeNodes: Set<string>): boolean {
-  const fromType = nodesById.get(edge.from)?.type;
+  const fromType = nodesById.get(edge.from)?.node_kind;
   return (fromType === "input" || activeNodes.has(edge.from)) && activeNodes.has(edge.to);
 }
 
@@ -246,7 +250,7 @@ function buildJoinGroups(edges: FlowEdge[], activeNodes: Set<string>, loopEdgeKe
   const incoming = new Map<string, FlowEdge[]>();
   edges.forEach((edge) => {
     if (!activeNodes.has(edge.from) || !activeNodes.has(edge.to)) return;
-    if (loopEdgeKeys.has(edgeKey(edge.from, edge.to, edge.data))) return;
+    if (loopEdgeKeys.has(edgeKey(edge.from, edge.to, edgeLabel(edge)))) return;
     incoming.set(edge.to, [...(incoming.get(edge.to) ?? []), edge]);
   });
   return [...incoming.entries()]
@@ -292,7 +296,7 @@ function validateReachability(nodes: AdkGraphNode[], edges: AdkGraphEdge[]): Adk
   };
   edges.filter((edge) => edge.from === "START").forEach((edge) => visit(edge.to));
   return activeNodes
-    .filter((node) => node.type !== "output" && !reachable.has(node.id))
+    .filter((node) => node.nodeKind !== "output" && !reachable.has(node.id))
     .map((node) => ({
       severity: "warning" as const,
       code: "unreachable_node",
@@ -316,11 +320,12 @@ function buildFanOutGroups(edges: AdkGraphEdge[]): AdkGraphFanOutGroup[] {
 }
 
 function isRouteEdge(edge: FlowEdge): boolean {
-  return edge.data_channel === "route" || Boolean(edge.route_condition);
+  return edge.edge_kind === "route" || Boolean(edge.route_condition);
 }
 
 function isLoopEdge(edge: FlowEdge, edges: FlowEdge[]): boolean {
-  if (edge.data.toLowerCase().includes("loop")) return true;
+  if (edge.execution_semantics === "loop_back" || edge.execution_semantics === "loop_exit") return true;
+  if (edgeLabel(edge).toLowerCase().includes("loop")) return true;
   if ((edge.route_condition ?? "").toLowerCase().includes("retry")) return true;
   return hasPath(edge.to, edge.from, edges);
 }
@@ -334,6 +339,10 @@ function hasPath(from: string, to: string, edges: FlowEdge[], visited = new Set<
 
 function edgeKey(from: string, to: string, data: string): string {
   return `${from}->${to}::${data}`;
+}
+
+function edgeLabel(edge: FlowEdge): string {
+  return edge.data_label ?? "";
 }
 
 function toRouteLiteral(value: string): string {

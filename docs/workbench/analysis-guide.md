@@ -39,6 +39,7 @@
 ## ADK 문서 사용
 
 ADK 공식 문서는 repo에 모두 복제하지 않는다.
-필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. 2.0 (Beta) 섹션(graph workflow, dynamic workflow, human-input 노드, trace/token observability)을 우선 조회한다.
+필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. 2.0 (Beta) 섹션(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)을 우선 조회한다.
 이 저장소의 활성 문서는 ADK 2.0 (Beta)을 기본 baseline으로 작성한다.
-1.14 환경 대상 legacy compat에서는 stable workflow agent 패턴인 `SequentialAgent`, `ParallelAgent`, `LoopAgent`로 매핑된다.
+작은 순차, 병렬, 반복, 사람 입력 흐름은 `workflow_kind`가 아니라 Graph IR node/container/edge로 표현한다.
+MCP 결과와 직접 내려받은 공식 문서가 다르거나 현재 taxonomy와 충돌하면 구현을 멈추고 사용자에게 질문한다.

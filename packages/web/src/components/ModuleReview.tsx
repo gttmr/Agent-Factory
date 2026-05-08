@@ -71,7 +71,7 @@ export function ModuleReview({
     updateCandidate(candidate.id, {
       module_category,
       agent_kind: module_category === "agent" ? candidate.agent_kind ?? "specialist" : null,
-      workflow_kind: module_category === "workflow" ? candidate.workflow_kind ?? "sequential" : null,
+      workflow_kind: module_category === "workflow" ? candidate.workflow_kind ?? "graph" : null,
       adapter_kind: module_category === "adapter" ? candidate.adapter_kind ?? "unknown" : null,
       remote_contract_kind: module_category === "remote_a2a" ? candidate.remote_contract_kind ?? "a2a" : null,
       risk_level: module_category === "remote_a2a" ? "high" : candidate.risk_level,
