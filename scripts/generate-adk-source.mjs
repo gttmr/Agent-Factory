@@ -59,13 +59,6 @@ function buildFiles() {
 
 function buildAgentPy() {
   const modules = scaffoldPlan.modules;
-  const imports = modules
-    .filter((module) => module.import_contract)
-    .map((module) => {
-      const contract = module.import_contract;
-      return `from ${contract.import_path} import ${contract.callable_name} as ${componentAlias(module)}`;
-    })
-    .join("\n");
   const functions = modules.map(buildNodeFunction).join("\n\n");
   const edgeRows = modules
     .map((module, index) => {
@@ -79,7 +72,6 @@ function buildAgentPy() {
 from typing import Any
 
 from google.adk import Event, Workflow
-${imports ? `\n${imports}` : ""}
 
 
 COMPONENT_CONTRACTS = ${toPythonLiteral(componentContracts())}
@@ -117,24 +109,6 @@ ${edgeRows}
 }
 
 function buildNodeFunction(module) {
-  if (module.import_contract) {
-    return `def ${nodeFunctionName(module)}(node_input: Any = None):
-    contract = COMPONENT_CONTRACTS["${module.id}"]
-    output = _event_output("${module.id}", "${escapePythonString(module.name)}", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    # TODO: map node_input into contract["inputs"] before calling the shared component.
-    try:
-        component_result = ${componentAlias(module)}(node_input)
-    except Exception as exc:
-        output["status"] = "component_call_failed"
-        output["error"] = str(exc)
-        return Event(output=output)
-    # TODO: validate component_result against contract["outputs"] before downstream routing.
-    output["status"] = "imported_component_wrapper"
-    output["component_result"] = component_result
-    return Event(output=output)`;
-  }
-
   return `def ${todoFunctionName(module)}(node_input: Any = None):
     """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
     raise NotImplementedError("${escapePythonString(module.name)} requires developer implementation")
@@ -162,7 +136,7 @@ function buildManifest() {
       generated_business_logic: false,
       private_data_or_endpoints: false
     },
-    imported_components: scaffoldPlan.manifest?.imported_components ?? [],
+    catalog_bound_modules: scaffoldPlan.manifest?.catalog_bound_modules ?? [],
     new_code_required: scaffoldPlan.manifest?.new_code_required ?? [],
     excluded_modules: scaffoldPlan.excluded_modules ?? [],
     modules: scaffoldPlan.modules
@@ -170,15 +144,7 @@ function buildManifest() {
 }
 
 function buildRequirements() {
-  const requirements = ["--pre", "google-adk", "pytest"];
-  const packages = new Set(
-    scaffoldPlan.modules.flatMap((module) => {
-      const contract = module.import_contract;
-      if (!contract) return [];
-      return [contract.package_version ? `${contract.package_name}==${contract.package_version}` : contract.package_name];
-    })
-  );
-  return `${[...requirements, ...packages].join("\n")}\n`;
+  return `${["--pre", "google-adk", "pytest"].join("\n")}\n`;
 }
 
 function buildContractTest() {
@@ -192,13 +158,13 @@ def test_agent_source_declares_adk_workflow():
     source = (ROOT / "${packageName}" / "agent.py").read_text(encoding="utf-8")
     assert "from google.adk import Event, Workflow" in source
     assert "root_agent = Workflow(" in source
-    assert "TODO_IMPLEMENT_HERE" in source or "imported_component_wrapper" in source
+    assert "TODO_IMPLEMENT_HERE" in source
 
 
 def test_manifest_uses_scaffold_plan_contract():
     manifest = (ROOT / "${packageName}" / "workflow_manifest.json").read_text(encoding="utf-8")
     assert '"raw_requirement_to_code": false' in manifest
-    assert '"imported_components"' in manifest
+    assert '"catalog_bound_modules"' in manifest
     assert '"new_code_required"' in manifest
 `;
 }
@@ -222,7 +188,6 @@ function componentContracts() {
       module.id,
       {
         catalog_binding: module.catalog_binding ?? null,
-        import_contract: module.import_contract ?? null,
         developer_todos: module.developer_todos,
         inputs: module.inputs,
         outputs: module.outputs,
@@ -234,10 +199,6 @@ function componentContracts() {
 
 function nodeFunctionName(module) {
   return `node_${toPythonIdentifier(module.id)}`;
-}
-
-function componentAlias(module) {
-  return `component_${toPythonIdentifier(module.id)}`;
 }
 
 function todoFunctionName(module) {

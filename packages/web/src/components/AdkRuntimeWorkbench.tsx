@@ -196,8 +196,8 @@ export function AdkRuntimeWorkbench({
             <strong>{scaffoldPlan.modules.length}</strong>
           </div>
           <div>
-            <span>Imported</span>
-            <strong>{scaffoldPlan.manifest.imported_components.length}</strong>
+            <span>Catalog-bound</span>
+            <strong>{scaffoldPlan.manifest.catalog_bound_modules.length}</strong>
           </div>
           <div>
             <span>TODO</span>

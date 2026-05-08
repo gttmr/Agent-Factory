@@ -8,11 +8,6 @@ adapters:
     mcp_tool_name: extract_text_from_image
     mcp_schema_ref: catalog.mock.vision.extract_text.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: extract_text_from_image
     contract_status: mock_mcp_ready
     inputs:
       - name: document_uri
@@ -41,11 +36,6 @@ adapters:
     mcp_tool_name: classify_document_layout
     mcp_schema_ref: catalog.mock.vision.layout.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: classify_document_layout
     contract_status: mock_mcp_ready
     inputs:
       - name: page_blocks
@@ -68,11 +58,6 @@ adapters:
     mcp_tool_name: transcribe_audio
     mcp_schema_ref: catalog.mock.audio.transcribe.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: transcribe_audio
     contract_status: mock_mcp_ready
     inputs:
       - name: audio_uri
@@ -101,11 +86,6 @@ adapters:
     mcp_tool_name: synthesize_speech
     mcp_schema_ref: catalog.mock.audio.tts.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: synthesize_speech
     contract_status: mock_mcp_ready
     inputs:
       - name: response_text
@@ -132,11 +112,6 @@ adapters:
     mcp_tool_name: detect_language
     mcp_schema_ref: catalog.mock.language.detect.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: detect_language
     contract_status: mock_mcp_ready
     inputs:
       - name: text
@@ -159,11 +134,6 @@ adapters:
     mcp_tool_name: translate_text
     mcp_schema_ref: catalog.mock.language.translate.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: translate_text
     contract_status: mock_mcp_ready
     inputs:
       - name: source_text
@@ -190,11 +160,6 @@ adapters:
     mcp_tool_name: redact_pii
     mcp_schema_ref: catalog.mock.language.redact_pii.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: redact_pii
     contract_status: mock_mcp_ready
     inputs:
       - name: raw_text
@@ -221,11 +186,6 @@ adapters:
     mcp_tool_name: classify_intent
     mcp_schema_ref: catalog.mock.language.intent.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: classify_intent
     contract_status: mock_mcp_ready
     inputs:
       - name: text
@@ -254,11 +214,6 @@ adapters:
     mcp_tool_name: search_policy_documents
     mcp_schema_ref: catalog.mock.knowledge.policy_search.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: search_policy_documents
     contract_status: mock_mcp_ready
     inputs:
       - name: query
@@ -284,11 +239,6 @@ adapters:
     mcp_tool_name: search_faq
     mcp_schema_ref: catalog.mock.knowledge.faq_search.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: search_faq
     contract_status: mock_mcp_ready
     inputs:
       - name: query
@@ -314,11 +264,6 @@ adapters:
     mcp_tool_name: vector_search
     mcp_schema_ref: catalog.mock.knowledge.vector_search.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: vector_search
     contract_status: mock_mcp_ready
     inputs:
       - name: query_embedding_or_text
@@ -344,11 +289,6 @@ adapters:
     mcp_tool_name: evaluate_routing_rule
     mcp_schema_ref: catalog.mock.registry.routing_rule.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: evaluate_routing_rule
     contract_status: mock_mcp_ready
     inputs:
       - name: case_features
@@ -375,11 +315,6 @@ adapters:
     mcp_tool_name: get_response_template
     mcp_schema_ref: catalog.mock.registry.response_template.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: get_response_template
     contract_status: mock_mcp_ready
     inputs:
       - name: template_key
@@ -406,11 +341,6 @@ adapters:
     mcp_tool_name: lookup_customer_profile
     mcp_schema_ref: catalog.mock.data.customer_profile.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: lookup_customer_profile
     contract_status: mock_mcp_ready
     inputs:
       - name: customer_identifier
@@ -435,11 +365,6 @@ adapters:
     mcp_tool_name: lookup_case_history
     mcp_schema_ref: catalog.mock.data.case_history.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: lookup_case_history
     contract_status: mock_mcp_ready
     inputs:
       - name: entity_identifier
@@ -466,11 +391,6 @@ adapters:
     mcp_tool_name: calculate_risk_score
     mcp_schema_ref: catalog.mock.computation.risk_score.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: calculate_risk_score
     contract_status: mock_mcp_ready
     inputs:
       - name: case_features
@@ -498,11 +418,6 @@ adapters:
     mcp_tool_name: send_notification_dry_run
     mcp_schema_ref: catalog.mock.notification.dry_run.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: send_notification_dry_run
     contract_status: mock_mcp_ready
     inputs:
       - name: recipient_ref
@@ -533,11 +448,6 @@ adapters:
     mcp_tool_name: convert_document
     mcp_schema_ref: catalog.mock.file.convert_document.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: convert_document
     contract_status: mock_mcp_ready
     inputs:
       - name: source_file_uri
@@ -563,11 +473,6 @@ adapters:
     mcp_tool_name: extract_table
     mcp_schema_ref: catalog.mock.file.extract_table.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: extract_table
     contract_status: mock_mcp_ready
     inputs:
       - name: document_sections
@@ -590,11 +495,6 @@ adapters:
     mcp_tool_name: verify_identity_signal
     mcp_schema_ref: catalog.mock.identity.signal.v1
     mcp_auth_mode: none_mock
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.adapters
-    callable_name: verify_identity_signal
     contract_status: mock_mcp_ready
     inputs:
       - name: identity_claim

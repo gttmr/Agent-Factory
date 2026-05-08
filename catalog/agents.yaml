@@ -17,11 +17,6 @@ agents:
       - name: missing_information
         type: array<string>
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: intake_triage_specialist
     notes: 여러 업무 도메인에서 공통으로 쓰는 1차 분류 Agent.
   - name: document_quality_specialist
     agent_kind: specialist
@@ -41,11 +36,6 @@ agents:
       - name: retry_required
         type: boolean
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: document_quality_specialist
     notes: OCR Adapter 뒤에 붙는 공통 품질 판단 Agent.
   - name: evidence_pack_specialist
     agent_kind: shared
@@ -65,11 +55,6 @@ agents:
       - name: citation_summary
         type: array<object>
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: evidence_pack_specialist
     notes: retrieval, rule_registry, data_query Adapter 결과를 사람이 읽기 좋은 근거로 통합한다.
   - name: compliance_review_specialist
     agent_kind: specialist
@@ -89,11 +74,6 @@ agents:
       - name: approval_required
         type: boolean
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: compliance_review_specialist
     notes: 실제 법무 판단이 아니라 워크벤치용 검토 shell이다.
   - name: customer_reply_drafting_specialist
     agent_kind: specialist
@@ -116,11 +96,6 @@ agents:
       - name: draft_rationale
         type: object
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: customer_reply_drafting_specialist
     notes: Template Adapter와 함께 쓰는 공통 응답 작성 Agent.
   - name: escalation_reasoning_specialist
     agent_kind: specialist
@@ -140,9 +115,4 @@ agents:
       - name: routing_reasons
         type: array<string>
     scaffold_output: agent_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.agents
-    callable_name: escalation_reasoning_specialist
     notes: 자동 라우팅 전 마지막 reasoning 경계.

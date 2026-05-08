@@ -16,18 +16,11 @@
       "catalog_binding": {
         "catalog_id": "seed-adapter-customer_profile_lookup",
         "name": "customer_profile_lookup",
-        "component_source": "python_package"
-      },
-      "import_contract": {
-        "package_name": "agent-factory-shared-components",
-        "package_version": "0.1.0",
-        "import_path": "agent_factory_shared.adapters",
-        "callable_name": "lookup_customer_profile"
+        "component_source": "stub"
       },
       "developer_todos": [
-        "Map ADK node_input into the shared component input contract.",
-        "Handle component exceptions and timeout policy without leaking private data.",
-        "Validate component output against the reviewed output contract."
+        "Review how this catalog spec should be invoked before replacing the TODO boundary.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -55,6 +48,7 @@
       "remote_contract_kind": null,
       "scaffold_output": "agent_shell_only",
       "no_runnable_business_logic": true,
+      "catalog_binding": null,
       "developer_todos": [
         "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
         "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
@@ -85,18 +79,25 @@
     }
   ],
   "manifest": {
-    "imported_components": [
+    "catalog_bound_modules": [
       {
         "module_id": "mod-001",
         "module_name": "customer_profile_lookup",
         "catalog_id": "seed-adapter-customer_profile_lookup",
-        "package_name": "agent-factory-shared-components",
-        "package_version": "0.1.0",
-        "import_path": "agent_factory_shared.adapters",
-        "callable_name": "lookup_customer_profile"
+        "catalog_name": "customer_profile_lookup",
+        "component_source": "stub"
       }
     ],
     "new_code_required": [
+      {
+        "module_id": "mod-001",
+        "module_name": "customer_profile_lookup",
+        "reason": "catalog binding is recorded, but runtime implementation remains a TODO boundary",
+        "developer_todos": [
+          "Review how this catalog spec should be invoked before replacing the TODO boundary.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
+        ]
+      },
       {
         "module_id": "mod-002",
         "module_name": "requirement_review_specialist",
@@ -112,7 +113,8 @@
     "can_generate_source": true,
     "blockers": [],
     "warnings": [
-      "requirement_review_specialist: generated as new-code TODO boundary because no python package import is available"
+      "customer_profile_lookup: catalog binding is emitted as TODO/stub until runtime binding policy is approved",
+      "requirement_review_specialist: generated as new-code TODO boundary because no catalog binding is selected"
     ]
   }
 }

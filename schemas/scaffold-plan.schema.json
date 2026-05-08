@@ -33,11 +33,11 @@
     "manifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["imported_components", "new_code_required"],
+      "required": ["catalog_bound_modules", "new_code_required"],
       "properties": {
-        "imported_components": {
+        "catalog_bound_modules": {
           "type": "array",
-          "items": { "$ref": "#/$defs/imported_component" }
+          "items": { "$ref": "#/$defs/catalog_bound_module" }
         },
         "new_code_required": {
           "type": "array",
@@ -130,9 +130,6 @@
         "catalog_binding": {
           "anyOf": [{ "$ref": "#/$defs/catalog_binding" }, { "type": "null" }]
         },
-        "import_contract": {
-          "anyOf": [{ "$ref": "#/$defs/import_contract" }, { "type": "null" }]
-        },
         "developer_todos": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
@@ -174,18 +171,7 @@
       "properties": {
         "catalog_id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
-        "component_source": { "type": "string", "enum": ["python_package", "mcp", "stub"] }
-      }
-    },
-    "import_contract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["package_name", "import_path", "callable_name"],
-      "properties": {
-        "package_name": { "type": "string", "minLength": 1 },
-        "package_version": { "type": "string", "minLength": 1 },
-        "import_path": { "type": "string", "minLength": 1 },
-        "callable_name": { "type": "string", "minLength": 1 }
+        "component_source": { "type": "string", "enum": ["mcp", "stub"] }
       }
     },
     "excluded_module": {
@@ -199,18 +185,16 @@
         "reason": { "type": "string", "minLength": 1 }
       }
     },
-    "imported_component": {
+    "catalog_bound_module": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["module_id", "module_name", "catalog_id", "package_name", "import_path", "callable_name"],
+      "required": ["module_id", "module_name", "catalog_id", "catalog_name", "component_source"],
       "properties": {
         "module_id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
         "module_name": { "type": "string", "minLength": 1 },
         "catalog_id": { "type": "string", "minLength": 1 },
-        "package_name": { "type": "string", "minLength": 1 },
-        "package_version": { "type": "string", "minLength": 1 },
-        "import_path": { "type": "string", "minLength": 1 },
-        "callable_name": { "type": "string", "minLength": 1 }
+        "catalog_name": { "type": "string", "minLength": 1 },
+        "component_source": { "type": "string", "enum": ["mcp", "stub"] }
       }
     },
     "new_code_required": {

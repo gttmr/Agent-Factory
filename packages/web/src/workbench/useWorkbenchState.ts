@@ -29,8 +29,6 @@ export type StepId =
   | "modules"
   | "graph"
   | "a2aContracts"
-  | "reuse"
-  | "domainMap"
   | "catalog"
   | "saved"
   | "export";
@@ -55,8 +53,6 @@ export const workbenchSteps: StepDefinition[] = [
   { id: "modules", label: "모듈 검토", group: "review" },
   { id: "graph", label: "Graph IR", group: "review" },
   { id: "a2aContracts", label: "Remote A2A 계약", group: "review" },
-  { id: "reuse", label: "재사용 히트맵", group: "assets" },
-  { id: "domainMap", label: "도메인 맵", group: "assets" },
   { id: "catalog", label: "카탈로그", group: "assets", alwaysAvailable: true },
   { id: "saved", label: "저장된 분석", group: "assets", alwaysAvailable: true },
   { id: "export", label: "ADK 소스 생성", group: "generate" }
@@ -374,10 +370,6 @@ function buildCatalogReferences(entries: CatalogEntry[]): CatalogReference[] {
       mcp_schema_ref: entry.mcp_schema_ref ?? null,
       mcp_auth_mode: entry.mcp_auth_mode ?? null,
       component_source: entry.component_source ?? null,
-      package_name: entry.package_name ?? null,
-      package_version: entry.package_version ?? null,
-      import_path: entry.import_path ?? null,
-      callable_name: entry.callable_name ?? null,
       owner_domain: entry.owner_domain ?? null,
       status: entry.status ?? null,
       responsibility: entry.responsibility ?? null,

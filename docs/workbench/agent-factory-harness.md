@@ -4,9 +4,9 @@ This document is the project-specific operating harness for Agent Factory work. 
 
 ## Purpose
 
-Agent Factory should turn vague requirements into reviewed, reusable planning artifacts before any scaffold or implementation step begins.
+Agent Factory should turn vague requirements into reviewed, reusable planning artifacts before any implementation step begins.
 
-The goal is repeatable agent delivery, not one-off code generation. Coding agents working in this repository must preserve a controlled pipeline:
+The goal is repeatable agent design review, not one-off code generation. Coding agents working in this repository must preserve a controlled pipeline:
 
 ```text
 raw requirement
@@ -14,16 +14,15 @@ raw requirement
   -> evidence and missing-information review
   -> module candidates
   -> workflow/process flow
-  -> reuse/domain review
-  -> approved scaffold plan
-  -> implementation handoff
+  -> catalog reuse and registration review
+  -> reviewed catalog and Graph IR decisions
 ```
 
 Raw requirements must not directly generate code.
 
 ## Classification first
 
-Before building or scaffolding, classify each requested capability into the active taxonomy.
+Before building implementation plans, classify each requested capability into the active taxonomy.
 
 Top-level categories:
 
@@ -54,9 +53,9 @@ A Remote A2A candidate must include:
 
 If those fields are unknown, mark the candidate as needing review instead of inventing them.
 
-## Scaffold gate
+## Deferred scaffold gate
 
-Scaffolding must consume only approved artifacts:
+Scaffold export is not part of the current product phase. If it is reintroduced later, scaffolding must consume only approved artifacts:
 
 - `scaffold-plan.json`
 - `implementation-handoff.md`
@@ -69,7 +68,7 @@ Do not scaffold directly from:
 - missing Remote A2A contract details
 - private or organization-specific runtime assumptions
 
-A scaffold plan should make boundaries explicit before code exists.
+A scaffold plan should make boundaries explicit before code exists. Until that phase is approved, scaffold-plan files in this repository are validation fixtures, not active export targets.
 
 ## Required artifact posture
 
@@ -82,10 +81,10 @@ Expected artifact families:
 - missing-information records
 - module candidates with category and subtype
 - process flow nodes and edges
-- reuse/domain capability mapping
+- catalog reuse decisions and registration changes
 - risk gates
-- scaffold plan
-- implementation handoff
+- catalog change decisions
+- deferred scaffold-plan fixture when schema work touches it
 - validation output
 - decision notes when taxonomy or boundary choices change
 
@@ -99,7 +98,7 @@ Good assistant tasks:
 - extract capabilities
 - classify module candidates
 - draft adapter, agent, workflow, and Remote A2A specs
-- generate scaffold-plan artifacts
+- maintain scaffold-plan validation fixtures when schema work touches them
 - generate validation cases
 - update catalogs and documentation
 - produce review checklists
@@ -120,7 +119,7 @@ Active source-of-truth areas:
 - `packages/web`: live workbench UI and analyzer flow
 - `schemas`: artifact contracts
 - `catalog`: reusable capability, domain-owner, and risk-gate catalogs
-- `templates`: artifact templates and scaffold-plan template
+- `templates`: reviewed artifact templates and deferred scaffold-plan fixtures
 - `docs/workbench`: active operating guidance
 - `docs/visualization`: visual design and graph/display guidance
 
@@ -128,7 +127,7 @@ Archive material under `docs/archive` is historical. Do not revive old taxonomy 
 
 ## Verification expectations
 
-After TypeScript, React, analyzer, export, schema, or validator changes, run the relevant verification.
+After TypeScript, React, analyzer, schema, or validator changes, run the relevant verification.
 
 Minimum build check for web changes:
 
@@ -155,6 +154,6 @@ Work is done only if:
 - subtype fields are present where required
 - Remote A2A remains high-friction and contract-backed
 - schemas, validator, analyzer types, and UI labels remain aligned when any enum changes
-- generated/exported artifacts pass validation where applicable
+- review artifacts and deferred fixtures pass validation where applicable
 - changed UI behavior is visually checked when applicable
 - no private banking data, credentials, endpoints, deployment scripts, or organization-specific runtime code were added

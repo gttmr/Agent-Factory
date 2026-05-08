@@ -1,12 +1,10 @@
 import { A2AContractReview } from "./components/A2AContractReview";
 import { AnalysisResult } from "./components/AnalysisResult";
 import { CatalogManager } from "./components/CatalogManager";
-import { DomainCapabilityMap } from "./components/DomainCapabilityMap";
 import { AdkRuntimeWorkbench } from "./components/AdkRuntimeWorkbench";
 import { ModuleReview } from "./components/ModuleReview";
 import { GraphCanvas } from "./components/GraphCanvas";
 import { RequirementIntake, RequirementIntakeContext } from "./components/RequirementIntake";
-import { ReuseHeatmap } from "./components/ReuseHeatmap";
 import { SavedAnalyses } from "./components/SavedAnalyses";
 import { MetricPill, Panel, SectionHeader } from "./ui/primitives";
 import { WorkbenchShell } from "./ui/WorkbenchShell";
@@ -93,7 +91,7 @@ export default function App() {
           moduleCandidates={state.moduleCandidates}
           a2aContracts={a2aContracts}
           onNavigateToA2AContracts={hasA2AReviewStep ? () => actions.setActiveStep("a2aContracts") : undefined}
-          onContinue={() => actions.setActiveStep(hasA2AReviewStep ? "a2aContracts" : "reuse")}
+          onContinue={() => actions.setActiveStep(hasA2AReviewStep ? "a2aContracts" : "catalog")}
         />
       );
     }
@@ -104,17 +102,9 @@ export default function App() {
           contracts={a2aContracts}
           moduleCandidates={state.moduleCandidates}
           onContractsChange={actions.setA2AContracts}
-          onContinue={() => actions.setActiveStep("reuse")}
+          onContinue={() => actions.setActiveStep("catalog")}
         />
       );
-    }
-
-    if (state.activeStep === "reuse" && state.analysis) {
-      return <ReuseHeatmap moduleCandidates={state.moduleCandidates} onContinue={() => actions.setActiveStep("domainMap")} />;
-    }
-
-    if (state.activeStep === "domainMap" && state.analysis) {
-      return <DomainCapabilityMap moduleCandidates={state.moduleCandidates} onContinue={() => actions.setActiveStep("catalog")} />;
     }
 
     if (state.activeStep === "catalog") {

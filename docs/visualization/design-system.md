@@ -4,7 +4,7 @@
 
 ## 디자인 원칙
 
-- **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Process Flow, Reuse Heatmap, Domain × Capability Map)이 동일 매핑을 사용한다.
+- **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Graph IR, Catalog, A2A Contract Review)이 동일 매핑을 사용한다.
 - **특수 흐름은 시각적으로 부각한다.** `process-flow.md`에서 정의한 fan-out/fan-in, loop, human input, branch marker는 텍스트 라벨만 두지 말고 stage marker와 점선 박스로 표시한다.
 - **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, stage 사이 connector 화살표와 데이터 라벨 chip 으로 통합한다.
 - **Workbench 는 운영 콘솔이다.** 첫 화면은 marketing hero가 아니라 개발리더가 상태, 다음 단계, 작업면, context를 바로 읽는 Ops console이어야 한다.
@@ -15,7 +15,7 @@
 `packages/web/src/ui/WorkbenchShell.tsx`가 workbench의 기본 골격이다.
 
 - 상단: `Agent Factory` 이름과 분석 상태 요약.
-- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다.
+- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다. `생성`은 현 UI에 남아 있는 실험적 generator 영역이며 현재 roadmap의 scaffold export 단계는 아니다.
 - 중앙: 현재 단계의 주 작업면.
 - 우측: 현재 단계 context 또는 inspector. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
 
@@ -46,7 +46,7 @@
 - `App.tsx`는 상태를 직접 조립하지 않고 shell과 화면 component를 연결한다.
 
 새 기능을 추가할 때는 먼저 reducer action과 step availability를 정의한 뒤 화면 component를 연결한다.
-저장된 분석과 scaffold 생성의 기존 artifact shape는 UI refactor 때문에 바꾸지 않는다.
+저장된 분석과 deferred scaffold fixture의 artifact shape는 UI refactor 때문에 바꾸지 않는다.
 
 ## 색 토큰
 
@@ -177,5 +177,5 @@ stage 순서, marker 판정, edge 의미는 `docs/workbench/process-flow.md`의 
 ## 검증
 
 - `npm run build` (tsc + vite build) 통과
-- Process Flow / Module Review / Reuse Heatmap / Domain Map 네 화면에서 카테고리 색이 동일한지 시각 확인
+- Module Review / Graph IR / Catalog / A2A Contract Review에서 카테고리 색이 동일한지 시각 확인
 - `before/after` 스크린샷이 필요할 때는 dev 서버 + chrome-devtools MCP 의 `take_screenshot` 으로 캡처

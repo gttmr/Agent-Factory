@@ -1,7 +1,7 @@
 # Module Review Board
 
 Module Review Board는 개발 리더가 분석 결과를 승인 가능한 설계 artifact로 바꾸는 결정 표면이다.
-이 화면의 결정이 Process Flow, Reuse Heatmap, Domain Capability Map, export artifact의 기준이 된다.
+이 화면의 결정이 Process Flow와 Catalog review의 기준이 된다.
 
 ## 행 단위 의미
 
@@ -28,7 +28,7 @@ Subtype은 `module_category`에 맞는 한 필드만 의미를 갖는다.
 
 허용 값은 네 개뿐이다.
 
-- `approved`: downstream export에 포함할 수 있다.
+- `approved`: Graph/Catalog review의 기준 후보로 포함할 수 있다.
 - `deferred`: 판단은 유효하지만 이번 범위에서 보류한다.
 - `rejected`: 후보로 쓰지 않는다.
 - `needs_info`: 승인 전 추가 정보가 필요하다.

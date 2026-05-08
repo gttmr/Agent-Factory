@@ -16,9 +16,9 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 5. [Review Board](./workbench/review-board.md)
    개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다.
 6. [Validation](./workbench/validation.md)
-   export artifact, ADK source 생성, 문서 구조를 검증하는 기준이다.
+   review artifact, schema, 문서 구조를 검증하는 기준이다.
 7. [Agent Factory Harness](./workbench/agent-factory-harness.md)
-   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, scaffold gate, 검증 기준을 정의한다.
+   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, 검증 기준을 정의한다.
 
 ## 보조 참조
 
@@ -32,8 +32,6 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 ## 시각화 참조
 
 - [Design system](./visualization/design-system.md)
-- [Reuse Heatmap](./visualization/reuse-heatmap.md)
-- [Domain Capability Map](./visualization/domain-capability-map.md)
 
 ## Archive
 

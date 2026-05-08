@@ -34,7 +34,7 @@ export function buildAdkSourceBundle(input: AdkSourceBundleInput): AdkSourceBund
   });
   const packageName = graphIr.packageName;
   const manifest = buildManifest(input, graphIr);
-  const requirements = buildRequirements(input.scaffoldPlan);
+  const requirements = buildRequirements();
 
   const files: Record<string, string> = {
     [`${packageName}/__init__.py`]: "from .agent import root_agent\n",
@@ -66,7 +66,6 @@ function buildAgentPy(input: AdkSourceBundleInput, graphIr: AdkGraphIr): string 
   const activeNodes = graphIr.nodes.filter((node) => node.activeInGraph && node.nodeKind !== "output");
   const edgeRows = buildEdgeRows(graphIr);
   const scaffoldModuleById = new Map(input.scaffoldPlan.modules.map((module) => [module.id, module]));
-  const importedComponents = buildPythonImports(input.scaffoldPlan);
   const nodeFunctions = activeNodes.map((node) => buildNodeFunction(node, scaffoldModuleById.get(node.id))).join("\n\n");
   const manifestSummary = {
     requirement_id: input.normalizedRequirement.id,
@@ -86,7 +85,6 @@ from typing import Any
 from google.adk import Event, Workflow
 from google.adk.events import RequestInput
 from google.adk.workflow import JoinNode
-${importedComponents ? `\n${importedComponents}` : ""}
 
 
 WORKFLOW_MANIFEST = ${toPythonLiteral(manifestSummary)}
@@ -185,27 +183,6 @@ function buildNodeFunction(node: AdkGraphNode, scaffoldModule: ScaffoldPlanModul
     return Event(output=output)`;
   }
 
-  if (scaffoldModule?.import_contract) {
-    const componentName = componentAlias(scaffoldModule);
-    return `def ${node.functionName}(node_input: Any = None):
-    """Shared component wrapper generated from scaffold-plan import contract."""
-    contract = _component_contract("${scaffoldModule.id}")
-    output = _event_output("${node.id}", "${escapePythonString(node.label)}", "event_output", node_input)
-    output["catalog_binding"] = contract["catalog_binding"]
-    output["developer_todos"] = contract["developer_todos"]
-    # TODO: map node_input into contract["inputs"] before calling the shared component.
-    try:
-        component_result = ${componentName}(node_input)
-    except Exception as exc:
-        output["status"] = "component_call_failed"
-        output["error"] = str(exc)
-        return Event(output=output)
-    # TODO: validate component_result against contract["outputs"] before downstream routing.
-    output["status"] = "imported_component_wrapper"
-    output["component_result"] = component_result
-    return Event(output=output)`;
-  }
-
   if (scaffoldModule) {
     const todoFunctionName = todoImplementationFunctionName(scaffoldModule);
     return `def ${todoFunctionName}(node_input: Any = None):
@@ -278,7 +255,7 @@ function buildManifest(input: AdkSourceBundleInput, graphIr: AdkGraphIr) {
       approved_module_count: input.scaffoldPlan.modules.length,
       excluded_modules: input.scaffoldPlan.excluded_modules
     },
-    imported_components: input.scaffoldPlan.manifest.imported_components,
+    catalog_bound_modules: input.scaffoldPlan.manifest.catalog_bound_modules,
     new_code_required: input.scaffoldPlan.manifest.new_code_required,
     nodes: graphIr.nodes.map((node) => ({
       id: node.id,
@@ -291,7 +268,6 @@ function buildManifest(input: AdkSourceBundleInput, graphIr: AdkGraphIr) {
       review_status: node.candidate?.status ?? null,
       risk_level: node.candidate?.risk_level ?? null,
       catalog_binding: scaffoldModuleById.get(node.id)?.catalog_binding ?? null,
-      import_contract: scaffoldModuleById.get(node.id)?.import_contract ?? null,
       developer_todos: scaffoldModuleById.get(node.id)?.developer_todos ?? []
     })),
     graph_ir: {
@@ -328,13 +304,13 @@ def test_manifest_has_runtime_guardrails():
     assert '"generated_business_logic": false' in manifest
     assert '"private_data_or_endpoints": false' in manifest
     assert '"graph_ir"' in manifest
-    assert '"imported_components"' in manifest
+    assert '"catalog_bound_modules"' in manifest
     assert '"new_code_required"' in manifest
 
 
 def test_agent_source_marks_developer_todo_boundaries():
     source = (ROOT / "${packageName}" / "agent.py").read_text(encoding="utf-8")
-    assert "TODO_IMPLEMENT_HERE" in source or "imported_component_wrapper" in source
+    assert "TODO_IMPLEMENT_HERE" in source
 `;
 }
 
@@ -375,7 +351,7 @@ adk web --port 8000 --host 127.0.0.1
 Open http://127.0.0.1:8000, select \`${graphIr.packageName}\`, run a sample message, then inspect session state and event history in the ADK web interface.
 
 The generated nodes preserve the reviewed workflow topology, Graph IR edge kinds, route metadata, and safety guardrails without adding private system calls or domain business logic.
-Approved modules with catalog package contracts are imported as shared components. Approved modules without package contracts are emitted as \`TODO_IMPLEMENT_HERE\` boundaries and listed in \`workflow_manifest.json\`.
+Approved modules are emitted as \`TODO_IMPLEMENT_HERE\` boundaries. Catalog bindings are recorded in \`workflow_manifest.json\`, but no Python package import contract is generated.
 
 ## Graph IR
 
@@ -410,26 +386,8 @@ function scaffoldModuleToCandidate(module: ScaffoldPlanModule): ModuleCandidate 
   };
 }
 
-function buildRequirements(scaffoldPlan: ScaffoldPlan): string {
-  const requirements = ["--pre", "google-adk", "pytest"];
-  const packageRequirements = new Set(
-    scaffoldPlan.modules.flatMap((module) => {
-      const contract = module.import_contract;
-      if (!contract) return [];
-      return [contract.package_version ? `${contract.package_name}==${contract.package_version}` : contract.package_name];
-    })
-  );
-  return `${[...requirements, ...packageRequirements].join("\n")}\n`;
-}
-
-function buildPythonImports(scaffoldPlan: ScaffoldPlan): string {
-  return scaffoldPlan.modules
-    .filter((module) => module.import_contract)
-    .map((module) => {
-      const contract = module.import_contract!;
-      return `from ${contract.import_path} import ${contract.callable_name} as ${componentAlias(module)}`;
-    })
-    .join("\n");
+function buildRequirements(): string {
+  return `${["--pre", "google-adk", "pytest"].join("\n")}\n`;
 }
 
 function buildComponentContracts(scaffoldPlan: ScaffoldPlan) {
@@ -438,7 +396,6 @@ function buildComponentContracts(scaffoldPlan: ScaffoldPlan) {
       module.id,
       {
         catalog_binding: module.catalog_binding ?? null,
-        import_contract: module.import_contract ?? null,
         developer_todos: module.developer_todos,
         inputs: module.inputs,
         outputs: module.outputs,
@@ -446,10 +403,6 @@ function buildComponentContracts(scaffoldPlan: ScaffoldPlan) {
       }
     ])
   );
-}
-
-function componentAlias(module: ScaffoldPlanModule): string {
-  return `component_${toPythonIdentifier(module.id)}`;
 }
 
 function todoImplementationFunctionName(module: ScaffoldPlanModule): string {

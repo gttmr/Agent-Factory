@@ -455,10 +455,6 @@ interface SanitizedCatalogEntry {
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
   component_source?: string;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   owner_domain?: string;
   status?: string;
   responsibility?: string;
@@ -507,10 +503,6 @@ function sanitizeCatalogPayload(value: unknown): SanitizedCatalogEntry[] {
       mcp_schema_ref: stringField(item, "mcp_schema_ref", 160),
       mcp_auth_mode: stringField(item, "mcp_auth_mode", 80),
       component_source: stringField(item, "component_source", 40),
-      package_name: stringField(item, "package_name", 120),
-      package_version: stringField(item, "package_version", 80),
-      import_path: stringField(item, "import_path", 160),
-      callable_name: stringField(item, "callable_name", 120),
       owner_domain: stringField(item, "owner_domain", 120),
       status: stringField(item, "status", 80),
       responsibility: stringField(item, "responsibility", 320),
@@ -639,7 +631,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
       "- Copy the catalog inputs and outputs onto a reused candidate unless the requirement narrows them; explain any narrowing in rationale or missing_information.",
       "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information.",
       "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name / mcp_schema_ref / mcp_auth_mode; copy them onto the candidate exactly. Do not invent server or tool names.",
-      "- Catalog entries may also include component_source, package_name, package_version, import_path, and callable_name. Preserve the catalog name on reused candidates so scaffold-plan generation can bind the approved module back to that package import contract.",
+      "- Catalog entries describe reusable reviewed specs, not Python package imports. Preserve the catalog name on reused candidates so scaffold-plan generation can record the catalog binding and still emit a TODO/stub runtime boundary.",
       "- For partial matches, still emit a candidate but flag the gap in missing_information (e.g. owner mismatch, narrower scope).",
       "- Do not duplicate a catalog entry as a separate new candidate — collapse it into the matching reuse candidate.",
       "- Never fabricate catalog entries that are not in this list.",
