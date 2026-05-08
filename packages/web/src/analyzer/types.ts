@@ -60,6 +60,104 @@ export const codexAnalyzerModels = [
   "gpt-5.3-codex-spark"
 ] as const;
 
+// A2A 1.0/latest contract enumerations.
+// These constants are the single source of truth for the validator and UI.
+export const A2A_OPERATION_NAMES = [
+  "SendMessage",
+  "SendStreamingMessage",
+  "GetTask",
+  "SubscribeToTask",
+  "CancelTask",
+  "ListTasks"
+] as const;
+
+export const A2A_HTTP_PATHS = [
+  "/message:send",
+  "/message:stream",
+  "/tasks/{id}",
+  "/tasks/{id}:subscribe",
+  "/tasks/{id}:cancel"
+] as const;
+
+export const A2A_TASK_STATES = [
+  "TASK_STATE_SUBMITTED",
+  "TASK_STATE_WORKING",
+  "TASK_STATE_INPUT_REQUIRED",
+  "TASK_STATE_AUTH_REQUIRED",
+  "TASK_STATE_COMPLETED",
+  "TASK_STATE_FAILED",
+  "TASK_STATE_CANCELED",
+  "TASK_STATE_REJECTED"
+] as const;
+
+export const A2A_PART_FIELDS = ["text", "raw", "url", "data"] as const;
+
+export const A2A_ROLES = ["ROLE_USER", "ROLE_AGENT"] as const;
+
+export const A2A_STREAM_WRAPPERS = ["task", "message", "taskStatusUpdate", "taskArtifactUpdate"] as const;
+
+export const A2A_CONTRACT_STATUSES = ["draft", "needs_info", "approved"] as const;
+
+// Stale terminology that must not appear inside a serialized contract object.
+// Per spec §5 last paragraph: old slash-form ops, legacy request wrapper names,
+// lowercase task states, bare task states without TASK_STATE_ prefix, removed
+// terminal stream markers, removed stream discriminators, old concrete Part
+// class names, and `file` as a Part content field.
+export const A2A_STALE_NAMES = [
+  // old slash-form operation names
+  "tasks/send",
+  "tasks/sendSubscribe",
+  "tasks/get",
+  "tasks/cancel",
+  "tasks/pushNotification/set",
+  "tasks/pushNotification/get",
+  "tasks/resubscribe",
+  "tasks/list",
+  // legacy request wrapper names
+  "SendTaskRequest",
+  "SendTaskResponse",
+  "SendTaskStreamingRequest",
+  "SendTaskStreamingResponse",
+  "GetTaskRequest",
+  "GetTaskResponse",
+  "CancelTaskRequest",
+  "CancelTaskResponse",
+  "TaskSendParams",
+  "TaskQueryParams",
+  "TaskIdParams",
+  // lowercase task-state words
+  "submitted",
+  "working",
+  "input-required",
+  "completed",
+  "failed",
+  "canceled",
+  "rejected",
+  "auth-required",
+  // bare task states without TASK_STATE_ prefix
+  "SUBMITTED",
+  "WORKING",
+  "INPUT_REQUIRED",
+  "AUTH_REQUIRED",
+  "COMPLETED",
+  "FAILED",
+  "CANCELED",
+  "REJECTED",
+  // removed terminal stream markers
+  "final",
+  "TaskStatusUpdateEvent",
+  "TaskArtifactUpdateEvent",
+  // removed stream discriminators
+  "isFinal",
+  "lastChunk",
+  // old concrete Part class names
+  "TextPart",
+  "FilePart",
+  "DataPart",
+  // `file` as a Part content field
+  "file"
+] as const;
+
 export type ModuleCategory = (typeof moduleCategories)[number];
 export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
@@ -72,6 +170,15 @@ export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
 export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
 export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
+
+export type A2AOperationName = (typeof A2A_OPERATION_NAMES)[number];
+export type A2AHttpPath = (typeof A2A_HTTP_PATHS)[number];
+export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
+export type TaskState = A2ATaskState;
+export type A2APartField = (typeof A2A_PART_FIELDS)[number];
+export type A2ARole = (typeof A2A_ROLES)[number];
+export type A2AStreamWrapper = (typeof A2A_STREAM_WRAPPERS)[number];
+export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
 
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
@@ -179,7 +286,81 @@ export interface ModuleCandidate {
   fallback?: string;
   audit?: string;
   data_policy?: string;
+  /**
+   * For remote_a2a candidates this links 1:1 to an A2AContract by contract_id.
+   * Required at validator time when module_category === "remote_a2a"; null or
+   * undefined for non-remote candidates.
+   */
+  a2a_contract_id?: string | null;
   developer_todos?: string[];
+}
+
+/**
+ * A2A 1.0/latest interaction contract for a single remote_a2a candidate.
+ * Spec §5. String fields use the runtime convention that the literal
+ * "needs_info" is a placeholder satisfying presence but flagged for review.
+ */
+export interface A2AContract {
+  /** Pattern: a2a-NNN. */
+  contract_id: string;
+  /** Must reference an existing remote_a2a ModuleCandidate id. */
+  remote_module_id: string;
+  target_agent_name: string;
+  target_agent_purpose: string;
+  contract_status: A2AContractStatus;
+  agent_card: {
+    discovery_method: string;
+    agent_card_url: string;
+    version: string;
+    notes: string;
+  };
+  supported_interfaces: Array<{
+    url: string;
+    protocol_binding: string;
+    protocol_version: string;
+    tenant_policy: string;
+  }>;
+  input_modes: string[];
+  output_modes: string[];
+  security_schemes: Array<{ name: string; scheme: string }>;
+  security_requirements: Array<{ scheme_name: string; scopes: string[] }>;
+  skills: string[];
+  extensions: string[];
+  message_contract: {
+    allowed_part_fields: A2APartField[];
+    allowed_roles: A2ARole[];
+  };
+  task_lifecycle: {
+    states: TaskState[];
+    allowed_transitions: Array<{ from: TaskState; to: TaskState }>;
+    terminal_states: TaskState[];
+    input_required_followup: string;
+    auth_required_followup: string;
+  };
+  streaming: {
+    supported: boolean;
+    wrappers: A2AStreamWrapper[];
+    non_streaming_fallback: string;
+  };
+  operations: A2AOperationName[];
+  http_paths: A2AHttpPath[];
+  artifact_contract: {
+    mutation_rules: string;
+    chunking_policy: string;
+  };
+  adk_host_mapping: string;
+  timeout: string;
+  retry: string;
+  fallback: string;
+  cancellation: string;
+  unsupported_operation: string;
+  get_task_fallback: string;
+  /** Spec §5 explicitly allows null when no push notification policy is required. */
+  push_notification_policy: string | null;
+  auth: string;
+  token_handling: string;
+  audit: string;
+  data_policy: string;
 }
 
 export interface CatalogBinding {
@@ -251,6 +432,198 @@ export interface ScaffoldPlan {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ADK 2.0 Graph IR — replaces the legacy stage-based ProcessFlow.
+//
+// `ProcessFlow`, `FlowNode`, `FlowEdge` are kept as type aliases so existing
+// imports keep compiling during the staged rollout. The legacy field names
+// (`type`, `edge_type`, `data`, `data_channel`, `subtype`, `state_key`,
+// `artifact_key`, `schema_ref`, `route_condition`) are preserved as optional
+// mirror fields on `GraphNode`/`GraphEdge` so consumers that still read those
+// names type-check unchanged. Phase 3 of the directive purges those readers.
+// ---------------------------------------------------------------------------
+
+export const GRAPH_NODE_KINDS = [
+  "input",
+  "output",
+  "agent",
+  "function",
+  "tool",
+  "adapter",
+  "human_input",
+  "workflow",
+  "remote_a2a",
+  "join",
+  "router",
+  "loop_control"
+] as const;
+
+export const GRAPH_CONTAINER_KINDS = [
+  "graph_workflow",
+  "dynamic_workflow",
+  "parallel_region",
+  "loop_region",
+  "human_review_region",
+  "remote_boundary"
+] as const;
+
+export const GRAPH_EDGE_KINDS = [
+  "event_output",
+  "event_message",
+  "session_state",
+  "temp_state",
+  "user_state",
+  "app_state",
+  "artifact",
+  "route",
+  "control",
+  "remote_a2a"
+] as const;
+
+export const GRAPH_LANE_IDS = [
+  "input",
+  "local_graph",
+  "adapter",
+  "human_input",
+  "output",
+  "remote_boundary"
+] as const;
+
+export const GRAPH_LAYOUT_POLICIES = [
+  "dag_with_routes",
+  "fan_out_fan_in",
+  "loop",
+  "linear",
+  "free"
+] as const;
+
+export const GRAPH_EXECUTION_SEMANTICS = [
+  "normal_transition",
+  "fan_out",
+  "fan_in",
+  "loop_back",
+  "loop_exit",
+  "conditional",
+  "boundary_crossing"
+] as const;
+
+export type NodeKind = (typeof GRAPH_NODE_KINDS)[number];
+export type ContainerKind = (typeof GRAPH_CONTAINER_KINDS)[number];
+export type EdgeKind = (typeof GRAPH_EDGE_KINDS)[number];
+export type LaneId = (typeof GRAPH_LANE_IDS)[number];
+export type LayoutPolicy = (typeof GRAPH_LAYOUT_POLICIES)[number];
+export type ExecutionSemantics = (typeof GRAPH_EXECUTION_SEMANTICS)[number];
+export type OwnerScope = "local" | "remote" | "external";
+
+export interface GraphPort {
+  id: string;
+  label: string;
+  schema_ref: string | null;
+}
+
+export interface GraphValidationIssue {
+  code: string;
+  message: string;
+  target_kind: "node" | "edge" | "container" | "graph";
+  target_id: string | null;
+}
+
+export interface GraphValidation {
+  ok: boolean;
+  errors: GraphValidationIssue[];
+  warnings: GraphValidationIssue[];
+}
+
+export interface GraphLane {
+  id: LaneId;
+  label: string;
+}
+
+export interface GraphContainer {
+  id: string;
+  module_id: string | null;
+  label: string;
+  container_kind: ContainerKind;
+  adk_mapping: string | null;
+  contains_node_ids: string[];
+  entry_node_ids: string[];
+  exit_node_ids: string[];
+  layout_policy: LayoutPolicy;
+  parent_container_id: string | null;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  // Marked optional in TS only — JSON schema + validator require these on
+  // every emitted graph. Loosened so legacy-shaped node literals constructed
+  // by pre-Phase-2 code keep type-checking during the rollout.
+  module_id?: string | null;
+  node_kind?: NodeKind;
+  execution_kind?: string | null;
+  adk_node_role?: "workflow_node" | "container_root" | "boundary" | "synthetic" | null;
+  owner_scope?: OwnerScope;
+  container_id?: string | null;
+  lane_id?: LaneId | string;
+  input_ports?: GraphPort[];
+  output_ports?: GraphPort[];
+  schema_refs?: string[];
+  review_status?: ModuleStatus | "n/a";
+  // Legacy mirror fields (DEPRECATED — readers purged in Phase 3).
+  // Required at the type level so existing readers (`node.type`, `node.subtype`)
+  // type-check unchanged. Phase 2's migration adapter must populate these for
+  // every emitted graph until Phase 3 deletes the readers.
+  type: FlowNodeType;
+  subtype?: string;
+}
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+  // Marked optional in TS only — JSON schema + validator require these on
+  // every emitted edge. See GraphNode note above.
+  id?: string;
+  from_port?: string | null;
+  to_port?: string | null;
+  edge_kind?: EdgeKind;
+  execution_semantics?: ExecutionSemantics;
+  data_label?: string;
+  schema_ref?: string | null;
+  route_condition?: string | null;
+  state_key?: string | null;
+  artifact_key?: string | null;
+  a2a_contract_id?: string | null;
+  is_remote_boundary_crossing?: boolean;
+  // Legacy mirror fields (DEPRECATED — readers purged in Phase 3).
+  // Required at the type level so existing readers (`edge.data`,
+  // `edge.edge_type`, `edge.data_channel`) type-check unchanged.
+  edge_type: FlowEdgeType;
+  data: string;
+  data_channel?: FlowDataChannel;
+}
+
+export interface GraphIR {
+  requirement_id: string;
+  // Required by the runtime validator and JSON schema. Marked optional in TS
+  // only so legacy construction sites (e.g. the temporary localFlow filter in
+  // ProcessFlowView) keep compiling during the staged rollout. Phase 4 makes
+  // these strictly required at the type level.
+  graph_id?: string;
+  root_workflow_module_id?: string | null;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  containers?: GraphContainer[];
+  lanes?: GraphLane[];
+  validation?: GraphValidation;
+}
+
+// Legacy aliases. Do not introduce new code that consumes these names — use
+// GraphIR / GraphNode / GraphEdge directly.
+export type ProcessFlow = GraphIR;
+export type FlowNode = GraphNode;
+export type FlowEdge = GraphEdge;
+// Legacy narrow enums — kept for the existing exhaustive Record<…, string>
+// tables in ProcessFlowView.tsx and adkSource.ts. Phase 3 deletes these.
 export type FlowNodeType = "input" | "output" | ModuleCategory;
 export type FlowEdgeType = "local" | "remote_a2a";
 export type FlowDataChannel =
@@ -264,31 +637,6 @@ export type FlowDataChannel =
   | "route"
   | "control"
   | "unknown";
-
-export interface FlowNode {
-  id: string;
-  label: string;
-  type: FlowNodeType;
-  subtype?: string;
-}
-
-export interface FlowEdge {
-  from: string;
-  to: string;
-  data: string;
-  edge_type: FlowEdgeType;
-  data_channel?: FlowDataChannel;
-  state_key?: string | null;
-  artifact_key?: string | null;
-  schema_ref?: string | null;
-  route_condition?: string | null;
-}
-
-export interface ProcessFlow {
-  requirement_id: string;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
 
 export interface ClassificationSummary {
   module_id: string;
@@ -333,6 +681,12 @@ export interface AnalysisResult {
   normalizedRequirement: NormalizedRequirement;
   evidence: EvidenceSummary;
   moduleCandidates: ModuleCandidate[];
+  /**
+   * A2A 1.0 contracts for remote_a2a candidates. Always present; empty array
+   * when no remote_a2a candidates exist. 1:1 pairing with remote candidates
+   * is enforced by the validator.
+   */
+  a2aContracts: A2AContract[];
   processFlow: ProcessFlow;
 }
 

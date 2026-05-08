@@ -3,6 +3,19 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  A2A_HTTP_PATHS,
+  A2A_OPERATION_NAMES,
+  A2A_PART_FIELDS,
+  A2A_ROLES,
+  A2A_STALE_NAMES,
+  A2A_STREAM_WRAPPERS,
+  A2A_TASK_STATES
+} from "../src/analyzer/types";
+import { normalizeA2A } from "../src/analyzer/a2aNormalize";
+import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
+import type { AnalysisResult } from "../src/analyzer/types";
+import { legacyStageToGraphIR, validateGraphIRSoft } from "../src/analyzer/graphMigration";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -185,7 +198,12 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
         }
 
         const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model, catalog });
-        const result = normalizeAnalysisResult(run.output);
+        const baseline = applyGraphIRMigration(normalizeAnalysisResult(run.output));
+        const result = applyA2ANormalization(baseline, {
+          model,
+          timeoutMs: run.timeoutMs,
+          elapsedMs: run.diagnostics.elapsedMs
+        });
         const errors = validateAnalysisResult(result);
         if (errors.length) {
           console.error("[codex-analyzer] 응답 검증 실패:", errors);
@@ -245,7 +263,13 @@ async function runStreamingAnalysis({
       catalog,
       onProgress: writeProgress
     });
-    const result = normalizeAnalysisResult(run.output);
+    const baseline = applyGraphIRMigration(normalizeAnalysisResult(run.output));
+    const result = applyA2ANormalization(baseline, {
+      model,
+      timeoutMs: run.timeoutMs,
+      elapsedMs: run.diagnostics.elapsedMs,
+      onProgress: writeProgress
+    });
     const errors = validateAnalysisResult(result);
     if (errors.length) {
       console.error("[codex-analyzer] 응답 검증 실패:", errors);
@@ -560,15 +584,26 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Use RequirementIntakeInput.domain as the user's selected domain unless rawText clearly contradicts it; record any contradiction in normalizedRequirement.contradictions.",
     "- normalizedRequirement.id = \"req-001\"; every module source_requirement_id = \"req-001\".",
     "- Number module ids sequentially as mod-001, mod-002, mod-003, ... with no gaps.",
-    "- processFlow.requirement_id = \"req-001\".",
-    "- Process flow node ids may reference input field names, module ids, or output field names. Edges must refer to existing node ids.",
-    "- Module node type must equal module_category. Module node subtype should be the active subtype value or null.",
-    "- Edge edge_type must be \"remote_a2a\" iff at least one endpoint is a remote_a2a node; all other edges are local.",
-    "- Every processFlow edge must include data_channel, state_key, artifact_key, schema_ref, and route_condition. Use data_channel values only from event_output, event_message, session_state, temp_state, user_state, app_state, artifact, route, control, unknown. Use null for state_key, artifact_key, schema_ref, and route_condition when not applicable.",
-    "- Ground edge metadata in ADK 2.0 data handling: Event.output is the default node-to-node payload, Event.message is user-facing or human-input text, Event.state is small serializable state, artifacts hold larger/binary named versioned data, route/control represent graph routing or loop/escalation signals.",
-    "- Use state_key only when the edge writes or reads ADK Session/State. Prefix key names deliberately: temp: for invocation-scoped intermediates, user: for user-scoped state, app: for app-scoped state, or no prefix for session state. Use artifact_key only when the edge passes or stores a named artifact. Use route_condition for branch route values or human approval outcomes.",
-    "- Include branch:, parallel:, or loop: prefixes in edge data only when those structures are supported by the requirement.",
+    "",
+    "Process flow output — Graph IR (NOT a stage list):",
+    "- processFlow MUST be a Graph IR object. Required fields: requirement_id (= \"req-001\"), graph_id (pattern graph-NNN, e.g. \"graph-001\"), root_workflow_module_id (the module_id of the outermost workflow node, or null if none), nodes, edges, containers, lanes, validation.",
+    "- DO NOT emit a top-level `stages` field anywhere. The validator rejects it.",
+    "- DO NOT emit legacy node fields `type`/`subtype` or legacy edge fields `edge_type`/`data`/`data_channel` at the top level. New analyzer output must use the Graph IR field names directly. (The server runs a migration pass for backward compat, but new emissions should be native Graph IR.)",
+    "- Allowed node_kind values (12, §6 semantics): input (graph entry), output (graph exit), agent (LLM agent), function (deterministic function), tool (tool / function call), adapter (adapter or legacy bridge), human_input (first-class human-input node — never an LLM agent in disguise), workflow (nested workflow node), remote_a2a (remote A2A boundary node), join (parallel merge), router (explicit routing decision), loop_control (loop continue / exit decision).",
+    "- Allowed container_kind values (6, §7): graph_workflow (root deterministic graph; ADK 2.0 graph workflow), dynamic_workflow (Python-driven dynamic workflow), parallel_region (fan-out → join), loop_region (back edge + exit), human_review_region (human-input pause), remote_boundary (the remote A2A zone). Local execution lives inside graph_workflow (or dynamic_workflow); Remote A2A nodes live in remote_boundary containers OUTSIDE the local container, never nested inside it.",
+    "- Allowed edge_kind values (10, §8/§9): event_output is the default machine-readable payload between nodes; event_message is reserved for user-facing or human-input prompt text; session_state / temp_state / user_state / app_state are only emitted when ADK Session/State persistence is the deliberate design point and require the matching state_key prefix (no prefix for session_state; temp: for temp_state; user: for user_state; app: for app_state); artifact requires a non-null artifact_key; route requires route_condition AND must originate from a router node; control is for retry / cancel / timeout / loop_stop / escalation signals; remote_a2a is only valid on edges crossing into a remote_boundary container, requires is_remote_boundary_crossing=true and a non-null a2a_contract_id.",
+    "- Allowed lane_id values (6): input, local_graph, adapter, human_input, output, remote_boundary. Every node MUST declare a lane_id from this set.",
+    "- Routes need an explicit router node; loops need a loop_region container with exactly one loop_back execution_semantics edge and one loop_exit execution_semantics edge; parallel needs a parallel_region container with ≥2 entry nodes and a join node as the merge exit.",
+    "- Human input must be modeled as node_kind: \"human_input\" (NOT an LLM agent in disguise). Its outbound edge to a router or downstream node is typically event_message or route.",
+    "- module_id rule: synthetic kinds (input, output, join, router, loop_control) MUST set module_id: null. Module-bound kinds (agent, workflow, adapter, remote_a2a) MUST set module_id to the matching candidate id.",
+    "- Every node id is unique within the graph. Every edge id matches ^edge-[0-9]+$ and is unique. Every container id matches ^container-[a-z0-9-]+$.",
+    "- Required validation block: emit { ok: true, errors: [], warnings: [] }. Server-side validation will populate any structural issues — keep self-validation conservative (emit ok:true with empty arrays if you cannot confidently self-validate).",
+    "- Do NOT infer Remote A2A from local complexity (§19). Multi-step local workflow alone is NOT enough to propose a remote_a2a node, edge, or container.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
+    "- Always emit a2aContracts at the top level of the AnalysisResult. Use an empty array when there are no remote_a2a candidates; never omit the key.",
+    "- For every remote_a2a candidate, emit exactly one paired A2AContract object inside a2aContracts. The contract's contract_id must match the pattern a2a-NNN (a2a-001, a2a-002, ... numbered sequentially with no gaps). The candidate's a2a_contract_id must equal that contract_id, and the contract's remote_module_id must equal the candidate's id (e.g. mod-003).",
+    "- When a required A2A contract field cannot be derived from the requirement, set the string field to the literal value \"needs_info\". For arrays only use [] where the schema permits an empty array. For task_lifecycle.states, default to [\"TASK_STATE_SUBMITTED\"]. For streaming.supported, default to false. For streaming.wrappers, default to []. For push_notification_policy, use null when no push policy applies.",
+    "- The candidate-side contract summary fields (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy, a2a_contract_id) must each carry a non-empty string. If unknown, set the field to \"needs_info\" and also append the field name to the candidate's missing_information array.",
     "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
     "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all. Route 2.0 trace/token observability hints into artifacts_events (event/token retention) and callbacks (instrumentation hooks); do not invent new hint keys.",
     "- Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
@@ -582,6 +617,24 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Retrieval and Rule Registry are adapter_kind values, not top-level categories.",
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
+    "",
+    "A2A 1.0/latest vocabulary (use ONLY these names inside any A2AContract object — no other variants):",
+    `- Operation names (operations[]): ${A2A_OPERATION_NAMES.map((name) => `\`${name}\``).join(" | ")}`,
+    `- HTTP+JSON paths (http_paths[]): ${A2A_HTTP_PATHS.map((p) => `\`${p}\``).join(" | ")}`,
+    `- Task states (task_lifecycle.states[], task_lifecycle.terminal_states[], allowed_transitions[]): ${A2A_TASK_STATES.map(
+      (state) => `\`${state}\``
+    ).join(" | ")}`,
+    `- Stream wrappers (streaming.wrappers[]): ${A2A_STREAM_WRAPPERS.map((w) => `\`${w}\``).join(" | ")}`,
+    `- Part content fields (message_contract.allowed_part_fields[]): ${A2A_PART_FIELDS.map(
+      (f) => `\`${f}\``
+    ).join(" | ")} — never \`file\``,
+    `- Roles (message_contract.allowed_roles[]): ${A2A_ROLES.map((r) => `\`${r}\``).join(" | ")}`,
+    "",
+    "A2A terminology denylist — never emit any of these tokens inside an A2AContract object (the validator scans for them and will reject the output):",
+    `- ${A2A_STALE_NAMES.map((name) => `\`${name}\``).join(", ")}`,
+    "  Specifically: do not use slash-form ops (tasks/send, tasks/sendSubscribe, tasks/get, tasks/cancel), legacy request wrapper names (SendTaskRequest, GetTaskRequest, ...), lowercase task-state words (submitted, working, ...), bare task states without TASK_STATE_ prefix (SUBMITTED, WORKING, ...), TextPart/FilePart/DataPart class names, or `file` as a Part content field.",
+    "",
+    "Remote A2A discipline (spec §4) — Remote A2A is high-friction and must not be inferred from multi-step local processing alone. Only classify a candidate as remote_a2a when there is explicit evidence of an independently owned, deployed, discoverable remote agent (separate owner/lifecycle, Agent Card or registry discovery, A2A-specific lifecycle/streaming/artifact semantics, cross-deployment delegation). When such evidence is missing but the requirement otherwise looks remote-shaped, classify the capability as agent/workflow/adapter and append the missing remote details (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy) to missing_information rather than fabricating a Remote A2A boundary.",
     "",
     "Korean prose for human-visible fields; keep engineering terms in English (Agent, Workflow, Adapter, Remote A2A, module_category, adapter_kind, Session/State, placeholder).",
     "Preserve important rawText terms and make rationales specific enough that a reviewer can explain why each module exists."
@@ -1522,6 +1575,113 @@ function normalizeAnalysisResult(value: unknown): unknown {
     };
   }
   return normalized;
+}
+
+interface A2ANormalizationContext {
+  model: string;
+  timeoutMs: number;
+  elapsedMs: number;
+  onProgress?: (event: AnalyzerProgressEvent) => void;
+}
+
+/**
+ * Run the shared A2A normalization pass after the Codex CLI returns and
+ * before the validator runs. Fills missing remote-A2A contract summary
+ * fields with the literal "needs_info", mints a placeholder contract for
+ * any remote_a2a candidate that lacks one, and drops orphan contracts.
+ *
+ * Diagnostics are emitted onto the existing SSE diagnostic channel (when
+ * streaming) so they show up in the live trace panel, and onto console.info
+ * either way so non-streaming callers still get an audit trail. We do not
+ * invent a new event channel — `phase: "diagnostic"` is the same channel the
+ * trace panel already consumes.
+ */
+/**
+ * Migrate a legacy stage-flow `processFlow` (if present) into Graph IR and
+ * run soft structural validation, merging issues into `processFlow.validation`.
+ *
+ * Must NEVER throw — §21 (seven-minute-failure regression rule) requires that
+ * we always return the analyzer result, even if structurally degraded. The UI
+ * then surfaces the validation banner.
+ */
+function applyGraphIRMigration(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const next: Record<string, unknown> = { ...value };
+  try {
+    if (isRecord(next.processFlow)) {
+      const reqId =
+        isRecord(next.normalizedRequirement) && typeof next.normalizedRequirement.id === "string"
+          ? (next.normalizedRequirement.id as string)
+          : "req-001";
+      const migrated = legacyStageToGraphIR(next.processFlow, reqId);
+      const soft = validateGraphIRSoft(migrated);
+      const existing = migrated.validation ?? { ok: true, errors: [], warnings: [] };
+      const mergedValidation = {
+        ok: existing.ok && soft.errors.length === 0,
+        errors: [...(existing.errors ?? []), ...soft.errors],
+        warnings: [...(existing.warnings ?? []), ...soft.warnings]
+      };
+      next.processFlow = { ...migrated, validation: mergedValidation };
+    }
+  } catch (error) {
+    console.warn("[codex-analyzer] graph-ir migration failed (non-fatal):", error);
+  }
+  return next;
+}
+
+function applyA2ANormalization(value: unknown, ctx: A2ANormalizationContext): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  // The shared module is typed against AnalysisResult. The runtime shape
+  // matches by construction (normalizeAnalysisResult preceded us); we cast
+  // through unknown to avoid a structural-assignability impedance mismatch
+  // with `unknown` upstream.
+  const { result, diagnostics } = normalizeA2A(value as unknown as AnalysisResult);
+  if (diagnostics.length > 0) {
+    emitA2ADiagnostics(diagnostics, ctx);
+  }
+  return result;
+}
+
+function emitA2ADiagnostics(diagnostics: A2ANormalizationDiagnostic[], ctx: A2ANormalizationContext) {
+  const at = new Date().toISOString();
+  for (const diag of diagnostics) {
+    console.info("[codex-analyzer] a2a normalization", {
+      kind: diag.kind,
+      subjectId: diag.subjectId,
+      fields: diag.fields,
+      message: diag.message
+    });
+    if (!ctx.onProgress) continue;
+    ctx.onProgress({
+      phase: "diagnostic",
+      message: diag.message,
+      at,
+      elapsedMs: ctx.elapsedMs,
+      model: ctx.model,
+      timeoutMs: ctx.timeoutMs,
+      traceKind: "diagnostic",
+      title: a2aDiagnosticTitle(diag.kind),
+      snippet: diag.fields && diag.fields.length ? diag.fields.join(", ") : undefined,
+      status: "info"
+    });
+  }
+}
+
+function a2aDiagnosticTitle(kind: A2ANormalizationDiagnostic["kind"]): string {
+  switch (kind) {
+    case "candidate_filled":
+      return "A2A 후보 placeholder";
+    case "contract_filled":
+      return "A2A 계약 placeholder";
+    case "contract_minted":
+      return "A2A 계약 자동 생성";
+    case "contract_orphan_removed":
+      return "고아 A2A 계약 제거";
+    default:
+      return "A2A 정규화";
+  }
 }
 
 function normalizeCandidate(candidate: Record<string, unknown>): Record<string, unknown> {

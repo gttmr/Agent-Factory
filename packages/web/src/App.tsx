@@ -1,14 +1,15 @@
 import { useMemo, useRef, useState } from "react";
+import { A2AContractReview } from "./components/A2AContractReview";
 import { AnalysisResult } from "./components/AnalysisResult";
 import { CatalogManager } from "./components/CatalogManager";
 import { DomainCapabilityMap } from "./components/DomainCapabilityMap";
 import { AdkRuntimeWorkbench } from "./components/AdkRuntimeWorkbench";
 import { ModuleReview } from "./components/ModuleReview";
-import { ProcessFlowView } from "./components/ProcessFlowView";
+import { GraphCanvas } from "./components/GraphCanvas";
 import { RequirementIntake } from "./components/RequirementIntake";
 import { ReuseHeatmap } from "./components/ReuseHeatmap";
 import { SavedAnalyses } from "./components/SavedAnalyses";
-import { getExampleRequirement } from "./analyzer/exampleRequirement";
+import { getExampleRequirement, getRemoteA2AExampleRequirement } from "./analyzer/exampleRequirement";
 import { defaultAnalyzerProvider } from "./analyzer/providers";
 import {
   createSavedAnalysisId,
@@ -20,6 +21,7 @@ import {
 import { loadSeedCatalog } from "./catalog/seed";
 import type { CatalogEntry } from "./catalog/types";
 import type {
+  A2AContract,
   AnalysisResult as AnalyzerResult,
   AnalyzerProgressEvent,
   CatalogReference,
@@ -33,7 +35,8 @@ type StepId =
   | "intake"
   | "analysis"
   | "modules"
-  | "flow"
+  | "graph"
+  | "a2aContracts"
   | "reuse"
   | "domainMap"
   | "catalog"
@@ -49,7 +52,8 @@ const steps: Array<{ id: StepId; label: string; alwaysAvailable?: boolean }> = [
   { id: "intake", label: "요구사항 접수", alwaysAvailable: true },
   { id: "analysis", label: "분석 결과" },
   { id: "modules", label: "모듈 검토" },
-  { id: "flow", label: "프로세스 플로우" },
+  { id: "graph", label: "그래프 워크플로우 검토" },
+  { id: "a2aContracts", label: "Remote A2A 계약 검토" },
   { id: "reuse", label: "재사용 히트맵" },
   { id: "domainMap", label: "도메인 맵" },
   { id: "catalog", label: "카탈로그", alwaysAvailable: true },
@@ -74,8 +78,20 @@ export default function App() {
   const [currentSavedId, setCurrentSavedId] = useState<string | null>(null);
 
   const processFlow = analysis?.processFlow ?? null;
+  const a2aContracts = analysis?.a2aContracts ?? [];
+  const hasA2AContracts = a2aContracts.length > 0;
 
   const canReview = analysis !== null;
+
+  const visibleSteps = useMemo(
+    () => steps.filter((step) => (step.id === "a2aContracts" ? hasA2AContracts : true)),
+    [hasA2AContracts]
+  );
+
+  function updateA2AContracts(updated: A2AContract[]) {
+    if (!analysis) return;
+    setAnalysis({ ...analysis, a2aContracts: updated });
+  }
 
   async function runAnalysis() {
     if (analysisRequestInFlight.current) {
@@ -114,6 +130,12 @@ export default function App() {
 
   function loadExample() {
     setInput(getExampleRequirement());
+    setValidationMessage("");
+    setCurrentSavedId(null);
+  }
+
+  function loadRemoteA2AExample() {
+    setInput(getRemoteA2AExampleRequirement());
     setValidationMessage("");
     setCurrentSavedId(null);
   }
@@ -197,7 +219,7 @@ export default function App() {
       </header>
 
       <nav className="stepper" aria-label="워크벤치 단계">
-        {steps.map((step) => (
+        {visibleSteps.map((step) => (
           <button
             key={step.id}
             type="button"
@@ -217,6 +239,7 @@ export default function App() {
             onInputChange={setInput}
             onAnalyze={runAnalysis}
             onLoadExample={loadExample}
+            onLoadRemoteA2AExample={loadRemoteA2AExample}
             onClear={clearAll}
             validationMessage={validationMessage}
             isAnalyzing={isAnalyzing}
@@ -241,14 +264,26 @@ export default function App() {
             moduleCandidates={moduleCandidates}
             catalogEntries={catalogEntries}
             onModuleCandidatesChange={setModuleCandidates}
-            onContinue={() => setActiveStep("flow")}
+            onContinue={() => setActiveStep("graph")}
+            onNavigateToA2AContracts={hasA2AContracts ? () => setActiveStep("a2aContracts") : undefined}
           />
         )}
 
-        {activeStep === "flow" && analysis && processFlow && (
-          <ProcessFlowView
-            processFlow={processFlow}
+        {activeStep === "graph" && analysis && processFlow && (
+          <GraphCanvas
+            graphIR={processFlow}
             moduleCandidates={moduleCandidates}
+            a2aContracts={a2aContracts}
+            onNavigateToA2AContracts={hasA2AContracts ? () => setActiveStep("a2aContracts") : undefined}
+            onContinue={() => setActiveStep(hasA2AContracts ? "a2aContracts" : "reuse")}
+          />
+        )}
+
+        {activeStep === "a2aContracts" && analysis && hasA2AContracts && (
+          <A2AContractReview
+            contracts={a2aContracts}
+            moduleCandidates={moduleCandidates}
+            onContractsChange={updateA2AContracts}
             onContinue={() => setActiveStep("reuse")}
           />
         )}

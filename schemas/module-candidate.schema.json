@@ -195,6 +195,13 @@
     "data_policy": {
       "type": "string",
       "minLength": 1
+    },
+    "a2a_contract_id": {
+      "anyOf": [
+        { "type": "string", "pattern": "^a2a-\\d{3,}$" },
+        { "type": "null" }
+      ],
+      "description": "1:1 link to an A2AContract by contract_id; required for remote_a2a candidates."
     }
   },
   "allOf": [
@@ -249,10 +256,15 @@
           "retry",
           "fallback",
           "audit",
-          "data_policy"
+          "data_policy",
+          "a2a_contract_id"
         ],
         "properties": {
-          "risk_level": { "const": "high" }
+          "risk_level": { "const": "high" },
+          "a2a_contract_id": {
+            "type": "string",
+            "pattern": "^a2a-\\d{3,}$"
+          }
         }
       }
     },

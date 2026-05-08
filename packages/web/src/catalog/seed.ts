@@ -3,6 +3,7 @@ import agentsYaml from "../../../../catalog/agents.yaml?raw";
 import adaptersYaml from "../../../../catalog/adapters.yaml?raw";
 import workflowsYaml from "../../../../catalog/workflows.yaml?raw";
 import remoteA2aYaml from "../../../../catalog/remote-a2a-contracts.yaml?raw";
+import { ensureRuntimeBinding } from "./runtimeBinding";
 import type { CatalogEntry } from "./types";
 
 interface AgentRow {
@@ -182,5 +183,5 @@ export function loadSeedCatalog(): CatalogEntry[] {
     });
   }
 
-  return entries;
+  return entries.map(ensureRuntimeBinding);
 }
