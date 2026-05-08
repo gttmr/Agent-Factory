@@ -179,7 +179,7 @@ export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
-export type ComponentSource = "python_package" | "mcp" | "stub";
+export type ComponentSource = "mcp" | "stub";
 
 export interface FieldSpec {
   name: string;
@@ -365,13 +365,6 @@ export interface CatalogBinding {
   component_source: ComponentSource;
 }
 
-export interface ImportContract {
-  package_name: string;
-  package_version?: string;
-  import_path: string;
-  callable_name: string;
-}
-
 export interface ScaffoldPlanModule {
   id: string;
   name: string;
@@ -383,7 +376,6 @@ export interface ScaffoldPlanModule {
   scaffold_output: string;
   no_runnable_business_logic: true;
   catalog_binding?: CatalogBinding;
-  import_contract?: ImportContract;
   developer_todos: string[];
   inputs: FieldSpec[];
   outputs: FieldSpec[];
@@ -405,14 +397,12 @@ export interface ScaffoldPlan {
   modules: ScaffoldPlanModule[];
   excluded_modules: ExcludedScaffoldModule[];
   manifest: {
-    imported_components: Array<{
+    catalog_bound_modules: Array<{
       module_id: string;
       module_name: string;
       catalog_id: string;
-      package_name: string;
-      package_version?: string;
-      import_path: string;
-      callable_name: string;
+      catalog_name: string;
+      component_source: ComponentSource;
     }>;
     new_code_required: Array<{
       module_id: string;
@@ -617,23 +607,6 @@ export interface CommonizationNotes {
   rejected_reuse: string[];
 }
 
-export interface ReuseHeatmapItem {
-  capability: string;
-  module_category: ModuleCategory;
-  subtype: string | null;
-  reuse_score: number;
-  domains: BankDomain[];
-  candidate_status: ModuleStatus;
-  rationale: string;
-}
-
-export interface DomainCapabilityMapRow {
-  capability: string;
-  module_category: ModuleCategory;
-  subtype: string | null;
-  domains: Record<BankDomain, "낮음" | "중간" | "높음">;
-}
-
 export interface AnalysisResult {
   normalizedRequirement: NormalizedRequirement;
   evidence: EvidenceSummary;
@@ -658,10 +631,6 @@ export interface CatalogReference {
   mcp_schema_ref?: string | null;
   mcp_auth_mode?: string | null;
   component_source?: ComponentSource | null;
-  package_name?: string | null;
-  package_version?: string | null;
-  import_path?: string | null;
-  callable_name?: string | null;
   owner_domain?: string | null;
   status?: string | null;
   responsibility?: string | null;

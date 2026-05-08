@@ -1094,8 +1094,27 @@ td {
   padding: 20px 20px 16px;
 }
 
+.review-console {
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) minmax(320px, 380px);
+  gap: 16px;
+  align-items: start;
+}
+
+.review-table-region {
+  min-width: 0;
+}
+
+.review-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
 .module-table {
-  min-width: 1760px;
+  min-width: 1120px;
   table-layout: fixed;
 }
 
@@ -1136,7 +1155,7 @@ td {
 }
 
 .module-status-col {
-  width: 220px;
+  width: 190px;
 }
 
 .module-action-col {
@@ -1150,6 +1169,23 @@ td {
 
 .module-table td {
   overflow-wrap: anywhere;
+}
+
+.selectable-table-row {
+  cursor: pointer;
+  outline: none;
+}
+
+.selectable-table-row:hover td {
+  background: #f8fbf8;
+}
+
+.selectable-table-row.is-selected td {
+  background: #edf6f1;
+}
+
+.selectable-table-row:focus-visible td {
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .module-table .table-name-field,
@@ -1177,6 +1213,29 @@ td {
 .status-cell {
   display: grid;
   gap: 8px;
+}
+
+.compact-status-cell {
+  gap: 6px;
+}
+
+.review-issue-badge {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid #edcf8f;
+  border-radius: 999px;
+  background: #fff8e8;
+  color: #5d420b;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.review-issue-badge.is-clear {
+  border-color: #a9d6bc;
+  background: #e8f6ee;
+  color: #17633b;
 }
 
 .status-missing-info {
@@ -1225,6 +1284,127 @@ td {
   font-size: 0.78rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.review-inspector {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.review-inspector-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.review-inspector-header h3 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.review-inspector-meta,
+.module-inspector-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.review-inspector-body {
+  display: grid;
+  gap: 12px;
+}
+
+.review-field-group,
+.readiness-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.review-field-group:first-child,
+.readiness-list:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.review-field-group header {
+  display: grid;
+  gap: 3px;
+}
+
+.review-field-group h4,
+.readiness-list h4 {
+  margin: 0;
+  color: #26313d;
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.review-field-group header p,
+.readiness-list p,
+.review-prose,
+.review-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.review-field-group-body {
+  display: grid;
+  gap: 8px;
+}
+
+.readiness-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #5d420b;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.readiness-warning {
+  border-color: #edcf8f;
+}
+
+.readiness-success p {
+  color: #17633b;
+}
+
+.review-definition-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.review-definition-grid div {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 8px;
+}
+
+.review-definition-grid dd {
+  margin: 0;
+  color: #26313d;
+  font-weight: 800;
 }
 
 .risk-pill.low {
@@ -2058,6 +2238,192 @@ td {
   color: #1a202c;
 }
 
+.catalog-review-console {
+  display: grid;
+  grid-template-columns: minmax(620px, 1fr) minmax(320px, 400px);
+  gap: 16px;
+  align-items: start;
+}
+
+.catalog-review-main {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.catalog-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.catalog-toolbar label {
+  min-width: 220px;
+}
+
+.catalog-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.catalog-table,
+.catalog-candidate-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.catalog-table th,
+.catalog-table td,
+.catalog-candidate-table th,
+.catalog-candidate-table td {
+  padding: 11px 12px;
+  vertical-align: top;
+}
+
+.catalog-table td strong,
+.catalog-candidate-table td strong {
+  display: block;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.catalog-table td small,
+.catalog-candidate-table td small {
+  display: -webkit-box;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.catalog-table .is-muted td {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.catalog-candidate-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.catalog-candidate-section > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.catalog-candidate-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.provenance-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.provenance-pill.prov-seeded,
+.status-pill.neutral {
+  background: #eff2ec;
+  color: var(--text-muted);
+}
+
+.provenance-pill.prov-added,
+.status-pill.approved {
+  background: #d2eee2;
+  border-color: #98d3b6;
+  color: #0e7c5f;
+}
+
+.provenance-pill.prov-edited {
+  background: #fbecd5;
+  border-color: #efc785;
+  color: #8a5a00;
+}
+
+.provenance-pill.prov-deleted {
+  background: #fde2dd;
+  border-color: #f0aaa4;
+  color: #b42318;
+}
+
+.review-kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  margin: 0;
+}
+
+.review-kv div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.review-kv dt {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.review-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.catalog-field-list {
+  display: grid;
+  gap: 5px;
+}
+
+.catalog-field-list ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #26313d;
+  font-size: 0.84rem;
+}
+
+.catalog-manager .review-inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.catalog-manager .form-field textarea {
+  min-height: 72px;
+}
+
 .catalog-filter {
   margin: 6px 0 14px;
   max-width: 280px;
@@ -2354,7 +2720,7 @@ td {
   font-size: 0.84rem;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 780px) {
   .runtime-controls,
   .graph-ir-summary {
     grid-template-columns: 1fr;
@@ -2370,7 +2736,7 @@ td {
   }
 }
 
-/* Remote A2A Contract Review (Phase 3) */
+/* Remote A2A Contract Review */
 .a2a-contract-review {
   display: flex;
   flex-direction: column;
@@ -2402,6 +2768,110 @@ td {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+.a2a-review-console {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  min-width: 0;
+}
+.a2a-contract-list-panel,
+.a2a-contract-detail {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.a2a-contract-list-panel {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+.a2a-list-heading h3 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+}
+.a2a-contract-list {
+  display: grid;
+  gap: 8px;
+}
+.a2a-list-item {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  min-height: 0;
+  border-radius: 8px;
+  border-color: var(--line);
+  background: #ffffff;
+  padding: 10px;
+  text-align: left;
+}
+.a2a-list-item:hover:not(:disabled),
+.a2a-list-item.is-selected {
+  border-color: var(--cat-remote-line);
+  background: var(--cat-remote-soft);
+  transform: none;
+}
+.a2a-list-title,
+.a2a-list-meta,
+.a2a-list-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.a2a-list-title strong {
+  color: #1d2330;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+.a2a-list-meta {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+.a2a-list-status-pill,
+.a2a-list-issue {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.a2a-list-status-pill.status-draft {
+  border-color: #f7d680;
+  background: #fff8e1;
+  color: #8a5a00;
+}
+.a2a-list-status-pill.status-needs_info,
+.a2a-list-issue {
+  border-color: var(--cat-remote-line);
+  background: #fff1f0;
+  color: var(--cat-remote);
+}
+.a2a-list-status-pill.status-approved,
+.a2a-list-issue.is-clear {
+  border-color: #a8d8b6;
+  background: #e1f4e6;
+  color: #1f6d3a;
+}
+.a2a-contract-detail {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+.a2a-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
 }
 .a2a-contract-review .a2a-contract-card {
   border: 1px solid #e2e6ec;
@@ -2467,6 +2937,15 @@ td {
   background: #eef0f3;
   color: #1d2330;
 }
+.a2a-contract-review .a2a-status-chip select {
+  width: auto;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-weight: 800;
+}
 .a2a-contract-review .a2a-status-chip.status-draft {
   background: #fff8e1;
   border-color: #f7d680;
@@ -2499,6 +2978,13 @@ td {
   padding: 0.7rem 0.9rem;
   background: #fafbfc;
 }
+.a2a-contract-review details.a2a-section > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.a2a-contract-review details.a2a-section > summary::-webkit-details-marker {
+  display: none;
+}
 .a2a-contract-review .a2a-section.is-highlight {
   border-color: var(--cat-remote-line);
   background: var(--cat-remote-soft);
@@ -2527,6 +3013,9 @@ td {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+}
+.a2a-contract-review details.a2a-section:not([open]) > .a2a-section-body {
+  display: none;
 }
 .a2a-contract-review .a2a-grid-two {
   display: grid;
@@ -2642,9 +3131,12 @@ td {
 }
 .a2a-contract-review .a2a-table-wrap {
   overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .a2a-contract-review .a2a-interface-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -2806,7 +3298,34 @@ button.a2a-review-link:hover {
   background: var(--cat-remote-soft);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1500px) {
+  .review-console,
+  .catalog-review-console,
+  .a2a-review-console {
+    grid-template-columns: 1fr;
+  }
+  .review-inspector,
+  .a2a-contract-list-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 780px) {
+  .catalog-toolbar,
+  .catalog-candidate-section > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .catalog-create-actions {
+    justify-content: flex-start;
+  }
+  .review-kv div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .a2a-detail-header {
+    flex-direction: column;
+  }
   .a2a-contract-review .a2a-grid-two {
     grid-template-columns: 1fr;
   }

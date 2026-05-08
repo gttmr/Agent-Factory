@@ -3,7 +3,6 @@ import type {
   CatalogBinding,
   ComponentSource,
   FieldSpec,
-  ImportContract,
   ModuleCandidate,
   NormalizedRequirement,
   ProcessFlow,
@@ -47,28 +46,27 @@ export function buildScaffoldPlan({
     modules,
     excluded_modules: excludedModules,
     manifest: {
-      imported_components: modules.flatMap((module) =>
-        module.catalog_binding && module.import_contract
+      catalog_bound_modules: modules.flatMap((module) =>
+        module.catalog_binding
           ? [
               {
                 module_id: module.id,
                 module_name: module.name,
                 catalog_id: module.catalog_binding.catalog_id,
-                ...module.import_contract
+                catalog_name: module.catalog_binding.name,
+                component_source: module.catalog_binding.component_source
               }
             ]
           : []
       ),
-      new_code_required: modules
-        .filter((module) => !module.import_contract)
-        .map((module) => ({
-          module_id: module.id,
-          module_name: module.name,
-          reason: module.catalog_binding
-            ? "catalog binding does not provide a python package import contract"
-            : "no catalog binding was selected for this approved module",
-          developer_todos: module.developer_todos
-        }))
+      new_code_required: modules.map((module) => ({
+        module_id: module.id,
+        module_name: module.name,
+        reason: module.catalog_binding
+          ? "catalog binding is recorded, but runtime implementation remains a TODO boundary"
+          : "no catalog binding was selected for this approved module",
+        developer_todos: module.developer_todos
+      }))
     },
     validation: {
       can_generate_source: modules.length > 0 && blockers.length === 0,
@@ -85,7 +83,6 @@ export function approvedScaffoldModuleIds(scaffoldPlan: ScaffoldPlan): Set<strin
 function buildScaffoldModule(candidate: ModuleCandidate, catalogEntries: CatalogEntry[]): ScaffoldPlanModule {
   const catalogEntry = findCatalogBinding(candidate, catalogEntries);
   const componentSource = componentSourceFor(catalogEntry);
-  const importContract = catalogEntry ? importContractFor(catalogEntry) : undefined;
   const binding: CatalogBinding | undefined = catalogEntry
     ? {
         catalog_id: catalogEntry.id,
@@ -93,7 +90,7 @@ function buildScaffoldModule(candidate: ModuleCandidate, catalogEntries: Catalog
         component_source: componentSource
       }
     : undefined;
-  const developerTodos = developerTodosFor(candidate, catalogEntry, importContract);
+  const developerTodos = developerTodosFor(candidate, catalogEntry);
 
   return {
     id: candidate.id,
@@ -106,12 +103,11 @@ function buildScaffoldModule(candidate: ModuleCandidate, catalogEntries: Catalog
     scaffold_output: catalogEntry?.scaffold_output ?? scaffoldOutputFor(candidate),
     no_runnable_business_logic: true,
     catalog_binding: binding,
-    import_contract: importContract,
     developer_todos: developerTodos,
     inputs: candidate.inputs,
     outputs: candidate.outputs,
     risk_signals: mergeRiskSignals(candidate.risk_signals, catalogEntry?.risk_signals ?? []),
-    required_review_fields: requiredReviewFieldsFor(candidate, catalogEntry, importContract)
+    required_review_fields: requiredReviewFieldsFor(candidate)
   };
 }
 
@@ -125,37 +121,17 @@ function findCatalogBinding(candidate: ModuleCandidate, entries: CatalogEntry[])
 function componentSourceFor(entry: CatalogEntry | undefined): ComponentSource {
   if (!entry) return "stub";
   if (entry.component_source) return entry.component_source;
-  if (entry.package_name || entry.import_path || entry.callable_name) return "python_package";
   if (entry.access_protocol === "mcp") return "mcp";
   return "stub";
 }
 
-function importContractFor(entry: CatalogEntry): ImportContract | undefined {
-  if (componentSourceFor(entry) !== "python_package") return undefined;
-  if (!entry.package_name || !entry.import_path || !entry.callable_name) return undefined;
-  return {
-    package_name: entry.package_name,
-    package_version: entry.package_version,
-    import_path: entry.import_path,
-    callable_name: entry.callable_name
-  };
-}
-
 function developerTodosFor(
   candidate: ModuleCandidate,
-  catalogEntry: CatalogEntry | undefined,
-  importContract: ImportContract | undefined
+  catalogEntry: CatalogEntry | undefined
 ): string[] {
-  if (importContract) {
-    return [
-      "Map ADK node_input into the shared component input contract.",
-      "Handle component exceptions and timeout policy without leaking private data.",
-      "Validate component output against the reviewed output contract."
-    ];
-  }
   if (catalogEntry) {
     return [
-      "Complete the catalog import contract or replace this placeholder with an approved callable boundary.",
+      "Review how this catalog spec should be invoked before replacing the TODO boundary.",
       "Map reviewed inputs and outputs before wiring runtime behavior."
     ];
   }
@@ -171,20 +147,11 @@ function developerTodosFor(
   ];
 }
 
-function requiredReviewFieldsFor(
-  candidate: ModuleCandidate,
-  catalogEntry: CatalogEntry | undefined,
-  importContract: ImportContract | undefined
-): string[] {
+function requiredReviewFieldsFor(candidate: ModuleCandidate): string[] {
   const fields = new Set<string>();
   if (!candidate.inputs.length) fields.add("inputs");
   if (!candidate.outputs.length) fields.add("outputs");
   if (!candidate.developer_todos?.length) fields.add("developer_todos");
-  if (catalogEntry && componentSourceFor(catalogEntry) === "python_package" && !importContract) {
-    fields.add("package_name");
-    fields.add("import_path");
-    fields.add("callable_name");
-  }
   if (candidate.module_category === "remote_a2a") {
     [
       "owner",
@@ -210,17 +177,16 @@ function collectBlockers(modules: ScaffoldPlanModule[]): string[] {
     if (!module.inputs.length) blockers.push(`${module.name}: input contract is missing`);
     if (!module.outputs.length) blockers.push(`${module.name}: output contract is missing`);
     if (!module.developer_todos.length) blockers.push(`${module.name}: developer TODO boundary is missing`);
-    if (module.catalog_binding?.component_source === "python_package" && !module.import_contract) {
-      blockers.push(`${module.name}: python package import contract is incomplete`);
-    }
     return blockers;
   });
 }
 
 function collectWarnings(modules: ScaffoldPlanModule[]): string[] {
   return modules.flatMap((module) => {
-    if (module.import_contract) return [];
-    return [`${module.name}: generated as new-code TODO boundary because no python package import is available`];
+    if (module.catalog_binding) {
+      return [`${module.name}: catalog binding is emitted as TODO/stub until runtime binding policy is approved`];
+    }
+    return [`${module.name}: generated as new-code TODO boundary because no catalog binding is selected`];
   });
 }
 

@@ -21,11 +21,6 @@ workflows:
       - "merge: 문서/음성/텍스트 결과를 normalized_intake_context와 intake_artifacts로 합친다."
       - "quality gate: document_quality_specialist가 문서 품질과 재시도 필요 여부를 판단한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: multimodal_intake_graph_workflow
     notes: OCR, STT, 언어 감지, PII 마스킹 Adapter를 조합하는 ADK 2.0 graph workflow 후보.
   - name: document_processing_sequence_workflow
     workflow_kind: graph
@@ -51,11 +46,6 @@ workflows:
       - "table_extraction_adapter로 표 데이터를 구조화한다."
       - "document_quality_specialist가 processed_document와 quality_report를 생성한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: document_processing_sequence_workflow
     notes: 문서 기반 업무에서 반복되는 전처리 pipeline.
   - name: customer_clarification_loop_workflow
     workflow_kind: graph
@@ -81,11 +71,6 @@ workflows:
       - "고객 답변이 들어오면 current_case_state에 반영하고 누락 정보 판단을 반복한다."
       - "loop 종료 조건: unresolved_items가 없거나 재시도/타임아웃 정책에 도달한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: customer_clarification_loop_workflow
     notes: 반복 횟수, 타임아웃, 고객 미응답 정책은 승인 전 검토 필드로 남긴다.
   - name: human_approval_gate_workflow
     workflow_kind: graph
@@ -110,11 +95,6 @@ workflows:
       - "ADK 2.0 human-input node가 승인자 입력을 받는다."
       - "route: approved, rejected, needs_revision, timeout 결과를 approval_route로 변환한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: human_approval_gate_workflow
     notes: ADK 2.0 human-input node로 매핑되는 공통 승인 gate.
   - name: evidence_parallel_enrichment_workflow
     workflow_kind: graph
@@ -140,11 +120,6 @@ workflows:
       - "merge: 성공 결과는 enrichment_results로, 실패/누락은 enrichment_errors로 모은다."
       - "evidence_pack_specialist가 후속 검토 가능한 evidence pack으로 정리한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: evidence_parallel_enrichment_workflow
     notes: 실패한 Adapter는 non-fatal result로 모아 후속 Agent가 판단하게 한다.
   - name: outbound_response_review_workflow
     workflow_kind: orchestration
@@ -170,9 +145,4 @@ workflows:
       - "pii_redaction_adapter가 발송 전 개인정보 마스킹 필요 항목을 점검한다."
       - "notification_dry_run_adapter가 실제 발송 없이 delivery_preview와 blocked_reason을 반환한다."
     scaffold_output: orchestration_shell_only
-    component_source: python_package
-    package_name: agent-factory-shared-components
-    package_version: 0.1.0
-    import_path: agent_factory_shared.workflows
-    callable_name: outbound_response_review_workflow
     notes: 실제 외부 발송은 하지 않고 검토 가능한 산출물만 만든다.

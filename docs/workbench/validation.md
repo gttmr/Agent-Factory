@@ -1,7 +1,7 @@
 # Validation
 
-Agent Factory export artifact는 구현 계획이나 후속 작업에 쓰기 전에 검증해야 한다.
-검증 목표는 raw requirement가 바로 코드나 실행 logic으로 건너뛰지 않게 하는 것이다.
+Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전에 검증해야 한다.
+검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
 
 ## module-candidates.json
 
@@ -24,10 +24,10 @@ Agent Factory export artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `human_input` node는 downstream edge가 있어야 한다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
 
-## scaffold-plan.json
+## Deferred scaffold-plan fixture
 
-`scaffold-plan.json`은 승인된 workbench export artifact다.
-이 파일은 향후 구현 계획의 입력일 수 있지만, raw requirement를 실행 가능한 business logic으로 바꾸라는 지시가 아니다.
+`scaffold-plan.json` schema와 template은 현재 제품 단계의 export 대상이 아니다.
+이 파일은 향후 구현 handoff가 다시 범위에 들어올 때 사용할 검증 fixture이며, raw requirement를 실행 가능한 business logic으로 바꾸라는 지시가 아니다.
 
 - source는 `approved_workbench_artifact`여야 한다.
 - `approved` candidate만 포함한다.
@@ -41,12 +41,11 @@ Agent Factory export artifact는 구현 계획이나 후속 작업에 쓰기 전
 node scripts/validate-artifacts.mjs templates
 node scripts/validate-artifacts.mjs templates/regression-scenarios
 cd packages/web && npm run build
-node scripts/generate-adk-source.mjs templates generated/adk-source-cli-smoke
-python3 -m compileall generated/adk-source-cli-smoke/req_001_adk generated/adk-source-cli-smoke/tests
 ```
 
 문서만 변경한 경우에는 build 대신 구조와 링크 검증을 우선한다.
-TypeScript, React, analyzer, export logic을 변경한 경우에는 `cd packages/web && npm run build`를 실행한다.
+TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run build`를 실행한다.
+scaffold-plan fixture나 ADK source generator를 직접 변경한 경우에만 `node scripts/generate-adk-source.mjs ...`와 `python3 -m compileall ...` smoke를 추가한다.
 
 ## ADK 공식 문서 확인
 

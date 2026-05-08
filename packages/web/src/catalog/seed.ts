@@ -16,10 +16,6 @@ interface AgentRow {
   outputs?: CatalogEntry["outputs"];
   scaffold_output?: string;
   component_source?: string;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   notes?: string;
 }
 
@@ -38,10 +34,6 @@ interface AdapterRow {
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
   component_source?: string;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   notes?: string;
 }
 
@@ -55,10 +47,6 @@ interface WorkflowRow {
   composition?: string[];
   scaffold_output?: string;
   component_source?: string;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   notes?: string;
 }
 
@@ -70,10 +58,6 @@ interface RemoteRow {
   inputs?: CatalogEntry["inputs"];
   outputs?: CatalogEntry["outputs"];
   component_source?: string;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   notes?: string;
 }
 
@@ -104,10 +88,6 @@ export function loadSeedCatalog(): CatalogEntry[] {
       outputs: row.outputs ?? [],
       scaffold_output: row.scaffold_output,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
-      package_name: row.package_name,
-      package_version: row.package_version,
-      import_path: row.import_path,
-      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -131,10 +111,6 @@ export function loadSeedCatalog(): CatalogEntry[] {
       mcp_schema_ref: row.mcp_schema_ref,
       mcp_auth_mode: row.mcp_auth_mode,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
-      package_name: row.package_name,
-      package_version: row.package_version,
-      import_path: row.import_path,
-      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -153,10 +129,6 @@ export function loadSeedCatalog(): CatalogEntry[] {
       composition: row.composition ?? [],
       scaffold_output: row.scaffold_output,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
-      package_name: row.package_name,
-      package_version: row.package_version,
-      import_path: row.import_path,
-      callable_name: row.callable_name,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -173,10 +145,6 @@ export function loadSeedCatalog(): CatalogEntry[] {
       inputs: row.inputs ?? [],
       outputs: row.outputs ?? [],
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
-      package_name: row.package_name,
-      package_version: row.package_version,
-      import_path: row.import_path,
-      callable_name: row.callable_name,
       required_before_approval: row.required_before_approval ?? [],
       notes: row.notes,
       provenance: "seeded"

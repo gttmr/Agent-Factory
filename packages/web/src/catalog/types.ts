@@ -35,10 +35,6 @@ export interface CatalogEntry {
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
   component_source?: ComponentSource;
-  package_name?: string;
-  package_version?: string;
-  import_path?: string;
-  callable_name?: string;
   runtime_binding?: RuntimeBinding | null;
   owner_domain?: string;
   status?: string;
