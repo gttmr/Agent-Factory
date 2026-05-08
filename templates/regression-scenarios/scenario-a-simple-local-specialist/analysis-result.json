@@ -1,0 +1,144 @@
+{
+  "normalizedRequirement": {
+    "id": "req-001",
+    "title": "Support request classifier and summarizer",
+    "raw_text": "We need a single agent that classifies an incoming support request into a small set of categories and writes a short summary the support engineer can read first.",
+    "domain": "customer-service",
+    "requester": {
+      "team": "support-operations",
+      "role": "business-user"
+    },
+    "business_goal": "Reduce time-to-first-read on incoming support requests by giving the engineer a category and a one-line summary.",
+    "current_process": [
+      "Read the support request",
+      "Classify it into one of a small set of categories",
+      "Write a one-line summary"
+    ],
+    "inputs": [
+      { "name": "support_request_text", "type": "text", "required": true }
+    ],
+    "outputs": [
+      { "name": "category", "type": "string", "required": true },
+      { "name": "summary", "type": "text", "required": true }
+    ],
+    "systems": [],
+    "risk_signals": ["customer_impact", "audit_required"],
+    "missing_information": [
+      "approved category list",
+      "summary length policy"
+    ],
+    "contradictions": [],
+    "status": "draft"
+  },
+  "evidence": {
+    "requested_goal": "Classify and summarize a support request.",
+    "business_domain_hint": "customer-service",
+    "user_role": "business-user",
+    "input_data": ["support_request_text"],
+    "output_data": ["category", "summary"],
+    "systems_mentioned": [],
+    "decisions_implied": ["pick category", "draft summary line"],
+    "risk_signals": ["customer_impact", "audit_required"],
+    "missing_information": ["approved category list", "summary length policy"],
+    "contradictions": [],
+    "assumptions": ["all processing is local; no external system call required"]
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "name": "support_request_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.84,
+      "rationale": "A single reasoning responsibility — classify into a category and write a short summary — fits a specialist agent.",
+      "adk_hints": {
+        "state_memory": "session_state holds the inbound support_request_text",
+        "callbacks": null,
+        "artifacts_events": "emits category and summary as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        { "name": "support_request_text", "type": "text", "required": true }
+      ],
+      "outputs": [
+        { "name": "category", "type": "string", "required": true },
+        { "name": "summary", "type": "text", "required": true }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "low",
+      "risk_signals": ["customer_impact", "audit_required"],
+      "status": "needs_info",
+      "missing_information": ["approved category list", "summary length policy"],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    }
+  ],
+  "a2aContracts": [],
+  "processFlow": {
+    "requirement_id": "req-001",
+    "nodes": [
+      { "id": "support_request_text", "label": "support_request_text", "type": "input", "subtype": null },
+      { "id": "mod-001", "label": "support_request_specialist", "type": "agent", "subtype": "specialist" },
+      { "id": "category", "label": "category", "type": "output", "subtype": null },
+      { "id": "summary", "label": "summary", "type": "output", "subtype": null }
+    ],
+    "edges": [
+      {
+        "from": "support_request_text",
+        "to": "mod-001",
+        "data": "raw support request text",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "SupportRequestInput",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "category",
+        "data": "classified category",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "SupportCategory",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "summary",
+        "data": "short summary line",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "SupportSummary",
+        "route_condition": null
+      }
+    ]
+  }
+}

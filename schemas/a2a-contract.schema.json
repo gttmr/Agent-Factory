@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/schemas/a2a-contract.schema.json",
+  "title": "A2A 1.0 Interaction Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_id",
+    "remote_module_id",
+    "target_agent_name",
+    "target_agent_purpose",
+    "contract_status",
+    "agent_card",
+    "supported_interfaces",
+    "input_modes",
+    "output_modes",
+    "security_schemes",
+    "security_requirements",
+    "skills",
+    "extensions",
+    "message_contract",
+    "task_lifecycle",
+    "streaming",
+    "operations",
+    "http_paths",
+    "artifact_contract",
+    "adk_host_mapping",
+    "timeout",
+    "retry",
+    "fallback",
+    "cancellation",
+    "unsupported_operation",
+    "get_task_fallback",
+    "push_notification_policy",
+    "auth",
+    "token_handling",
+    "audit",
+    "data_policy"
+  ],
+  "properties": {
+    "contract_id": {
+      "type": "string",
+      "pattern": "^a2a-\\d{3,}$",
+      "examples": ["a2a-001"]
+    },
+    "remote_module_id": {
+      "type": "string",
+      "pattern": "^mod-[a-z0-9-]+$",
+      "description": "Must reference an existing remote_a2a ModuleCandidate id."
+    },
+    "target_agent_name": { "type": "string", "minLength": 1 },
+    "target_agent_purpose": { "type": "string", "minLength": 1 },
+    "contract_status": { "$ref": "#/$defs/contractStatus" },
+    "agent_card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discovery_method", "agent_card_url", "version", "notes"],
+      "properties": {
+        "discovery_method": { "type": "string", "minLength": 1 },
+        "agent_card_url": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string", "minLength": 1 }
+      }
+    },
+    "supported_interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "protocol_binding", "protocol_version", "tenant_policy"],
+        "properties": {
+          "url": { "type": "string", "minLength": 1 },
+          "protocol_binding": { "type": "string", "minLength": 1 },
+          "protocol_version": { "type": "string", "minLength": 1 },
+          "tenant_policy": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "input_modes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output_modes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "security_schemes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "scheme"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "scheme": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "security_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scheme_name", "scopes"],
+        "properties": {
+          "scheme_name": { "type": "string", "minLength": 1 },
+          "scopes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "extensions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "message_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_part_fields", "allowed_roles"],
+      "properties": {
+        "allowed_part_fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/partField" }
+        },
+        "allowed_roles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" }
+        }
+      }
+    },
+    "task_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "states",
+        "allowed_transitions",
+        "terminal_states",
+        "input_required_followup",
+        "auth_required_followup"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/taskState" }
+        },
+        "allowed_transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "$ref": "#/$defs/taskState" },
+              "to": { "$ref": "#/$defs/taskState" }
+            }
+          }
+        },
+        "terminal_states": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/taskState" }
+        },
+        "input_required_followup": { "type": "string", "minLength": 1 },
+        "auth_required_followup": { "type": "string", "minLength": 1 }
+      }
+    },
+    "streaming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported", "wrappers", "non_streaming_fallback"],
+      "properties": {
+        "supported": { "type": "boolean" },
+        "wrappers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/streamWrapper" }
+        },
+        "non_streaming_fallback": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/operationName" }
+    },
+    "http_paths": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/httpPath" }
+    },
+    "artifact_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutation_rules", "chunking_policy"],
+      "properties": {
+        "mutation_rules": { "type": "string", "minLength": 1 },
+        "chunking_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "adk_host_mapping": { "type": "string", "minLength": 1 },
+    "timeout": { "type": "string", "minLength": 1 },
+    "retry": { "type": "string", "minLength": 1 },
+    "fallback": { "type": "string", "minLength": 1 },
+    "cancellation": { "type": "string", "minLength": 1 },
+    "unsupported_operation": { "type": "string", "minLength": 1 },
+    "get_task_fallback": { "type": "string", "minLength": 1 },
+    "push_notification_policy": {
+      "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }],
+      "description": "Spec §5 explicitly allows null when no push notification policy applies."
+    },
+    "auth": { "type": "string", "minLength": 1 },
+    "token_handling": { "type": "string", "minLength": 1 },
+    "audit": { "type": "string", "minLength": 1 },
+    "data_policy": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "contractStatus": {
+      "type": "string",
+      "enum": ["draft", "needs_info", "approved"]
+    },
+    "operationName": {
+      "type": "string",
+      "enum": [
+        "SendMessage",
+        "SendStreamingMessage",
+        "GetTask",
+        "SubscribeToTask",
+        "CancelTask",
+        "ListTasks"
+      ]
+    },
+    "httpPath": {
+      "type": "string",
+      "enum": [
+        "/message:send",
+        "/message:stream",
+        "/tasks/{id}",
+        "/tasks/{id}:subscribe",
+        "/tasks/{id}:cancel"
+      ]
+    },
+    "taskState": {
+      "type": "string",
+      "enum": [
+        "TASK_STATE_SUBMITTED",
+        "TASK_STATE_WORKING",
+        "TASK_STATE_INPUT_REQUIRED",
+        "TASK_STATE_AUTH_REQUIRED",
+        "TASK_STATE_COMPLETED",
+        "TASK_STATE_FAILED",
+        "TASK_STATE_CANCELED",
+        "TASK_STATE_REJECTED"
+      ]
+    },
+    "partField": {
+      "type": "string",
+      "enum": ["text", "raw", "url", "data"]
+    },
+    "role": {
+      "type": "string",
+      "enum": ["ROLE_USER", "ROLE_AGENT"]
+    },
+    "streamWrapper": {
+      "type": "string",
+      "enum": ["task", "message", "taskStatusUpdate", "taskArtifactUpdate"]
+    }
+  }
+}

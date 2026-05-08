@@ -1,0 +1,223 @@
+{
+  "normalizedRequirement": {
+    "id": "req-001",
+    "title": "Policy-grounded Q&A agent with citations",
+    "raw_text": "We need an internal agent that answers staff questions using approved policy documents. Every answer must include citations to the approved sources, and access to those sources must respect the existing source ACL. The list of approved sources is still being finalized.",
+    "domain": "customer-service",
+    "requester": {
+      "team": "policy-operations",
+      "role": "business-user"
+    },
+    "business_goal": "Give staff fast, grounded answers to policy questions while preserving source access controls and audit trail.",
+    "current_process": [
+      "Receive a staff question about policy",
+      "Look up grounded evidence from approved policy documents",
+      "Compose a grounded answer that cites each source"
+    ],
+    "inputs": [
+      { "name": "staff_question_text", "type": "text", "required": true }
+    ],
+    "outputs": [
+      { "name": "grounded_answer", "type": "text", "required": true },
+      { "name": "citations", "type": "array", "required": true }
+    ],
+    "systems": [
+      { "name": "policy_document_store", "access": "read" }
+    ],
+    "risk_signals": ["audit_required"],
+    "missing_information": [
+      "approved source list",
+      "citation policy",
+      "source access control"
+    ],
+    "contradictions": [],
+    "status": "draft"
+  },
+  "evidence": {
+    "requested_goal": "Answer staff questions using approved policy documents with citations.",
+    "business_domain_hint": "customer-service",
+    "user_role": "business-user",
+    "input_data": ["staff_question_text"],
+    "output_data": ["grounded_answer", "citations"],
+    "systems_mentioned": ["policy_document_store"],
+    "decisions_implied": ["select grounded passages", "compose grounded answer"],
+    "risk_signals": ["audit_required"],
+    "missing_information": ["approved source list", "citation policy", "source access control"],
+    "contradictions": [],
+    "assumptions": ["retrieval is a callable adapter, not a separate remote agent"]
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "name": "policy_qa_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.81,
+      "rationale": "A single reasoning agent composes a grounded answer from retrieved policy evidence.",
+      "adk_hints": {
+        "state_memory": "session_state holds the inbound staff question",
+        "callbacks": null,
+        "artifacts_events": "emits grounded_answer and citations as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": "grounded generation required; cite every source"
+      },
+      "inputs": [
+        { "name": "staff_question_text", "type": "text", "required": true },
+        { "name": "guidance_summary", "type": "text", "required": true },
+        { "name": "citations", "type": "array", "required": true }
+      ],
+      "outputs": [
+        { "name": "grounded_answer", "type": "text", "required": true },
+        { "name": "citations", "type": "array", "required": true }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": ["audit_required"],
+      "status": "needs_info",
+      "missing_information": ["citation policy", "source access control"],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": true,
+      "grounding_required": true,
+      "source_acl_required": true,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-002",
+      "source_requirement_id": "req-001",
+      "name": "policy_document_retrieval",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "retrieval",
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "knowledge_retrieval",
+      "confidence": 0.83,
+      "rationale": "Retrieval over approved policy documents is a callable adapter capability with citation and source ACL constraints.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "returns guidance_summary plus citations array",
+        "mcp_a2a": null,
+        "streaming_grounding": "must return citations alongside any retrieved passage"
+      },
+      "inputs": [
+        { "name": "knowledge_query", "type": "text", "required": true }
+      ],
+      "outputs": [
+        { "name": "guidance_summary", "type": "text", "required": true },
+        { "name": "citations", "type": "array", "required": true }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "risk_signals": ["audit_required"],
+      "status": "needs_info",
+      "missing_information": ["approved source list", "citation policy", "source access control"],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": true,
+      "grounding_required": true,
+      "source_acl_required": true,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    }
+  ],
+  "a2aContracts": [],
+  "processFlow": {
+    "requirement_id": "req-001",
+    "nodes": [
+      { "id": "staff_question_text", "label": "staff_question_text", "type": "input", "subtype": null },
+      { "id": "mod-002", "label": "policy_document_retrieval", "type": "adapter", "subtype": "retrieval" },
+      { "id": "mod-001", "label": "policy_qa_specialist", "type": "agent", "subtype": "specialist" },
+      { "id": "grounded_answer", "label": "grounded_answer", "type": "output", "subtype": null },
+      { "id": "citations", "label": "citations", "type": "output", "subtype": null }
+    ],
+    "edges": [
+      {
+        "from": "staff_question_text",
+        "to": "mod-002",
+        "data": "retrieval query",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "RetrievalQuery",
+        "route_condition": null
+      },
+      {
+        "from": "staff_question_text",
+        "to": "mod-001",
+        "data": "raw staff question",
+        "edge_type": "local",
+        "data_channel": "session_state",
+        "state_key": "session:staff_question",
+        "artifact_key": null,
+        "schema_ref": null,
+        "route_condition": null
+      },
+      {
+        "from": "mod-002",
+        "to": "mod-001",
+        "data": "retrieved guidance with citations",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "GuidanceWithCitations",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "grounded_answer",
+        "data": "grounded answer text",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "GroundedAnswer",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "citations",
+        "data": "citation array",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "CitationList",
+        "route_condition": null
+      }
+    ]
+  }
+}

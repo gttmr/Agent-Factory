@@ -1521,6 +1521,181 @@ td {
   color: var(--red);
 }
 
+/* Phase 4: Remote A2A boundary zone — splits local execution frame from remote agent contracts. */
+.process-flow-zones {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.process-flow-zone {
+  display: grid;
+  gap: 12px;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.process-flow-zone--local {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.process-flow-zone--remote {
+  border: 2px dashed var(--cat-remote-line);
+  background: var(--cat-remote-soft);
+}
+
+.process-flow-zone-head {
+  display: grid;
+  gap: 4px;
+}
+
+.process-flow-zone-head > .eyebrow {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.process-flow-zone--remote > .process-flow-zone-head > .eyebrow {
+  color: var(--cat-remote);
+}
+
+.process-flow-zone-head > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
+.process-flow-zone-nodes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.process-flow-internal-remote {
+  display: grid;
+  gap: 6px;
+  border-top: 1px dashed var(--cat-remote-line);
+  padding-top: 10px;
+}
+
+.process-flow-internal-remote > .eyebrow {
+  color: var(--cat-remote);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.process-flow-internal-remote > ul {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  list-style: none;
+}
+
+.process-flow-internal-remote > ul > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--cat-remote-line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.process-flow-internal-remote > ul > li > strong {
+  color: var(--cat-remote);
+  font-weight: 800;
+}
+
+.process-flow-internal-remote > ul > li > em {
+  font-style: normal;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.process-flow-boundary-edges {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.process-flow-boundary-edges.empty {
+  justify-items: center;
+}
+
+.process-flow-boundary-edges > ul {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.process-flow-boundary-edges > ul > li.boundary-edge {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+  gap: 12px;
+  align-items: center;
+  border: 1px dashed var(--cat-remote-line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 8px 14px;
+}
+
+.boundary-edge > .boundary-edge-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cat-remote);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.boundary-edge > .boundary-edge-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.boundary-edge > .boundary-edge-path > strong {
+  color: #1a202c;
+  font-weight: 700;
+}
+
+.boundary-edge > .boundary-edge-path > .boundary-edge-arrow {
+  color: var(--cat-remote);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.boundary-edge > .boundary-edge-label {
+  display: inline-flex;
+  border: 1px dashed var(--cat-remote-line);
+  border-radius: 999px;
+  background: var(--cat-remote-soft);
+  color: var(--cat-remote);
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  justify-self: end;
+}
+
 .stage-connector {
   display: grid;
   justify-items: center;
@@ -2686,5 +2861,417 @@ td {
   }
   .catalog-form .form-grid label.span-2 {
     grid-column: 1;
+  }
+}
+
+/* Remote A2A Contract Review (Phase 3) */
+.a2a-contract-review {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.a2a-contract-review > .a2a-banner {
+  border-radius: 10px;
+  border: 1px solid var(--cat-remote-line);
+  background: var(--cat-remote-soft);
+  color: var(--cat-remote);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.a2a-contract-review > .a2a-banner.needs-info {
+  border-color: var(--cat-remote-line);
+}
+.a2a-contract-review > .a2a-empty {
+  padding: 1rem;
+  border: 1px dashed #d6dbe2;
+  border-radius: 10px;
+  color: #6a7280;
+  font-size: 0.92rem;
+}
+.a2a-contract-review > .a2a-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.a2a-contract-review .a2a-contract-card {
+  border: 1px solid #e2e6ec;
+  border-left: 4px solid var(--cat-remote);
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.a2a-contract-review .a2a-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-bottom: 1px solid #f0f2f5;
+  padding-bottom: 0.6rem;
+}
+.a2a-contract-review > .a2a-card-header > .a2a-card-title,
+.a2a-contract-review .a2a-contract-card > .a2a-card-header > .a2a-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.a2a-contract-review .a2a-card-name {
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #1d2330;
+}
+.a2a-contract-review .a2a-card-mod-id {
+  font-size: 0.8rem;
+  color: #6a7280;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.a2a-contract-review .a2a-card-meta {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+.a2a-contract-review .a2a-meta-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.a2a-contract-review .a2a-meta-label {
+  color: #6a7280;
+}
+.a2a-contract-review .a2a-meta-value {
+  font-family: ui-monospace, Menlo, monospace;
+  color: #1d2330;
+}
+.a2a-contract-review .a2a-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: #eef0f3;
+  color: #1d2330;
+}
+.a2a-contract-review .a2a-status-chip.status-draft {
+  background: #fff8e1;
+  border-color: #f7d680;
+  color: #8a5a00;
+}
+.a2a-contract-review .a2a-status-chip.status-needs_info {
+  background: var(--cat-remote-soft);
+  border-color: var(--cat-remote-line);
+  color: var(--cat-remote);
+}
+.a2a-contract-review .a2a-status-chip.status-approved {
+  background: #e1f4e6;
+  border-color: #a8d8b6;
+  color: #1f6d3a;
+}
+.a2a-contract-review .a2a-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.a2a-contract-review .a2a-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.a2a-contract-review .a2a-section {
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  background: #fafbfc;
+}
+.a2a-contract-review .a2a-section.is-highlight {
+  border-color: var(--cat-remote-line);
+  background: var(--cat-remote-soft);
+}
+.a2a-contract-review .a2a-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.a2a-contract-review .a2a-section-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #1d2330;
+  margin: 0;
+}
+.a2a-contract-review .a2a-section-hint {
+  font-size: 0.78rem;
+  color: #6a7280;
+}
+.a2a-contract-review .a2a-section-hint.inline {
+  display: inline;
+}
+.a2a-contract-review .a2a-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.a2a-contract-review .a2a-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.a2a-contract-review .a2a-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.a2a-contract-review .a2a-field-label {
+  font-size: 0.78rem;
+  color: #6a7280;
+  font-weight: 500;
+}
+.a2a-contract-review .a2a-field-value {
+  font-size: 0.88rem;
+  color: #1d2330;
+  word-break: break-word;
+}
+.a2a-contract-review .a2a-needs-info-tag {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: var(--cat-remote-soft);
+  color: var(--cat-remote);
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid var(--cat-remote-line);
+}
+.a2a-contract-review .a2a-na {
+  font-style: italic;
+  color: #9aa0aa;
+  font-size: 0.85rem;
+}
+.a2a-contract-review .a2a-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.a2a-contract-review .a2a-pill-list > li {
+  display: inline-flex;
+}
+.a2a-contract-review .a2a-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: #1d2330;
+  font-size: 0.78rem;
+  border: 1px solid #d6dbe2;
+}
+.a2a-contract-review .a2a-pill.is-needs-info {
+  background: var(--cat-remote-soft);
+  color: var(--cat-remote);
+  border-color: var(--cat-remote-line);
+}
+.a2a-contract-review .a2a-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.a2a-contract-review .a2a-checkbox-row > li {
+  display: inline-flex;
+}
+.a2a-contract-review .a2a-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #d6dbe2;
+  background: #fff;
+  color: #1d2330;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.a2a-contract-review .a2a-check.is-checked {
+  background: #e9f0ff;
+  border-color: #b6c8ee;
+  color: #1d3a7a;
+}
+.a2a-contract-review .a2a-check.is-muted {
+  color: #9aa0aa;
+  background: #f6f7f9;
+}
+.a2a-contract-review .a2a-forbidden-note {
+  font-size: 0.78rem;
+  color: var(--cat-remote);
+  margin-top: 0.35rem;
+}
+.a2a-contract-review .a2a-key-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.a2a-contract-review .a2a-key {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.82rem;
+  color: #1d2330;
+  background: #f0f2f5;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+.a2a-contract-review .a2a-table-wrap {
+  overflow-x: auto;
+}
+.a2a-contract-review .a2a-interface-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.a2a-contract-review .a2a-interface-table > thead > tr > th,
+.a2a-contract-review .a2a-interface-table > tbody > tr > td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #eef0f3;
+  vertical-align: top;
+}
+.a2a-contract-review .a2a-interface-table > thead > tr > th {
+  font-size: 0.78rem;
+  color: #6a7280;
+  font-weight: 500;
+  background: #f6f7f9;
+}
+.a2a-contract-review .a2a-streaming-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
+.a2a-contract-review .a2a-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.a2a-contract-review .a2a-stream-wrappers {
+  margin: 0.4rem 0 0;
+}
+.a2a-contract-review .a2a-task-state {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.8rem;
+}
+.a2a-contract-review .a2a-transition-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.a2a-contract-review .a2a-transition-list > li {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.8rem;
+  color: #1d2330;
+}
+.a2a-contract-review .a2a-arrow {
+  color: #6a7280;
+  margin: 0 0.4rem;
+}
+.a2a-contract-review .a2a-text-value,
+.a2a-contract-review .a2a-value {
+  font-size: 0.88rem;
+  color: #1d2330;
+  word-break: break-word;
+}
+.a2a-contract-review .a2a-inline-label {
+  font-size: 0.78rem;
+  color: #6a7280;
+  margin-right: 0.35rem;
+}
+.a2a-contract-review .a2a-orphan-section {
+  border: 1px dashed var(--cat-remote-line);
+  background: var(--cat-remote-soft);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.a2a-contract-review .a2a-orphan-heading {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--cat-remote);
+}
+.a2a-contract-review .a2a-orphan-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cat-remote);
+}
+
+/* CatalogManager runtime_binding badge */
+.runtime-binding-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-family: ui-monospace, Menlo, monospace;
+  border: 1px solid #d6dbe2;
+  background: #f6f7f9;
+  color: #4a5260;
+}
+.runtime-binding-badge.runtime-binding-mcp {
+  background: #e9f0ff;
+  border-color: #b6c8ee;
+  color: #1d3a7a;
+}
+.runtime-binding-badge.runtime-binding-stub {
+  background: #f0f2f5;
+  border-color: #c8cdd5;
+  color: #5a6270;
+}
+.runtime-binding-badge.runtime-binding-remote_a2a {
+  background: var(--cat-remote-soft);
+  border-color: var(--cat-remote-line);
+  color: var(--cat-remote);
+}
+.runtime-binding-badge.runtime-binding-unresolved {
+  background: #fff8e1;
+  border-color: #f7d680;
+  color: #8a5a00;
+}
+
+/* ModuleReview cross-link to A2A review */
+button.a2a-review-link {
+  margin-top: 0.5rem;
+  background: transparent;
+  border: 1px solid var(--cat-remote-line);
+  color: var(--cat-remote);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+button.a2a-review-link:hover {
+  background: var(--cat-remote-soft);
+}
+
+@media (max-width: 720px) {
+  .a2a-contract-review .a2a-grid-two {
+    grid-template-columns: 1fr;
   }
 }

@@ -124,13 +124,75 @@ const dataChannelGlyph: Record<FlowDataChannel, string> = {
 };
 
 export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: ProcessFlowViewProps) {
-  const stages = buildFlowStages(processFlow, moduleCandidates);
-  const customSignals = detectCustomAgentSignals(processFlow, moduleCandidates);
   const candidateById = new Map(moduleCandidates.map((candidate) => [candidate.id, candidate]));
-  const interStageEdges = buildInterStageEdges(stages, processFlow.edges);
+  const customSignals = detectCustomAgentSignals(processFlow, moduleCandidates);
   const remoteEdgeCount = processFlow.edges.filter((edge) => edge.edge_type === "remote_a2a").length;
   const graphModel = buildGraphInsightModel(processFlow);
   const graphText = toMermaid(processFlow);
+
+  // Phase 4: partition nodes/edges so remote_a2a renders outside the local frame.
+  const remoteNodeIds = new Set(
+    processFlow.nodes.filter((node) => node.type === "remote_a2a").map((node) => node.id)
+  );
+  const remoteNodes = processFlow.nodes.filter((node) => node.type === "remote_a2a");
+  const localNodes = processFlow.nodes.filter((node) => node.type !== "remote_a2a");
+  const localEdges = processFlow.edges.filter(
+    (edge) => !remoteNodeIds.has(edge.from) && !remoteNodeIds.has(edge.to)
+  );
+  const crossingEdges = processFlow.edges.filter(
+    (edge) => remoteNodeIds.has(edge.from) !== remoteNodeIds.has(edge.to)
+  );
+  const internalRemoteEdges = processFlow.edges.filter(
+    (edge) => remoteNodeIds.has(edge.from) && remoteNodeIds.has(edge.to)
+  );
+
+  const localFlow: ProcessFlow = {
+    requirement_id: processFlow.requirement_id,
+    nodes: localNodes,
+    edges: localEdges
+  };
+  const stages = buildFlowStages(localFlow, moduleCandidates);
+  const interStageEdges = buildInterStageEdges(stages, localEdges);
+  const hasRemoteZone = remoteNodes.length > 0;
+  const nodeById = new Map(processFlow.nodes.map((node) => [node.id, node]));
+
+  const localStagedFlow = (
+    <div className="staged-flow" aria-label="단계별 프로세스 플로우">
+      {stages.map((stage, index) => (
+        <div className="stage-wrap" key={stage.id}>
+          <article className={`flow-stage layout-${stage.layout}`}>
+            <header className="stage-header">
+              <div className="stage-titles">
+                <span className="stage-eyebrow">STAGE {index + 1}</span>
+                <h3>{stage.title}</h3>
+                <p>{stage.detail}</p>
+              </div>
+              {stage.marker ? (
+                <span className={`stage-marker marker-${stage.marker.kind}`}>
+                  <strong>{markerCopy[stage.marker.kind].glyph}</strong>
+                  {stage.marker.label}
+                </span>
+              ) : null}
+            </header>
+
+            <div className={`stage-nodes layout-${stage.layout}`}>
+              {stage.nodes.map((node) => {
+                const candidate = candidateById.get(node.id);
+                return <FlowNodeCard key={node.id} node={node} candidate={candidate} />;
+              })}
+            </div>
+          </article>
+
+          {index < stages.length - 1 && (
+            <StageConnector
+              edges={interStageEdges[index] ?? []}
+              isRemote={(interStageEdges[index] ?? []).some((edge) => edge.edge_type === "remote_a2a")}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flow-workspace">
@@ -145,41 +207,49 @@ export function ProcessFlowView({ processFlow, moduleCandidates, onContinue }: P
 
         <GraphOverview model={graphModel} />
 
-        <div className="staged-flow" aria-label="단계별 프로세스 플로우">
-          {stages.map((stage, index) => (
-            <div className="stage-wrap" key={stage.id}>
-              <article className={`flow-stage layout-${stage.layout}`}>
-                <header className="stage-header">
-                  <div className="stage-titles">
-                    <span className="stage-eyebrow">STAGE {index + 1}</span>
-                    <h3>{stage.title}</h3>
-                    <p>{stage.detail}</p>
-                  </div>
-                  {stage.marker ? (
-                    <span className={`stage-marker marker-${stage.marker.kind}`}>
-                      <strong>{markerCopy[stage.marker.kind].glyph}</strong>
-                      {stage.marker.label}
-                    </span>
-                  ) : null}
-                </header>
+        {hasRemoteZone ? (
+          <div className="process-flow-zones" aria-label="로컬 실행 영역과 Remote A2A 경계 분리 뷰">
+            <section className="process-flow-zone process-flow-zone--local" aria-label="로컬 실행 영역">
+              <header className="process-flow-zone-head">
+                <span className="eyebrow">로컬 실행 영역</span>
+                <p>ADK 2.0 graph workflow 내부의 local handoff. Session/State와 Artifact는 이 프레임 안에서 흐릅니다.</p>
+              </header>
+              {localStagedFlow}
+            </section>
 
-                <div className={`stage-nodes layout-${stage.layout}`}>
-                  {stage.nodes.map((node) => {
-                    const candidate = candidateById.get(node.id);
-                    return <FlowNodeCard key={node.id} node={node} candidate={candidate} />;
-                  })}
+            <BoundaryConnector edges={crossingEdges} nodeById={nodeById} remoteNodeIds={remoteNodeIds} />
+
+            <section className="process-flow-zone process-flow-zone--remote" aria-label="Remote A2A 경계">
+              <header className="process-flow-zone-head">
+                <span className="eyebrow">Remote A2A 경계</span>
+                <p>독립 소유 remote agent. Agent Card · 인증 · timeout · retry · fallback · audit는 별도 계약으로 관리합니다.</p>
+              </header>
+              <div className="process-flow-zone-nodes">
+                {remoteNodes.map((node) => {
+                  const candidate = candidateById.get(node.id);
+                  return <FlowNodeCard key={node.id} node={node} candidate={candidate} />;
+                })}
+              </div>
+              {internalRemoteEdges.length ? (
+                <div className="process-flow-internal-remote" aria-label="Remote 내부 edge">
+                  <span className="eyebrow">Remote 내부 흐름</span>
+                  <ul>
+                    {internalRemoteEdges.map((edge, index) => (
+                      <li key={`${edge.from}-${edge.to}-${index}`}>
+                        <strong>{nodeById.get(edge.from)?.label ?? edge.from}</strong>
+                        <span aria-hidden="true">⇨</span>
+                        <strong>{nodeById.get(edge.to)?.label ?? edge.to}</strong>
+                        <em>{simplifyEdgeData(edge.data) || "remote_a2a"}</em>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </article>
-
-              {index < stages.length - 1 && (
-                <StageConnector
-                  edges={interStageEdges[index] ?? []}
-                  isRemote={(interStageEdges[index] ?? []).some((edge) => edge.edge_type === "remote_a2a")}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+              ) : null}
+            </section>
+          </div>
+        ) : (
+          localStagedFlow
+        )}
 
         <GraphRouteBoard model={graphModel} />
       </section>
@@ -434,6 +504,56 @@ function StageConnector({ edges, isRemote }: { edges: FlowEdge[]; isRemote: bool
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function BoundaryConnector({
+  edges,
+  nodeById,
+  remoteNodeIds
+}: {
+  edges: FlowEdge[];
+  nodeById: Map<string, FlowNode>;
+  remoteNodeIds: Set<string>;
+}) {
+  if (!edges.length) {
+    return (
+      <div className="process-flow-boundary-edges empty" aria-hidden="true">
+        <div className="stage-connector remote" aria-hidden="true">
+          <div className="stage-connector-arrow">⇨</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="process-flow-boundary-edges" aria-label="로컬과 Remote A2A 경계를 가로지르는 edge">
+      <ul>
+        {edges.map((edge, index) => {
+          const outbound = remoteNodeIds.has(edge.to);
+          const fromNode = nodeById.get(edge.from);
+          const toNode = nodeById.get(edge.to);
+          const arrow = outbound ? "⇨" : "⇦";
+          const directionLabel = outbound ? "→ Remote A2A →" : "← Remote A2A ←";
+          const label = simplifyEdgeData(edge.data) || "remote_a2a";
+          return (
+            <li
+              key={`${edge.from}-${edge.to}-${index}`}
+              className={`boundary-edge ${outbound ? "outbound" : "inbound"}`}
+            >
+              <span className="boundary-edge-direction">{directionLabel}</span>
+              <div className="boundary-edge-path">
+                <strong>{fromNode?.label ?? edge.from}</strong>
+                <span className="boundary-edge-arrow" aria-hidden="true">
+                  {arrow}
+                </span>
+                <strong>{toNode?.label ?? edge.to}</strong>
+              </div>
+              <span className="boundary-edge-label">{label}</span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -1,0 +1,159 @@
+{
+  "normalizedRequirement": {
+    "id": "req-001",
+    "title": "Rule-based case routing by maintained thresholds",
+    "raw_text": "We need to route incoming cases by priority thresholds that the operations team maintains in a versioned rule registry. Each threshold change has an effective date and must remain auditable. The route output is one of a small set of branch values.",
+    "domain": "customer-service",
+    "requester": {
+      "team": "support-operations",
+      "role": "business-user"
+    },
+    "business_goal": "Apply the maintained priority thresholds consistently and keep an audit trail of which version was used.",
+    "current_process": [
+      "Read the case classification",
+      "Look up the current routing thresholds",
+      "Pick the matching route branch"
+    ],
+    "inputs": [
+      { "name": "case_classification", "type": "string", "required": true }
+    ],
+    "outputs": [
+      { "name": "route_branch", "type": "string", "required": true }
+    ],
+    "systems": [
+      { "name": "routing_rule_registry", "access": "read" }
+    ],
+    "risk_signals": ["audit_required"],
+    "missing_information": [
+      "registry owner",
+      "versioning rule",
+      "effective date policy"
+    ],
+    "contradictions": [],
+    "status": "draft"
+  },
+  "evidence": {
+    "requested_goal": "Route cases by maintained rule thresholds.",
+    "business_domain_hint": "customer-service",
+    "user_role": "business-user",
+    "input_data": ["case_classification"],
+    "output_data": ["route_branch"],
+    "systems_mentioned": ["routing_rule_registry"],
+    "decisions_implied": ["pick a branch from the rule registry"],
+    "risk_signals": ["audit_required"],
+    "missing_information": ["registry owner", "versioning rule", "effective date policy"],
+    "contradictions": [],
+    "assumptions": ["routing is deterministic; rule registry is the single source of truth"]
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "name": "case_routing_rule_registry",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "rule_registry",
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "metadata_registry",
+      "confidence": 0.79,
+      "rationale": "Maintained, versioned routing thresholds with effective dates fit the rule_registry adapter subtype.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "returns the matching route branch as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        { "name": "case_classification", "type": "string", "required": true }
+      ],
+      "outputs": [
+        { "name": "route_branch", "type": "string", "required": true },
+        { "name": "rule_version", "type": "string", "required": true },
+        { "name": "effective_date", "type": "string", "required": true }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "low",
+      "risk_signals": ["audit_required"],
+      "status": "needs_info",
+      "missing_information": ["registry owner", "versioning rule", "effective date policy"],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": true,
+      "effective_date_required": true,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    }
+  ],
+  "a2aContracts": [],
+  "processFlow": {
+    "requirement_id": "req-001",
+    "nodes": [
+      { "id": "case_classification", "label": "case_classification", "type": "input", "subtype": null },
+      { "id": "mod-001", "label": "case_routing_rule_registry", "type": "adapter", "subtype": "rule_registry" },
+      { "id": "route_high", "label": "route_high", "type": "output", "subtype": null },
+      { "id": "route_standard", "label": "route_standard", "type": "output", "subtype": null },
+      { "id": "route_low", "label": "route_low", "type": "output", "subtype": null }
+    ],
+    "edges": [
+      {
+        "from": "case_classification",
+        "to": "mod-001",
+        "data": "classification key",
+        "edge_type": "local",
+        "data_channel": "event_output",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "RoutingLookupInput",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "route_high",
+        "data": "selected branch when threshold matches high",
+        "edge_type": "local",
+        "data_channel": "route",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": null,
+        "route_condition": "route_branch == 'high'"
+      },
+      {
+        "from": "mod-001",
+        "to": "route_standard",
+        "data": "selected branch when threshold matches standard",
+        "edge_type": "local",
+        "data_channel": "route",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": null,
+        "route_condition": "route_branch == 'standard'"
+      },
+      {
+        "from": "mod-001",
+        "to": "route_low",
+        "data": "selected branch when threshold matches low",
+        "edge_type": "local",
+        "data_channel": "route",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": null,
+        "route_condition": "route_branch == 'low'"
+      }
+    ]
+  }
+}

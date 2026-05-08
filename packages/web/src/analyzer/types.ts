@@ -60,6 +60,104 @@ export const codexAnalyzerModels = [
   "gpt-5.3-codex-spark"
 ] as const;
 
+// A2A 1.0/latest contract enumerations.
+// These constants are the single source of truth for the validator and UI.
+export const A2A_OPERATION_NAMES = [
+  "SendMessage",
+  "SendStreamingMessage",
+  "GetTask",
+  "SubscribeToTask",
+  "CancelTask",
+  "ListTasks"
+] as const;
+
+export const A2A_HTTP_PATHS = [
+  "/message:send",
+  "/message:stream",
+  "/tasks/{id}",
+  "/tasks/{id}:subscribe",
+  "/tasks/{id}:cancel"
+] as const;
+
+export const A2A_TASK_STATES = [
+  "TASK_STATE_SUBMITTED",
+  "TASK_STATE_WORKING",
+  "TASK_STATE_INPUT_REQUIRED",
+  "TASK_STATE_AUTH_REQUIRED",
+  "TASK_STATE_COMPLETED",
+  "TASK_STATE_FAILED",
+  "TASK_STATE_CANCELED",
+  "TASK_STATE_REJECTED"
+] as const;
+
+export const A2A_PART_FIELDS = ["text", "raw", "url", "data"] as const;
+
+export const A2A_ROLES = ["ROLE_USER", "ROLE_AGENT"] as const;
+
+export const A2A_STREAM_WRAPPERS = ["task", "message", "taskStatusUpdate", "taskArtifactUpdate"] as const;
+
+export const A2A_CONTRACT_STATUSES = ["draft", "needs_info", "approved"] as const;
+
+// Stale terminology that must not appear inside a serialized contract object.
+// Per spec §5 last paragraph: old slash-form ops, legacy request wrapper names,
+// lowercase task states, bare task states without TASK_STATE_ prefix, removed
+// terminal stream markers, removed stream discriminators, old concrete Part
+// class names, and `file` as a Part content field.
+export const A2A_STALE_NAMES = [
+  // old slash-form operation names
+  "tasks/send",
+  "tasks/sendSubscribe",
+  "tasks/get",
+  "tasks/cancel",
+  "tasks/pushNotification/set",
+  "tasks/pushNotification/get",
+  "tasks/resubscribe",
+  "tasks/list",
+  // legacy request wrapper names
+  "SendTaskRequest",
+  "SendTaskResponse",
+  "SendTaskStreamingRequest",
+  "SendTaskStreamingResponse",
+  "GetTaskRequest",
+  "GetTaskResponse",
+  "CancelTaskRequest",
+  "CancelTaskResponse",
+  "TaskSendParams",
+  "TaskQueryParams",
+  "TaskIdParams",
+  // lowercase task-state words
+  "submitted",
+  "working",
+  "input-required",
+  "completed",
+  "failed",
+  "canceled",
+  "rejected",
+  "auth-required",
+  // bare task states without TASK_STATE_ prefix
+  "SUBMITTED",
+  "WORKING",
+  "INPUT_REQUIRED",
+  "AUTH_REQUIRED",
+  "COMPLETED",
+  "FAILED",
+  "CANCELED",
+  "REJECTED",
+  // removed terminal stream markers
+  "final",
+  "TaskStatusUpdateEvent",
+  "TaskArtifactUpdateEvent",
+  // removed stream discriminators
+  "isFinal",
+  "lastChunk",
+  // old concrete Part class names
+  "TextPart",
+  "FilePart",
+  "DataPart",
+  // `file` as a Part content field
+  "file"
+] as const;
+
 export type ModuleCategory = (typeof moduleCategories)[number];
 export type AdapterKind = (typeof adapterKinds)[number];
 export type AgentKind = (typeof agentKinds)[number];
@@ -72,6 +170,15 @@ export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
 export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
 export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
+
+export type A2AOperationName = (typeof A2A_OPERATION_NAMES)[number];
+export type A2AHttpPath = (typeof A2A_HTTP_PATHS)[number];
+export type A2ATaskState = (typeof A2A_TASK_STATES)[number];
+export type TaskState = A2ATaskState;
+export type A2APartField = (typeof A2A_PART_FIELDS)[number];
+export type A2ARole = (typeof A2A_ROLES)[number];
+export type A2AStreamWrapper = (typeof A2A_STREAM_WRAPPERS)[number];
+export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
 
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
@@ -179,7 +286,81 @@ export interface ModuleCandidate {
   fallback?: string;
   audit?: string;
   data_policy?: string;
+  /**
+   * For remote_a2a candidates this links 1:1 to an A2AContract by contract_id.
+   * Required at validator time when module_category === "remote_a2a"; null or
+   * undefined for non-remote candidates.
+   */
+  a2a_contract_id?: string | null;
   developer_todos?: string[];
+}
+
+/**
+ * A2A 1.0/latest interaction contract for a single remote_a2a candidate.
+ * Spec §5. String fields use the runtime convention that the literal
+ * "needs_info" is a placeholder satisfying presence but flagged for review.
+ */
+export interface A2AContract {
+  /** Pattern: a2a-NNN. */
+  contract_id: string;
+  /** Must reference an existing remote_a2a ModuleCandidate id. */
+  remote_module_id: string;
+  target_agent_name: string;
+  target_agent_purpose: string;
+  contract_status: A2AContractStatus;
+  agent_card: {
+    discovery_method: string;
+    agent_card_url: string;
+    version: string;
+    notes: string;
+  };
+  supported_interfaces: Array<{
+    url: string;
+    protocol_binding: string;
+    protocol_version: string;
+    tenant_policy: string;
+  }>;
+  input_modes: string[];
+  output_modes: string[];
+  security_schemes: Array<{ name: string; scheme: string }>;
+  security_requirements: Array<{ scheme_name: string; scopes: string[] }>;
+  skills: string[];
+  extensions: string[];
+  message_contract: {
+    allowed_part_fields: A2APartField[];
+    allowed_roles: A2ARole[];
+  };
+  task_lifecycle: {
+    states: TaskState[];
+    allowed_transitions: Array<{ from: TaskState; to: TaskState }>;
+    terminal_states: TaskState[];
+    input_required_followup: string;
+    auth_required_followup: string;
+  };
+  streaming: {
+    supported: boolean;
+    wrappers: A2AStreamWrapper[];
+    non_streaming_fallback: string;
+  };
+  operations: A2AOperationName[];
+  http_paths: A2AHttpPath[];
+  artifact_contract: {
+    mutation_rules: string;
+    chunking_policy: string;
+  };
+  adk_host_mapping: string;
+  timeout: string;
+  retry: string;
+  fallback: string;
+  cancellation: string;
+  unsupported_operation: string;
+  get_task_fallback: string;
+  /** Spec §5 explicitly allows null when no push notification policy is required. */
+  push_notification_policy: string | null;
+  auth: string;
+  token_handling: string;
+  audit: string;
+  data_policy: string;
 }
 
 export interface CatalogBinding {
@@ -333,6 +514,12 @@ export interface AnalysisResult {
   normalizedRequirement: NormalizedRequirement;
   evidence: EvidenceSummary;
   moduleCandidates: ModuleCandidate[];
+  /**
+   * A2A 1.0 contracts for remote_a2a candidates. Always present; empty array
+   * when no remote_a2a candidates exist. 1:1 pairing with remote candidates
+   * is enforced by the validator.
+   */
+  a2aContracts: A2AContract[];
   processFlow: ProcessFlow;
 }
 

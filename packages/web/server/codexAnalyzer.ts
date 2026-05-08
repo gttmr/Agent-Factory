@@ -3,6 +3,18 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  A2A_HTTP_PATHS,
+  A2A_OPERATION_NAMES,
+  A2A_PART_FIELDS,
+  A2A_ROLES,
+  A2A_STALE_NAMES,
+  A2A_STREAM_WRAPPERS,
+  A2A_TASK_STATES
+} from "../src/analyzer/types";
+import { normalizeA2A } from "../src/analyzer/a2aNormalize";
+import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
+import type { AnalysisResult } from "../src/analyzer/types";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -185,7 +197,12 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
         }
 
         const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model, catalog });
-        const result = normalizeAnalysisResult(run.output);
+        const baseline = normalizeAnalysisResult(run.output);
+        const result = applyA2ANormalization(baseline, {
+          model,
+          timeoutMs: run.timeoutMs,
+          elapsedMs: run.diagnostics.elapsedMs
+        });
         const errors = validateAnalysisResult(result);
         if (errors.length) {
           console.error("[codex-analyzer] 응답 검증 실패:", errors);
@@ -245,7 +262,13 @@ async function runStreamingAnalysis({
       catalog,
       onProgress: writeProgress
     });
-    const result = normalizeAnalysisResult(run.output);
+    const baseline = normalizeAnalysisResult(run.output);
+    const result = applyA2ANormalization(baseline, {
+      model,
+      timeoutMs: run.timeoutMs,
+      elapsedMs: run.diagnostics.elapsedMs,
+      onProgress: writeProgress
+    });
     const errors = validateAnalysisResult(result);
     if (errors.length) {
       console.error("[codex-analyzer] 응답 검증 실패:", errors);
@@ -569,6 +592,10 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Use state_key only when the edge writes or reads ADK Session/State. Prefix key names deliberately: temp: for invocation-scoped intermediates, user: for user-scoped state, app: for app-scoped state, or no prefix for session state. Use artifact_key only when the edge passes or stores a named artifact. Use route_condition for branch route values or human approval outcomes.",
     "- Include branch:, parallel:, or loop: prefixes in edge data only when those structures are supported by the requirement.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
+    "- Always emit a2aContracts at the top level of the AnalysisResult. Use an empty array when there are no remote_a2a candidates; never omit the key.",
+    "- For every remote_a2a candidate, emit exactly one paired A2AContract object inside a2aContracts. The contract's contract_id must match the pattern a2a-NNN (a2a-001, a2a-002, ... numbered sequentially with no gaps). The candidate's a2a_contract_id must equal that contract_id, and the contract's remote_module_id must equal the candidate's id (e.g. mod-003).",
+    "- When a required A2A contract field cannot be derived from the requirement, set the string field to the literal value \"needs_info\". For arrays only use [] where the schema permits an empty array. For task_lifecycle.states, default to [\"TASK_STATE_SUBMITTED\"]. For streaming.supported, default to false. For streaming.wrappers, default to []. For push_notification_policy, use null when no push policy applies.",
+    "- The candidate-side contract summary fields (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy, a2a_contract_id) must each carry a non-empty string. If unknown, set the field to \"needs_info\" and also append the field name to the candidate's missing_information array.",
     "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
     "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all. Route 2.0 trace/token observability hints into artifacts_events (event/token retention) and callbacks (instrumentation hooks); do not invent new hint keys.",
     "- Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
@@ -582,6 +609,24 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Retrieval and Rule Registry are adapter_kind values, not top-level categories.",
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
+    "",
+    "A2A 1.0/latest vocabulary (use ONLY these names inside any A2AContract object — no other variants):",
+    `- Operation names (operations[]): ${A2A_OPERATION_NAMES.map((name) => `\`${name}\``).join(" | ")}`,
+    `- HTTP+JSON paths (http_paths[]): ${A2A_HTTP_PATHS.map((p) => `\`${p}\``).join(" | ")}`,
+    `- Task states (task_lifecycle.states[], task_lifecycle.terminal_states[], allowed_transitions[]): ${A2A_TASK_STATES.map(
+      (state) => `\`${state}\``
+    ).join(" | ")}`,
+    `- Stream wrappers (streaming.wrappers[]): ${A2A_STREAM_WRAPPERS.map((w) => `\`${w}\``).join(" | ")}`,
+    `- Part content fields (message_contract.allowed_part_fields[]): ${A2A_PART_FIELDS.map(
+      (f) => `\`${f}\``
+    ).join(" | ")} — never \`file\``,
+    `- Roles (message_contract.allowed_roles[]): ${A2A_ROLES.map((r) => `\`${r}\``).join(" | ")}`,
+    "",
+    "A2A terminology denylist — never emit any of these tokens inside an A2AContract object (the validator scans for them and will reject the output):",
+    `- ${A2A_STALE_NAMES.map((name) => `\`${name}\``).join(", ")}`,
+    "  Specifically: do not use slash-form ops (tasks/send, tasks/sendSubscribe, tasks/get, tasks/cancel), legacy request wrapper names (SendTaskRequest, GetTaskRequest, ...), lowercase task-state words (submitted, working, ...), bare task states without TASK_STATE_ prefix (SUBMITTED, WORKING, ...), TextPart/FilePart/DataPart class names, or `file` as a Part content field.",
+    "",
+    "Remote A2A discipline (spec §4) — Remote A2A is high-friction and must not be inferred from multi-step local processing alone. Only classify a candidate as remote_a2a when there is explicit evidence of an independently owned, deployed, discoverable remote agent (separate owner/lifecycle, Agent Card or registry discovery, A2A-specific lifecycle/streaming/artifact semantics, cross-deployment delegation). When such evidence is missing but the requirement otherwise looks remote-shaped, classify the capability as agent/workflow/adapter and append the missing remote details (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy) to missing_information rather than fabricating a Remote A2A boundary.",
     "",
     "Korean prose for human-visible fields; keep engineering terms in English (Agent, Workflow, Adapter, Remote A2A, module_category, adapter_kind, Session/State, placeholder).",
     "Preserve important rawText terms and make rationales specific enough that a reviewer can explain why each module exists."
@@ -1522,6 +1567,80 @@ function normalizeAnalysisResult(value: unknown): unknown {
     };
   }
   return normalized;
+}
+
+interface A2ANormalizationContext {
+  model: string;
+  timeoutMs: number;
+  elapsedMs: number;
+  onProgress?: (event: AnalyzerProgressEvent) => void;
+}
+
+/**
+ * Run the shared A2A normalization pass after the Codex CLI returns and
+ * before the validator runs. Fills missing remote-A2A contract summary
+ * fields with the literal "needs_info", mints a placeholder contract for
+ * any remote_a2a candidate that lacks one, and drops orphan contracts.
+ *
+ * Diagnostics are emitted onto the existing SSE diagnostic channel (when
+ * streaming) so they show up in the live trace panel, and onto console.info
+ * either way so non-streaming callers still get an audit trail. We do not
+ * invent a new event channel — `phase: "diagnostic"` is the same channel the
+ * trace panel already consumes.
+ */
+function applyA2ANormalization(value: unknown, ctx: A2ANormalizationContext): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  // The shared module is typed against AnalysisResult. The runtime shape
+  // matches by construction (normalizeAnalysisResult preceded us); we cast
+  // through unknown to avoid a structural-assignability impedance mismatch
+  // with `unknown` upstream.
+  const { result, diagnostics } = normalizeA2A(value as unknown as AnalysisResult);
+  if (diagnostics.length > 0) {
+    emitA2ADiagnostics(diagnostics, ctx);
+  }
+  return result;
+}
+
+function emitA2ADiagnostics(diagnostics: A2ANormalizationDiagnostic[], ctx: A2ANormalizationContext) {
+  const at = new Date().toISOString();
+  for (const diag of diagnostics) {
+    console.info("[codex-analyzer] a2a normalization", {
+      kind: diag.kind,
+      subjectId: diag.subjectId,
+      fields: diag.fields,
+      message: diag.message
+    });
+    if (!ctx.onProgress) continue;
+    ctx.onProgress({
+      phase: "diagnostic",
+      message: diag.message,
+      at,
+      elapsedMs: ctx.elapsedMs,
+      model: ctx.model,
+      timeoutMs: ctx.timeoutMs,
+      traceKind: "diagnostic",
+      title: a2aDiagnosticTitle(diag.kind),
+      snippet: diag.fields && diag.fields.length ? diag.fields.join(", ") : undefined,
+      status: "info"
+    });
+  }
+}
+
+function a2aDiagnosticTitle(kind: A2ANormalizationDiagnostic["kind"]): string {
+  switch (kind) {
+    case "candidate_filled":
+      return "A2A 후보 placeholder";
+    case "contract_filled":
+      return "A2A 계약 placeholder";
+    case "contract_minted":
+      return "A2A 계약 자동 생성";
+    case "contract_orphan_removed":
+      return "고아 A2A 계약 제거";
+    default:
+      return "A2A 정규화";
+  }
 }
 
 function normalizeCandidate(candidate: Record<string, unknown>): Record<string, unknown> {

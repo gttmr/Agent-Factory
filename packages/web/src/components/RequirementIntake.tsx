@@ -16,6 +16,7 @@ interface RequirementIntakeProps {
   onInputChange: (input: RequirementIntakeInput) => void;
   onAnalyze: () => void;
   onLoadExample: () => void;
+  onLoadRemoteA2AExample: () => void;
   onClear: () => void;
   validationMessage: string;
   isAnalyzing: boolean;
@@ -54,6 +55,7 @@ export function RequirementIntake({
   onInputChange,
   onAnalyze,
   onLoadExample,
+  onLoadRemoteA2AExample,
   onClear,
   validationMessage,
   isAnalyzing,
@@ -173,6 +175,9 @@ export function RequirementIntake({
           </button>
           <button type="button" onClick={onLoadExample}>
             예시 불러오기
+          </button>
+          <button type="button" onClick={onLoadRemoteA2AExample}>
+            Remote A2A 예시 불러오기
           </button>
           <button type="button" onClick={onClear}>
             초기화

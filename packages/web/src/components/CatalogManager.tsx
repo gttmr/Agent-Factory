@@ -26,8 +26,9 @@ import type {
   RemoteContractKind,
   WorkflowKind
 } from "../analyzer/types";
-import type { CatalogEntry, CatalogEntrySnapshot } from "../catalog/types";
+import type { CatalogEntry, CatalogEntrySnapshot, RuntimeBinding } from "../catalog/types";
 import { buildChangeSet, snapshotOf } from "../catalog/diff";
+import { refreshRuntimeBinding } from "../catalog/runtimeBinding";
 import { CategoryBadge, ProtocolBadge, SubtypeBadge, categoryClass } from "./CategoryBadge";
 
 type CatalogTab = "registered" | "new" | "fromAnalysis";
@@ -54,6 +55,13 @@ const provenanceClass: Record<CatalogEntry["provenance"], string> = {
 };
 
 const componentSources: ComponentSource[] = ["python_package", "mcp", "stub"];
+
+const runtimeBindingLabels: Record<RuntimeBinding, string> = {
+  unresolved: "unresolved",
+  mcp: "mcp",
+  stub: "stub",
+  remote_a2a: "remote_a2a"
+};
 
 export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onContinue }: CatalogManagerProps) {
   const [activeTab, setActiveTab] = useState<CatalogTab>("registered");
@@ -90,10 +98,10 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
       entries.map((entry) => {
         if (entry.id !== editingId) return entry;
         if (entry.provenance === "session_added") {
-          return { ...draft, provenance: "session_added" };
+          return refreshRuntimeBinding({ ...draft, provenance: "session_added" });
         }
         const baseSnapshot = entry.originalSnapshot ?? snapshotOf(entry);
-        return { ...draft, provenance: "session_edited", originalSnapshot: baseSnapshot };
+        return refreshRuntimeBinding({ ...draft, provenance: "session_edited", originalSnapshot: baseSnapshot });
       })
     );
     cancelEdit();
@@ -110,7 +118,7 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
     setEditingId(id);
     setDraft(empty);
     setActiveTab("registered");
-    onEntriesChange([...entries, empty]);
+    onEntriesChange([...entries, refreshRuntimeBinding(empty)]);
   }
 
   function deleteEntry(entry: CatalogEntry) {
@@ -167,7 +175,7 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
       risk_signals: candidate.risk_signals,
       provenance: "session_added"
     };
-    onEntriesChange([...entries, newEntry]);
+    onEntriesChange([...entries, refreshRuntimeBinding(newEntry)]);
     setActiveTab("registered");
   }
 
@@ -313,6 +321,11 @@ function RegisteredTab({
                   <CategoryBadge category={entry.module_category} />
                   {subtypeForEntry(entry) ? <SubtypeBadge value={subtypeForEntry(entry)!} /> : null}
                   {entry.access_protocol ? <ProtocolBadge value={entry.access_protocol} /> : null}
+                  {entry.runtime_binding ? (
+                    <span className={`runtime-binding-badge runtime-binding-${entry.runtime_binding}`}>
+                      {runtimeBindingLabels[entry.runtime_binding]}
+                    </span>
+                  ) : null}
                   <span className={`prov-badge ${provenanceClass[entry.provenance]}`}>
                     {provenanceLabel[entry.provenance]}
                   </span>

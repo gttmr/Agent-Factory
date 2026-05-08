@@ -51,9 +51,16 @@ interface ModuleReviewProps {
   catalogEntries: CatalogEntry[];
   onModuleCandidatesChange: (candidates: ModuleCandidate[]) => void;
   onContinue: () => void;
+  onNavigateToA2AContracts?: () => void;
 }
 
-export function ModuleReview({ moduleCandidates, catalogEntries, onModuleCandidatesChange, onContinue }: ModuleReviewProps) {
+export function ModuleReview({
+  moduleCandidates,
+  catalogEntries,
+  onModuleCandidatesChange,
+  onContinue,
+  onNavigateToA2AContracts
+}: ModuleReviewProps) {
   function updateCandidate(id: string, changes: Partial<ModuleCandidate>) {
     onModuleCandidatesChange(
       moduleCandidates.map((candidate) => (candidate.id === id ? { ...candidate, ...changes } : candidate))
@@ -191,6 +198,15 @@ export function ModuleReview({ moduleCandidates, catalogEntries, onModuleCandida
                 </td>
                 <td>
                   <NextAction candidate={candidate} />
+                  {candidate.module_category === "remote_a2a" && onNavigateToA2AContracts ? (
+                    <button
+                      type="button"
+                      className="a2a-review-link"
+                      onClick={onNavigateToA2AContracts}
+                    >
+                      Remote A2A 계약 검토 →
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             ))}

@@ -1,0 +1,239 @@
+{
+  "normalizedRequirement": {
+    "id": "req-001",
+    "title": "Delegate credit analysis to an externally owned remote agent",
+    "raw_text": "We need to delegate part of our intake workflow to a remote credit analysis agent that is owned and operated by an independent partner organization. The remote agent is discovered through a published Agent Card. Our local workflow must call it through the A2A protocol with auth, lifecycle, timeout, retry, and audit. Some protocol details such as Agent Card version, skill list, streaming support, and push notification policy are still being agreed with the partner.",
+    "domain": "customer-service",
+    "requester": {
+      "team": "support-operations",
+      "role": "business-user"
+    },
+    "business_goal": "Use the partner-owned credit analysis agent for specialist analysis without rebuilding it locally.",
+    "current_process": [
+      "Receive the intake request locally",
+      "Prepare a delegated task payload",
+      "Call the partner-owned remote agent through A2A",
+      "Track the remote task lifecycle",
+      "Receive the remote analysis result and continue locally"
+    ],
+    "inputs": [
+      { "name": "intake_request", "type": "object", "required": true }
+    ],
+    "outputs": [
+      { "name": "remote_analysis_result", "type": "object", "required": true }
+    ],
+    "systems": [
+      { "name": "partner_credit_analysis_agent", "access": "unknown" }
+    ],
+    "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+    "missing_information": [
+      "Agent Card version",
+      "Skill list",
+      "Streaming support",
+      "Push notification policy"
+    ],
+    "contradictions": [],
+    "status": "draft"
+  },
+  "evidence": {
+    "requested_goal": "Delegate analysis to an independently owned remote specialist agent discovered through an Agent Card.",
+    "business_domain_hint": "customer-service",
+    "user_role": "business-user",
+    "input_data": ["intake_request"],
+    "output_data": ["remote_analysis_result"],
+    "systems_mentioned": ["partner_credit_analysis_agent"],
+    "decisions_implied": ["delegate to remote partner", "track remote lifecycle"],
+    "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+    "missing_information": [
+      "Agent Card version",
+      "Skill list",
+      "Streaming support",
+      "Push notification policy"
+    ],
+    "contradictions": [],
+    "assumptions": [
+      "Partner organization owns and operates the remote agent independently",
+      "Discovery is through a published Agent Card URL",
+      "Communication uses A2A protocol with full contract"
+    ]
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "name": "remote_credit_analysis_agent",
+      "module_category": "remote_a2a",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": "a2a",
+      "legacy_recommended_type": "remote_a2a_contract",
+      "confidence": 0.74,
+      "rationale": "The remote agent is owned by an independent partner organization, discovered through a published Agent Card, and called through the A2A protocol — this is a true remote agent boundary, not a local multi-step workflow.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": null,
+        "mcp_a2a": "remote A2A peer; ADK host calls partner Agent Card endpoint",
+        "streaming_grounding": null
+      },
+      "inputs": [
+        { "name": "delegated_task", "type": "object", "required": true }
+      ],
+      "outputs": [
+        { "name": "remote_analysis_result", "type": "object", "required": true }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "high",
+      "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+      "status": "needs_info",
+      "missing_information": [
+        "Agent Card version",
+        "Skill list",
+        "Streaming support",
+        "Push notification policy"
+      ],
+      "side_effect": "read_write",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": "CreditInsightCo (external partner)",
+      "agent_card": "https://creditinsightco.example/.well-known/agent.json",
+      "auth": "OAuth2 client credentials issued by CreditInsightCo",
+      "task_lifecycle": "asynchronous task with submission, working, and terminal outcome states tracked locally",
+      "timeout": "60s overall, 10s connect",
+      "retry": "max 2 attempts with exponential backoff on transient errors only",
+      "fallback": "route to human reviewer when remote outcome is not produced within budget",
+      "audit": "log every remote call, lifecycle transition, and outcome to the audit trail",
+      "data_policy": "tokenize personal data before sending; remote may not retain payload beyond task duration",
+      "a2a_contract_id": "a2a-001"
+    }
+  ],
+  "a2aContracts": [
+    {
+      "contract_id": "a2a-001",
+      "remote_module_id": "mod-001",
+      "target_agent_name": "CreditInsightCo Credit Analyzer",
+      "target_agent_purpose": "Run partner-owned credit analysis on delegated tasks and return a structured analysis result.",
+      "contract_status": "needs_info",
+      "agent_card": {
+        "discovery_method": "well-known Agent Card URL published by the partner",
+        "agent_card_url": "https://creditinsightco.example/.well-known/agent.json",
+        "version": "needs_info",
+        "notes": "Partner has not pinned an Agent Card version yet; review pending."
+      },
+      "supported_interfaces": [
+        {
+          "url": "https://creditinsightco.example/a2a",
+          "protocol_binding": "HTTP+JSON",
+          "protocol_version": "A2A 1.0",
+          "tenant_policy": "single tenant per client credential"
+        }
+      ],
+      "input_modes": ["application/json"],
+      "output_modes": ["application/json"],
+      "security_schemes": [
+        { "name": "partnerOAuth2", "scheme": "oauth2_client_credentials" }
+      ],
+      "security_requirements": [
+        { "scheme_name": "partnerOAuth2", "scopes": ["credit.analyze"] }
+      ],
+      "skills": ["needs_info"],
+      "extensions": [],
+      "message_contract": {
+        "allowed_part_fields": ["text", "data"],
+        "allowed_roles": ["ROLE_USER", "ROLE_AGENT"]
+      },
+      "task_lifecycle": {
+        "states": [
+          "TASK_STATE_SUBMITTED",
+          "TASK_STATE_WORKING",
+          "TASK_STATE_INPUT_REQUIRED",
+          "TASK_STATE_AUTH_REQUIRED",
+          "TASK_STATE_COMPLETED",
+          "TASK_STATE_FAILED",
+          "TASK_STATE_CANCELED",
+          "TASK_STATE_REJECTED"
+        ],
+        "allowed_transitions": [
+          { "from": "TASK_STATE_SUBMITTED", "to": "TASK_STATE_WORKING" },
+          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_INPUT_REQUIRED" },
+          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_AUTH_REQUIRED" },
+          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_COMPLETED" },
+          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_FAILED" },
+          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_CANCELED" },
+          { "from": "TASK_STATE_INPUT_REQUIRED", "to": "TASK_STATE_WORKING" },
+          { "from": "TASK_STATE_AUTH_REQUIRED", "to": "TASK_STATE_WORKING" }
+        ],
+        "terminal_states": [
+          "TASK_STATE_COMPLETED",
+          "TASK_STATE_FAILED",
+          "TASK_STATE_CANCELED",
+          "TASK_STATE_REJECTED"
+        ],
+        "input_required_followup": "raise additional question to local workflow operator and resume task once answer arrives",
+        "auth_required_followup": "refresh partner OAuth2 token through credential manager and resume task"
+      },
+      "streaming": {
+        "supported": false,
+        "wrappers": [],
+        "non_streaming_fallback": "use SendMessage and poll GetTask until a terminal lifecycle outcome is reached"
+      },
+      "operations": ["SendMessage", "GetTask", "CancelTask"],
+      "http_paths": ["/message:send", "/tasks/{id}", "/tasks/{id}:cancel"],
+      "artifact_contract": {
+        "mutation_rules": "remote may emit artifact updates only through taskArtifactUpdate stream wrapper events",
+        "chunking_policy": "no chunking expected for the analysis result payload"
+      },
+      "adk_host_mapping": "ADK host treats this peer as a remote A2A peer mapped through the partner Agent Card",
+      "timeout": "60s overall budget; 10s connect timeout",
+      "retry": "max 2 attempts with exponential backoff on transient transport errors only",
+      "fallback": "route to local human reviewer when no terminal outcome arrives within timeout",
+      "cancellation": "issue CancelTask through /tasks/{id}:cancel and mark local task as cancellation requested",
+      "unsupported_operation": "if the remote rejects an operation, surface the error and skip retries",
+      "get_task_fallback": "poll GetTask every 5s when streaming is not negotiated",
+      "push_notification_policy": null,
+      "auth": "OAuth2 client credentials issued by partner; rotate weekly",
+      "token_handling": "store tokens in the local secret manager; never persist on disk",
+      "audit": "log every operation, lifecycle transition, and outcome to the local audit trail",
+      "data_policy": "tokenize personal data before sending; partner may not retain payload past the task lifetime"
+    }
+  ],
+  "processFlow": {
+    "requirement_id": "req-001",
+    "nodes": [
+      { "id": "intake_request", "label": "intake_request", "type": "input", "subtype": null },
+      { "id": "mod-001", "label": "remote_credit_analysis_agent", "type": "remote_a2a", "subtype": "a2a" },
+      { "id": "remote_analysis_result", "label": "remote_analysis_result", "type": "output", "subtype": null }
+    ],
+    "edges": [
+      {
+        "from": "intake_request",
+        "to": "mod-001",
+        "data": "delegated task payload",
+        "edge_type": "remote_a2a",
+        "data_channel": "event_message",
+        "state_key": null,
+        "artifact_key": null,
+        "schema_ref": "DelegatedTask",
+        "route_condition": null
+      },
+      {
+        "from": "mod-001",
+        "to": "remote_analysis_result",
+        "data": "remote analysis outcome returned through A2A task lifecycle",
+        "edge_type": "remote_a2a",
+        "data_channel": "artifact",
+        "state_key": null,
+        "artifact_key": "remote_analysis_artifact",
+        "schema_ref": "RemoteAnalysisResult",
+        "route_condition": null
+      }
+    ]
+  }
+}

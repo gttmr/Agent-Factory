@@ -5,6 +5,7 @@ import type {
   CodexAnalyzerModel,
   RequirementIntakeInput
 } from "./types";
+import { normalizeA2A } from "./a2aNormalize";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -58,11 +59,24 @@ export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
     const contentType = response.headers.get("Content-Type") ?? "";
     if (!contentType.includes("text/event-stream") || !response.body) {
       const payload = await response.json().catch(() => null);
-      return payload as AnalysisResult;
+      return ensureA2AContractsField(payload as AnalysisResult);
     }
 
-    return readProgressStream(response.body, options.onProgress);
+    return ensureA2AContractsField(await readProgressStream(response.body, options.onProgress));
   }
+}
+
+// Boundary helper: defend the client AnalysisResult shape regardless of
+// whether the server-side normalization ran. Mirrors the same placeholder-fill
+// and orphan-drop rules via the shared a2aNormalize module so the UI never
+// has to handle missing fields. Diagnostics are dropped here — the server
+// already emits them onto the SSE diagnostic channel; the client boundary is
+// the silent backstop.
+function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
+  if (!result || typeof result !== "object") {
+    return result;
+  }
+  return normalizeA2A(result).result;
 }
 
 export const defaultAnalyzerProvider: AnalyzerProvider = new OpenAICompatibleAnalyzerProvider();

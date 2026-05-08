@@ -12,6 +12,15 @@ import type {
 
 export type CatalogProvenance = "seeded" | "session_added" | "session_edited" | "session_deleted";
 
+export type RuntimeBinding = "unresolved" | "mcp" | "stub" | "remote_a2a";
+
+export const runtimeBindings: readonly RuntimeBinding[] = [
+  "unresolved",
+  "mcp",
+  "stub",
+  "remote_a2a"
+];
+
 export interface CatalogEntry {
   id: string;
   name: string;
@@ -30,6 +39,7 @@ export interface CatalogEntry {
   package_version?: string;
   import_path?: string;
   callable_name?: string;
+  runtime_binding?: RuntimeBinding | null;
   owner_domain?: string;
   status?: string;
   responsibility?: string;

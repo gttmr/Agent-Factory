@@ -26,10 +26,22 @@ export function loadSavedAnalyses(): SavedAnalysisRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isSavedAnalysisRecord).slice(0, MAX_RECORDS);
+    return parsed.filter(isSavedAnalysisRecord).slice(0, MAX_RECORDS).map(backfillA2AContracts);
   } catch {
     return [];
   }
+}
+
+// Older saved records pre-date the a2aContracts field. Default to an empty
+// array on load so they satisfy the AnalysisResult type.
+function backfillA2AContracts(record: SavedAnalysisRecord): SavedAnalysisRecord {
+  if (record.analysis && !Array.isArray((record.analysis as { a2aContracts?: unknown }).a2aContracts)) {
+    return {
+      ...record,
+      analysis: { ...record.analysis, a2aContracts: [] }
+    };
+  }
+  return record;
 }
 
 export function upsertSavedAnalysis(record: SavedAnalysisRecord): SavedAnalysisRecord[] {
