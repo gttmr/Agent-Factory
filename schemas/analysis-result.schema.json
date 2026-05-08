@@ -657,7 +657,9 @@
           ]
         },
         "owner_scope": { "type": "string", "enum": ["local", "remote", "external"] },
-        "container_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "container_id": {
+          "anyOf": [{ "type": "string", "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
+        },
         "lane_id": {
           "type": "string",
           "enum": ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"]
@@ -688,7 +690,7 @@
         "is_remote_boundary_crossing"
       ],
       "properties": {
-        "id": { "type": "string" },
+        "id": { "type": "string", "pattern": "^edge-[0-9]+$" },
         "from": { "type": "string" },
         "to": { "type": "string" },
         "from_port": { "$ref": "#/$defs/nullableString" },
@@ -745,7 +747,7 @@
         "parent_container_id"
       ],
       "properties": {
-        "id": { "type": "string" },
+        "id": { "type": "string", "pattern": "^container-[a-z0-9-]+$" },
         "module_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
         "label": { "type": "string" },
         "container_kind": {
@@ -767,7 +769,9 @@
           "type": "string",
           "enum": ["dag_with_routes", "fan_out_fan_in", "loop", "linear", "free"]
         },
-        "parent_container_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+        "parent_container_id": {
+          "anyOf": [{ "type": "string", "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
+        }
       }
     },
     "graphLane": {

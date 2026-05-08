@@ -1,4 +1,4 @@
-import { normalizeGraphIRForRuntime } from "./graphMigration";
+import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -56,9 +56,10 @@ export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysi
   const requirementId =
     (analysis as { normalizedRequirement?: { id?: string } }).normalizedRequirement?.id ?? "req-001";
   const migrated = normalizeGraphIRForRuntime(flow, requirementId);
+  const validation = mergeGraphIRValidation(migrated.validation, validateGraphIRSoft(migrated));
   return {
     ...withContracts,
-    analysis: { ...analysis, processFlow: migrated }
+    analysis: { ...analysis, processFlow: { ...migrated, validation } }
   };
 }
 

@@ -76,6 +76,143 @@ function padEdgeId(index: number): string {
   return `edge-${String(index + 1).padStart(3, "0")}`;
 }
 
+function nextUnusedEdgeId(used: Set<string>): string {
+  let index = 1;
+  while (used.has(padEdgeId(index - 1))) {
+    index += 1;
+  }
+  return padEdgeId(index - 1);
+}
+
+function canonicalEdgeId(value: unknown, index: number, used: Set<string>): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  const base = (() => {
+    const canonical = raw.match(/^edge-([0-9]+)$/);
+    if (canonical) return `edge-${canonical[1]}`;
+    const shorthand = raw.match(/^e-([0-9]+)$/);
+    if (shorthand) return `edge-${shorthand[1]}`;
+    return padEdgeId(index);
+  })();
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  const next = nextUnusedEdgeId(used);
+  used.add(next);
+  return next;
+}
+
+function slugForContainerId(value: string, fallback: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/^container-/, "")
+    .replace(/^c-/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
+
+function canonicalContainerIdValue(value: unknown, fallback = "root"): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (/^container-[a-z0-9-]+$/.test(raw)) return raw;
+  return `container-${slugForContainerId(raw, fallback)}`;
+}
+
+function uniqueContainerId(base: string, used: Set<string>): string {
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  let suffix = 2;
+  while (used.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  const next = `${base}-${suffix}`;
+  used.add(next);
+  return next;
+}
+
+function resolveContainerReference(value: unknown, idMap: Map<string, string>): string | null {
+  const raw = typeof value === "string" && value.trim() ? value.trim() : null;
+  if (!raw) return null;
+  return idMap.get(raw) ?? canonicalContainerIdValue(raw);
+}
+
+const SOFT_VALIDATION_CODES = new Set([
+  "graph_not_object",
+  "duplicate_node_id",
+  "invalid_lane_id",
+  "duplicate_edge_id",
+  "invalid_edge_id",
+  "dangling_edge_endpoint",
+  "route_missing_condition",
+  "artifact_missing_key",
+  "state_missing_key",
+  "remote_missing_contract",
+  "remote_boundary_flag_missing",
+  "invalid_container_id",
+  "parallel_region_needs_two_entries",
+  "parallel_region_missing_join",
+  "loop_region_missing_back",
+  "loop_region_missing_exit"
+]);
+
+function keepNonSoftIssue(issue: GraphValidationIssue): boolean {
+  return !SOFT_VALIDATION_CODES.has(issue.code);
+}
+
+export function mergeGraphIRValidation(
+  existing: GraphValidation | undefined,
+  soft: { errors: GraphValidationIssue[]; warnings: GraphValidationIssue[] }
+): GraphValidation {
+  const baseErrors = Array.isArray(existing?.errors) ? existing.errors.filter(keepNonSoftIssue) : [];
+  const baseWarnings = Array.isArray(existing?.warnings) ? existing.warnings.filter(keepNonSoftIssue) : [];
+  const errors = [...baseErrors, ...soft.errors];
+  const warnings = [...baseWarnings, ...soft.warnings];
+  return {
+    ok: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
+function canonicalizeGraphIRIds(graphIR: GraphIR): GraphIR {
+  const usedContainerIds = new Set<string>();
+  const containerIdMap = new Map<string, string>();
+  const containers = (graphIR.containers ?? []).map((container, index) => {
+    const rawId = typeof container.id === "string" && container.id.trim() ? container.id.trim() : `container-${index + 1}`;
+    const canonical = uniqueContainerId(canonicalContainerIdValue(rawId, index === 0 ? "root" : `region-${index + 1}`), usedContainerIds);
+    if (!containerIdMap.has(rawId)) {
+      containerIdMap.set(rawId, canonical);
+    }
+    return {
+      ...container,
+      id: canonical
+    };
+  });
+
+  const nodes = (graphIR.nodes ?? []).map((node) => ({
+    ...node,
+    container_id: resolveContainerReference(node.container_id, containerIdMap)
+  }));
+
+  const edgesUsed = new Set<string>();
+  const edges = (graphIR.edges ?? []).map((edge, index) => ({
+    ...edge,
+    id: canonicalEdgeId(edge.id, index, edgesUsed)
+  }));
+
+  return {
+    ...graphIR,
+    nodes,
+    edges,
+    containers: containers.map((container) => ({
+      ...container,
+      parent_container_id: resolveContainerReference(container.parent_container_id, containerIdMap)
+    }))
+  };
+}
+
 /**
  * Detect a legacy stage-flow shape and convert it to Graph IR. If the input
  * is already Graph-IR-shaped (or not a record), it is returned unchanged.
@@ -301,7 +438,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
   const lanes = graphIR.lanes ?? [];
   const validation = graphIR.validation ?? { ok: true, errors: [], warnings: [] };
 
-  return {
+  return canonicalizeGraphIRIds({
     requirement_id: asString(graphIR.requirement_id, requirementId),
     graph_id: asString(graphIR.graph_id, "graph-001"),
     root_workflow_module_id: graphIR.root_workflow_module_id ?? null,
@@ -358,7 +495,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
     containers,
     lanes,
     validation
-  };
+  });
 }
 
 /**

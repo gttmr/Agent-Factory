@@ -10,6 +10,8 @@ This is the Agent Factory workbench — a local-first tool that turns raw requir
 
 For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, export, or review-board work.
 
+Before source-code edits, check whether the change affects active `docs/` Markdown. Taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, and operating policy changes must update the relevant docs in the same change set. Leave `docs/archive/**` untouched unless the task explicitly asks for archival or migration work.
+
 ## Common Commands
 
 The web package is the only buildable artifact. All commands run from `packages/web` unless noted.
@@ -81,7 +83,7 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 ### Schemas, catalog, templates
 
 - `schemas/`: JSON Schemas for normalized requirement, module candidate, process flow, classification, commonization, and scaffold plan.
-- `catalog/`: YAML catalogs for reusable agents, workflows, adapters, remote A2A placeholders, domain owners, and risk gates. Risk signals on candidates should align with `catalog/risk-gates.yaml`.
+- `catalog/`: YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates. Catalog entries are runtime-oriented contracts, not mocks; mock/test-double generation is a separate future workflow. Risk signals on candidates should align with `catalog/risk-gates.yaml`.
 - `templates/`: artifact templates the validator smoke-checks by default, plus `scaffold-plan.template.json`.
 
 ### UI design system
@@ -112,6 +114,7 @@ Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take
 ## Editing Rules (from AGENTS.md)
 
 - Keep changes scoped to the requested workbench behavior. No drive-by abstractions, configuration, or extensibility.
+- Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
 - Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active source of truth.
 - Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.

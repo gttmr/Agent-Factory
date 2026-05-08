@@ -167,7 +167,7 @@ function buildNodeFunction(node: AdkGraphNode, scaffoldModule: ScaffoldPlanModul
   }
 
   if (node.runtimeRole === "mcp_adapter") {
-    const mockCall = {
+    const contractCall = {
       mcp_server: node.candidate?.mcp_server ?? null,
       mcp_tool_name: node.candidate?.mcp_tool_name ?? null,
       mcp_schema_ref: node.candidate?.mcp_schema_ref ?? null,
@@ -176,10 +176,11 @@ function buildNodeFunction(node: AdkGraphNode, scaffoldModule: ScaffoldPlanModul
       declared_outputs: node.candidate?.outputs ?? []
     };
     return `def ${node.functionName}(node_input: Any = None):
-    """MCP Adapter mock placeholder generated from catalog metadata."""
-    mock_call = json.loads(${JSON.stringify(JSON.stringify(mockCall))})
+    """MCP Adapter contract placeholder generated from catalog metadata."""
+    contract_call = json.loads(${JSON.stringify(JSON.stringify(contractCall))})
     output = _event_output("${node.id}", "${escapePythonString(node.label)}", "mcp_adapter", node_input)
-    output["mock_mcp_call"] = mock_call
+    output["mcp_contract_call"] = contract_call
+    output["status"] = "runtime_configuration_required"
     return Event(output=output)`;
   }
 

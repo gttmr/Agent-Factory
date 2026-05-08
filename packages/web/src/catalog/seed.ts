@@ -11,11 +11,13 @@ interface AgentRow {
   agent_kind?: string;
   owner_domain?: string;
   status?: string;
+  contract_status?: string;
   responsibility?: string;
   inputs?: CatalogEntry["inputs"];
   outputs?: CatalogEntry["outputs"];
   scaffold_output?: string;
   component_source?: string;
+  runtime_binding?: string;
   notes?: string;
 }
 
@@ -34,6 +36,7 @@ interface AdapterRow {
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
   component_source?: string;
+  runtime_binding?: string;
   notes?: string;
 }
 
@@ -47,6 +50,8 @@ interface WorkflowRow {
   composition?: string[];
   scaffold_output?: string;
   component_source?: string;
+  runtime_binding?: string;
+  contract_status?: string;
   notes?: string;
 }
 
@@ -58,6 +63,8 @@ interface RemoteRow {
   inputs?: CatalogEntry["inputs"];
   outputs?: CatalogEntry["outputs"];
   component_source?: string;
+  runtime_binding?: string;
+  contract_status?: string;
   notes?: string;
 }
 
@@ -83,11 +90,13 @@ export function loadSeedCatalog(): CatalogEntry[] {
       agent_kind: (row.agent_kind as CatalogEntry["agent_kind"]) ?? null,
       owner_domain: row.owner_domain,
       status: row.status,
+      contract_status: row.contract_status,
       responsibility: row.responsibility,
       inputs: row.inputs ?? [],
       outputs: row.outputs ?? [],
       scaffold_output: row.scaffold_output,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -111,6 +120,7 @@ export function loadSeedCatalog(): CatalogEntry[] {
       mcp_schema_ref: row.mcp_schema_ref,
       mcp_auth_mode: row.mcp_auth_mode,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -129,6 +139,8 @@ export function loadSeedCatalog(): CatalogEntry[] {
       composition: row.composition ?? [],
       scaffold_output: row.scaffold_output,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
+      contract_status: row.contract_status,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -145,6 +157,8 @@ export function loadSeedCatalog(): CatalogEntry[] {
       inputs: row.inputs ?? [],
       outputs: row.outputs ?? [],
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
+      runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
+      contract_status: row.contract_status,
       required_before_approval: row.required_before_approval ?? [],
       notes: row.notes,
       provenance: "seeded"

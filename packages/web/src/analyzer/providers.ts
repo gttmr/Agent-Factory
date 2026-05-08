@@ -6,7 +6,7 @@ import type {
   RequirementIntakeInput
 } from "./types";
 import { normalizeA2A } from "./a2aNormalize";
-import { normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
+import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -92,14 +92,9 @@ function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
           : "req-001";
       const migrated = normalizeGraphIRForRuntime(r.processFlow, reqId);
       const soft = validateGraphIRSoft(migrated);
-      const existing = migrated.validation ?? { ok: true, errors: [], warnings: [] };
       (r as Record<string, unknown>).processFlow = {
         ...migrated,
-        validation: {
-          ok: existing.ok && soft.errors.length === 0,
-          errors: [...(existing.errors ?? []), ...soft.errors],
-          warnings: [...(existing.warnings ?? []), ...soft.warnings]
-        }
+        validation: mergeGraphIRValidation(migrated.validation, soft)
       };
     }
   } catch (error) {

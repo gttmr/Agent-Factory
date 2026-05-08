@@ -57,14 +57,15 @@ const provenanceClass: Record<CatalogEntry["provenance"], string> = {
 const runtimeBindingLabels: Record<RuntimeBinding, string> = {
   unresolved: "미정",
   mcp: "MCP",
-  stub: "Stub",
+  stub: "구현 필요",
   remote_a2a: "Remote A2A"
 };
 
-const componentSources: ComponentSource[] = ["mcp", "stub"];
+const componentSources: ComponentSource[] = ["mcp", "remote_a2a", "stub"];
 const componentSourceLabels: Record<ComponentSource, string> = {
   mcp: "MCP",
-  stub: "Stub/TODO"
+  remote_a2a: "Remote A2A",
+  stub: "Generated TODO"
 };
 
 const riskSignalOptions: RiskSignal[] = [
@@ -147,7 +148,6 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
       id,
       name: "",
       module_category: category,
-      component_source: "stub",
       provenance: "session_added"
     });
     setSelectedEntryId(id);
@@ -198,7 +198,8 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
       mcp_tool_name: candidate.mcp_tool_name,
       mcp_schema_ref: candidate.mcp_schema_ref,
       mcp_auth_mode: candidate.mcp_auth_mode,
-      component_source: candidate.access_protocol === "mcp" ? "mcp" : "stub",
+      component_source:
+        candidate.access_protocol === "mcp" ? "mcp" : candidate.module_category === "remote_a2a" ? "remote_a2a" : "stub",
       owner_domain: candidate.owner_domain,
       status: "candidate",
       responsibility: candidate.rationale,
@@ -490,6 +491,10 @@ function CatalogInspector({ entry, onEdit, onDelete, onRestore }: CatalogInspect
             <dd>{entry.status || "미지정"}</dd>
           </div>
           <div>
+            <dt>Contract status</dt>
+            <dd>{entry.contract_status || "미지정"}</dd>
+          </div>
+          <div>
             <dt>Scaffold output</dt>
             <dd>{entry.scaffold_output || "기본값"}</dd>
           </div>
@@ -574,6 +579,10 @@ function CatalogEditInspector({ draft, onDraftChange, onSave, onCancel }: Catalo
         <label className="form-field">
           <span>Status</span>
           <input value={draft.status ?? ""} onChange={(event) => update("status", emptyToUndefined(event.target.value))} />
+        </label>
+        <label className="form-field">
+          <span>contract_status</span>
+          <input value={draft.contract_status ?? ""} onChange={(event) => update("contract_status", emptyToUndefined(event.target.value))} />
         </label>
         <label className="form-field">
           <span>Owner domain</span>
@@ -826,8 +835,9 @@ function subtypeForEntry(entry: CatalogEntry): AgentKind | WorkflowKind | Adapte
 function bindingLabel(entry: CatalogEntry): string {
   const runtime = entry.runtime_binding ?? "unresolved";
   if (entry.module_category === "remote_a2a") return "Remote A2A";
+  if (entry.component_source === "remote_a2a") return "Remote A2A";
   if (entry.access_protocol === "mcp" || runtime === "mcp") return "MCP";
-  if (entry.component_source === "stub" || runtime === "stub") return "Stub/TODO";
+  if (entry.component_source === "stub" || runtime === "stub") return "구현 필요";
   return runtimeBindingLabels[runtime];
 }
 

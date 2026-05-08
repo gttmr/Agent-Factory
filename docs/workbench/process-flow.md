@@ -19,6 +19,17 @@ Process Flow는 `AnalysisResult.processFlow`에 저장되는 ADK 2.0 Graph IR ar
 새 artifact는 legacy `type`, `subtype`, `edge_type`, `data`, `data_channel` 필드를 내보내면 안 된다.
 validator는 이 필드가 새 Graph IR에 남아 있으면 실패시킨다.
 
+## ID 규칙
+
+최종 저장/export Graph IR은 canonical ID 형식을 사용한다.
+
+- edge id: `edge-001`, `edge-002`, `edge-003`
+- container id: `container-root`, `container-human-review`, `container-parallel-customer-data`
+
+`e-001`, `c-root`, `c-human-review` 같은 축약형은 최종 artifact에서 허용하지 않는다.
+Live analyzer draft가 축약형을 반환하더라도 workbench runtime은 저장/검증 전에 canonical 형식으로 보정한다.
+`node.container_id`와 `container.parent_container_id`는 보정된 container id를 참조해야 한다.
+
 ## Node
 
 허용되는 `node_kind`:
@@ -53,6 +64,8 @@ validator는 이 필드가 새 Graph IR에 남아 있으면 실패시킨다.
 
 작은 흐름은 container와 edge semantics로 표현한다.
 병렬은 `parallel_region`, 반복은 `loop_region`, 사람 검토는 `human_review_region`, 원격 agent 경계는 `remote_boundary`다.
+시각화에서 container는 node를 다시 배치하는 독립 lane이 아니라, 전체 workflow 안에 있는 node bounds에서 파생되는 region overlay다.
+따라서 `parallel_region`, `human_review_region`, `remote_boundary`는 workflow 외부 슬롯으로 분리하지 않고 일반 흐름 위에 겹쳐 표시한다.
 
 ## Edge
 

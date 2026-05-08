@@ -1,19 +1,63 @@
 adapters:
-  - name: ocr_text_extraction_adapter
+  - name: legacy_core_sql_query_adapter
+    adapter_kind: data_query
+    owner_domain: 공통
+    status: proposed
+    access_protocol: mcp
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: legacy-core-sql-mcp
+    mcp_tool_name: execute_readonly_sql
+    mcp_schema_ref: catalog.banking.legacy_core_sql.execute_readonly_sql.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
+    inputs:
+      - name: data_source_key
+        type: string
+        required: true
+      - name: sql_text
+        type: string
+        required: true
+      - name: parameters
+        type: object
+        required: false
+      - name: query_purpose
+        type: string
+        required: true
+    outputs:
+      - name: rows
+        type: array<object>
+      - name: schema
+        type: array<object>
+      - name: row_count
+        type: number
+      - name: query_trace
+        type: object
+    risk_signals:
+      - personal_data
+      - financial_data
+      - audit_required
+    notes: 레거시 코어 DB를 read-only SQL로 조회하는 MCP Adapter 계약. 실제 접속 정보와 권한은 runtime configuration에서 주입하며 catalog에는 credential을 저장하지 않는다.
+  - name: bank_document_ocr_adapter
     adapter_kind: external_service
     owner_domain: 공통
     status: proposed
     access_protocol: mcp
-    mcp_server: mock-vision-mcp
-    mcp_tool_name: extract_text_from_image
-    mcp_schema_ref: catalog.mock.vision.extract_text.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: document-ocr-mcp
+    mcp_tool_name: extract_bank_document_text
+    mcp_schema_ref: catalog.banking.document_ocr.extract_text.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
     inputs:
       - name: document_uri
         type: string
         required: true
       - name: mime_type
+        type: string
+        required: false
+      - name: document_type_hint
         type: string
         required: false
     outputs:
@@ -23,198 +67,25 @@ adapters:
         type: array<object>
       - name: confidence
         type: number
-    risk_signals:
-      - personal_data
-      - audit_required
-    notes: 이미지/PDF 문서에서 텍스트를 추출하는 가상 MCP OCR Adapter.
-  - name: document_layout_classifier_adapter
-    adapter_kind: computation
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-vision-mcp
-    mcp_tool_name: classify_document_layout
-    mcp_schema_ref: catalog.mock.vision.layout.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: page_blocks
-        type: array<object>
-        required: true
-    outputs:
-      - name: document_sections
-        type: array<object>
-      - name: detected_tables
-        type: array<object>
-    risk_signals:
-      - audit_required
-    notes: OCR 결과를 표, 제목, 본문, 서명 영역 등으로 나눈다.
-  - name: stt_transcription_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-audio-mcp
-    mcp_tool_name: transcribe_audio
-    mcp_schema_ref: catalog.mock.audio.transcribe.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: audio_uri
-        type: string
-        required: true
-      - name: language_hint
-        type: string
-        required: false
-    outputs:
-      - name: transcript
-        type: text
-      - name: speaker_segments
-        type: array<object>
-      - name: confidence
-        type: number
-    risk_signals:
-      - personal_data
-      - audit_required
-    notes: 상담 녹취나 음성 메모를 텍스트로 변환하는 가상 MCP STT Adapter.
-  - name: tts_voice_response_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-audio-mcp
-    mcp_tool_name: synthesize_speech
-    mcp_schema_ref: catalog.mock.audio.tts.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: response_text
-        type: text
-        required: true
-      - name: voice_profile
-        type: string
-        required: false
-    outputs:
-      - name: audio_uri
-        type: string
-      - name: duration_ms
-        type: number
-    risk_signals:
-      - external_message
-      - audit_required
-    notes: 고객 안내 음성을 생성하는 dry-run용 TTS Adapter.
-  - name: language_detection_adapter
-    adapter_kind: computation
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-language-mcp
-    mcp_tool_name: detect_language
-    mcp_schema_ref: catalog.mock.language.detect.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: text
-        type: text
-        required: true
-    outputs:
-      - name: language_code
-        type: string
-      - name: confidence
-        type: number
-    risk_signals:
-      - audit_required
-    notes: 다국어 입력 전처리에 쓰는 언어 감지 Adapter.
-  - name: text_translation_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-language-mcp
-    mcp_tool_name: translate_text
-    mcp_schema_ref: catalog.mock.language.translate.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: source_text
-        type: text
-        required: true
-      - name: target_language
-        type: string
-        required: true
-    outputs:
-      - name: translated_text
-        type: text
-      - name: translation_notes
-        type: object
-    risk_signals:
-      - external_message
-      - audit_required
-    notes: 고객 입력 또는 답변 초안을 지정 언어로 변환하는 가상 Adapter.
-  - name: pii_redaction_adapter
-    adapter_kind: computation
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-language-mcp
-    mcp_tool_name: redact_pii
-    mcp_schema_ref: catalog.mock.language.redact_pii.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: raw_text
-        type: text
-        required: true
-      - name: redaction_policy
-        type: object
-        required: false
-    outputs:
-      - name: redacted_text
-        type: text
-      - name: redaction_map
-        type: array<object>
-    risk_signals:
-      - personal_data
-      - audit_required
-    notes: 로그, 프롬프트, 외부 발송 전에 개인정보를 마스킹한다.
-  - name: intent_classification_adapter
-    adapter_kind: computation
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-language-mcp
-    mcp_tool_name: classify_intent
-    mcp_schema_ref: catalog.mock.language.intent.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: text
-        type: text
-        required: true
-      - name: taxonomy_ref
-        type: string
-        required: false
-    outputs:
-      - name: intent
-        type: string
-      - name: confidence
-        type: number
-      - name: labels
+      - name: extraction_warnings
         type: array<string>
     risk_signals:
-      - customer_impact
+      - personal_data
+      - financial_data
       - audit_required
-    notes: 확정 전 taxonomy에도 연결 가능한 범용 의도 분류 Adapter.
-  - name: policy_retrieval_adapter
+    notes: 신청서, 증빙서류, 약정서 등 은행 문서에서 텍스트와 위치 블록을 추출하는 OCR MCP Adapter 계약.
+  - name: banking_policy_retrieval_adapter
     adapter_kind: retrieval
     owner_domain: 공통
     status: proposed
     access_protocol: mcp
-    mcp_server: mock-knowledge-mcp
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: banking-knowledge-mcp
     mcp_tool_name: search_policy_documents
-    mcp_schema_ref: catalog.mock.knowledge.policy_search.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
+    mcp_schema_ref: catalog.banking.knowledge.policy_search.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
     inputs:
       - name: query
         type: text
@@ -222,100 +93,64 @@ adapters:
       - name: domain_filter
         type: string
         required: false
+      - name: effective_date
+        type: string
+        required: false
     outputs:
       - name: policy_matches
         type: array<object>
       - name: citations
         type: array<object>
-    risk_signals:
-      - audit_required
-    notes: 정책/가이드 문서 검색용 mock retrieval Adapter.
-  - name: faq_retrieval_adapter
-    adapter_kind: retrieval
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-knowledge-mcp
-    mcp_tool_name: search_faq
-    mcp_schema_ref: catalog.mock.knowledge.faq_search.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: query
-        type: text
-        required: true
-      - name: channel
-        type: string
-        required: false
-    outputs:
-      - name: faq_matches
-        type: array<object>
-      - name: citations
-        type: array<object>
-    risk_signals:
-      - audit_required
-    notes: 반복 상담 답변 근거를 찾는 FAQ retrieval Adapter.
-  - name: semantic_memory_search_adapter
-    adapter_kind: retrieval
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-knowledge-mcp
-    mcp_tool_name: vector_search
-    mcp_schema_ref: catalog.mock.knowledge.vector_search.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: query_embedding_or_text
-        type: object
-        required: true
-      - name: collection
-        type: string
-        required: true
-    outputs:
-      - name: search_results
-        type: array<object>
-      - name: retrieval_trace
+      - name: freshness
         type: object
     risk_signals:
       - audit_required
-    notes: 유사 케이스나 내부 지식 검색을 흉내내는 mock vector search Adapter.
-  - name: routing_rule_registry_adapter
+    notes: 여신, 수신, 카드, 고객 업무의 정책/업무 가이드를 근거와 함께 조회하는 retrieval Adapter 계약.
+  - name: banking_rule_registry_adapter
     adapter_kind: rule_registry
     owner_domain: 공통
     status: proposed
     access_protocol: mcp
-    mcp_server: mock-registry-mcp
-    mcp_tool_name: evaluate_routing_rule
-    mcp_schema_ref: catalog.mock.registry.routing_rule.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: banking-rule-registry-mcp
+    mcp_tool_name: evaluate_rule_set
+    mcp_schema_ref: catalog.banking.rule_registry.evaluate_rule_set.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
     inputs:
+      - name: rule_set_key
+        type: string
+        required: true
       - name: case_features
         type: object
         required: true
-      - name: rule_set
+      - name: evaluation_date
         type: string
         required: false
     outputs:
-      - name: routing_decision
+      - name: rule_result
         type: object
       - name: matched_rules
         type: array<object>
+      - name: required_actions
+        type: array<string>
     risk_signals:
       - customer_impact
       - audit_required
-    notes: 우선순위, 승인 필요, 재시도 경로를 계산하는 versioned rule registry.
-  - name: response_template_registry_adapter
+    notes: 심사, 라우팅, 승인 필요 여부를 versioned rule set으로 평가하는 rule registry Adapter 계약.
+  - name: banking_template_registry_adapter
     adapter_kind: template
     owner_domain: 공통
     status: proposed
     access_protocol: mcp
-    mcp_server: mock-registry-mcp
-    mcp_tool_name: get_response_template
-    mcp_schema_ref: catalog.mock.registry.response_template.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: banking-template-registry-mcp
+    mcp_tool_name: get_template
+    mcp_schema_ref: catalog.banking.template_registry.get_template.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
     inputs:
       - name: template_key
         type: string
@@ -323,31 +158,43 @@ adapters:
       - name: locale
         type: string
         required: false
+      - name: channel
+        type: string
+        required: false
     outputs:
       - name: template
         type: object
       - name: required_variables
         type: array<string>
+      - name: approval_constraints
+        type: object
     risk_signals:
       - external_message
       - audit_required
-    notes: 답변 초안, 알림 문구, 추가 확인 요청 문구의 공통 템플릿을 제공한다.
-  - name: customer_profile_mock_adapter
+    notes: 고객 안내문, 보완 요청, 심사 결과 통지 등에 쓰는 승인된 템플릿을 조회하는 Adapter 계약.
+  - name: customer_account_snapshot_adapter
     adapter_kind: data_query
     owner_domain: 고객
     status: proposed
     access_protocol: mcp
-    mcp_server: mock-data-mcp
-    mcp_tool_name: lookup_customer_profile
-    mcp_schema_ref: catalog.mock.data.customer_profile.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
+    runtime_binding: mcp
+    component_source: mcp
+    mcp_server: customer-account-mcp
+    mcp_tool_name: get_customer_account_snapshot
+    mcp_schema_ref: catalog.banking.customer_account.snapshot.v1
+    mcp_auth_mode: runtime_managed_service_account
+    contract_status: runtime_config_required
     inputs:
       - name: customer_identifier
         type: string
         required: true
+      - name: snapshot_scope
+        type: array<string>
+        required: false
     outputs:
-      - name: customer_profile
+      - name: customer_snapshot
+        type: object
+      - name: account_summary
         type: object
       - name: data_freshness
         type: object
@@ -355,161 +202,4 @@ adapters:
       - personal_data
       - financial_data
       - audit_required
-    notes: 실제 고객계 대신 mock data를 반환하는 고객 프로필 조회 Adapter.
-  - name: case_history_mock_adapter
-    adapter_kind: data_query
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-data-mcp
-    mcp_tool_name: lookup_case_history
-    mcp_schema_ref: catalog.mock.data.case_history.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: entity_identifier
-        type: string
-        required: true
-      - name: lookback_days
-        type: number
-        required: false
-    outputs:
-      - name: related_cases
-        type: array<object>
-      - name: recurrence_summary
-        type: object
-    risk_signals:
-      - personal_data
-      - audit_required
-    notes: 반복 이슈나 과거 처리 이력을 흉내내는 mock 조회 Adapter.
-  - name: risk_score_computation_adapter
-    adapter_kind: computation
-    owner_domain: 리스크
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-computation-mcp
-    mcp_tool_name: calculate_risk_score
-    mcp_schema_ref: catalog.mock.computation.risk_score.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: case_features
-        type: object
-        required: true
-      - name: risk_policy_ref
-        type: string
-        required: false
-    outputs:
-      - name: risk_score
-        type: object
-      - name: score_factors
-        type: array<object>
-    risk_signals:
-      - credit_decision_support
-      - customer_impact
-      - audit_required
-    notes: 자동 결정이 아니라 승인 라우팅 보조 점수만 산출한다.
-  - name: notification_dry_run_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-notification-mcp
-    mcp_tool_name: send_notification_dry_run
-    mcp_schema_ref: catalog.mock.notification.dry_run.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: recipient_ref
-        type: string
-        required: true
-      - name: message_body
-        type: text
-        required: true
-      - name: channel
-        type: string
-        required: true
-    outputs:
-      - name: delivery_preview
-        type: object
-      - name: blocked_reason
-        type: string|null
-    risk_signals:
-      - external_message
-      - personal_data
-      - audit_required
-    notes: 실제 발송 없이 메시지 payload와 차단 사유만 반환한다.
-  - name: document_conversion_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-file-mcp
-    mcp_tool_name: convert_document
-    mcp_schema_ref: catalog.mock.file.convert_document.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: source_file_uri
-        type: string
-        required: true
-      - name: target_format
-        type: string
-        required: true
-    outputs:
-      - name: converted_file_uri
-        type: string
-      - name: conversion_metadata
-        type: object
-    risk_signals:
-      - audit_required
-    notes: 파일 변환을 mock으로 수행해 OCR 또는 문서 검토 전에 표준 포맷을 만든다.
-  - name: table_extraction_adapter
-    adapter_kind: computation
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-file-mcp
-    mcp_tool_name: extract_table
-    mcp_schema_ref: catalog.mock.file.extract_table.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: document_sections
-        type: array<object>
-        required: true
-    outputs:
-      - name: tables
-        type: array<object>
-      - name: extraction_warnings
-        type: array<string>
-    risk_signals:
-      - audit_required
-    notes: 신청서, 명세서, 첨부 문서의 표 영역을 구조화한다.
-  - name: identity_signal_mock_adapter
-    adapter_kind: external_service
-    owner_domain: 고객
-    status: proposed
-    access_protocol: mcp
-    mcp_server: mock-identity-mcp
-    mcp_tool_name: verify_identity_signal
-    mcp_schema_ref: catalog.mock.identity.signal.v1
-    mcp_auth_mode: none_mock
-    contract_status: mock_mcp_ready
-    inputs:
-      - name: identity_claim
-        type: object
-        required: true
-      - name: channel_context
-        type: object
-        required: false
-    outputs:
-      - name: identity_signal
-        type: object
-      - name: verification_gaps
-        type: array<string>
-    risk_signals:
-      - personal_data
-      - customer_impact
-      - audit_required
-    notes: 실명확인 시스템이 아니라 검증 신호 mock만 반환한다.
+    notes: 고객 기본정보와 계좌 요약을 조회하는 MCP Adapter 계약. 조회 범위와 마스킹 정책은 runtime 권한 설정을 따른다.

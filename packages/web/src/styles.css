@@ -3381,7 +3381,7 @@ button.a2a-review-link:hover {
 
 .graph-container-overlay {
   position: absolute;
-  border-radius: 12px;
+  border-radius: 8px;
   pointer-events: none;
   background: rgba(255, 255, 255, 0.35);
 }
@@ -3409,24 +3409,26 @@ button.a2a-review-link:hover {
 
 .graph-container-overlay.kind-graph_workflow {
   border: 1.5px solid var(--cat-workflow-line);
+  background: rgba(255, 255, 255, 0.22);
 }
 .graph-container-overlay.kind-dynamic_workflow {
   border: 2px dashed var(--cat-workflow-line);
+  background: rgba(255, 255, 255, 0.22);
 }
 .graph-container-overlay.kind-parallel_region {
-  border: 1.5px solid var(--cat-workflow-line);
-  background: var(--cat-workflow-soft, rgba(255,255,255,0.4));
+  border: 1px solid var(--cat-workflow-line);
+  background: color-mix(in srgb, var(--cat-workflow-soft, #eef7f3) 58%, transparent);
 }
 .graph-container-overlay.kind-loop_region {
-  border: 1.5px dashed var(--cat-workflow-line);
+  border: 1px dashed var(--cat-workflow-line);
 }
 .graph-container-overlay.kind-human_review_region {
-  border: 1.5px solid var(--cat-input-line, #c9b787);
-  background: var(--cat-input-soft, #fff8e8);
+  border: 1px solid var(--cat-input-line, #c9b787);
+  background: color-mix(in srgb, var(--cat-input-soft, #fff8e8) 62%, transparent);
 }
 .graph-container-overlay.kind-remote_boundary {
-  border: 2px solid var(--cat-remote-line);
-  background: var(--cat-remote-soft);
+  border: 1px solid var(--cat-remote-line);
+  background: color-mix(in srgb, var(--cat-remote-soft, #feeceb) 62%, transparent);
 }
 .graph-container-overlay.kind-remote_boundary > .graph-container-overlay-head {
   border-color: var(--cat-remote-line);

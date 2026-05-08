@@ -8,7 +8,7 @@ This repository contains the workbench application and shared schemas. It is not
 
 - `packages/web`: React/Vite requirement intake, review, Graph IR, and catalog review workbench.
 - `schemas`: JSON Schemas for normalized requirements, module candidates, process flow, classification, commonization, and deferred scaffold-plan validation artifacts.
-- `catalog`: MVP YAML catalogs for reusable agents, workflows, adapters, remote A2A placeholders, domain owners, and risk gates.
+- `catalog`: MVP YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates.
 - `templates`: generic reviewed artifact templates and deferred scaffold-plan validation fixtures.
 - `docs`: workbench analysis, taxonomy, workflow-decision, validation, and reference documentation.
 - `.agents/skills`: skill material that may be synchronized later, but is not the primary edit target for this workbench refactor.
@@ -54,6 +54,8 @@ Definitions:
 - Remote A2A: independent remote agent boundary with protocol-level contract.
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and managed rule registries remain visible as Adapter subtypes through `adapter_kind`.
+
+Catalog entries are runtime-oriented contracts, not mocks. Mock generation is a separate future workflow that may read these contracts to create local test doubles, but the catalog itself should describe the intended MCP, Remote A2A, or implementation binding.
 
 ## Remote A2A Policy
 

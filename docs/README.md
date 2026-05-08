@@ -8,7 +8,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 1. [Analysis guide](./workbench/analysis-guide.md)
    Raw requirement를 정규화하고 evidence, module candidate, process flow, review decision으로 바꾸는 순서를 설명한다.
 2. [Taxonomy](./workbench/taxonomy.md)
-   `module_category`와 subtype enum의 단일 활성 기준이다.
+   `module_category`, subtype enum, catalog runtime binding의 단일 활성 기준이다.
 3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
    ADK 2.0 (Beta) baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
 4. [Process Flow](./workbench/process-flow.md)
@@ -16,9 +16,9 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 5. [Review Board](./workbench/review-board.md)
    개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다.
 6. [Validation](./workbench/validation.md)
-   review artifact, schema, 문서 구조를 검증하는 기준이다.
+   review artifact, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다.
 7. [Agent Factory Harness](./workbench/agent-factory-harness.md)
-   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, 검증 기준을 정의한다.
+   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, docs 최신화, 검증 기준을 정의한다.
 
 ## 보조 참조
 
@@ -44,5 +44,6 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 - Human-facing overview: [../README.md](../README.md)
 - Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
 - Shared schemas: [../schemas](../schemas)
+- Live analyzer compact draft schema: [../schemas/analysis-draft.schema.json](../schemas/analysis-draft.schema.json)
 - 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. ADK 2.0 (Beta) 섹션을 우선 조회하고 1.14 stable agent 페이지는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
 - Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files and are not indexed as active workbench docs here.

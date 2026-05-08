@@ -30,9 +30,23 @@
 - 새 taxonomy 값을 만들지 않는다. 값은 [Taxonomy](./taxonomy.md)를 따른다.
 - 여러 단계가 있다는 이유만으로 `remote_a2a`를 만들지 않는다.
 - MCP tool, retrieval, grounding, external service는 우선 `adapter` 후보로 본다.
+- Catalog entries는 mock이 아니라 reusable runtime contract로 해석한다. Mock/test double 생성은 별도 후속 기능이며 분석 산출물에 mock-only 후보를 섞지 않는다.
+- 공통 Workflow가 `runtime_binding: remote_a2a`로 등록되어 있어도 `module_category`는 `workflow`로 유지한다. 독립 원격 Agent 계약 증거가 있을 때만 `module_category: remote_a2a`를 만든다.
 - ADK component는 category가 아니다. 필요하면 module candidate의 ADK hint로 남긴다.
 - 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
 - Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. 현재 범위는 review artifact와 catalog decision을 만드는 단계이며, scaffold export는 별도 승인 전까지 보류한다.
+
+## Live analyzer 실행 계약
+
+Live analyzer는 Codex CLI가 필요한 repo 문맥을 직접 확인할 수 있게 shell 접근을 유지한다.
+단, CLI가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다.
+
+- CLI에는 `schemas/analysis-draft.schema.json` compact draft schema를 `--output-schema`로 전달한다.
+- 실행 시 `/tmp/agent-factory-codex-*/analyzer-context-index.md`를 만들어 active docs, schema, catalog 위치와 주요 section을 안내한다.
+- 모델은 index를 지도처럼 사용하고, 정확한 판단이 필요하면 원본 `docs/`, `schemas/`, `catalog/` 파일을 `rg`나 bounded `sed`로 직접 확인한다.
+- Compact draft에는 분류 판단, rationale, `catalog_entry_id`, Graph IR topology 같은 결정 정보를 담는다.
+- 서버는 draft를 catalog와 schema 기본값으로 hydrate해 기존 `AnalysisResult` 형태로 만든 뒤 기존 Graph IR/A2A normalization과 validation을 수행한다.
+- Spark 모델에서 실패해도 다른 모델로 자동 fallback하지 않는다. 실패 원인은 `max_output_tokens`, `context_window_exceeded`, `stream_incomplete`, `turn_failed`처럼 구분해 trace와 로그에 남긴다.
 
 ## ADK 문서 사용
 

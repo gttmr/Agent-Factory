@@ -1,16 +1,9 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
-  A2A_HTTP_PATHS,
-  A2A_OPERATION_NAMES,
-  A2A_PART_FIELDS,
-  A2A_ROLES,
-  A2A_STALE_NAMES,
-  A2A_STREAM_WRAPPERS,
-  A2A_TASK_STATES,
   GRAPH_CONTAINER_KINDS,
   GRAPH_EDGE_KINDS,
   GRAPH_EXECUTION_SEMANTICS,
@@ -21,7 +14,7 @@ import {
 import { normalizeA2A } from "../src/analyzer/a2aNormalize";
 import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
 import type { AnalysisResult } from "../src/analyzer/types";
-import { normalizeGraphIRForRuntime, validateGraphIRSoft } from "../src/analyzer/graphMigration";
+import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "../src/analyzer/graphMigration";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -151,6 +144,7 @@ type CodexAnalyzerError = Error & {
 
 export function createCodexAnalyzerMiddleware(repoRoot: string) {
   const schemaPath = resolve(repoRoot, "schemas/analysis-result.schema.json");
+  const draftSchemaPath = resolve(repoRoot, "schemas/analysis-draft.schema.json");
   let isAnalyzing = false;
 
   return async function codexAnalyzerMiddleware(req: IncomingMessage, res: ServerResponse, next: MiddlewareNext) {
@@ -182,11 +176,11 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
       isAnalyzing = true;
       try {
         if (streamProgress) {
-          await runStreamingAnalysis({ repoRoot, schemaPath, input, model, catalog, res });
+          await runStreamingAnalysis({ repoRoot, schemaPath, draftSchemaPath, input, model, catalog, res });
           return;
         }
 
-        const run = await runCodexAnalyzer({ repoRoot, schemaPath, input, model, catalog });
+        const run = await runCodexAnalyzer({ repoRoot, schemaPath, draftSchemaPath, input, model, catalog });
         const baseline = applyGraphIRMigration(normalizeAnalysisResult(run.output));
         const result = applyA2ANormalization(baseline, {
           model,
@@ -229,6 +223,7 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
 async function runStreamingAnalysis({
   repoRoot,
   schemaPath,
+  draftSchemaPath,
   input,
   model,
   catalog,
@@ -236,6 +231,7 @@ async function runStreamingAnalysis({
 }: {
   repoRoot: string;
   schemaPath: string;
+  draftSchemaPath: string;
   input: Record<string, unknown>;
   model: string;
   catalog: SanitizedCatalogEntry[];
@@ -247,6 +243,7 @@ async function runStreamingAnalysis({
     const run = await runCodexAnalyzer({
       repoRoot,
       schemaPath,
+      draftSchemaPath,
       input,
       model,
       catalog,
@@ -335,6 +332,7 @@ async function runStreamingAnalysis({
 async function runCodexAnalyzer({
   repoRoot,
   schemaPath,
+  draftSchemaPath,
   input,
   model,
   catalog,
@@ -342,6 +340,7 @@ async function runCodexAnalyzer({
 }: {
   repoRoot: string;
   schemaPath: string;
+  draftSchemaPath: string;
   input: Record<string, unknown>;
   model: string;
   catalog: SanitizedCatalogEntry[];
@@ -350,7 +349,9 @@ async function runCodexAnalyzer({
   const runDir = join(tmpdir(), `agent-factory-codex-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await mkdir(runDir, { recursive: true });
   const outputPath = join(runDir, "analysis-result.json");
-  const prompt = buildPrompt(input, catalog);
+  const contextIndexPath = join(runDir, "analyzer-context-index.md");
+  await writeAnalyzerContextIndex({ repoRoot, resultSchemaPath: schemaPath, draftSchemaPath, catalog, contextIndexPath });
+  const prompt = buildPrompt(input, catalog, contextIndexPath);
   const timeoutMs = getAnalyzerTimeoutMs();
   const startedAt = Date.now();
 
@@ -382,7 +383,7 @@ async function runCodexAnalyzer({
         "--ephemeral",
         "--json",
         "--output-schema",
-        schemaPath,
+        draftSchemaPath,
         "--output-last-message",
         outputPath,
         "-"
@@ -398,7 +399,7 @@ async function runCodexAnalyzer({
 
     const outputText = await readFile(outputPath, "utf8").catch(() => stdout);
     try {
-      const output = parseJsonObject(outputText);
+      const output = hydrateAnalysisDraft(parseJsonObject(outputText), { input, catalog });
       onProgress?.({
         phase: "diagnostic",
         message: "Codex CLI 실행 계측을 수집했습니다.",
@@ -423,13 +424,15 @@ async function runCodexAnalyzer({
         promptChars: prompt.length,
         timeoutMs
       };
-    } catch {
+    } catch (parseError) {
+      const failure = summarizeProcessFailure(stdout, stderr);
       throw createAnalyzerError(
         "failed",
-        `Codex CLI가 JSON 응답을 반환하지 않았습니다. ${stderr || stdout}`.trim(),
+        `Codex CLI compact draft를 해석하지 못했습니다. ${parseError instanceof Error ? parseError.message : "unknown parse error"}${failure.message ? ` ${failure.message}` : ""}`.trim(),
         {
           ...diagnostics,
-          timeoutMs
+          timeoutMs,
+          lastTraceSnippet: failure.snippet || diagnostics.lastTraceSnippet
         }
       );
     }
@@ -444,17 +447,538 @@ async function runCodexAnalyzer({
   }
 }
 
+interface AnalysisDraftHydrationContext {
+  input: Record<string, unknown>;
+  catalog: SanitizedCatalogEntry[];
+}
+
+function hydrateAnalysisDraft(draft: unknown, ctx: AnalysisDraftHydrationContext): unknown {
+  if (!isRecord(draft)) {
+    return draft;
+  }
+  const catalogById = new Map(ctx.catalog.map((entry) => [entry.id, entry]));
+  const catalogByName = new Map(ctx.catalog.map((entry) => [entry.name, entry]));
+  const normalizedRequirement = hydrateNormalizedRequirement(draft.normalizedRequirement, ctx.input);
+  const evidence = hydrateEvidence(draft.evidence, normalizedRequirement);
+  const moduleCandidates = hydrateModuleCandidates(draft.moduleCandidates, catalogById, catalogByName);
+  const processFlow = hydrateProcessFlow(draft.processFlow, moduleCandidates);
+  return {
+    normalizedRequirement,
+    evidence,
+    moduleCandidates,
+    a2aContracts: [],
+    processFlow
+  };
+}
+
+function hydrateNormalizedRequirement(value: unknown, input: Record<string, unknown>): Record<string, unknown> {
+  const record = isRecord(value) ? value : {};
+  const requester = isRecord(record.requester) ? record.requester : {};
+  const rawText = stringOr(record.raw_text, stringOr(input.rawText, ""));
+  const domain = stringOr(record.domain, stringOr(input.domain, "공통"));
+  return {
+    id: "req-001",
+    title: stringOr(record.title, "제목 없는 요구사항"),
+    raw_text: rawText,
+    domain,
+    requester: {
+      team: stringOr(requester.team, "needs_info"),
+      role: stringOr(requester.role, "needs_info")
+    },
+    business_goal: stringOr(record.business_goal, "needs_info"),
+    current_process: stringArrayOr(record.current_process),
+    inputs: hydrateFields(record.inputs),
+    outputs: hydrateFields(record.outputs),
+    systems: hydrateSystems(record.systems),
+    risk_signals: riskSignalArrayOr(record.risk_signals),
+    missing_information: stringArrayOr(record.missing_information),
+    contradictions: stringArrayOr(record.contradictions),
+    status: requirementStatuses.has(String(record.status)) ? record.status : "draft"
+  };
+}
+
+function hydrateEvidence(value: unknown, normalizedRequirement: Record<string, unknown>): Record<string, unknown> {
+  const record = isRecord(value) ? value : {};
+  return {
+    requested_goal: stringOr(record.requested_goal, stringOr(normalizedRequirement.business_goal, "needs_info")),
+    business_domain_hint: stringOr(record.business_domain_hint, stringOr(normalizedRequirement.domain, "공통")),
+    user_role: stringOr(record.user_role, "needs_info"),
+    input_data: stringArrayOr(record.input_data),
+    output_data: stringArrayOr(record.output_data),
+    systems_mentioned: stringArrayOr(record.systems_mentioned),
+    decisions_implied: stringArrayOr(record.decisions_implied),
+    risk_signals: riskSignalArrayOr(record.risk_signals, riskSignalArrayOr(normalizedRequirement.risk_signals)),
+    missing_information: stringArrayOr(record.missing_information),
+    contradictions: stringArrayOr(record.contradictions),
+    assumptions: stringArrayOr(record.assumptions)
+  };
+}
+
+function hydrateModuleCandidates(
+  value: unknown,
+  catalogById: Map<string, SanitizedCatalogEntry>,
+  catalogByName: Map<string, SanitizedCatalogEntry>
+): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isRecord).map((candidate, index) => {
+    const catalogId = stringOr(candidate.catalog_entry_id, "");
+    const candidateName = stringOr(candidate.name, "") ?? "";
+    const catalogEntry = (catalogId ? catalogById.get(catalogId) : undefined) ?? catalogByName.get(candidateName);
+    const category = enumOr(candidate.module_category, moduleCategories, catalogEntry?.module_category ?? "adapter");
+    const subtype = stringOr(candidateSubType(candidate, category), catalogEntry?.subtype ?? null);
+    const riskSignals = riskSignalArrayOr(candidate.risk_signals, riskSignalArrayOr(catalogEntry?.risk_signals));
+    const auditRequired = riskSignals.includes("audit_required");
+    const result: Record<string, unknown> = {
+      id: normalizeModuleId(candidate.id, index),
+      source_requirement_id: "req-001",
+      name: catalogEntry?.name ?? stringOr(candidate.name, `module-${index + 1}`),
+      module_category: category,
+      agent_kind: category === "agent" ? enumOr(subtype, agentKinds, "specialist") : null,
+      workflow_kind: category === "workflow" ? enumOr(subtype, workflowKinds, "unknown") : null,
+      adapter_kind: category === "adapter" ? enumOr(subtype, adapterKinds, "unknown") : null,
+      remote_contract_kind: category === "remote_a2a" ? enumOr(subtype, remoteContractKinds, "a2a") : null,
+      access_protocol: catalogEntry?.access_protocol ?? null,
+      mcp_server: catalogEntry?.mcp_server,
+      mcp_tool_name: catalogEntry?.mcp_tool_name,
+      mcp_schema_ref: catalogEntry?.mcp_schema_ref,
+      mcp_auth_mode: catalogEntry?.mcp_auth_mode,
+      legacy_recommended_type: legacyRecommendationFor(category),
+      confidence: numberInRange(candidate.confidence, 0, 1, 0.7),
+      rationale: stringOr(candidate.rationale, catalogEntry?.responsibility ?? "needs_info"),
+      adk_hints: hydrateAdkHints(candidate.adk_hints),
+      inputs: hydrateFields(candidate.inputs, hydrateFields(catalogEntry?.inputs)),
+      outputs: hydrateFields(candidate.outputs, hydrateFields(catalogEntry?.outputs)),
+      reuse_candidate: typeof candidate.reuse_candidate === "boolean" ? candidate.reuse_candidate : Boolean(catalogEntry),
+      risk_level: enumOr(candidate.risk_level, riskLevels, riskLevelFor(category, riskSignals)),
+      risk_signals: riskSignals,
+      status: enumOr(candidate.status, moduleStatuses, "needs_info"),
+      missing_information: stringArrayOr(candidate.missing_information),
+      side_effect: enumOr(candidate.side_effect, new Set(["none", "read", "write", "read_write", "unknown"]), defaultSideEffect(category)),
+      auth_required: false,
+      audit_required: auditRequired,
+      citation_required: category === "adapter" && subtype === "retrieval" ? true : null,
+      grounding_required: category === "adapter" && subtype === "retrieval" ? true : null,
+      source_acl_required: riskSignals.includes("personal_data") || riskSignals.includes("financial_data") ? true : null,
+      versioned: category === "adapter" && (subtype === "rule_registry" || subtype === "template"),
+      effective_date_required: subtype === "retrieval" || subtype === "rule_registry" ? true : null,
+      owner_domain: stringOr(candidate.owner_domain, catalogEntry?.owner_domain ?? null),
+      owner: category === "remote_a2a" ? "needs_info" : null,
+      agent_card: category === "remote_a2a" ? "needs_info" : null,
+      auth: category === "remote_a2a" ? "needs_info" : null,
+      task_lifecycle: category === "remote_a2a" ? "needs_info" : null,
+      timeout: category === "remote_a2a" ? "needs_info" : null,
+      retry: category === "remote_a2a" ? "needs_info" : null,
+      fallback: category === "remote_a2a" ? "needs_info" : null,
+      audit: category === "remote_a2a" ? "needs_info" : null,
+      data_policy: category === "remote_a2a" ? "needs_info" : null,
+      a2a_contract_id: category === "remote_a2a" ? stringOr(candidate.a2a_contract_id, null) : null
+    };
+    const developerTodos = stringArrayOr(candidate.developer_todos);
+    if (developerTodos.length > 0) {
+      result.developer_todos = developerTodos;
+    }
+    return result;
+  });
+}
+
+function hydrateProcessFlow(value: unknown, moduleCandidates: Record<string, unknown>[]): Record<string, unknown> {
+  const record = isRecord(value) ? value : {};
+  const nodes = hydrateGraphNodes(record.nodes, moduleCandidates);
+  const edges = hydrateGraphEdges(record.edges, nodes);
+  const containers = hydrateGraphContainers(record.containers, nodes);
+  return {
+    requirement_id: "req-001",
+    graph_id: normalizeGraphId(record.graph_id),
+    root_workflow_module_id: stringOr(
+      record.root_workflow_module_id,
+      stringOr(moduleCandidates.find((candidate) => candidate.module_category === "workflow")?.id, null)
+    ),
+    nodes,
+    edges,
+    containers,
+    lanes: hydrateGraphLanes(record.lanes, nodes),
+    validation: {
+      ok: true,
+      errors: [],
+      warnings: []
+    }
+  };
+}
+
+function hydrateGraphNodes(value: unknown, moduleCandidates: Record<string, unknown>[]): Record<string, unknown>[] {
+  const moduleById = new Map(moduleCandidates.map((candidate) => [String(candidate.id), candidate]));
+  const rawNodes = Array.isArray(value) && value.some(isRecord) ? value.filter(isRecord) : synthesizeGraphNodes(moduleCandidates);
+  return rawNodes.map((node, index) => {
+    const nodeKind = enumOr(node.node_kind, graphNodeKinds, inferNodeKind(node, moduleById));
+    const moduleId = moduleBoundNodeKind(nodeKind) ? stringOr(node.module_id, inferModuleIdFromNode(node, moduleById)) : null;
+    const ownerScope = enumOr(node.owner_scope, new Set(["local", "remote", "external"]), nodeKind === "remote_a2a" ? "remote" : "local");
+    const laneId = enumOr(node.lane_id, graphLaneIds, laneForNodeKind(nodeKind));
+    return {
+      id: stringOr(node.id, `node-${String(index + 1).padStart(3, "0")}`),
+      module_id: moduleId,
+      label: stringOr(node.label, stringOr(moduleById.get(String(moduleId))?.name, `node-${index + 1}`)),
+      node_kind: nodeKind,
+      execution_kind: stringOr(node.execution_kind, null),
+      adk_node_role: enumOr(
+        node.adk_node_role,
+        new Set(["workflow_node", "container_root", "boundary", "synthetic"]),
+        nodeKind === "remote_a2a" ? "boundary" : moduleBoundNodeKind(nodeKind) ? "workflow_node" : "synthetic"
+      ),
+      owner_scope: ownerScope,
+      container_id: stringOr(node.container_id, nodeKind === "remote_a2a" ? "container-remote" : "container-root"),
+      lane_id: laneId,
+      input_ports: [],
+      output_ports: [],
+      schema_refs: stringArrayOr(node.schema_refs),
+      review_status: enumOr(node.review_status, new Set(["needs_info", "approved", "deferred", "rejected", "n/a"]), moduleBoundNodeKind(nodeKind) ? "needs_info" : "n/a")
+    };
+  });
+}
+
+function synthesizeGraphNodes(moduleCandidates: Record<string, unknown>[]): Record<string, unknown>[] {
+  const nodes: Record<string, unknown>[] = [{ id: "node-input", label: "요구사항 입력", node_kind: "input" }];
+  for (const candidate of moduleCandidates) {
+    const category = String(candidate.module_category);
+    nodes.push({
+      id: `node-${candidate.id}`,
+      label: String(candidate.name),
+      node_kind: category === "remote_a2a" ? "remote_a2a" : category,
+      module_id: String(candidate.id)
+    });
+  }
+  nodes.push({ id: "node-output", label: "분석 결과", node_kind: "output" });
+  return nodes;
+}
+
+function hydrateGraphEdges(value: unknown, nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  const rawEdges = Array.isArray(value) && value.some(isRecord) ? value.filter(isRecord) : synthesizeGraphEdges(nodes);
+  return rawEdges.map((edge, index) => {
+    const edgeKind = enumOr(edge.edge_kind, graphEdgeKinds, "event_output");
+    const remote = edgeKind === "remote_a2a" || edge.is_remote_boundary_crossing === true;
+    return {
+      id: stringOr(edge.id, `edge-${String(index + 1).padStart(3, "0")}`),
+      from: stringOr(edge.from, ""),
+      to: stringOr(edge.to, ""),
+      from_port: null,
+      to_port: null,
+      edge_kind: edgeKind,
+      execution_semantics: enumOr(edge.execution_semantics, graphExecutionSemantics, remote ? "boundary_crossing" : "normal_transition"),
+      data_label: stringOr(edge.data_label, ""),
+      schema_ref: stringOr(edge.schema_ref, null),
+      route_condition: stringOr(edge.route_condition, null),
+      state_key: stringOr(edge.state_key, null),
+      artifact_key: stringOr(edge.artifact_key, null),
+      a2a_contract_id: stringOr(edge.a2a_contract_id, null),
+      is_remote_boundary_crossing: remote
+    };
+  });
+}
+
+function synthesizeGraphEdges(nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  const edges: Record<string, unknown>[] = [];
+  for (let i = 0; i < nodes.length - 1; i += 1) {
+    edges.push({
+      id: `edge-${String(i + 1).padStart(3, "0")}`,
+      from: nodes[i].id,
+      to: nodes[i + 1].id,
+      edge_kind: "event_output",
+      execution_semantics: "normal_transition",
+      data_label: ""
+    });
+  }
+  return edges;
+}
+
+function hydrateGraphContainers(value: unknown, nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (Array.isArray(value) && value.some(isRecord)) {
+    return value.filter(isRecord).map((container) => ({
+      id: stringOr(container.id, "container-root"),
+      module_id: stringOr(container.module_id, null),
+      label: stringOr(container.label, "Root graph workflow"),
+      container_kind: enumOr(container.container_kind, graphContainerKinds, "graph_workflow"),
+      adk_mapping: stringOr(container.adk_mapping, null),
+      contains_node_ids: stringArrayOr(container.contains_node_ids),
+      entry_node_ids: stringArrayOr(container.entry_node_ids),
+      exit_node_ids: stringArrayOr(container.exit_node_ids),
+      layout_policy: enumOr(container.layout_policy, graphLayoutPolicies, "dag_with_routes"),
+      parent_container_id: stringOr(container.parent_container_id, null)
+    }));
+  }
+  const localIds = nodes.filter((node) => node.owner_scope !== "remote").map((node) => String(node.id));
+  const remoteIds = nodes.filter((node) => node.owner_scope === "remote").map((node) => String(node.id));
+  const containers: Record<string, unknown>[] = [
+    {
+      id: "container-root",
+      module_id: null,
+      label: "Root graph workflow",
+      container_kind: "graph_workflow",
+      adk_mapping: "ADK Graph Workflow",
+      contains_node_ids: localIds,
+      entry_node_ids: nodes.filter((node) => node.node_kind === "input").map((node) => String(node.id)),
+      exit_node_ids: nodes.filter((node) => node.node_kind === "output").map((node) => String(node.id)),
+      layout_policy: "dag_with_routes",
+      parent_container_id: null
+    }
+  ];
+  if (remoteIds.length > 0) {
+    containers.push({
+      id: "container-remote",
+      module_id: null,
+      label: "Remote A2A boundary",
+      container_kind: "remote_boundary",
+      adk_mapping: "A2A remote boundary",
+      contains_node_ids: remoteIds,
+      entry_node_ids: remoteIds,
+      exit_node_ids: remoteIds,
+      layout_policy: "free",
+      parent_container_id: null
+    });
+  }
+  return containers;
+}
+
+function hydrateGraphLanes(value: unknown, nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (Array.isArray(value) && value.some(isRecord)) {
+    return value.filter(isRecord).map((lane) => ({
+      id: enumOr(lane.id, graphLaneIds, "local_graph"),
+      label: stringOr(lane.label, String(lane.id ?? "local_graph"))
+    }));
+  }
+  const used = new Set(nodes.map((node) => String(node.lane_id)));
+  const labels: Record<string, string> = {
+    input: "Input",
+    local_graph: "Local Graph",
+    adapter: "Adapter",
+    human_input: "Human Input",
+    output: "Output",
+    remote_boundary: "Remote Boundary"
+  };
+  return Array.from(graphLaneIds)
+    .filter((lane) => used.has(lane) || lane === "input" || lane === "local_graph" || lane === "output")
+    .map((id) => ({ id, label: labels[id] }));
+}
+
+function stringOr(value: unknown, fallback: string | null): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  return fallback;
+}
+
+function stringArrayOr(value: unknown, fallback: string[] = []): string[] {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function riskSignalArrayOr(value: unknown, fallback: string[] = []): string[] {
+  return stringArrayOr(value, fallback).filter((signal) => riskSignals.has(signal));
+}
+
+function hydrateFields(
+  value: unknown,
+  fallback: Array<{ name: string; type: string; required?: boolean }> = []
+): Array<{ name: string; type: string; required: boolean }> {
+  const source = Array.isArray(value) ? value : fallback;
+  return source.filter(isRecord).map((field) => ({
+    name: stringOr(field.name, "field") ?? "field",
+    type: stringOr(field.type, "unknown") ?? "unknown",
+    required: typeof field.required === "boolean" ? field.required : false
+  }));
+}
+
+function hydrateSystems(value: unknown): Array<{ name: string; access: string }> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isRecord).map((system) => ({
+    name: stringOr(system.name, "needs_info") ?? "needs_info",
+    access: enumOr(system.access, systemAccess, "unknown")
+  }));
+}
+
+function hydrateAdkHints(value: unknown): Record<string, string | null> {
+  const record = isRecord(value) ? value : {};
+  return {
+    state_memory: stringOr(record.state_memory, null),
+    callbacks: stringOr(record.callbacks, null),
+    artifacts_events: stringOr(record.artifacts_events, null),
+    mcp_a2a: stringOr(record.mcp_a2a, null),
+    streaming_grounding: stringOr(record.streaming_grounding, null)
+  };
+}
+
+function enumOr<T extends string>(value: unknown, allowed: ReadonlySet<T> | Set<T>, fallback: T): T {
+  return typeof value === "string" && allowed.has(value as T) ? (value as T) : fallback;
+}
+
+function numberInRange(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max ? value : fallback;
+}
+
+function normalizeModuleId(value: unknown, index: number): string {
+  return typeof value === "string" && /^mod-[a-z0-9-]+$/.test(value)
+    ? value
+    : `mod-${String(index + 1).padStart(3, "0")}`;
+}
+
+function normalizeGraphId(value: unknown): string {
+  return typeof value === "string" && /^graph-[0-9]+$/.test(value) ? value : "graph-001";
+}
+
+function candidateSubType(candidate: Record<string, unknown>, category: string): string | null {
+  if (category === "agent") return stringOr(candidate.agent_kind, null);
+  if (category === "workflow") return stringOr(candidate.workflow_kind, null);
+  if (category === "adapter") return stringOr(candidate.adapter_kind, null);
+  if (category === "remote_a2a") return stringOr(candidate.remote_contract_kind, null);
+  return null;
+}
+
+function legacyRecommendationFor(category: string): string {
+  if (category === "agent") return "specialist_agent";
+  if (category === "workflow") return "internal_workflow";
+  if (category === "adapter") return "tool_adapter";
+  if (category === "remote_a2a") return "remote_a2a_contract";
+  return "unknown";
+}
+
+function riskLevelFor(category: string, signals: string[]): "low" | "medium" | "high" {
+  if (category === "remote_a2a") return "high";
+  if (signals.some((signal) => signal === "personal_data" || signal === "financial_data" || signal === "transaction_write")) {
+    return "high";
+  }
+  if (signals.length > 0) return "medium";
+  return "low";
+}
+
+function defaultSideEffect(category: string): "none" | "read" | "write" | "read_write" | "unknown" {
+  if (category === "adapter") return "read";
+  if (category === "agent" || category === "workflow") return "read";
+  return "unknown";
+}
+
+function moduleBoundNodeKind(kind: string): boolean {
+  return kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a";
+}
+
+function inferNodeKind(node: Record<string, unknown>, moduleById: Map<string, Record<string, unknown>>): string {
+  const moduleId = stringOr(node.module_id, null);
+  const category = moduleId ? moduleById.get(moduleId)?.module_category : null;
+  if (category === "remote_a2a") return "remote_a2a";
+  if (typeof category === "string" && graphNodeKinds.has(category)) return category;
+  return "function";
+}
+
+function inferModuleIdFromNode(node: Record<string, unknown>, moduleById: Map<string, Record<string, unknown>>): string | null {
+  const direct = stringOr(node.module_id, null);
+  if (direct) return direct;
+  const id = stringOr(node.id, "");
+  if (id && id.startsWith("node-mod-")) {
+    const candidateId = id.slice("node-".length);
+    if (moduleById.has(candidateId)) return candidateId;
+  }
+  return null;
+}
+
+function laneForNodeKind(kind: string): string {
+  if (kind === "input") return "input";
+  if (kind === "output") return "output";
+  if (kind === "adapter" || kind === "tool") return "adapter";
+  if (kind === "human_input") return "human_input";
+  if (kind === "remote_a2a") return "remote_boundary";
+  return "local_graph";
+}
+
+async function writeAnalyzerContextIndex({
+  repoRoot,
+  resultSchemaPath,
+  draftSchemaPath,
+  catalog,
+  contextIndexPath
+}: {
+  repoRoot: string;
+  resultSchemaPath: string;
+  draftSchemaPath: string;
+  catalog: SanitizedCatalogEntry[];
+  contextIndexPath: string;
+}) {
+  const files = [
+    "docs/workbench/taxonomy.md",
+    "docs/workbench/workflow-decision-guide.md",
+    "docs/workbench/process-flow.md",
+    "docs/workbench/analysis-guide.md",
+    "schemas/analysis-result.schema.json",
+    "schemas/analysis-draft.schema.json",
+    "catalog/adapters.yaml",
+    "catalog/agents.yaml",
+    "catalog/workflows.yaml",
+    "catalog/remote-a2a-contracts.yaml"
+  ];
+  const summaries: string[] = [];
+  for (const file of files) {
+    const abs = resolve(repoRoot, file);
+    const text = await readFile(abs, "utf8").catch(() => "");
+    const headings = text
+      .split(/\r?\n/)
+      .map((line, index) => ({ line, index: index + 1 }))
+      .filter(({ line }) => /^#{1,3}\s+/.test(line))
+      .slice(0, 24)
+      .map(({ line, index }) => `  - L${index}: ${line.replace(/^#+\s*/, "")}`);
+    summaries.push([`- ${file} (${text.length} chars)`, ...headings].join("\n"));
+  }
+
+  const catalogSummary = catalog.map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    module_category: entry.module_category,
+    subtype: entry.subtype,
+    runtime_binding: entry.runtime_binding,
+    access_protocol: entry.access_protocol,
+    mcp_server: entry.mcp_server,
+    mcp_tool_name: entry.mcp_tool_name,
+    owner_domain: entry.owner_domain,
+    contract_status: entry.contract_status
+  }));
+
+  await writeFile(
+    contextIndexPath,
+    [
+      "# Agent Factory Analyzer Context Index",
+      "",
+      "Use this file as a navigation index. It is not a substitute for the source files.",
+      "Read the original docs/schema/catalog with targeted sed/rg when a classification or Graph IR decision depends on exact wording.",
+      "",
+      `- Final hydrated schema: ${resultSchemaPath}`,
+      `- CLI compact draft schema currently enforced by --output-schema: ${draftSchemaPath}`,
+      "",
+      "## Source Files",
+      "",
+      summaries.join("\n"),
+      "",
+      "## Catalog Contract Index",
+      "",
+      JSON.stringify(catalogSummary, null, 2)
+    ].join("\n"),
+    "utf8"
+  );
+}
+
 interface SanitizedCatalogEntry {
   id: string;
   name: string;
   module_category: string;
   subtype: string | null;
+  runtime_binding?: string;
   access_protocol?: string;
   mcp_server?: string;
   mcp_tool_name?: string;
   mcp_schema_ref?: string;
   mcp_auth_mode?: string;
   component_source?: string;
+  contract_status?: string;
   owner_domain?: string;
   status?: string;
   responsibility?: string;
@@ -497,12 +1021,14 @@ function sanitizeCatalogPayload(value: unknown): SanitizedCatalogEntry[] {
       name,
       module_category: moduleCategory,
       subtype: subtypeRaw ?? null,
+      runtime_binding: stringField(item, "runtime_binding", 40),
       access_protocol: stringField(item, "access_protocol", 32),
       mcp_server: stringField(item, "mcp_server", 120),
       mcp_tool_name: stringField(item, "mcp_tool_name", 120),
       mcp_schema_ref: stringField(item, "mcp_schema_ref", 160),
       mcp_auth_mode: stringField(item, "mcp_auth_mode", 80),
       component_source: stringField(item, "component_source", 40),
+      contract_status: stringField(item, "contract_status", 80),
       owner_domain: stringField(item, "owner_domain", 120),
       status: stringField(item, "status", 80),
       responsibility: stringField(item, "responsibility", 320),
@@ -543,10 +1069,18 @@ function sanitizeCatalogFields(value: unknown): Array<{ name: string; type: stri
   return result;
 }
 
-function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEntry[]): string {
+function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEntry[], contextIndexPath: string): string {
   const sections: string[] = [
     "You are the live requirement analyzer for the Agent Factory workbench.",
-    "Return only JSON matching schemas/analysis-result.schema.json. No markdown, no commentary.",
+    "Return only JSON matching schemas/analysis-draft.schema.json. No markdown, no commentary.",
+    "The server will hydrate your compact draft into schemas/analysis-result.schema.json after you finish.",
+    "Do not emit the full final AnalysisResult shape. Emit only the compact draft fields requested by the output schema.",
+    "",
+    "Context access:",
+    `- First read the analyzer context index at ${contextIndexPath}.`,
+    "- The index is only a navigation aid. Use targeted sed/rg on the original docs/schema/catalog files when exact wording matters.",
+    "- Shell access remains available because analysis quality depends on source-grounded docs and schema checks.",
+    "- Avoid dumping entire large files when a targeted section is enough; prefer rg and bounded sed ranges.",
     "",
     "ADK runtime baseline:",
     "- ADK 2.0 (Beta) is the default mental model: graph-based deterministic workflows with explicit nodes/edges, dynamic (Python-driven) workflows, built-in parallel/merge, first-class human-input nodes, and trace/token observability.",
@@ -560,34 +1094,31 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "",
     "Do not paraphrase the docs into long output. Use them only to ground classification, adk_hints, and processFlow shape.",
     "",
-    "Output rules (engineering invariants only - non-negotiable):",
+    "Compact draft output rules:",
     "- RequirementIntakeInput intentionally contains only a selected domain and rawText. Infer title, requester, systems, inputs, outputs, process, and missing details from rawText instead of expecting separate intake fields.",
     "- Use RequirementIntakeInput.domain as the user's selected domain unless rawText clearly contradicts it; record any contradiction in normalizedRequirement.contradictions.",
     "- normalizedRequirement.id = \"req-001\"; every module source_requirement_id = \"req-001\".",
     "- Number module ids sequentially as mod-001, mod-002, mod-003, ... with no gaps.",
+    "- For catalog reuse, set reuse_candidate=true, set catalog_entry_id to the exact catalog id, and keep the catalog entry name verbatim. You may omit repeated catalog inputs/outputs when unchanged; the server hydrates them.",
+    "- For new modules, include inputs/outputs when they are materially needed to explain the contract.",
+    "- Include concise Korean rationale and missing_information. Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
     "",
-    "Process flow output — Graph IR (NOT a stage list):",
-    "- processFlow MUST be a Graph IR object. Required fields: requirement_id (= \"req-001\"), graph_id (pattern graph-NNN, e.g. \"graph-001\"), root_workflow_module_id (the module_id of the outermost workflow node, or null if none), nodes, edges, containers, lanes, validation.",
+    "Process flow output — compact Graph IR draft (NOT a stage list):",
+    "- processFlow MUST contain nodes, edges, containers, lanes, and validation because the Codex response_format schema requires all object keys. Use [] for containers/lanes when the default root graph container is enough; the server hydrates required Graph IR defaults.",
+    "- Graph IR ids must use canonical final artifact forms: edge ids like edge-001, edge-002, edge-003; container ids like container-root, container-human-review, container-parallel-customer-data. Do not use e-001, c-root, c-human-review, or other shorthand.",
+    "- node.container_id and container.parent_container_id must exactly reference an emitted container id. If you are unsure about a custom container boundary, use containers: [] and let the server hydrate the default root container.",
     "- DO NOT emit a top-level `stages` field anywhere. The validator rejects it.",
-    "- DO NOT emit legacy node fields `type`/`subtype` or legacy edge fields `edge_type`/`data`/`data_channel` at the top level. New analyzer output must use the Graph IR field names directly. (The server runs a migration pass for backward compat, but new emissions should be native Graph IR.)",
-    "- Allowed node_kind values (12, §6 semantics): input (graph entry), output (graph exit), agent (LLM agent), function (deterministic function), tool (tool / function call), adapter (adapter or legacy bridge), human_input (first-class human-input node — never an LLM agent in disguise), workflow (nested workflow node), remote_a2a (remote A2A boundary node), join (parallel merge), router (explicit routing decision), loop_control (loop continue / exit decision).",
-    "- Allowed container_kind values (6, §7): graph_workflow (root deterministic graph; ADK 2.0 graph workflow), dynamic_workflow (Python-driven dynamic workflow), parallel_region (fan-out → join), loop_region (back edge + exit), human_review_region (human-input pause), remote_boundary (the remote A2A zone). Local execution lives inside graph_workflow (or dynamic_workflow); Remote A2A nodes live in remote_boundary containers OUTSIDE the local container, never nested inside it.",
-    "- Allowed edge_kind values (10, §8/§9): event_output is the default machine-readable payload between nodes; event_message is reserved for user-facing or human-input prompt text; session_state / temp_state / user_state / app_state are only emitted when ADK Session/State persistence is the deliberate design point and require the matching state_key prefix (no prefix for session_state; temp: for temp_state; user: for user_state; app: for app_state); artifact requires a non-null artifact_key; route requires route_condition AND must originate from a router node; control is for retry / cancel / timeout / loop_stop / escalation signals; remote_a2a is only valid on edges crossing into a remote_boundary container, requires is_remote_boundary_crossing=true and a non-null a2a_contract_id.",
-    "- Allowed lane_id values (6): input, local_graph, adapter, human_input, output, remote_boundary. Every node MUST declare a lane_id from this set.",
-    "- Routes need an explicit router node; loops need a loop_region container with exactly one loop_back execution_semantics edge and one loop_exit execution_semantics edge; parallel needs a parallel_region container with ≥2 entry nodes and a join node as the merge exit.",
+    "- DO NOT emit legacy node fields `type`/`subtype` or legacy edge fields `edge_type`/`data`/`data_channel`.",
+    `- Allowed node_kind: ${GRAPH_NODE_KINDS.join(", ")}.`,
+    `- Allowed edge_kind: ${GRAPH_EDGE_KINDS.join(", ")}.`,
+    `- Allowed container_kind: ${GRAPH_CONTAINER_KINDS.join(", ")}.`,
+    "- Routes need an explicit router node; loops need a loop_region container; parallel needs a parallel_region and join node when the requirement actually implies those structures.",
     "- Human input must be modeled as node_kind: \"human_input\" (NOT an LLM agent in disguise). Its outbound edge to a router or downstream node is typically event_message or route.",
-    "- module_id rule: synthetic kinds (input, output, join, router, loop_control) MUST set module_id: null. Module-bound kinds (agent, workflow, adapter, remote_a2a) MUST set module_id to the matching candidate id.",
-    "- Every node id is unique within the graph. Every edge id matches ^edge-[0-9]+$ and is unique. Every container id matches ^container-[a-z0-9-]+$.",
-    "- Required validation block: emit { ok: true, errors: [], warnings: [] }. Server-side validation will populate any structural issues — keep self-validation conservative (emit ok:true with empty arrays if you cannot confidently self-validate).",
-    "- Do NOT infer Remote A2A from local complexity (§19). Multi-step local workflow alone is NOT enough to propose a remote_a2a node, edge, or container.",
+    "- Module-bound node kinds (agent, workflow, adapter, remote_a2a) should set module_id to the matching candidate id. Synthetic node kinds should use null or omit module_id.",
+    "- Do NOT infer Remote A2A from local complexity. Multi-step local workflow alone is NOT enough to propose a remote_a2a node, edge, or container.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
-    "- Always emit a2aContracts at the top level of the AnalysisResult. Use an empty array when there are no remote_a2a candidates; never omit the key.",
-    "- For every remote_a2a candidate, emit exactly one paired A2AContract object inside a2aContracts. The contract's contract_id must match the pattern a2a-NNN (a2a-001, a2a-002, ... numbered sequentially with no gaps). The candidate's a2a_contract_id must equal that contract_id, and the contract's remote_module_id must equal the candidate's id (e.g. mod-003).",
-    "- When a required A2A contract field cannot be derived from the requirement, set the string field to the literal value \"needs_info\". For arrays only use [] where the schema permits an empty array. For task_lifecycle.states, default to [\"TASK_STATE_SUBMITTED\"]. For streaming.supported, default to false. For streaming.wrappers, default to []. For push_notification_policy, use null when no push policy applies.",
-    "- The candidate-side contract summary fields (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy, a2a_contract_id) must each carry a non-empty string. If unknown, set the field to \"needs_info\" and also append the field name to the candidate's missing_information array.",
-    "- Every module candidate must include missing_information as an array of short Korean strings. Use [] only when no candidate-specific detail is missing.",
-    "- adk_hints is required on every module candidate. Always emit an object with all five keys (state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding); set a key to null when its ADK guidance does not apply, and to a short Korean sentence (grounded in adk-docs-mcp) when it does. Use null for the whole adk_hints object only when no ADK component is relevant at all. Route 2.0 trace/token observability hints into artifacts_events (event/token retention) and callbacks (instrumentation hooks); do not invent new hint keys.",
-    "- Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
+    "- a2aContracts may be omitted in the compact draft. The server hydrates placeholder A2A contracts for real remote_a2a candidates.",
+    "- adk_hints should be concise and grounded in adk-docs-mcp when relevant. Use only these keys: state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding.",
     "",
     "Taxonomy guardrails:",
     "- Use module_category only from agent, workflow, adapter, remote_a2a.",
@@ -600,22 +1131,6 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
     "",
-    "A2A 1.0/latest vocabulary (use ONLY these names inside any A2AContract object — no other variants):",
-    `- Operation names (operations[]): ${A2A_OPERATION_NAMES.map((name) => `\`${name}\``).join(" | ")}`,
-    `- HTTP+JSON paths (http_paths[]): ${A2A_HTTP_PATHS.map((p) => `\`${p}\``).join(" | ")}`,
-    `- Task states (task_lifecycle.states[], task_lifecycle.terminal_states[], allowed_transitions[]): ${A2A_TASK_STATES.map(
-      (state) => `\`${state}\``
-    ).join(" | ")}`,
-    `- Stream wrappers (streaming.wrappers[]): ${A2A_STREAM_WRAPPERS.map((w) => `\`${w}\``).join(" | ")}`,
-    `- Part content fields (message_contract.allowed_part_fields[]): ${A2A_PART_FIELDS.map(
-      (f) => `\`${f}\``
-    ).join(" | ")} — never \`file\``,
-    `- Roles (message_contract.allowed_roles[]): ${A2A_ROLES.map((r) => `\`${r}\``).join(" | ")}`,
-    "",
-    "A2A terminology denylist — never emit any of these tokens inside an A2AContract object (the validator scans for them and will reject the output):",
-    `- ${A2A_STALE_NAMES.map((name) => `\`${name}\``).join(", ")}`,
-    "  Specifically: do not use slash-form ops (tasks/send, tasks/sendSubscribe, tasks/get, tasks/cancel), legacy request wrapper names (SendTaskRequest, GetTaskRequest, ...), lowercase task-state words (submitted, working, ...), bare task states without TASK_STATE_ prefix (SUBMITTED, WORKING, ...), TextPart/FilePart/DataPart class names, or `file` as a Part content field.",
-    "",
     "Remote A2A discipline (spec §4) — Remote A2A is high-friction and must not be inferred from multi-step local processing alone. Only classify a candidate as remote_a2a when there is explicit evidence of an independently owned, deployed, discoverable remote agent (separate owner/lifecycle, Agent Card or registry discovery, A2A-specific lifecycle/streaming/artifact semantics, cross-deployment delegation). When such evidence is missing but the requirement otherwise looks remote-shaped, classify the capability as agent/workflow/adapter and append the missing remote details (owner, agent_card, auth, task_lifecycle, timeout, retry, fallback, audit, data_policy) to missing_information rather than fabricating a Remote A2A boundary.",
     "",
     "Korean prose for human-visible fields; keep engineering terms in English (Agent, Workflow, Adapter, Remote A2A, module_category, adapter_kind, Session/State, placeholder).",
@@ -627,14 +1142,17 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
       "",
       "Registered shared catalog (already-approved reusable agents/workflows/adapters/remote contracts):",
       "- Treat this list as the source of truth for what already exists in the workbench. Prefer reuse over inventing a new module.",
+      "- Catalog entries are real runtime contracts, not mocks. Do not create or classify mock-only modules from catalog metadata.",
+      "- Mock generation is a separate future capability that may use catalog contracts as input; it is not part of requirement analysis output.",
       "- When a candidate's responsibility, inputs, outputs, subtype, owner_domain, and access protocol match an existing entry, set the candidate's name to the catalog entry's name verbatim, set reuse_candidate to true, and explain the binding in rationale (mention the catalog entry name and id).",
       "- Copy the catalog inputs and outputs onto a reused candidate unless the requirement narrows them; explain any narrowing in rationale or missing_information.",
-      "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information.",
+      "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information. If runtime_binding is \"remote_a2a\", explain that this is a catalog runtime binding for the workflow, not a new module_category: remote_a2a candidate by itself.",
       "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name / mcp_schema_ref / mcp_auth_mode; copy them onto the candidate exactly. Do not invent server or tool names.",
-      "- Catalog entries describe reusable reviewed specs, not Python package imports. Preserve the catalog name on reused candidates so scaffold-plan generation can record the catalog binding and still emit a TODO/stub runtime boundary.",
+      "- Catalog entries describe reusable reviewed runtime contracts. Preserve the catalog name on reused candidates so scaffold-plan generation can record the catalog binding and emit a reviewed wiring TODO when runtime configuration is still required.",
       "- For partial matches, still emit a candidate but flag the gap in missing_information (e.g. owner mismatch, narrower scope).",
       "- Do not duplicate a catalog entry as a separate new candidate — collapse it into the matching reuse candidate.",
       "- Never fabricate catalog entries that are not in this list.",
+      "- In compact draft output, use catalog_entry_id instead of repeating unchanged catalog inputs/outputs.",
       "Catalog JSON:",
       JSON.stringify(catalog, null, 2)
     );
@@ -788,13 +1306,15 @@ function runProcess(
         resolvePromise({ stdout, stderr, diagnostics });
         return;
       }
+      const failure = summarizeProcessFailure(stdout, stderr);
       reject(
         createAnalyzerError(
           "failed",
-          `Codex CLI 분석 실패(code ${code ?? "unknown"}): ${stderr || stdout}`.trim(),
+          `Codex CLI 분석 실패(code ${code ?? "unknown"}): ${failure.message}`.trim(),
           {
             ...diagnostics,
-            timeoutMs
+            timeoutMs,
+            lastTraceSnippet: failure.snippet || diagnostics.lastTraceSnippet
           }
         )
       );
@@ -802,6 +1322,30 @@ function runProcess(
 
     child.stdin.end(input);
   });
+}
+
+function summarizeProcessFailure(stdout: string, stderr: string): { message: string; snippet: string } {
+  const combined = `${stderr}\n${stdout}`.trim();
+  const normalized = combined.replace(/\s+/g, " ");
+  const classifications: string[] = [];
+  if (/max_output_tokens/i.test(combined)) {
+    classifications.push("max_output_tokens");
+  }
+  if (/context window|ran out of room/i.test(combined)) {
+    classifications.push("context_window_exceeded");
+  }
+  if (/stream disconnected|Incomplete response/i.test(combined)) {
+    classifications.push("stream_incomplete");
+  }
+  if (/turn\.failed/i.test(combined)) {
+    classifications.push("turn_failed");
+  }
+  const prefix = classifications.length ? `[${classifications.join(", ")}] ` : "";
+  const tail = normalized.length > 1200 ? normalized.slice(-1200) : normalized;
+  return {
+    message: `${prefix}${tail || "no process output"}`,
+    snippet: tail
+  };
 }
 
 interface CliTraceEvent {
@@ -1657,12 +2201,7 @@ function applyGraphIRMigration(value: unknown): unknown {
           : "req-001";
       const migrated = normalizeGraphIRForRuntime(next.processFlow, reqId);
       const soft = validateGraphIRSoft(migrated);
-      const existing = migrated.validation ?? { ok: true, errors: [], warnings: [] };
-      const mergedValidation = {
-        ok: existing.ok && soft.errors.length === 0,
-        errors: [...(existing.errors ?? []), ...soft.errors],
-        warnings: [...(existing.warnings ?? []), ...soft.warnings]
-      };
+      const mergedValidation = mergeGraphIRValidation(migrated.validation, soft);
       next.processFlow = { ...migrated, validation: mergedValidation };
     }
   } catch (error) {

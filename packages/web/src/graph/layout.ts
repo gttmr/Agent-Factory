@@ -1,6 +1,5 @@
-// Layout helper for GraphIR — positions nodes via dagre per local container,
-// then unions container bounding rectangles. Lanes only set a fallback X
-// position when a node has no container.
+// Layout helper for GraphIR — positions nodes once for the whole workflow,
+// then derives container overlays from already-positioned node bounds.
 import dagre from "dagre";
 import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "reactflow";
 import type {
@@ -41,9 +40,12 @@ const NODE_WIDTH = 232;
 const NODE_HEIGHT = 116;
 const ROUTER_SIZE = 96;
 const JOIN_SIZE = 56;
-const CONTAINER_PADDING_X = 28;
-const CONTAINER_PADDING_Y = 44;
-const REMOTE_GAP = 220;
+const WORKFLOW_PADDING_X = 42;
+const WORKFLOW_PADDING_Y = 54;
+const REGION_PADDING_X = 18;
+const REGION_PADDING_Y = 30;
+const GRAPH_ORIGIN_X = 72;
+const GRAPH_ORIGIN_Y = 96;
 
 const LANE_ORDER: LaneId[] = [
   "input",
@@ -77,8 +79,46 @@ function laneIndex(laneId: string | undefined): number {
   return idx === -1 ? 1 : idx;
 }
 
-function isLocalContainer(kind: GraphContainer["container_kind"]): boolean {
-  return kind !== "remote_boundary";
+function isWorkflowContainer(kind: GraphContainer["container_kind"]): boolean {
+  return kind === "graph_workflow" || kind === "dynamic_workflow";
+}
+
+function rectPadding(kind: GraphContainer["container_kind"]): { x: number; y: number } {
+  return isWorkflowContainer(kind)
+    ? { x: WORKFLOW_PADDING_X, y: WORKFLOW_PADDING_Y }
+    : { x: REGION_PADDING_X, y: REGION_PADDING_Y };
+}
+
+function rectFromNodeIds(
+  container: GraphContainer,
+  ids: string[],
+  positions: Map<string, NodeXY>
+): ContainerRect | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const id of ids) {
+    const p = positions.get(id);
+    if (!p) continue;
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x + p.width);
+    maxY = Math.max(maxY, p.y + p.height);
+  }
+  if (!Number.isFinite(minX)) return null;
+  const padding = rectPadding(container.container_kind);
+  return {
+    container,
+    x: minX - padding.x,
+    y: minY - padding.y,
+    width: maxX - minX + padding.x * 2,
+    height: maxY - minY + padding.y * 2
+  };
+}
+
+function rectPriority(kind: GraphContainer["container_kind"]): number {
+  return isWorkflowContainer(kind) ? 0 : 1;
 }
 
 export function layoutGraphIR(
@@ -94,147 +134,72 @@ export function layoutGraphIR(
   const containerRects: ContainerRect[] = [];
 
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
-  const containerOf = new Map<string, GraphContainer>();
-  for (const c of containers) {
-    for (const id of c.contains_node_ids ?? []) {
-      containerOf.set(id, c);
+
+  const g = new dagre.graphlib.Graph({ multigraph: true });
+  g.setGraph({ rankdir: "LR", nodesep: 28, ranksep: 56, marginx: 0, marginy: 0 });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  for (const n of allNodes) {
+    const { width, height } = nodeSize(n);
+    g.setNode(n.id, { width, height });
+  }
+  for (const e of allEdges) {
+    if (nodeById.has(e.from) && nodeById.has(e.to)) {
+      g.setEdge(e.from, e.to, {}, e.id ?? `${e.from}->${e.to}`);
     }
   }
-
-  // Track horizontal cursor for stacking containers along X.
-  let containerCursorX = 40;
-  const localContainers = containers.filter((c) => isLocalContainer(c.container_kind));
-  const remoteContainers = containers.filter((c) => !isLocalContainer(c.container_kind));
-
-  // Layout each local container with dagre LR.
-  for (const container of localContainers) {
-    const ids = container.contains_node_ids ?? [];
-    if (ids.length === 0) continue;
-
-    const g = new dagre.graphlib.Graph({ multigraph: true });
-    g.setGraph({ rankdir: "LR", nodesep: 36, ranksep: 80, marginx: 0, marginy: 0 });
-    g.setDefaultEdgeLabel(() => ({}));
-
-    for (const id of ids) {
-      const n = nodeById.get(id);
-      if (!n) continue;
-      const { width, height } = nodeSize(n);
-      g.setNode(id, { width, height });
-    }
-    const idSet = new Set(ids);
-    for (const e of allEdges) {
-      if (idSet.has(e.from) && idSet.has(e.to)) {
-        g.setEdge(e.from, e.to, {}, e.id ?? `${e.from}->${e.to}`);
-      }
-    }
-    try {
-      dagre.layout(g);
-    } catch {
-      // ignore — fall through to manual placement
-    }
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let fallbackY = 0;
-    for (const id of ids) {
-      const n = nodeById.get(id);
-      if (!n) continue;
-      const { width, height } = nodeSize(n);
-      const dn = g.node(id);
-      let cx: number;
-      let cy: number;
-      if (dn && Number.isFinite(dn.x) && Number.isFinite(dn.y)) {
-        cx = dn.x;
-        cy = dn.y;
-      } else {
-        cx = width / 2;
-        cy = fallbackY + height / 2;
-        fallbackY += height + 24;
-      }
-      const x = cx - width / 2;
-      const y = cy - height / 2;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
-      positions.set(id, { x, y, width, height });
-    }
-
-    if (!Number.isFinite(minX)) continue;
-
-    // Translate container into a horizontal slot.
-    const localOriginX = containerCursorX - minX + CONTAINER_PADDING_X;
-    const localOriginY = 80 - minY + CONTAINER_PADDING_Y;
-    const containerX = containerCursorX;
-    const containerY = 80;
-    const containerWidth = maxX - minX + CONTAINER_PADDING_X * 2;
-    const containerHeight = maxY - minY + CONTAINER_PADDING_Y * 2;
-
-    for (const id of ids) {
-      const p = positions.get(id);
-      if (!p) continue;
-      positions.set(id, {
-        ...p,
-        x: p.x + localOriginX,
-        y: p.y + localOriginY
-      });
-    }
-
-    containerRects.push({
-      container,
-      x: containerX,
-      y: containerY,
-      width: containerWidth,
-      height: containerHeight
-    });
-
-    containerCursorX += containerWidth + 60;
+  try {
+    dagre.layout(g);
+  } catch {
+    // ignore — orphan fallback below will keep the graph renderable
   }
 
-  // Place remote containers to the right with a gap.
-  let remoteX = containerCursorX + REMOTE_GAP - 60;
-  for (const container of remoteContainers) {
-    const ids = container.contains_node_ids ?? [];
-    let cursorY = 80 + CONTAINER_PADDING_Y;
-    let maxRowWidth = 0;
-    for (const id of ids) {
-      const n = nodeById.get(id);
-      if (!n) continue;
-      const { width, height } = nodeSize(n);
-      positions.set(id, {
-        x: remoteX + CONTAINER_PADDING_X,
-        y: cursorY,
-        width,
-        height
-      });
-      cursorY += height + 24;
-      maxRowWidth = Math.max(maxRowWidth, width);
+  let minGraphX = Infinity;
+  let minGraphY = Infinity;
+  let fallbackY = 0;
+  for (const n of allNodes) {
+    const { width, height } = nodeSize(n);
+    const dn = g.node(n.id);
+    let x: number;
+    let y: number;
+    if (dn && Number.isFinite(dn.x) && Number.isFinite(dn.y)) {
+      x = dn.x - width / 2;
+      y = dn.y - height / 2;
+    } else {
+      const idx = laneIndex(n.lane_id as string | undefined);
+      x = idx * 220;
+      y = fallbackY;
+      fallbackY += height + 22;
     }
-    const containerWidth = maxRowWidth + CONTAINER_PADDING_X * 2;
-    const containerHeight = cursorY - 80 + CONTAINER_PADDING_Y;
-    containerRects.push({
-      container,
-      x: remoteX,
-      y: 80,
-      width: containerWidth,
-      height: containerHeight
-    });
-    remoteX += containerWidth + 60;
+    minGraphX = Math.min(minGraphX, x);
+    minGraphY = Math.min(minGraphY, y);
+    positions.set(n.id, { x, y, width, height });
   }
 
-  // Lane fallback for orphan nodes.
+  const translateX = Number.isFinite(minGraphX) ? GRAPH_ORIGIN_X - minGraphX : GRAPH_ORIGIN_X;
+  const translateY = Number.isFinite(minGraphY) ? GRAPH_ORIGIN_Y - minGraphY : GRAPH_ORIGIN_Y;
+  for (const [id, p] of positions) {
+    positions.set(id, { ...p, x: p.x + translateX, y: p.y + translateY });
+  }
+
+  // Lane fallback for any nodes not accepted by dagre.
   const orphanY = new Map<number, number>();
   for (const n of allNodes) {
     if (positions.has(n.id)) continue;
     const idx = laneIndex(n.lane_id as string | undefined);
-    const baseX = 60 + idx * 240;
-    const colY = orphanY.get(idx) ?? 80;
+    const baseX = GRAPH_ORIGIN_X + idx * 220;
+    const colY = orphanY.get(idx) ?? GRAPH_ORIGIN_Y;
     const { width, height } = nodeSize(n);
     positions.set(n.id, { x: baseX, y: colY, width, height });
-    orphanY.set(idx, colY + height + 24);
+    orphanY.set(idx, colY + height + 22);
   }
+
+  for (const container of containers) {
+    const ids = (container.contains_node_ids ?? []).filter((id) => nodeById.has(id));
+    const rect = rectFromNodeIds(container, ids, positions);
+    if (rect) containerRects.push(rect);
+  }
+  containerRects.sort((a, b) => rectPriority(a.container.container_kind) - rectPriority(b.container.container_kind));
 
   const rfNodes: ReactFlowNode<GraphNodeData>[] = allNodes.map((n) => {
     const p = positions.get(n.id) ?? { x: 0, y: 0, width: NODE_WIDTH, height: NODE_HEIGHT };
