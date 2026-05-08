@@ -35,7 +35,7 @@ function HandleStrip() {
 function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" | "workflow" | "adapter" | "remote_a2a" }) {
   const { graphNode, selected, onSelect } = data;
   const cat = moduleCategoryFromKind(kind);
-  const sub = graphNode.execution_kind ?? graphNode.subtype ?? null;
+  const sub = graphNode.execution_kind ?? null;
   return (
     <div
       className={`graph-node graph-node-card cat-${cat ?? "agent"} ${selected ? "is-selected" : ""}`}

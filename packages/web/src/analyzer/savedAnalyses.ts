@@ -1,4 +1,4 @@
-import { legacyStageToGraphIR } from "./graphMigration";
+import { normalizeGraphIRForRuntime } from "./graphMigration";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -27,7 +27,7 @@ export function loadSavedAnalyses(): SavedAnalysisRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isSavedAnalysisRecord).slice(0, MAX_RECORDS).map(backfillAnalysisShape);
+    return parsed.flatMap(normalizeSavedAnalysisRecord).slice(0, MAX_RECORDS);
   } catch {
     return [];
   }
@@ -53,16 +53,9 @@ export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysi
   const analysis = withContracts.analysis as AnalysisResult | undefined;
   if (!analysis) return withContracts;
   const flow = (analysis as { processFlow?: unknown }).processFlow;
-  const isLegacyShape =
-    flow !== null &&
-    typeof flow === "object" &&
-    !Array.isArray(flow) &&
-    (!Array.isArray((flow as { containers?: unknown }).containers) ||
-      !Array.isArray((flow as { lanes?: unknown }).lanes));
-  if (!isLegacyShape) return withContracts;
   const requirementId =
     (analysis as { normalizedRequirement?: { id?: string } }).normalizedRequirement?.id ?? "req-001";
-  const migrated = legacyStageToGraphIR(flow, requirementId);
+  const migrated = normalizeGraphIRForRuntime(flow, requirementId);
   return {
     ...withContracts,
     analysis: { ...analysis, processFlow: migrated }
@@ -94,17 +87,34 @@ function persistSavedAnalyses(records: SavedAnalysisRecord[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
-function isSavedAnalysisRecord(value: unknown): value is SavedAnalysisRecord {
-  if (!value || typeof value !== "object") return false;
+function normalizeSavedAnalysisRecord(value: unknown): SavedAnalysisRecord[] {
+  if (!value || typeof value !== "object") return [];
   const record = value as Partial<SavedAnalysisRecord>;
-  return (
+  const valid =
     typeof record.id === "string" &&
     typeof record.title === "string" &&
     typeof record.savedAt === "string" &&
     Boolean(record.input) &&
     Boolean(record.analysis) &&
-    Array.isArray(record.moduleCandidates) &&
     Array.isArray(record.acceptedMissing) &&
-    typeof record.analyzerModel === "string"
-  );
+    typeof record.analyzerModel === "string";
+  if (!valid) return [];
+  const analysis = record.analysis as AnalysisResult;
+  const moduleCandidates = Array.isArray(record.moduleCandidates)
+    ? record.moduleCandidates
+    : Array.isArray((analysis as { moduleCandidates?: unknown }).moduleCandidates)
+      ? ((analysis as { moduleCandidates: ModuleCandidate[] }).moduleCandidates)
+      : [];
+  return [
+    backfillAnalysisShape({
+      id: record.id as string,
+      title: record.title as string,
+      savedAt: record.savedAt as string,
+      input: record.input as RequirementIntakeInput,
+      analysis,
+      moduleCandidates,
+      acceptedMissing: record.acceptedMissing as string[],
+      analyzerModel: record.analyzerModel as CodexAnalyzerModel
+    })
+  ];
 }

@@ -43,6 +43,14 @@ function isGraphIRShaped(value: Record<string, unknown>): boolean {
   return nodes.every((node) => isRecord(node) && typeof node.node_kind === "string");
 }
 
+function asString(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
 function laneForLegacyType(legacyType: string | undefined, nodeKind: NodeKind): LaneId {
   if (legacyType === "input" || nodeKind === "input") return "input";
   if (legacyType === "output" || nodeKind === "output") return "output";
@@ -182,10 +190,7 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
       input_ports: [],
       output_ports: [],
       schema_refs: [],
-      review_status: reviewStatus,
-      // Legacy mirror fields preserved for transitional readers.
-      type: (legacyType ?? candidateKind) as GraphNode["type"],
-      subtype
+      review_status: reviewStatus
     });
   }
 
@@ -220,12 +225,7 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
         typeof (raw as Record<string, unknown>).a2a_contract_id === "string"
           ? ((raw as Record<string, unknown>).a2a_contract_id as string)
           : null,
-      is_remote_boundary_crossing: isRemote,
-      // Legacy mirror fields preserved.
-      edge_type: (edgeType === "remote_a2a" ? "remote_a2a" : "local") as GraphEdge["edge_type"],
-      data: dataLabel,
-      data_channel:
-        typeof channel === "string" ? (channel as GraphEdge["data_channel"]) : ("event_output" as GraphEdge["data_channel"])
+      is_remote_boundary_crossing: isRemote
     });
   }
 
@@ -284,6 +284,77 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
     root_workflow_module_id: firstModuleBoundId,
     nodes,
     edges,
+    containers,
+    lanes,
+    validation
+  };
+}
+
+/**
+ * Return a native Graph IR object with legacy mirror fields removed. This is
+ * intentionally tolerant because it runs on saved browser records and older
+ * analyzer output before the strict validator gets a chance to reject them.
+ */
+export function normalizeGraphIRForRuntime(input: unknown, requirementId: string): GraphIR {
+  const graphIR = legacyStageToGraphIR(input, requirementId);
+  const containers = graphIR.containers ?? [];
+  const lanes = graphIR.lanes ?? [];
+  const validation = graphIR.validation ?? { ok: true, errors: [], warnings: [] };
+
+  return {
+    requirement_id: asString(graphIR.requirement_id, requirementId),
+    graph_id: asString(graphIR.graph_id, "graph-001"),
+    root_workflow_module_id: graphIR.root_workflow_module_id ?? null,
+    nodes: (graphIR.nodes ?? []).map((node) => {
+      const nodeRecord = node as GraphNode & Record<string, unknown>;
+      const legacyType = typeof nodeRecord.type === "string" ? nodeRecord.type : undefined;
+      const nodeKind =
+        node.node_kind && NODE_KIND_SET.has(node.node_kind)
+          ? node.node_kind
+          : legacyType && NODE_KIND_SET.has(legacyType)
+            ? (legacyType as NodeKind)
+            : "function";
+      return {
+        id: asString(node.id, "node-unknown"),
+        label: asString(node.label, asString(node.id, "node")),
+        module_id: asNullableString(node.module_id),
+        node_kind: nodeKind,
+        execution_kind: asNullableString(node.execution_kind),
+        adk_node_role: node.adk_node_role ?? null,
+        owner_scope: node.owner_scope ?? (nodeKind === "remote_a2a" ? "remote" : "local"),
+        container_id: asNullableString(node.container_id),
+        lane_id: LANE_ID_SET.has(String(node.lane_id)) ? (node.lane_id as LaneId) : laneForLegacyType(legacyType, nodeKind),
+        input_ports: Array.isArray(node.input_ports) ? node.input_ports : [],
+        output_ports: Array.isArray(node.output_ports) ? node.output_ports : [],
+        schema_refs: Array.isArray(node.schema_refs) ? node.schema_refs : [],
+        review_status: node.review_status ?? "needs_info"
+      };
+    }),
+    edges: (graphIR.edges ?? []).map((edge, index) => {
+      const edgeRecord = edge as GraphEdge & Record<string, unknown>;
+      const legacyChannel = edgeRecord.data_channel;
+      const legacyEdgeType = edgeRecord.edge_type;
+      const edgeKind =
+        edge.edge_kind && EDGE_KIND_SET.has(edge.edge_kind)
+          ? edge.edge_kind
+          : legacyChannelToEdgeKind(legacyChannel, legacyEdgeType);
+      return {
+        id: asString(edge.id, padEdgeId(index)),
+        from: asString(edge.from, ""),
+        to: asString(edge.to, ""),
+        from_port: asNullableString(edge.from_port),
+        to_port: asNullableString(edge.to_port),
+        edge_kind: edgeKind,
+        execution_semantics: edge.execution_semantics ?? executionSemanticsForEdge(edgeKind),
+        data_label: typeof edge.data_label === "string" ? edge.data_label : typeof edgeRecord.data === "string" ? edgeRecord.data : "",
+        schema_ref: asNullableString(edge.schema_ref),
+        route_condition: asNullableString(edge.route_condition),
+        state_key: asNullableString(edge.state_key),
+        artifact_key: asNullableString(edge.artifact_key),
+        a2a_contract_id: asNullableString(edge.a2a_contract_id),
+        is_remote_boundary_crossing: edge.is_remote_boundary_crossing === true || edgeKind === "remote_a2a"
+      };
+    }),
     containers,
     lanes,
     validation

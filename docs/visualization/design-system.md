@@ -1,12 +1,52 @@
 # Web Workbench Design System
 
-이 문서는 `packages/web` 워크벤치 UI 의 디자인 시스템을 정의한다. 카테고리 색·글리프 컨트랙트, 공유 컴포넌트 패턴, Process Flow 의 stage 모델, CSS 함정을 다룬다. 새 화면을 추가하거나 기존 화면을 수정할 때 이 문서의 컨트랙트를 따른다.
+이 문서는 `packages/web` 워크벤치 UI 의 디자인 시스템을 정의한다. 카테고리 색·글리프 컨트랙트, 공유 컴포넌트 패턴, 화면 배치, CSS 함정을 다룬다. Graph IR 의미와 marker 판정 규칙은 `docs/workbench/process-flow.md`를 따른다.
 
 ## 디자인 원칙
 
 - **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Process Flow, Reuse Heatmap, Domain × Capability Map)이 동일 매핑을 사용한다.
-- **특수 흐름은 시각적으로 부각한다.** parallel / loop / human_review / branch 같은 흐름은 텍스트 라벨이 아니라 stage marker 와 점선 박스로 표시한다.
+- **특수 흐름은 시각적으로 부각한다.** `process-flow.md`에서 정의한 fan-out/fan-in, loop, human input, branch marker는 텍스트 라벨만 두지 말고 stage marker와 점선 박스로 표시한다.
 - **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, stage 사이 connector 화살표와 데이터 라벨 chip 으로 통합한다.
+- **Workbench 는 운영 콘솔이다.** 첫 화면은 marketing hero가 아니라 개발리더가 상태, 다음 단계, 작업면, context를 바로 읽는 Ops console이어야 한다.
+- **카드는 상호작용 표면에만 쓴다.** 페이지 전체를 카드 모자이크로 만들지 말고 shell, rail, workspace, inspector의 정보 구조를 우선한다.
+
+## 화면 골격
+
+`packages/web/src/ui/WorkbenchShell.tsx`가 workbench의 기본 골격이다.
+
+- 상단: `Agent Factory` 이름과 분석 상태 요약.
+- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다.
+- 중앙: 현재 단계의 주 작업면.
+- 우측: 현재 단계 context 또는 inspector. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
+
+980px 이하에서는 좌측 rail을 한 줄 가로 스크롤로 압축하고 context는 작업면 아래로 내려간다.
+단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
+
+## 코드 primitives
+
+공통 UI primitive는 `packages/web/src/ui/primitives.tsx`에 둔다.
+새 화면은 가능한 한 이 primitive를 먼저 사용한다.
+
+- `Panel`: 실제 작업 surface 또는 inspector block에만 사용한다.
+- `SectionHeader`: eyebrow, 제목, 설명, 보조 action을 같은 구조로 배치한다.
+- `Button`: `primary`, `secondary`, `ghost` variant만 쓴다.
+- `Field`, `SelectField`, `TextareaField`, `FileField`: label과 control 간격을 통일한다.
+- `MetricPill`: 상태 요약, context metric, 짧은 숫자 정보를 표시한다.
+- `EmptyState`: 아직 trace나 결과가 없는 영역을 조용히 설명한다.
+
+도메인 고유 표시는 이 primitive가 아니라 기존 `CategoryBadge` / `SubtypeBadge`를 사용한다.
+카테고리 색·글리프 single source of truth를 중복 구현하지 않는다.
+
+## 상태 구조
+
+`packages/web/src/workbench/useWorkbenchState.ts`가 화면 상태 전이의 기준이다.
+
+- `StepId`, `StepDefinition`, 단계 그룹 label을 이 파일에서 관리한다.
+- 분석 실행, 저장/불러오기, 모듈 후보 변경, A2A 계약 변경, catalog 변경은 reducer action으로 처리한다.
+- `App.tsx`는 상태를 직접 조립하지 않고 shell과 화면 component를 연결한다.
+
+새 기능을 추가할 때는 먼저 reducer action과 step availability를 정의한 뒤 화면 component를 연결한다.
+저장된 분석과 scaffold 생성의 기존 artifact shape는 UI refactor 때문에 바꾸지 않는다.
 
 ## 색 토큰
 
@@ -36,7 +76,7 @@
 - output → `⇤`
 
 **서브타입 (workflow_kind / adapter_kind / agent_kind / remote_contract_kind):**
-- parallel → `⇉`, loop → `↻`, human_review → `✓`, sequential → `→`, orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
+- orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
 - retrieval → `🔎`, rule_registry → `§`, legacy_api → `API`, data_query → `?`, template → `T`, computation → `Σ`, external_service → `↗`
 - specialist → `S`, shared → `★`, a2a → `A2A`, unknown → `·`
 
@@ -56,7 +96,7 @@
 ```tsx
 <SubtypeBadge value={candidate.adapter_kind!} />
 ```
-서브타입 enum 값(`legacy_api`, `loop`, `shared` 등)을 받아 글리프와 한글/영문 라벨을 표시. 라벨 매핑은 `classificationRules.ts` 의 `*KindLabels` 를 사용한다.
+서브타입 enum 값(`legacy_api`, `graph`, `shared` 등)을 받아 글리프와 한글/영문 라벨을 표시. 라벨 매핑은 `classificationRules.ts` 의 `*KindLabels` 를 사용한다.
 
 **`getSubtypeValue(candidate)`**
 `module_category` 에 따라 올바른 서브타입 필드(`adapter_kind` / `workflow_kind` / `agent_kind` / `remote_contract_kind`)를 반환하는 헬퍼. UI 에서 어떤 필드를 봐야 할지 매번 분기하지 않도록 만든다.
@@ -79,42 +119,27 @@
 
 한 셀에 카테고리 배지와 서브타입 배지를 세로로 쌓을 때는 `cell-stack` 클래스를 쓴다 (flex column + align-items:flex-start). grid 로 만들면 자식 inline-flex 가 block 으로 변환되어 배지가 두 줄로 깨진다.
 
-## Process Flow stage 모델
+## Process Flow 시각화
 
-`packages/web/src/components/ProcessFlowView.tsx` 의 `buildFlowStages()` 가 candidate 와 process flow 로부터 stage 를 만든다.
+`packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.
+stage 순서, marker 판정, edge 의미는 `docs/workbench/process-flow.md`의 Graph IR 규칙을 따른다.
 
-**Stage 순서 (모듈이 존재할 때만 표시):**
-1. **입력 컨텍스트** — `input` 노드들
-2. **Adapter 호출** — `adapter_kind` 가 `legacy_api` 또는 `retrieval` 인 노드. 2개 이상이면 layout=parallel + parallel marker
-3. **Local 검토 / Orchestration** — workflow / agent / 그 외 adapter (rule_registry 제외)
-4. **Rule Registry 라우팅** — `adapter_kind: rule_registry` 노드 단독
-5. **Remote A2A 경계** — `remote_a2a` 노드들
-6. **결과 산출** — `output` 노드들
-7. (필요 시) **추가 모듈** — 위에 자동 배치되지 않은 잔여 노드 (출력 직전에 끼워 넣음)
+**Marker 스타일**
+- `parallel`, `human_review`, `loop`, `branch` marker는 `.stage-marker.marker-*` 색을 사용한다.
+- 새 marker를 추가할 때는 Graph IR 의미를 먼저 `process-flow.md`에 정의한 뒤 `markerCopy`의 glyph/label과 CSS 색을 갱신한다.
+- container overlay는 흐름의 실제 범위를 가려서는 안 된다. 점선 경계와 낮은 대비 배경으로 node/edge 읽기를 방해하지 않게 한다.
 
-**Stage marker 자동 감지:**
-- `parallel` — Adapter 호출이 2개 이상이거나 candidate 중 `workflow_kind: parallel` 이 있을 때
-- `human_review` — candidate 중 `workflow_kind: human_review` 이거나 `risk_signals` 에 `human_approval_required` 가 있을 때
-- `loop` — candidate 중 `workflow_kind: loop` 이거나 edge data 가 `loop:` 로 시작할 때
-- `branch` — edge data 가 `branch:` 로 시작할 때
+**Stage connector**
+- stage 사이 connector는 화살표와 `data_label` chip을 함께 보여준다.
+- 한 connector는 데이터 라벨을 최대 4개까지만 표시해 stage row가 과도하게 커지지 않게 한다.
 
-새 marker 를 추가할 때는 stage builder 의 감지 로직과 `markerCopy` (글리프·라벨)와 `.stage-marker.marker-*` 의 CSS 색을 모두 갱신한다.
+**Graph route board**
+- stage view 아래에 모든 edge를 펼쳐 보여준다.
+- route marker, `edge_kind`, `execution_semantics`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip은 한 줄에서 스캔 가능해야 한다.
 
-**Stage connector** — stage 사이에 화살표와 edge data chip 을 표시한다. `buildInterStageEdges()` 가 stage 간 edge 를 모은다. 같은 stage 내부의 edge 는 표시하지 않는다 (stage 자체가 그 묶음을 의미). 한 connector 는 데이터 라벨을 최대 4 개까지만 표시한다.
-
-**Graph route board** — stage view 아래에서 모든 edge 를 한 번 더 펼쳐 보여준다. 목적은 ADK 2.0 graph workflow 의 node/edge routing, fan-out/fan-in, branch/loop, Remote A2A 경계를 stage 묶음 밖에서도 검토하는 것이다. 각 edge 는 출발 node, 도착 node, route marker, `data_channel`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip 을 표시한다.
-
-`data_channel` 라벨은 다음처럼 표시한다.
-
-- `event_output` → `Event.output`
-- `event_message` → `Event.message`
-- `session_state` / `temp_state` / `user_state` / `app_state` → ADK State scope
-- `artifact` → `Artifact`
-- `route` → `Route`
-- `control` → `Control`
-- `unknown` → `미정`
-
-**Data ledger** — 오른쪽 inspector 에서 state/artifact edge 만 모아 표시한다. edge metadata 가 아직 없으면 대표 placeholder key 를 보여주되, live analyzer 결과가 들어오면 실제 `state_key` / `artifact_key`를 우선한다.
+**Data ledger**
+- 오른쪽 inspector에서 state/artifact edge만 모아 표시한다.
+- edge metadata가 아직 없으면 대표 placeholder key를 보여주되, live analyzer 결과가 들어오면 실제 `state_key` / `artifact_key`를 우선한다.
 
 ## `adk_hints` UI 블록
 

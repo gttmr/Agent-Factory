@@ -294,16 +294,7 @@
     },
     "workflowKind": {
       "type": "string",
-      "enum": [
-        "sequential",
-        "parallel",
-        "loop",
-        "human_review",
-        "orchestration",
-        "graph",
-        "dynamic",
-        "unknown"
-      ]
+      "enum": ["orchestration", "graph", "dynamic", "unknown"]
     },
     "adapterKind": {
       "type": "string",
@@ -449,7 +440,7 @@
       "source_requirement_id": "req-001",
       "name": "requirement_handling_workflow",
       "module_category": "workflow",
-      "workflow_kind": "sequential",
+      "workflow_kind": "graph",
       "legacy_recommended_type": "internal_workflow",
       "confidence": 0.76,
       "rationale": "The module coordinates ordered local steps.",

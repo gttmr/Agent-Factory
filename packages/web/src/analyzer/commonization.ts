@@ -67,11 +67,11 @@ export function buildDomainCapabilityMap(moduleCandidates: ModuleCandidate[]): D
 
 export function buildMermaidProcessFlow(processFlow: ProcessFlow): string {
   const nodeLines = processFlow.nodes.map((node) => {
-    const subtype = node.subtype ? `: ${node.subtype}` : "";
-    return `  ${safeId(node.id)}["${node.label} (${node.type}${subtype})"]`;
+    const executionLabel = node.execution_kind ? `: ${node.execution_kind}` : "";
+    return `  ${safeId(node.id)}["${node.label} (${node.node_kind}${executionLabel})"]`;
   });
   const edgeLines = processFlow.edges.map((edge) => {
-    const label = edge.edge_type === "remote_a2a" ? `remote_a2a: ${edge.data}` : edge.data;
+    const label = edge.edge_kind === "remote_a2a" ? `remote_a2a: ${edge.data_label}` : edge.data_label;
     return `  ${safeId(edge.from)} -->|"${label}"| ${safeId(edge.to)}`;
   });
 

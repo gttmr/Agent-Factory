@@ -344,7 +344,7 @@
       "name": "human_review_gate",
       "module_category": "workflow",
       "agent_kind": null,
-      "workflow_kind": "human_review",
+      "workflow_kind": "graph",
       "adapter_kind": null,
       "remote_contract_kind": null,
       "legacy_recommended_type": "internal_workflow",

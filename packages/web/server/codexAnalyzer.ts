@@ -10,12 +10,18 @@ import {
   A2A_ROLES,
   A2A_STALE_NAMES,
   A2A_STREAM_WRAPPERS,
-  A2A_TASK_STATES
+  A2A_TASK_STATES,
+  GRAPH_CONTAINER_KINDS,
+  GRAPH_EDGE_KINDS,
+  GRAPH_EXECUTION_SEMANTICS,
+  GRAPH_LANE_IDS,
+  GRAPH_LAYOUT_POLICIES,
+  GRAPH_NODE_KINDS
 } from "../src/analyzer/types";
 import { normalizeA2A } from "../src/analyzer/a2aNormalize";
 import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
 import type { AnalysisResult } from "../src/analyzer/types";
-import { legacyStageToGraphIR, validateGraphIRSoft } from "../src/analyzer/graphMigration";
+import { normalizeGraphIRForRuntime, validateGraphIRSoft } from "../src/analyzer/graphMigration";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -30,16 +36,7 @@ const adapterKinds = new Set([
   "unknown"
 ]);
 const agentKinds = new Set(["specialist", "shared"]);
-const workflowKinds = new Set([
-  "sequential",
-  "parallel",
-  "loop",
-  "human_review",
-  "orchestration",
-  "graph",
-  "dynamic",
-  "unknown"
-]);
+const workflowKinds = new Set(["orchestration", "graph", "dynamic", "unknown"]);
 const remoteContractKinds = new Set(["a2a", "unknown"]);
 const riskLevels = new Set(["low", "medium", "high"]);
 const moduleStatuses = new Set(["needs_info", "deferred", "rejected"]);
@@ -55,20 +52,12 @@ const riskSignals = new Set([
   "audit_required"
 ]);
 const systemAccess = new Set(["unknown", "read", "write", "read_write", "not_required"]);
-const flowNodeTypes = new Set(["input", "output", "agent", "workflow", "adapter", "remote_a2a"]);
-const flowEdgeTypes = new Set(["local", "remote_a2a"]);
-const flowDataChannels = new Set([
-  "event_output",
-  "event_message",
-  "session_state",
-  "temp_state",
-  "user_state",
-  "app_state",
-  "artifact",
-  "route",
-  "control",
-  "unknown"
-]);
+const graphNodeKinds: ReadonlySet<string> = new Set(GRAPH_NODE_KINDS);
+const graphContainerKinds: ReadonlySet<string> = new Set(GRAPH_CONTAINER_KINDS);
+const graphEdgeKinds: ReadonlySet<string> = new Set(GRAPH_EDGE_KINDS);
+const graphLaneIds: ReadonlySet<string> = new Set(GRAPH_LANE_IDS);
+const graphLayoutPolicies: ReadonlySet<string> = new Set(GRAPH_LAYOUT_POLICIES);
+const graphExecutionSemantics: ReadonlySet<string> = new Set(GRAPH_EXECUTION_SEMANTICS);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -569,13 +558,13 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "",
     "ADK runtime baseline:",
     "- ADK 2.0 (Beta) is the default mental model: graph-based deterministic workflows with explicit nodes/edges, dynamic (Python-driven) workflows, built-in parallel/merge, first-class human-input nodes, and trace/token observability.",
-    "- ADK 1.14 stable agents (SequentialAgent / ParallelAgent / LoopAgent) remain valid as a legacy compat fallback when a target deployment cannot run 2.0. Do not invent new top-level categories for either runtime.",
+    "- Workflow means the broad Workflow Agent boundary. Do not emit small pattern workflow_kind values for sequence, parallelism, loops, or human review; represent those inside Graph IR.",
     "",
     "Authoritative references - consult these before deciding:",
-    "- docs/workbench/taxonomy.md (module_category, *_kind enums including graph/dynamic, Remote A2A conditions) — read from the working tree.",
-    "- docs/workbench/workflow-decision-guide.md (sequential/parallel/loop/human_review/orchestration/graph/dynamic rules; ADK 2.0 baseline with 1.14 compat notes).",
-    "- docs/workbench/process-flow.md and docs/visualization/design-system.md (process flow stage, edge, and marker rules).",
-    "- adk-docs-mcp — use list_doc_sources/fetch_docs for ADK 2.0 component facts (graph workflow, dynamic workflow, human-input node, trace/token observability) and for the version-neutral component set: Sessions/State/Memory, Callbacks, Artifacts/Events, Apps/Plugins, MCP, A2A, Streaming, Grounding. This is the source of truth for adk_hints; prefer 2.0 sections, fall back to 1.14 only for legacy compat questions.",
+    "- docs/workbench/taxonomy.md (module_category, *_kind enums including orchestration/graph/dynamic, Remote A2A conditions) — read from the working tree.",
+    "- docs/workbench/workflow-decision-guide.md (Workflow Agent classification and Graph IR representation rules).",
+    "- docs/workbench/process-flow.md (native Graph IR node, container, edge, stage projection, and marker rules).",
+    "- adk-docs-mcp — use list_doc_sources/fetch_docs for ADK 2.0 component facts (graph workflow, dynamic workflow, human-input node, trace/token observability) and for the version-neutral component set: Sessions/State/Memory, Callbacks, Artifacts/Events, Apps/Plugins, MCP, A2A, Streaming, Grounding. This is the source of truth for adk_hints; do not use 1.x workflow-agent class names as classification criteria.",
     "",
     "Do not paraphrase the docs into long output. Use them only to ground classification, adk_hints, and processFlow shape.",
     "",
@@ -610,10 +599,11 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "",
     "Taxonomy guardrails:",
     "- Use module_category only from agent, workflow, adapter, remote_a2a.",
-    "- Allowed workflow_kind values: sequential, parallel, loop, human_review, orchestration, graph, dynamic, unknown.",
-    "- Pick graph when the requirement implies an explicit node/edge orchestration with deterministic routing and built-in merge/parallel (ADK 2.0 graph workflow). Distinguishes from orchestration by the explicit graph topology rather than ad-hoc composition.",
+    "- Allowed workflow_kind values: orchestration, graph, dynamic, unknown.",
+    "- Do not emit workflow_kind sequential, parallel, loop, or human_review. Those are Graph IR representation details: normal_transition/fan_out/fan_in/loop_back/loop_exit, parallel_region, loop_region, human_review_region, router, join, and human_input nodes.",
+    "- Pick graph when the requirement implies an explicit node/edge orchestration with deterministic routing, branches, joins, loops, or human input (ADK 2.0 graph workflow).",
     "- Pick dynamic when control flow is code-driven (Python conditionals/loops/custom logic) rather than declarative — for example, when the dynamic dimension dominates over the declarative graph (ADK 2.0 dynamic workflow).",
-    "- For human_review: on ADK 2.0 this maps to the first-class human-input node; on 1.14 it remains a workbench gate concept only. The workbench classification is the same in both cases.",
+    "- Pick orchestration when the requirement describes high-level coordination but does not yet justify a fully explicit graph or dynamic workflow. Still emit the observable flow as native Graph IR.",
     "- Retrieval and Rule Registry are adapter_kind values, not top-level categories.",
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
@@ -1453,6 +1443,42 @@ function validateProcessFlow(value: unknown, errors: string[]) {
   if (typeof value.requirement_id === "string" && !/^req-[a-z0-9-]+$/.test(value.requirement_id)) {
     errors.push("processFlow.requirement_id는 req-* 패턴이어야 합니다.");
   }
+  expectString(value, "graph_id", errors);
+  if (typeof value.graph_id === "string" && !/^graph-[0-9]+$/.test(value.graph_id)) {
+    errors.push("processFlow.graph_id는 graph-NNN 패턴이어야 합니다.");
+  }
+  if (value.root_workflow_module_id !== null && value.root_workflow_module_id !== undefined && !truthyString(value.root_workflow_module_id)) {
+    errors.push("processFlow.root_workflow_module_id는 문자열 또는 null이어야 합니다.");
+  }
+  if (!Array.isArray(value.containers)) {
+    errors.push("processFlow.containers 배열이 필요합니다.");
+  } else {
+    value.containers.forEach((container, index) => {
+      if (!isRecord(container)) {
+        errors.push(`processFlow.containers[${index}] 객체가 필요합니다.`);
+        return;
+      }
+      expectString(container, "id", errors);
+      expectString(container, "label", errors);
+      if (typeof container.container_kind !== "string" || !graphContainerKinds.has(container.container_kind)) {
+        errors.push(`processFlow.containers[${index}].container_kind 값이 올바르지 않습니다.`);
+      }
+      if (typeof container.layout_policy !== "string" || !graphLayoutPolicies.has(container.layout_policy)) {
+        errors.push(`processFlow.containers[${index}].layout_policy 값이 올바르지 않습니다.`);
+      }
+      ["contains_node_ids", "entry_node_ids", "exit_node_ids"].forEach((key) => {
+        if (!Array.isArray(container[key])) {
+          errors.push(`processFlow.containers[${index}].${key} 배열이 필요합니다.`);
+        }
+      });
+    });
+  }
+  if (!Array.isArray(value.lanes)) {
+    errors.push("processFlow.lanes 배열이 필요합니다.");
+  }
+  if (!isRecord(value.validation)) {
+    errors.push("processFlow.validation 객체가 필요합니다.");
+  }
   if (!Array.isArray(value.nodes)) {
     errors.push("processFlow.nodes 배열이 필요합니다.");
   } else {
@@ -1463,8 +1489,20 @@ function validateProcessFlow(value: unknown, errors: string[]) {
       }
       expectString(node, "id", errors);
       expectString(node, "label", errors);
-      if (typeof node.type !== "string" || !flowNodeTypes.has(node.type)) {
-        errors.push(`processFlow.nodes[${index}].type 값이 올바르지 않습니다.`);
+      if ("type" in node || "subtype" in node) {
+        errors.push(`processFlow.nodes[${index}] legacy type/subtype 필드는 허용되지 않습니다.`);
+      }
+      if (typeof node.node_kind !== "string" || !graphNodeKinds.has(node.node_kind)) {
+        errors.push(`processFlow.nodes[${index}].node_kind 값이 올바르지 않습니다.`);
+      }
+      if (typeof node.lane_id !== "string" || !graphLaneIds.has(node.lane_id)) {
+        errors.push(`processFlow.nodes[${index}].lane_id 값이 올바르지 않습니다.`);
+      }
+      if (node.module_id !== null && node.module_id !== undefined && !truthyString(node.module_id)) {
+        errors.push(`processFlow.nodes[${index}].module_id 값은 문자열 또는 null이어야 합니다.`);
+      }
+      if (!Array.isArray(node.input_ports) || !Array.isArray(node.output_ports) || !Array.isArray(node.schema_refs)) {
+        errors.push(`processFlow.nodes[${index}] input_ports/output_ports/schema_refs 배열이 필요합니다.`);
       }
     });
   }
@@ -1478,22 +1516,34 @@ function validateProcessFlow(value: unknown, errors: string[]) {
       }
       expectString(edge, "from", errors);
       expectString(edge, "to", errors);
-      expectString(edge, "data", errors);
-      if (typeof edge.edge_type !== "string" || !flowEdgeTypes.has(edge.edge_type)) {
-        errors.push(`processFlow.edges[${index}].edge_type 값이 올바르지 않습니다.`);
+      expectString(edge, "id", errors);
+      if ("edge_type" in edge || "data" in edge || "data_channel" in edge) {
+        errors.push(`processFlow.edges[${index}] legacy edge_type/data/data_channel 필드는 허용되지 않습니다.`);
       }
-      if (
-        edge.data_channel !== undefined &&
-        (typeof edge.data_channel !== "string" || !flowDataChannels.has(edge.data_channel))
-      ) {
-        errors.push(`processFlow.edges[${index}].data_channel 값이 올바르지 않습니다.`);
+      if (typeof edge.edge_kind !== "string" || !graphEdgeKinds.has(edge.edge_kind)) {
+        errors.push(`processFlow.edges[${index}].edge_kind 값이 올바르지 않습니다.`);
       }
-      ["state_key", "artifact_key", "schema_ref", "route_condition"].forEach((key) => {
+      if (typeof edge.execution_semantics !== "string" || !graphExecutionSemantics.has(edge.execution_semantics)) {
+        errors.push(`processFlow.edges[${index}].execution_semantics 값이 올바르지 않습니다.`);
+      }
+      if (typeof edge.is_remote_boundary_crossing !== "boolean") {
+        errors.push(`processFlow.edges[${index}].is_remote_boundary_crossing 값은 boolean이어야 합니다.`);
+      }
+      ["from_port", "to_port", "state_key", "artifact_key", "schema_ref", "route_condition", "a2a_contract_id"].forEach((key) => {
         const field = edge[key];
         if (field !== undefined && field !== null && !truthyString(field)) {
           errors.push(`processFlow.edges[${index}].${key} 값은 문자열 또는 null이어야 합니다.`);
         }
       });
+      if (edge.edge_kind === "route" && !truthyString(edge.route_condition)) {
+        errors.push(`processFlow.edges[${index}] route edge에는 route_condition이 필요합니다.`);
+      }
+      if (edge.edge_kind === "artifact" && !truthyString(edge.artifact_key)) {
+        errors.push(`processFlow.edges[${index}] artifact edge에는 artifact_key가 필요합니다.`);
+      }
+      if (edge.edge_kind === "remote_a2a" && edge.is_remote_boundary_crossing !== true) {
+        errors.push(`processFlow.edges[${index}] remote_a2a edge는 is_remote_boundary_crossing=true여야 합니다.`);
+      }
     });
   }
 }
@@ -1613,7 +1663,7 @@ function applyGraphIRMigration(value: unknown): unknown {
         isRecord(next.normalizedRequirement) && typeof next.normalizedRequirement.id === "string"
           ? (next.normalizedRequirement.id as string)
           : "req-001";
-      const migrated = legacyStageToGraphIR(next.processFlow, reqId);
+      const migrated = normalizeGraphIRForRuntime(next.processFlow, reqId);
       const soft = validateGraphIRSoft(migrated);
       const existing = migrated.validation ?? { ok: true, errors: [], warnings: [] };
       const mergedValidation = {

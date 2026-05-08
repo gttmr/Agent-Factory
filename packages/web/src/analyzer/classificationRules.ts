@@ -32,10 +32,6 @@ export const agentKindLabels: Record<AgentKind, string> = {
 };
 
 export const workflowKindLabels: Record<WorkflowKind, string> = {
-  sequential: "Sequential",
-  parallel: "Parallel",
-  loop: "Loop",
-  human_review: "Human Review",
   orchestration: "Orchestration",
   graph: "Graph",
   dynamic: "Dynamic",
@@ -60,7 +56,7 @@ export const classificationRules: Record<ModuleCategory, string> = {
   agent:
     "판단, 요약, 분류, 추천, triage처럼 reasoning responsibility가 있는 단위에 사용합니다.",
   workflow:
-    "sequential, parallel, loop, orchestration, human review처럼 결정적이거나 반결정적인 control flow에 사용합니다.",
+    "큰 의미의 Workflow Agent입니다. orchestration, graph, dynamic 중 하나로 분류하고, 순차/병렬/반복/사람 승인 같은 작은 흐름은 Graph IR 노드와 엣지로 표현합니다.",
   adapter:
     "API call, retrieval, managed rules, data query, template, computation, external service처럼 Agent나 Workflow가 호출하는 capability에 사용합니다.",
   remote_a2a:

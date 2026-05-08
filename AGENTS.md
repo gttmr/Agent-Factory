@@ -12,6 +12,8 @@
 
 - `README.md`: human-facing workbench overview and taxonomy contract.
 - `AGENTS.md`: model-facing repository index and working rules.
+- `CLAUDE.md`: Claude Code-facing repository guide; keep it aligned with this file on load-bearing rules.
+- `docs/workbench/agent-factory-harness.md`: project-specific Agent Factory operating harness for intake, classification, scaffold gating, review artifacts, and verification.
 - `packages/web`: requirement intake, analysis review, process flow, Graph IR, and ADK runtime handoff UI.
 - `schemas`: normalized requirement, module candidate, and process-flow schemas.
 - `catalog`: initial YAML catalogs for reusable capabilities, domain owners, and risk gates.
@@ -47,13 +49,26 @@ Adapter `adapter_kind` values:
 Definitions:
 
 - Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
-- Workflow: deterministic or semi-deterministic control flow such as sequential, parallel, loop, orchestration, human review, graph, or dynamic.
+- Workflow: broad Workflow Agent boundary, classified as orchestration, graph, dynamic, or unknown. Smaller sequence, fan-out/fan-in, loop, and human-input flows live inside Graph IR.
 - Adapter: callable capability used by agents or workflows.
 - Remote A2A: independent remote agent boundary with protocol-level contract.
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
 
-ADK runtime baseline: ADK 2.0 (Beta). 1.14 stable agents (`SequentialAgent`, `ParallelAgent`, `LoopAgent`) remain valid as legacy compat targets but are not the default mental model. `graph` maps to ADK 2.0 graph workflow; `dynamic` maps to ADK 2.0 dynamic workflow; `human_review` maps to the 2.0 first-class human-input node (1.14 fallback: workbench gate concept only).
+ADK runtime baseline: ADK 2.0 (Beta). `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`. ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis.
+
+## Agent Factory Harness
+
+Before non-trivial analysis, taxonomy, scaffold, or export work, apply `docs/workbench/agent-factory-harness.md`.
+
+Core harness rules:
+
+- Convert raw requirements into reviewed artifacts before implementation.
+- Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
+- Keep retrieval, rule registry, and tool/adapter concepts as adapter subtypes, not top-level categories.
+- Treat Remote A2A as high-friction: require independent ownership, protocol boundary, auth, lifecycle, timeout, retry, fallback, and audit details.
+- Scaffolding must consume approved `scaffold-plan.json` and `implementation-handoff.md`, never raw requests or unreviewed analyzer output.
+- Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flows, reuse/domain mapping, risk gates, validation output, and decision notes.
 
 ## Editing Rules
 
