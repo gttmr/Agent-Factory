@@ -31,9 +31,32 @@ const workflowKinds = new Set([
 ]);
 const remoteKinds = new Set(["a2a", "unknown"]);
 const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
-const flowNodeTypes = new Set(["input", "output", "agent", "workflow", "adapter", "remote_a2a"]);
-const flowEdgeTypes = new Set(["local", "remote_a2a"]);
-const flowDataChannels = new Set([
+// Graph IR (ADK 2.0). Mirrors the GRAPH_* constant exports in
+// packages/web/src/analyzer/types.ts. The validator must stay
+// dependency-free, so the lists are duplicated here.
+const graphNodeKinds = new Set([
+  "input",
+  "output",
+  "agent",
+  "function",
+  "tool",
+  "adapter",
+  "human_input",
+  "workflow",
+  "remote_a2a",
+  "join",
+  "router",
+  "loop_control"
+]);
+const graphContainerKinds = new Set([
+  "graph_workflow",
+  "dynamic_workflow",
+  "parallel_region",
+  "loop_region",
+  "human_review_region",
+  "remote_boundary"
+]);
+const graphEdgeKinds = new Set([
   "event_output",
   "event_message",
   "session_state",
@@ -43,8 +66,36 @@ const flowDataChannels = new Set([
   "artifact",
   "route",
   "control",
-  "unknown"
+  "remote_a2a"
 ]);
+const graphLaneIds = new Set([
+  "input",
+  "local_graph",
+  "adapter",
+  "human_input",
+  "output",
+  "remote_boundary"
+]);
+const graphLayoutPolicies = new Set([
+  "dag_with_routes",
+  "fan_out_fan_in",
+  "loop",
+  "linear",
+  "free"
+]);
+const graphExecutionSemantics = new Set([
+  "normal_transition",
+  "fan_out",
+  "fan_in",
+  "loop_back",
+  "loop_exit",
+  "conditional",
+  "boundary_crossing"
+]);
+// Synthetic node kinds that MUST NOT bind to a module candidate.
+const syntheticNodeKindsStrict = new Set(["input", "output", "join", "router", "loop_control"]);
+// Synthetic-ish kinds that MAY optionally bind to a candidate without erroring.
+const syntheticNodeKindsLenient = new Set(["function", "tool", "human_input"]);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -342,57 +393,299 @@ function validateProcessFlow(dir = root) {
   if (!existsSync(path)) {
     return;
   }
-
   const flow = readJson(path);
-  if (typeof flow !== "object" || flow === null || Array.isArray(flow)) {
-    errors.push("process-flow.json must contain an object.");
+  validateGraphIR(flow, "process-flow.json", new Map(), new Map());
+}
+
+/**
+ * Structural validation for an ADK 2.0 Graph IR object.
+ *
+ * @param {unknown} graph - the GraphIR document
+ * @param {string} label - prefix used in error messages
+ * @param {Map<string, object>} candidatesById - module candidate index for
+ *   cross-checking node module bindings (empty Map skips that check)
+ * @param {Map<string, object>} contractsById - A2A contract index for
+ *   cross-checking remote_a2a edges (empty Map skips that check)
+ */
+function validateGraphIR(graph, label, candidatesById, contractsById) {
+  if (!graph || typeof graph !== "object" || Array.isArray(graph)) {
+    errors.push(`${label} must contain an object.`);
     return;
   }
-  if (!Array.isArray(flow.nodes)) {
-    errors.push("process-flow.json nodes must be an array.");
+
+  if (typeof graph.graph_id !== "string" || !/^graph-[0-9]+$/.test(graph.graph_id)) {
+    errors.push(`${label}.graph_id must match ^graph-[0-9]+$.`);
+  }
+
+  if (graph.root_workflow_module_id !== null && typeof graph.root_workflow_module_id !== "string") {
+    errors.push(`${label}.root_workflow_module_id must be a string or null.`);
+  }
+
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : null;
+  const edges = Array.isArray(graph.edges) ? graph.edges : null;
+  const containers = Array.isArray(graph.containers) ? graph.containers : null;
+  const lanes = Array.isArray(graph.lanes) ? graph.lanes : null;
+
+  if (!nodes) errors.push(`${label}.nodes must be an array.`);
+  if (!edges) errors.push(`${label}.edges must be an array.`);
+  if (!containers) errors.push(`${label}.containers must be an array.`);
+  if (!lanes) errors.push(`${label}.lanes must be an array.`);
+
+  // validation block presence
+  if (!graph.validation || typeof graph.validation !== "object" || Array.isArray(graph.validation)) {
+    errors.push(`${label}.validation must be an object with ok/errors/warnings.`);
   } else {
-    flow.nodes.forEach((node, index) => {
-      if (!node || typeof node !== "object" || Array.isArray(node)) {
-        errors.push(`process-flow.json nodes[${index}] must be an object.`);
-        return;
-      }
-      if (typeof node.id !== "string" || !node.id.trim()) {
-        errors.push(`process-flow.json nodes[${index}] requires id.`);
-      }
-      if (typeof node.label !== "string" || !node.label.trim()) {
-        errors.push(`process-flow.json nodes[${index}] requires label.`);
-      }
-      if (!flowNodeTypes.has(node.type)) {
-        errors.push(`process-flow.json nodes[${index}] has invalid type.`);
-      }
-    });
+    if (typeof graph.validation.ok !== "boolean") {
+      errors.push(`${label}.validation.ok must be a boolean.`);
+    }
+    if (!Array.isArray(graph.validation.errors)) {
+      errors.push(`${label}.validation.errors must be an array.`);
+    }
+    if (!Array.isArray(graph.validation.warnings)) {
+      errors.push(`${label}.validation.warnings must be an array.`);
+    }
   }
-  if (!Array.isArray(flow.edges)) {
-    errors.push("process-flow.json edges must be an array.");
-    return;
-  }
-  flow.edges.forEach((edge, index) => {
-    if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
-      errors.push(`process-flow.json edges[${index}] must be an object.`);
+
+  if (!nodes || !edges || !containers) return;
+
+  // Index nodes / containers, enforce id uniqueness.
+  const nodeById = new Map();
+  nodes.forEach((node, index) => {
+    if (!node || typeof node !== "object" || Array.isArray(node)) {
+      errors.push(`${label}.nodes[${index}] must be an object.`);
       return;
     }
-    ["from", "to", "data"].forEach((key) => {
-      if (typeof edge[key] !== "string" || !edge[key].trim()) {
-        errors.push(`process-flow.json edges[${index}] requires ${key}.`);
-      }
-    });
-    if (!flowEdgeTypes.has(edge.edge_type)) {
-      errors.push(`process-flow.json edges[${index}] has invalid edge_type.`);
+    if (typeof node.id !== "string" || !node.id.trim()) {
+      errors.push(`${label}.nodes[${index}].id is required.`);
+      return;
     }
-    if (edge.data_channel !== undefined && !flowDataChannels.has(edge.data_channel)) {
-      errors.push(`process-flow.json edges[${index}] has invalid data_channel.`);
+    if (nodeById.has(node.id)) {
+      errors.push(`${label}.nodes[${index}].id duplicates ${node.id}.`);
+    } else {
+      nodeById.set(node.id, node);
     }
-    ["state_key", "artifact_key", "schema_ref", "route_condition"].forEach((key) => {
-      if (edge[key] !== undefined && edge[key] !== null && (typeof edge[key] !== "string" || !edge[key].trim())) {
-        errors.push(`process-flow.json edges[${index}] ${key} must be a non-empty string or null.`);
-      }
-    });
+    if (!graphNodeKinds.has(node.node_kind)) {
+      errors.push(`${label}.nodes[${index}] (${node.id}) has invalid node_kind.`);
+    }
+    if (!graphLaneIds.has(node.lane_id)) {
+      errors.push(`${label}.nodes[${index}] (${node.id}) has invalid lane_id.`);
+    }
   });
+
+  const containerById = new Map();
+  containers.forEach((container, index) => {
+    if (!container || typeof container !== "object" || Array.isArray(container)) {
+      errors.push(`${label}.containers[${index}] must be an object.`);
+      return;
+    }
+    if (typeof container.id !== "string" || !container.id.trim()) {
+      errors.push(`${label}.containers[${index}].id is required.`);
+      return;
+    }
+    if (containerById.has(container.id)) {
+      errors.push(`${label}.containers[${index}].id duplicates ${container.id}.`);
+    } else {
+      containerById.set(container.id, container);
+    }
+    if (!graphContainerKinds.has(container.container_kind)) {
+      errors.push(`${label}.containers[${index}] (${container.id}) has invalid container_kind.`);
+    }
+    if (!graphLayoutPolicies.has(container.layout_policy)) {
+      errors.push(`${label}.containers[${index}] (${container.id}) has invalid layout_policy.`);
+    }
+    for (const key of ["contains_node_ids", "entry_node_ids", "exit_node_ids"]) {
+      if (!Array.isArray(container[key])) {
+        errors.push(`${label}.containers[${index}] (${container.id}).${key} must be an array.`);
+        continue;
+      }
+      container[key].forEach((id, idx) => {
+        if (typeof id !== "string" || !nodeById.has(id)) {
+          errors.push(
+            `${label}.containers[${index}] (${container.id}).${key}[${idx}] references unknown node ${id}.`
+          );
+        }
+      });
+    }
+  });
+
+  // node.container_id must reference an existing container.
+  nodes.forEach((node, index) => {
+    if (!node || typeof node !== "object") return;
+    if (node.container_id !== null && node.container_id !== undefined) {
+      if (typeof node.container_id !== "string" || !containerById.has(node.container_id)) {
+        errors.push(
+          `${label}.nodes[${index}] (${node.id}).container_id references unknown container ${node.container_id}.`
+        );
+      }
+    }
+    // Module-bound nodes: cross-check candidate category vs node_kind.
+    if (typeof node.module_id === "string" && node.module_id.trim()) {
+      if (syntheticNodeKindsStrict.has(node.node_kind)) {
+        errors.push(
+          `${label}.nodes[${index}] (${node.id}) has node_kind ${node.node_kind} but is bound to module ${node.module_id}; synthetic nodes must have module_id null.`
+        );
+      } else if (candidatesById.size > 0) {
+        const candidate = candidatesById.get(node.module_id);
+        if (!candidate) {
+          errors.push(
+            `${label}.nodes[${index}] (${node.id}).module_id ${node.module_id} does not match any module candidate.`
+          );
+        } else if (
+          (node.node_kind === "agent" && candidate.module_category !== "agent") ||
+          (node.node_kind === "workflow" && candidate.module_category !== "workflow") ||
+          (node.node_kind === "adapter" && candidate.module_category !== "adapter") ||
+          (node.node_kind === "remote_a2a" && candidate.module_category !== "remote_a2a")
+        ) {
+          errors.push(
+            `${label}.nodes[${index}] (${node.id}) node_kind ${node.node_kind} does not match candidate ${candidate.id} module_category ${candidate.module_category}.`
+          );
+        }
+      }
+    } else if (
+      !syntheticNodeKindsStrict.has(node.node_kind) &&
+      !syntheticNodeKindsLenient.has(node.node_kind) &&
+      node.node_kind !== undefined
+    ) {
+      errors.push(
+        `${label}.nodes[${index}] (${node.id}) node_kind ${node.node_kind} requires a module_id.`
+      );
+    }
+  });
+
+  // Edges.
+  const edgeIds = new Set();
+  edges.forEach((edge, index) => {
+    if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
+      errors.push(`${label}.edges[${index}] must be an object.`);
+      return;
+    }
+    if (typeof edge.id !== "string" || !edge.id.trim()) {
+      errors.push(`${label}.edges[${index}].id is required.`);
+    } else if (edgeIds.has(edge.id)) {
+      errors.push(`${label}.edges[${index}].id duplicates ${edge.id}.`);
+    } else {
+      edgeIds.add(edge.id);
+    }
+    if (typeof edge.from !== "string" || !nodeById.has(edge.from)) {
+      errors.push(`${label}.edges[${index}] (${edge.id}).from references unknown node ${edge.from}.`);
+    }
+    if (typeof edge.to !== "string" || !nodeById.has(edge.to)) {
+      errors.push(`${label}.edges[${index}] (${edge.id}).to references unknown node ${edge.to}.`);
+    }
+    if (!graphEdgeKinds.has(edge.edge_kind)) {
+      errors.push(`${label}.edges[${index}] (${edge.id}) has invalid edge_kind.`);
+    }
+    if (!graphExecutionSemantics.has(edge.execution_semantics)) {
+      errors.push(`${label}.edges[${index}] (${edge.id}) has invalid execution_semantics.`);
+    }
+
+    if (edge.edge_kind === "route") {
+      if (typeof edge.route_condition !== "string" || !edge.route_condition.trim()) {
+        errors.push(`${label}.edges[${index}] (${edge.id}) route edge requires non-empty route_condition.`);
+      }
+    }
+    if (edge.edge_kind === "artifact") {
+      if (typeof edge.artifact_key !== "string" || !edge.artifact_key.trim()) {
+        errors.push(`${label}.edges[${index}] (${edge.id}) artifact edge requires non-empty artifact_key.`);
+      }
+    }
+    const stateEdgeKinds = ["session_state", "temp_state", "user_state", "app_state"];
+    if (stateEdgeKinds.includes(edge.edge_kind)) {
+      if (typeof edge.state_key !== "string" || !edge.state_key.trim()) {
+        errors.push(`${label}.edges[${index}] (${edge.id}) ${edge.edge_kind} edge requires non-empty state_key.`);
+      } else {
+        if (edge.edge_kind === "temp_state" && !edge.state_key.startsWith("temp:")) {
+          errors.push(`${label}.edges[${index}] (${edge.id}) temp_state state_key must start with "temp:".`);
+        }
+        if (edge.edge_kind === "user_state" && !edge.state_key.startsWith("user:")) {
+          errors.push(`${label}.edges[${index}] (${edge.id}) user_state state_key must start with "user:".`);
+        }
+        if (edge.edge_kind === "app_state" && !edge.state_key.startsWith("app:")) {
+          errors.push(`${label}.edges[${index}] (${edge.id}) app_state state_key must start with "app:".`);
+        }
+      }
+    }
+    if (edge.edge_kind === "remote_a2a") {
+      if (edge.is_remote_boundary_crossing !== true) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}) remote_a2a edge must set is_remote_boundary_crossing=true.`
+        );
+      }
+      if (typeof edge.a2a_contract_id !== "string" || !edge.a2a_contract_id.trim()) {
+        errors.push(`${label}.edges[${index}] (${edge.id}) remote_a2a edge requires a2a_contract_id.`);
+      } else if (contractsById.size > 0 && !contractsById.has(edge.a2a_contract_id)) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}).a2a_contract_id ${edge.a2a_contract_id} does not match any A2A contract.`
+        );
+      }
+    } else {
+      if (edge.is_remote_boundary_crossing !== false) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}) non-remote edge must set is_remote_boundary_crossing=false.`
+        );
+      }
+      if (edge.a2a_contract_id !== null && edge.a2a_contract_id !== undefined) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}) non-remote edge must have a2a_contract_id=null.`
+        );
+      }
+    }
+  });
+
+  // At least one input-laned and one output-laned node.
+  const hasInputLane = nodes.some((node) => node && node.lane_id === "input");
+  const hasOutputLane = nodes.some((node) => node && node.lane_id === "output");
+  if (!hasInputLane) errors.push(`${label} requires at least one node with lane_id "input".`);
+  if (!hasOutputLane) errors.push(`${label} requires at least one node with lane_id "output".`);
+
+  // human_input nodes must have at least one outgoing edge.
+  for (const node of nodes) {
+    if (node && node.node_kind === "human_input") {
+      const out = edges.some((edge) => edge && edge.from === node.id);
+      if (!out) {
+        errors.push(`${label}.nodes (${node.id}) human_input node must have at least one outgoing edge.`);
+      }
+    }
+  }
+
+  // Container-kind specific structural rules.
+  for (const container of containers) {
+    if (!container || typeof container !== "object") continue;
+    if (container.container_kind === "parallel_region") {
+      if (!Array.isArray(container.entry_node_ids) || container.entry_node_ids.length < 2) {
+        errors.push(
+          `${label}.containers (${container.id}) parallel_region must have ≥2 entry_node_ids.`
+        );
+      }
+      if (!Array.isArray(container.exit_node_ids) || container.exit_node_ids.length < 1) {
+        errors.push(`${label}.containers (${container.id}) parallel_region must have ≥1 exit_node_ids.`);
+      }
+      // At least one node downstream of the region must be a join node.
+      const inside = new Set(Array.isArray(container.contains_node_ids) ? container.contains_node_ids : []);
+      const reachableJoin = edges.some(
+        (edge) => edge && inside.has(edge.from) && nodeById.get(edge.to)?.node_kind === "join"
+      );
+      if (!reachableJoin) {
+        errors.push(
+          `${label}.containers (${container.id}) parallel_region must reach a join node downstream.`
+        );
+      }
+    }
+    if (container.container_kind === "loop_region") {
+      const hasLoopBack = edges.some((edge) => edge && edge.execution_semantics === "loop_back");
+      const hasLoopExit = edges.some((edge) => edge && edge.execution_semantics === "loop_exit");
+      if (!hasLoopBack) {
+        errors.push(
+          `${label}.containers (${container.id}) loop_region requires at least one edge with execution_semantics "loop_back".`
+        );
+      }
+      if (!hasLoopExit) {
+        errors.push(
+          `${label}.containers (${container.id}) loop_region requires at least one edge with execution_semantics "loop_exit".`
+        );
+      }
+    }
+  }
 }
 
 function validateAdkHints(value, label) {
@@ -491,6 +784,12 @@ function validateAnalysisResult(dir = root) {
     return;
   }
 
+  // Anti-regression for spec §11: stages are no longer the workflow semantic
+  // unit. Reject any leftover top-level stages array on the analysis result.
+  if ("stages" in result) {
+    errors.push("analysis-result.json must not contain a top-level stages field; use processFlow Graph IR instead.");
+  }
+
   // Build the candidate index from the same dir, if present, so we can
   // cross-check remote_module_id and 1:1 pairing. Falls back to the
   // analysis-result's embedded moduleCandidates when no sibling file exists.
@@ -543,6 +842,25 @@ function validateAnalysisResult(dir = root) {
         `remote_a2a candidate ${moduleId}.a2a_contract_id (${linkedContractId}) does not match its contract (${matches[0].contract_id}).`
       );
     }
+  }
+
+  // GraphIR structural validation. Build full candidate index (not just
+  // remote) and contract index so node module bindings and remote-edge
+  // contract refs can be cross-checked.
+  const candidatesById = new Map();
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate.id === "string") {
+      candidatesById.set(candidate.id, candidate);
+    }
+  }
+  const contractsById = new Map();
+  for (const contract of result.a2aContracts) {
+    if (contract && typeof contract.contract_id === "string") {
+      contractsById.set(contract.contract_id, contract);
+    }
+  }
+  if (result.processFlow !== undefined) {
+    validateGraphIR(result.processFlow, "analysis-result.json:processFlow", candidatesById, contractsById);
   }
 }
 

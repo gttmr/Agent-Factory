@@ -17,15 +17,30 @@
       "Receive the remote analysis result and continue locally"
     ],
     "inputs": [
-      { "name": "intake_request", "type": "object", "required": true }
+      {
+        "name": "intake_request",
+        "type": "object",
+        "required": true
+      }
     ],
     "outputs": [
-      { "name": "remote_analysis_result", "type": "object", "required": true }
+      {
+        "name": "remote_analysis_result",
+        "type": "object",
+        "required": true
+      }
     ],
     "systems": [
-      { "name": "partner_credit_analysis_agent", "access": "unknown" }
+      {
+        "name": "partner_credit_analysis_agent",
+        "access": "unknown"
+      }
     ],
-    "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+    "risk_signals": [
+      "customer_impact",
+      "human_approval_required",
+      "audit_required"
+    ],
     "missing_information": [
       "Agent Card version",
       "Skill list",
@@ -39,11 +54,24 @@
     "requested_goal": "Delegate analysis to an independently owned remote specialist agent discovered through an Agent Card.",
     "business_domain_hint": "customer-service",
     "user_role": "business-user",
-    "input_data": ["intake_request"],
-    "output_data": ["remote_analysis_result"],
-    "systems_mentioned": ["partner_credit_analysis_agent"],
-    "decisions_implied": ["delegate to remote partner", "track remote lifecycle"],
-    "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+    "input_data": [
+      "intake_request"
+    ],
+    "output_data": [
+      "remote_analysis_result"
+    ],
+    "systems_mentioned": [
+      "partner_credit_analysis_agent"
+    ],
+    "decisions_implied": [
+      "delegate to remote partner",
+      "track remote lifecycle"
+    ],
+    "risk_signals": [
+      "customer_impact",
+      "human_approval_required",
+      "audit_required"
+    ],
     "missing_information": [
       "Agent Card version",
       "Skill list",
@@ -78,14 +106,26 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "delegated_task", "type": "object", "required": true }
+        {
+          "name": "delegated_task",
+          "type": "object",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "remote_analysis_result", "type": "object", "required": true }
+        {
+          "name": "remote_analysis_result",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "high",
-      "risk_signals": ["customer_impact", "human_approval_required", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "human_approval_required",
+        "audit_required"
+      ],
       "status": "needs_info",
       "missing_information": [
         "Agent Card version",
@@ -135,19 +175,39 @@
           "tenant_policy": "single tenant per client credential"
         }
       ],
-      "input_modes": ["application/json"],
-      "output_modes": ["application/json"],
+      "input_modes": [
+        "application/json"
+      ],
+      "output_modes": [
+        "application/json"
+      ],
       "security_schemes": [
-        { "name": "partnerOAuth2", "scheme": "oauth2_client_credentials" }
+        {
+          "name": "partnerOAuth2",
+          "scheme": "oauth2_client_credentials"
+        }
       ],
       "security_requirements": [
-        { "scheme_name": "partnerOAuth2", "scopes": ["credit.analyze"] }
+        {
+          "scheme_name": "partnerOAuth2",
+          "scopes": [
+            "credit.analyze"
+          ]
+        }
       ],
-      "skills": ["needs_info"],
+      "skills": [
+        "needs_info"
+      ],
       "extensions": [],
       "message_contract": {
-        "allowed_part_fields": ["text", "data"],
-        "allowed_roles": ["ROLE_USER", "ROLE_AGENT"]
+        "allowed_part_fields": [
+          "text",
+          "data"
+        ],
+        "allowed_roles": [
+          "ROLE_USER",
+          "ROLE_AGENT"
+        ]
       },
       "task_lifecycle": {
         "states": [
@@ -161,14 +221,38 @@
           "TASK_STATE_REJECTED"
         ],
         "allowed_transitions": [
-          { "from": "TASK_STATE_SUBMITTED", "to": "TASK_STATE_WORKING" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_INPUT_REQUIRED" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_AUTH_REQUIRED" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_COMPLETED" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_FAILED" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_CANCELED" },
-          { "from": "TASK_STATE_INPUT_REQUIRED", "to": "TASK_STATE_WORKING" },
-          { "from": "TASK_STATE_AUTH_REQUIRED", "to": "TASK_STATE_WORKING" }
+          {
+            "from": "TASK_STATE_SUBMITTED",
+            "to": "TASK_STATE_WORKING"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_INPUT_REQUIRED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_AUTH_REQUIRED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_COMPLETED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_FAILED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_CANCELED"
+          },
+          {
+            "from": "TASK_STATE_INPUT_REQUIRED",
+            "to": "TASK_STATE_WORKING"
+          },
+          {
+            "from": "TASK_STATE_AUTH_REQUIRED",
+            "to": "TASK_STATE_WORKING"
+          }
         ],
         "terminal_states": [
           "TASK_STATE_COMPLETED",
@@ -184,8 +268,16 @@
         "wrappers": [],
         "non_streaming_fallback": "use SendMessage and poll GetTask until a terminal lifecycle outcome is reached"
       },
-      "operations": ["SendMessage", "GetTask", "CancelTask"],
-      "http_paths": ["/message:send", "/tasks/{id}", "/tasks/{id}:cancel"],
+      "operations": [
+        "SendMessage",
+        "GetTask",
+        "CancelTask"
+      ],
+      "http_paths": [
+        "/message:send",
+        "/tasks/{id}",
+        "/tasks/{id}:cancel"
+      ],
       "artifact_contract": {
         "mutation_rules": "remote may emit artifact updates only through taskArtifactUpdate stream wrapper events",
         "chunking_policy": "no chunking expected for the analysis result payload"
@@ -206,34 +298,182 @@
   ],
   "processFlow": {
     "requirement_id": "req-001",
+    "graph_id": "graph-001",
+    "root_workflow_module_id": null,
     "nodes": [
-      { "id": "intake_request", "label": "intake_request", "type": "input", "subtype": null },
-      { "id": "mod-001", "label": "remote_credit_analysis_agent", "type": "remote_a2a", "subtype": "a2a" },
-      { "id": "remote_analysis_result", "label": "remote_analysis_result", "type": "output", "subtype": null }
+      {
+        "id": "intake_request",
+        "module_id": null,
+        "label": "intake_request",
+        "node_kind": "input",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "local_dispatcher",
+        "module_id": null,
+        "label": "local_dispatcher",
+        "node_kind": "function",
+        "execution_kind": "deterministic",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-001",
+        "module_id": "mod-001",
+        "label": "remote_credit_analysis_agent",
+        "node_kind": "remote_a2a",
+        "execution_kind": "remote_a2a",
+        "adk_node_role": "boundary",
+        "owner_scope": "remote",
+        "container_id": "container-remote",
+        "lane_id": "remote_boundary",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "remote_analysis_result",
+        "module_id": null,
+        "label": "remote_analysis_result",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      }
     ],
     "edges": [
       {
+        "id": "edge-001",
         "from": "intake_request",
-        "to": "mod-001",
-        "data": "delegated task payload",
-        "edge_type": "remote_a2a",
-        "data_channel": "event_message",
+        "to": "local_dispatcher",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "intake payload",
+        "schema_ref": "IntakeRequest",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "DelegatedTask",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-002",
+        "from": "local_dispatcher",
+        "to": "mod-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "remote_a2a",
+        "execution_semantics": "boundary_crossing",
+        "data_label": "delegated task payload",
+        "schema_ref": "DelegatedTask",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": "a2a-001",
+        "is_remote_boundary_crossing": true
+      },
+      {
+        "id": "edge-003",
         "from": "mod-001",
         "to": "remote_analysis_result",
-        "data": "remote analysis outcome returned through A2A task lifecycle",
-        "edge_type": "remote_a2a",
-        "data_channel": "artifact",
-        "state_key": null,
-        "artifact_key": "remote_analysis_artifact",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "remote analysis outcome",
         "schema_ref": "RemoteAnalysisResult",
-        "route_condition": null
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       }
-    ]
+    ],
+    "containers": [
+      {
+        "id": "container-root",
+        "module_id": null,
+        "label": "Root graph workflow",
+        "container_kind": "graph_workflow",
+        "adk_mapping": "GraphWorkflow",
+        "contains_node_ids": [
+          "intake_request",
+          "local_dispatcher",
+          "remote_analysis_result"
+        ],
+        "entry_node_ids": [
+          "intake_request"
+        ],
+        "exit_node_ids": [
+          "remote_analysis_result"
+        ],
+        "layout_policy": "dag_with_routes",
+        "parent_container_id": null
+      },
+      {
+        "id": "container-remote",
+        "module_id": "mod-001",
+        "label": "Remote A2A boundary",
+        "container_kind": "remote_boundary",
+        "adk_mapping": "RemoteBoundary",
+        "contains_node_ids": [
+          "mod-001"
+        ],
+        "entry_node_ids": [
+          "mod-001"
+        ],
+        "exit_node_ids": [
+          "mod-001"
+        ],
+        "layout_policy": "free",
+        "parent_container_id": null
+      }
+    ],
+    "lanes": [
+      {
+        "id": "input",
+        "label": "input"
+      },
+      {
+        "id": "local_graph",
+        "label": "local_graph"
+      },
+      {
+        "id": "output",
+        "label": "output"
+      },
+      {
+        "id": "remote_boundary",
+        "label": "remote_boundary"
+      }
+    ],
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { legacyStageToGraphIR } from "./graphMigration";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -26,7 +27,7 @@ export function loadSavedAnalyses(): SavedAnalysisRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isSavedAnalysisRecord).slice(0, MAX_RECORDS).map(backfillA2AContracts);
+    return parsed.filter(isSavedAnalysisRecord).slice(0, MAX_RECORDS).map(backfillAnalysisShape);
   } catch {
     return [];
   }
@@ -42,6 +43,30 @@ function backfillA2AContracts(record: SavedAnalysisRecord): SavedAnalysisRecord 
     };
   }
   return record;
+}
+
+// Older saved records also pre-date the GraphIR shape on processFlow. If the
+// stored shape is a legacy stage flow (no `containers`/`lanes` arrays), run
+// the migration adapter so the workbench can render it without crashing.
+export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysisRecord {
+  const withContracts = backfillA2AContracts(record);
+  const analysis = withContracts.analysis as AnalysisResult | undefined;
+  if (!analysis) return withContracts;
+  const flow = (analysis as { processFlow?: unknown }).processFlow;
+  const isLegacyShape =
+    flow !== null &&
+    typeof flow === "object" &&
+    !Array.isArray(flow) &&
+    (!Array.isArray((flow as { containers?: unknown }).containers) ||
+      !Array.isArray((flow as { lanes?: unknown }).lanes));
+  if (!isLegacyShape) return withContracts;
+  const requirementId =
+    (analysis as { normalizedRequirement?: { id?: string } }).normalizedRequirement?.id ?? "req-001";
+  const migrated = legacyStageToGraphIR(flow, requirementId);
+  return {
+    ...withContracts,
+    analysis: { ...analysis, processFlow: migrated }
+  };
 }
 
 export function upsertSavedAnalysis(record: SavedAnalysisRecord): SavedAnalysisRecord[] {

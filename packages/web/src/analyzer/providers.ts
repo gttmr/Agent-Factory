@@ -6,6 +6,7 @@ import type {
   RequirementIntakeInput
 } from "./types";
 import { normalizeA2A } from "./a2aNormalize";
+import { legacyStageToGraphIR, validateGraphIRSoft } from "./graphMigration";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -75,6 +76,34 @@ export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
 function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
   if (!result || typeof result !== "object") {
     return result;
+  }
+  // Defensive client-side migration: if a server bypassed the migration pass
+  // (legacy cached result, older server, etc.), still convert stage-flow to
+  // Graph IR so the UI never sees the legacy shape. NEVER throw — degraded
+  // graphs render with the validation banner instead.
+  try {
+    const r = result as unknown as Record<string, unknown>;
+    if (r && typeof r === "object" && r.processFlow && typeof r.processFlow === "object") {
+      const reqId =
+        r.normalizedRequirement &&
+        typeof r.normalizedRequirement === "object" &&
+        typeof (r.normalizedRequirement as Record<string, unknown>).id === "string"
+          ? ((r.normalizedRequirement as Record<string, unknown>).id as string)
+          : "req-001";
+      const migrated = legacyStageToGraphIR(r.processFlow, reqId);
+      const soft = validateGraphIRSoft(migrated);
+      const existing = migrated.validation ?? { ok: true, errors: [], warnings: [] };
+      (r as Record<string, unknown>).processFlow = {
+        ...migrated,
+        validation: {
+          ok: existing.ok && soft.errors.length === 0,
+          errors: [...(existing.errors ?? []), ...soft.errors],
+          warnings: [...(existing.warnings ?? []), ...soft.warnings]
+        }
+      };
+    }
+  } catch (error) {
+    console.warn("[analyzer] graph-ir client migration failed (non-fatal):", error);
   }
   return normalizeA2A(result).result;
 }

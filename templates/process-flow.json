@@ -1,116 +1,110 @@
 {
   "requirement_id": "req-001",
+  "graph_id": "graph-001",
+  "root_workflow_module_id": "mod-001",
   "nodes": [
     {
-      "id": "complaint_text",
-      "label": "complaint_text",
-      "type": "input"
-    },
-    {
-      "id": "customer_id",
-      "label": "customer_id",
-      "type": "input"
+      "id": "input_payload",
+      "module_id": null,
+      "label": "input_payload",
+      "node_kind": "input",
+      "execution_kind": "io",
+      "adk_node_role": "synthetic",
+      "owner_scope": "local",
+      "container_id": "container-root",
+      "lane_id": "input",
+      "input_ports": [],
+      "output_ports": [],
+      "schema_refs": [],
+      "review_status": "approved"
     },
     {
       "id": "mod-001",
-      "label": "customer_profile_lookup",
-      "type": "adapter",
-      "subtype": "legacy_api"
+      "module_id": "mod-001",
+      "label": "local_specialist_agent",
+      "node_kind": "agent",
+      "execution_kind": "llm_agent",
+      "adk_node_role": "workflow_node",
+      "owner_scope": "local",
+      "container_id": "container-root",
+      "lane_id": "local_graph",
+      "input_ports": [],
+      "output_ports": [],
+      "schema_refs": [],
+      "review_status": "approved"
     },
     {
-      "id": "mod-002",
-      "label": "response_guidance_retrieval",
-      "type": "adapter",
-      "subtype": "retrieval"
-    },
-    {
-      "id": "mod-003",
-      "label": "complaint_triage_workflow",
-      "type": "workflow",
-      "subtype": "sequential"
-    },
-    {
-      "id": "mod-004",
-      "label": "complaint_triage_specialist",
-      "type": "agent",
-      "subtype": "specialist"
-    },
-    {
-      "id": "mod-005",
-      "label": "support_routing_rules",
-      "type": "adapter",
-      "subtype": "rule_registry"
-    },
-    {
-      "id": "recommended_next_step",
-      "label": "recommended_next_step",
-      "type": "output"
+      "id": "output_payload",
+      "module_id": null,
+      "label": "output_payload",
+      "node_kind": "output",
+      "execution_kind": "io",
+      "adk_node_role": "synthetic",
+      "owner_scope": "local",
+      "container_id": "container-root",
+      "lane_id": "output",
+      "input_ports": [],
+      "output_ports": [],
+      "schema_refs": [],
+      "review_status": "approved"
     }
   ],
   "edges": [
     {
-      "from": "customer_id",
+      "id": "edge-001",
+      "from": "input_payload",
       "to": "mod-001",
-      "data": "lookup key",
-      "edge_type": "local",
-      "data_channel": "event_output",
-      "schema_ref": "CustomerLookupInput"
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "request payload",
+      "schema_ref": "RequestPayload",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
     },
     {
-      "from": "complaint_text",
-      "to": "mod-002",
-      "data": "retrieval query",
-      "edge_type": "local",
-      "data_channel": "event_output",
-      "schema_ref": "RetrievalQuery"
-    },
-    {
-      "from": "complaint_text",
-      "to": "mod-003",
-      "data": "raw complaint text",
-      "edge_type": "local",
-      "data_channel": "session_state",
-      "state_key": "complaint_context"
-    },
-    {
+      "id": "edge-002",
       "from": "mod-001",
-      "to": "mod-003",
-      "data": "customer profile",
-      "edge_type": "local",
-      "data_channel": "temp_state",
-      "state_key": "temp:customer_profile"
-    },
-    {
-      "from": "mod-002",
-      "to": "mod-003",
-      "data": "response guidance",
-      "edge_type": "local",
-      "data_channel": "temp_state",
-      "state_key": "temp:response_guidance"
-    },
-    {
-      "from": "mod-003",
-      "to": "mod-004",
-      "data": "triage context",
-      "edge_type": "local",
-      "data_channel": "event_output",
-      "schema_ref": "ComplaintTriageContext"
-    },
-    {
-      "from": "mod-004",
-      "to": "mod-005",
-      "data": "triage category",
-      "edge_type": "local",
-      "data_channel": "route",
-      "route_condition": "priority route"
-    },
-    {
-      "from": "mod-005",
-      "to": "recommended_next_step",
-      "data": "routing decision",
-      "edge_type": "local",
-      "data_channel": "event_output",
-      "schema_ref": "RoutingDecision"
+      "to": "output_payload",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "response payload",
+      "schema_ref": "ResponsePayload",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
     }
-  ]
+  ],
+  "containers": [
+    {
+      "id": "container-root",
+      "module_id": null,
+      "label": "Root graph workflow",
+      "container_kind": "graph_workflow",
+      "adk_mapping": "GraphWorkflow",
+      "contains_node_ids": ["input_payload", "mod-001", "output_payload"],
+      "entry_node_ids": ["input_payload"],
+      "exit_node_ids": ["output_payload"],
+      "layout_policy": "dag_with_routes",
+      "parent_container_id": null
+    }
+  ],
+  "lanes": [
+    { "id": "input", "label": "input" },
+    { "id": "local_graph", "label": "local_graph" },
+    { "id": "output", "label": "output" }
+  ],
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  }
 }

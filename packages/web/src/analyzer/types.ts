@@ -432,6 +432,198 @@ export interface ScaffoldPlan {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ADK 2.0 Graph IR — replaces the legacy stage-based ProcessFlow.
+//
+// `ProcessFlow`, `FlowNode`, `FlowEdge` are kept as type aliases so existing
+// imports keep compiling during the staged rollout. The legacy field names
+// (`type`, `edge_type`, `data`, `data_channel`, `subtype`, `state_key`,
+// `artifact_key`, `schema_ref`, `route_condition`) are preserved as optional
+// mirror fields on `GraphNode`/`GraphEdge` so consumers that still read those
+// names type-check unchanged. Phase 3 of the directive purges those readers.
+// ---------------------------------------------------------------------------
+
+export const GRAPH_NODE_KINDS = [
+  "input",
+  "output",
+  "agent",
+  "function",
+  "tool",
+  "adapter",
+  "human_input",
+  "workflow",
+  "remote_a2a",
+  "join",
+  "router",
+  "loop_control"
+] as const;
+
+export const GRAPH_CONTAINER_KINDS = [
+  "graph_workflow",
+  "dynamic_workflow",
+  "parallel_region",
+  "loop_region",
+  "human_review_region",
+  "remote_boundary"
+] as const;
+
+export const GRAPH_EDGE_KINDS = [
+  "event_output",
+  "event_message",
+  "session_state",
+  "temp_state",
+  "user_state",
+  "app_state",
+  "artifact",
+  "route",
+  "control",
+  "remote_a2a"
+] as const;
+
+export const GRAPH_LANE_IDS = [
+  "input",
+  "local_graph",
+  "adapter",
+  "human_input",
+  "output",
+  "remote_boundary"
+] as const;
+
+export const GRAPH_LAYOUT_POLICIES = [
+  "dag_with_routes",
+  "fan_out_fan_in",
+  "loop",
+  "linear",
+  "free"
+] as const;
+
+export const GRAPH_EXECUTION_SEMANTICS = [
+  "normal_transition",
+  "fan_out",
+  "fan_in",
+  "loop_back",
+  "loop_exit",
+  "conditional",
+  "boundary_crossing"
+] as const;
+
+export type NodeKind = (typeof GRAPH_NODE_KINDS)[number];
+export type ContainerKind = (typeof GRAPH_CONTAINER_KINDS)[number];
+export type EdgeKind = (typeof GRAPH_EDGE_KINDS)[number];
+export type LaneId = (typeof GRAPH_LANE_IDS)[number];
+export type LayoutPolicy = (typeof GRAPH_LAYOUT_POLICIES)[number];
+export type ExecutionSemantics = (typeof GRAPH_EXECUTION_SEMANTICS)[number];
+export type OwnerScope = "local" | "remote" | "external";
+
+export interface GraphPort {
+  id: string;
+  label: string;
+  schema_ref: string | null;
+}
+
+export interface GraphValidationIssue {
+  code: string;
+  message: string;
+  target_kind: "node" | "edge" | "container" | "graph";
+  target_id: string | null;
+}
+
+export interface GraphValidation {
+  ok: boolean;
+  errors: GraphValidationIssue[];
+  warnings: GraphValidationIssue[];
+}
+
+export interface GraphLane {
+  id: LaneId;
+  label: string;
+}
+
+export interface GraphContainer {
+  id: string;
+  module_id: string | null;
+  label: string;
+  container_kind: ContainerKind;
+  adk_mapping: string | null;
+  contains_node_ids: string[];
+  entry_node_ids: string[];
+  exit_node_ids: string[];
+  layout_policy: LayoutPolicy;
+  parent_container_id: string | null;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  // Marked optional in TS only — JSON schema + validator require these on
+  // every emitted graph. Loosened so legacy-shaped node literals constructed
+  // by pre-Phase-2 code keep type-checking during the rollout.
+  module_id?: string | null;
+  node_kind?: NodeKind;
+  execution_kind?: string | null;
+  adk_node_role?: "workflow_node" | "container_root" | "boundary" | "synthetic" | null;
+  owner_scope?: OwnerScope;
+  container_id?: string | null;
+  lane_id?: LaneId | string;
+  input_ports?: GraphPort[];
+  output_ports?: GraphPort[];
+  schema_refs?: string[];
+  review_status?: ModuleStatus | "n/a";
+  // Legacy mirror fields (DEPRECATED — readers purged in Phase 3).
+  // Required at the type level so existing readers (`node.type`, `node.subtype`)
+  // type-check unchanged. Phase 2's migration adapter must populate these for
+  // every emitted graph until Phase 3 deletes the readers.
+  type: FlowNodeType;
+  subtype?: string;
+}
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+  // Marked optional in TS only — JSON schema + validator require these on
+  // every emitted edge. See GraphNode note above.
+  id?: string;
+  from_port?: string | null;
+  to_port?: string | null;
+  edge_kind?: EdgeKind;
+  execution_semantics?: ExecutionSemantics;
+  data_label?: string;
+  schema_ref?: string | null;
+  route_condition?: string | null;
+  state_key?: string | null;
+  artifact_key?: string | null;
+  a2a_contract_id?: string | null;
+  is_remote_boundary_crossing?: boolean;
+  // Legacy mirror fields (DEPRECATED — readers purged in Phase 3).
+  // Required at the type level so existing readers (`edge.data`,
+  // `edge.edge_type`, `edge.data_channel`) type-check unchanged.
+  edge_type: FlowEdgeType;
+  data: string;
+  data_channel?: FlowDataChannel;
+}
+
+export interface GraphIR {
+  requirement_id: string;
+  // Required by the runtime validator and JSON schema. Marked optional in TS
+  // only so legacy construction sites (e.g. the temporary localFlow filter in
+  // ProcessFlowView) keep compiling during the staged rollout. Phase 4 makes
+  // these strictly required at the type level.
+  graph_id?: string;
+  root_workflow_module_id?: string | null;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  containers?: GraphContainer[];
+  lanes?: GraphLane[];
+  validation?: GraphValidation;
+}
+
+// Legacy aliases. Do not introduce new code that consumes these names — use
+// GraphIR / GraphNode / GraphEdge directly.
+export type ProcessFlow = GraphIR;
+export type FlowNode = GraphNode;
+export type FlowEdge = GraphEdge;
+// Legacy narrow enums — kept for the existing exhaustive Record<…, string>
+// tables in ProcessFlowView.tsx and adkSource.ts. Phase 3 deletes these.
 export type FlowNodeType = "input" | "output" | ModuleCategory;
 export type FlowEdgeType = "local" | "remote_a2a";
 export type FlowDataChannel =
@@ -445,31 +637,6 @@ export type FlowDataChannel =
   | "route"
   | "control"
   | "unknown";
-
-export interface FlowNode {
-  id: string;
-  label: string;
-  type: FlowNodeType;
-  subtype?: string;
-}
-
-export interface FlowEdge {
-  from: string;
-  to: string;
-  data: string;
-  edge_type: FlowEdgeType;
-  data_channel?: FlowDataChannel;
-  state_key?: string | null;
-  artifact_key?: string | null;
-  schema_ref?: string | null;
-  route_condition?: string | null;
-}
-
-export interface ProcessFlow {
-  requirement_id: string;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
 
 export interface ClassificationSummary {
   module_id: string;

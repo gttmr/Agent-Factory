@@ -15,14 +15,29 @@
       "Write a one-line summary"
     ],
     "inputs": [
-      { "name": "support_request_text", "type": "text", "required": true }
+      {
+        "name": "support_request_text",
+        "type": "text",
+        "required": true
+      }
     ],
     "outputs": [
-      { "name": "category", "type": "string", "required": true },
-      { "name": "summary", "type": "text", "required": true }
+      {
+        "name": "category",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "summary",
+        "type": "text",
+        "required": true
+      }
     ],
     "systems": [],
-    "risk_signals": ["customer_impact", "audit_required"],
+    "risk_signals": [
+      "customer_impact",
+      "audit_required"
+    ],
     "missing_information": [
       "approved category list",
       "summary length policy"
@@ -34,14 +49,30 @@
     "requested_goal": "Classify and summarize a support request.",
     "business_domain_hint": "customer-service",
     "user_role": "business-user",
-    "input_data": ["support_request_text"],
-    "output_data": ["category", "summary"],
+    "input_data": [
+      "support_request_text"
+    ],
+    "output_data": [
+      "category",
+      "summary"
+    ],
     "systems_mentioned": [],
-    "decisions_implied": ["pick category", "draft summary line"],
-    "risk_signals": ["customer_impact", "audit_required"],
-    "missing_information": ["approved category list", "summary length policy"],
+    "decisions_implied": [
+      "pick category",
+      "draft summary line"
+    ],
+    "risk_signals": [
+      "customer_impact",
+      "audit_required"
+    ],
+    "missing_information": [
+      "approved category list",
+      "summary length policy"
+    ],
     "contradictions": [],
-    "assumptions": ["all processing is local; no external system call required"]
+    "assumptions": [
+      "all processing is local; no external system call required"
+    ]
   },
   "moduleCandidates": [
     {
@@ -64,17 +95,35 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "support_request_text", "type": "text", "required": true }
+        {
+          "name": "support_request_text",
+          "type": "text",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "category", "type": "string", "required": true },
-        { "name": "summary", "type": "text", "required": true }
+        {
+          "name": "category",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "low",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "needs_info",
-      "missing_information": ["approved category list", "summary length policy"],
+      "missing_information": [
+        "approved category list",
+        "summary length policy"
+      ],
       "side_effect": "none",
       "auth_required": false,
       "audit_required": true,
@@ -99,46 +148,162 @@
   "a2aContracts": [],
   "processFlow": {
     "requirement_id": "req-001",
+    "graph_id": "graph-001",
+    "root_workflow_module_id": "mod-001",
     "nodes": [
-      { "id": "support_request_text", "label": "support_request_text", "type": "input", "subtype": null },
-      { "id": "mod-001", "label": "support_request_specialist", "type": "agent", "subtype": "specialist" },
-      { "id": "category", "label": "category", "type": "output", "subtype": null },
-      { "id": "summary", "label": "summary", "type": "output", "subtype": null }
+      {
+        "id": "support_request_text",
+        "module_id": null,
+        "label": "support_request_text",
+        "node_kind": "input",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-001",
+        "module_id": "mod-001",
+        "label": "support_request_specialist",
+        "node_kind": "agent",
+        "execution_kind": "llm_agent",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "category",
+        "module_id": null,
+        "label": "category",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "summary",
+        "module_id": null,
+        "label": "summary",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      }
     ],
     "edges": [
       {
+        "id": "edge-001",
         "from": "support_request_text",
         "to": "mod-001",
-        "data": "raw support request text",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "raw support request text",
+        "schema_ref": "SupportRequestInput",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "SupportRequestInput",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-002",
         "from": "mod-001",
         "to": "category",
-        "data": "classified category",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "classified category",
+        "schema_ref": "SupportCategory",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "SupportCategory",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-003",
         "from": "mod-001",
         "to": "summary",
-        "data": "short summary line",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "short summary line",
+        "schema_ref": "SupportSummary",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "SupportSummary",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       }
-    ]
+    ],
+    "containers": [
+      {
+        "id": "container-root",
+        "module_id": null,
+        "label": "Root graph workflow",
+        "container_kind": "graph_workflow",
+        "adk_mapping": "GraphWorkflow",
+        "contains_node_ids": [
+          "support_request_text",
+          "mod-001",
+          "category",
+          "summary"
+        ],
+        "entry_node_ids": [
+          "support_request_text"
+        ],
+        "exit_node_ids": [
+          "category",
+          "summary"
+        ],
+        "layout_policy": "dag_with_routes",
+        "parent_container_id": null
+      }
+    ],
+    "lanes": [
+      {
+        "id": "input",
+        "label": "input"
+      },
+      {
+        "id": "local_graph",
+        "label": "local_graph"
+      },
+      {
+        "id": "output",
+        "label": "output"
+      }
+    ],
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
   }
 }

@@ -15,16 +15,33 @@
       "Compose a grounded answer that cites each source"
     ],
     "inputs": [
-      { "name": "staff_question_text", "type": "text", "required": true }
+      {
+        "name": "staff_question_text",
+        "type": "text",
+        "required": true
+      }
     ],
     "outputs": [
-      { "name": "grounded_answer", "type": "text", "required": true },
-      { "name": "citations", "type": "array", "required": true }
+      {
+        "name": "grounded_answer",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "citations",
+        "type": "array",
+        "required": true
+      }
     ],
     "systems": [
-      { "name": "policy_document_store", "access": "read" }
+      {
+        "name": "policy_document_store",
+        "access": "read"
+      }
     ],
-    "risk_signals": ["audit_required"],
+    "risk_signals": [
+      "audit_required"
+    ],
     "missing_information": [
       "approved source list",
       "citation policy",
@@ -37,14 +54,32 @@
     "requested_goal": "Answer staff questions using approved policy documents with citations.",
     "business_domain_hint": "customer-service",
     "user_role": "business-user",
-    "input_data": ["staff_question_text"],
-    "output_data": ["grounded_answer", "citations"],
-    "systems_mentioned": ["policy_document_store"],
-    "decisions_implied": ["select grounded passages", "compose grounded answer"],
-    "risk_signals": ["audit_required"],
-    "missing_information": ["approved source list", "citation policy", "source access control"],
+    "input_data": [
+      "staff_question_text"
+    ],
+    "output_data": [
+      "grounded_answer",
+      "citations"
+    ],
+    "systems_mentioned": [
+      "policy_document_store"
+    ],
+    "decisions_implied": [
+      "select grounded passages",
+      "compose grounded answer"
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [
+      "approved source list",
+      "citation policy",
+      "source access control"
+    ],
     "contradictions": [],
-    "assumptions": ["retrieval is a callable adapter, not a separate remote agent"]
+    "assumptions": [
+      "retrieval is a callable adapter, not a separate remote agent"
+    ]
   },
   "moduleCandidates": [
     {
@@ -67,19 +102,44 @@
         "streaming_grounding": "grounded generation required; cite every source"
       },
       "inputs": [
-        { "name": "staff_question_text", "type": "text", "required": true },
-        { "name": "guidance_summary", "type": "text", "required": true },
-        { "name": "citations", "type": "array", "required": true }
+        {
+          "name": "staff_question_text",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "guidance_summary",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "citations",
+          "type": "array",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "grounded_answer", "type": "text", "required": true },
-        { "name": "citations", "type": "array", "required": true }
+        {
+          "name": "grounded_answer",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "citations",
+          "type": "array",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "status": "needs_info",
-      "missing_information": ["citation policy", "source access control"],
+      "missing_information": [
+        "citation policy",
+        "source access control"
+      ],
       "side_effect": "none",
       "auth_required": false,
       "audit_required": true,
@@ -120,17 +180,35 @@
         "streaming_grounding": "must return citations alongside any retrieved passage"
       },
       "inputs": [
-        { "name": "knowledge_query", "type": "text", "required": true }
+        {
+          "name": "knowledge_query",
+          "type": "text",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "guidance_summary", "type": "text", "required": true },
-        { "name": "citations", "type": "array", "required": true }
+        {
+          "name": "guidance_summary",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "citations",
+          "type": "array",
+          "required": true
+        }
       ],
       "reuse_candidate": true,
       "risk_level": "medium",
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "status": "needs_info",
-      "missing_information": ["approved source list", "citation policy", "source access control"],
+      "missing_information": [
+        "approved source list",
+        "citation policy",
+        "source access control"
+      ],
       "side_effect": "read",
       "auth_required": true,
       "audit_required": true,
@@ -155,69 +233,296 @@
   "a2aContracts": [],
   "processFlow": {
     "requirement_id": "req-001",
+    "graph_id": "graph-001",
+    "root_workflow_module_id": "mod-001",
     "nodes": [
-      { "id": "staff_question_text", "label": "staff_question_text", "type": "input", "subtype": null },
-      { "id": "mod-002", "label": "policy_document_retrieval", "type": "adapter", "subtype": "retrieval" },
-      { "id": "mod-001", "label": "policy_qa_specialist", "type": "agent", "subtype": "specialist" },
-      { "id": "grounded_answer", "label": "grounded_answer", "type": "output", "subtype": null },
-      { "id": "citations", "label": "citations", "type": "output", "subtype": null }
+      {
+        "id": "staff_question_text",
+        "module_id": null,
+        "label": "staff_question_text",
+        "node_kind": "input",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-002",
+        "module_id": "mod-002",
+        "label": "policy_document_retrieval",
+        "node_kind": "adapter",
+        "execution_kind": "deterministic",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-parallel",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "history_lookup",
+        "module_id": null,
+        "label": "history_lookup",
+        "node_kind": "function",
+        "execution_kind": "deterministic",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-parallel",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "join-001",
+        "module_id": null,
+        "label": "join",
+        "node_kind": "join",
+        "execution_kind": null,
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-001",
+        "module_id": "mod-001",
+        "label": "policy_qa_specialist",
+        "node_kind": "agent",
+        "execution_kind": "llm_agent",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "grounded_answer",
+        "module_id": null,
+        "label": "grounded_answer",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "citations",
+        "module_id": null,
+        "label": "citations",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      }
     ],
     "edges": [
       {
+        "id": "edge-001",
         "from": "staff_question_text",
         "to": "mod-002",
-        "data": "retrieval query",
-        "edge_type": "local",
-        "data_channel": "event_output",
-        "state_key": null,
-        "artifact_key": null,
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_out",
+        "data_label": "retrieval query",
         "schema_ref": "RetrievalQuery",
-        "route_condition": null
-      },
-      {
-        "from": "staff_question_text",
-        "to": "mod-001",
-        "data": "raw staff question",
-        "edge_type": "local",
-        "data_channel": "session_state",
-        "state_key": "session:staff_question",
-        "artifact_key": null,
-        "schema_ref": null,
-        "route_condition": null
-      },
-      {
-        "from": "mod-002",
-        "to": "mod-001",
-        "data": "retrieved guidance with citations",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "GuidanceWithCitations",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-002",
+        "from": "staff_question_text",
+        "to": "history_lookup",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_out",
+        "data_label": "history query",
+        "schema_ref": "HistoryQuery",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-003",
+        "from": "mod-002",
+        "to": "join-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_in",
+        "data_label": "retrieved policy docs",
+        "schema_ref": "PolicyDocs",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-004",
+        "from": "history_lookup",
+        "to": "join-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_in",
+        "data_label": "prior interactions",
+        "schema_ref": "HistoryRecords",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-005",
+        "from": "join-001",
+        "to": "mod-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "merged context",
+        "schema_ref": "QAContext",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-006",
         "from": "mod-001",
         "to": "grounded_answer",
-        "data": "grounded answer text",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "grounded answer",
+        "schema_ref": "GroundedAnswer",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "GroundedAnswer",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-007",
         "from": "mod-001",
         "to": "citations",
-        "data": "citation array",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "citation list",
+        "schema_ref": "CitationList",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "CitationList",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       }
-    ]
+    ],
+    "containers": [
+      {
+        "id": "container-root",
+        "module_id": null,
+        "label": "Root graph workflow",
+        "container_kind": "graph_workflow",
+        "adk_mapping": "GraphWorkflow",
+        "contains_node_ids": [
+          "staff_question_text",
+          "join-001",
+          "mod-001",
+          "grounded_answer",
+          "citations"
+        ],
+        "entry_node_ids": [
+          "staff_question_text"
+        ],
+        "exit_node_ids": [
+          "grounded_answer",
+          "citations"
+        ],
+        "layout_policy": "dag_with_routes",
+        "parent_container_id": null
+      },
+      {
+        "id": "container-parallel",
+        "module_id": null,
+        "label": "Parallel evidence gathering",
+        "container_kind": "parallel_region",
+        "adk_mapping": "ParallelRegion",
+        "contains_node_ids": [
+          "mod-002",
+          "history_lookup"
+        ],
+        "entry_node_ids": [
+          "mod-002",
+          "history_lookup"
+        ],
+        "exit_node_ids": [
+          "join-001"
+        ],
+        "layout_policy": "fan_out_fan_in",
+        "parent_container_id": "container-root"
+      }
+    ],
+    "lanes": [
+      {
+        "id": "input",
+        "label": "input"
+      },
+      {
+        "id": "local_graph",
+        "label": "local_graph"
+      },
+      {
+        "id": "adapter",
+        "label": "adapter"
+      },
+      {
+        "id": "output",
+        "label": "output"
+      }
+    ],
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
   }
 }

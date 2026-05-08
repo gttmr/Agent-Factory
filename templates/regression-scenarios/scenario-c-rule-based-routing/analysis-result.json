@@ -15,15 +15,28 @@
       "Pick the matching route branch"
     ],
     "inputs": [
-      { "name": "case_classification", "type": "string", "required": true }
+      {
+        "name": "case_classification",
+        "type": "string",
+        "required": true
+      }
     ],
     "outputs": [
-      { "name": "route_branch", "type": "string", "required": true }
+      {
+        "name": "route_branch",
+        "type": "string",
+        "required": true
+      }
     ],
     "systems": [
-      { "name": "routing_rule_registry", "access": "read" }
+      {
+        "name": "routing_rule_registry",
+        "access": "read"
+      }
     ],
-    "risk_signals": ["audit_required"],
+    "risk_signals": [
+      "audit_required"
+    ],
     "missing_information": [
       "registry owner",
       "versioning rule",
@@ -36,14 +49,30 @@
     "requested_goal": "Route cases by maintained rule thresholds.",
     "business_domain_hint": "customer-service",
     "user_role": "business-user",
-    "input_data": ["case_classification"],
-    "output_data": ["route_branch"],
-    "systems_mentioned": ["routing_rule_registry"],
-    "decisions_implied": ["pick a branch from the rule registry"],
-    "risk_signals": ["audit_required"],
-    "missing_information": ["registry owner", "versioning rule", "effective date policy"],
+    "input_data": [
+      "case_classification"
+    ],
+    "output_data": [
+      "route_branch"
+    ],
+    "systems_mentioned": [
+      "routing_rule_registry"
+    ],
+    "decisions_implied": [
+      "pick a branch from the rule registry"
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [
+      "registry owner",
+      "versioning rule",
+      "effective date policy"
+    ],
     "contradictions": [],
-    "assumptions": ["routing is deterministic; rule registry is the single source of truth"]
+    "assumptions": [
+      "routing is deterministic; rule registry is the single source of truth"
+    ]
   },
   "moduleCandidates": [
     {
@@ -66,18 +95,40 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "case_classification", "type": "string", "required": true }
+        {
+          "name": "case_classification",
+          "type": "string",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "route_branch", "type": "string", "required": true },
-        { "name": "rule_version", "type": "string", "required": true },
-        { "name": "effective_date", "type": "string", "required": true }
+        {
+          "name": "route_branch",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rule_version",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "effective_date",
+          "type": "string",
+          "required": true
+        }
       ],
       "reuse_candidate": true,
       "risk_level": "low",
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "status": "needs_info",
-      "missing_information": ["registry owner", "versioning rule", "effective date policy"],
+      "missing_information": [
+        "registry owner",
+        "versioning rule",
+        "effective date policy"
+      ],
       "side_effect": "read",
       "auth_required": true,
       "audit_required": true,
@@ -102,58 +153,231 @@
   "a2aContracts": [],
   "processFlow": {
     "requirement_id": "req-001",
+    "graph_id": "graph-001",
+    "root_workflow_module_id": "mod-001",
     "nodes": [
-      { "id": "case_classification", "label": "case_classification", "type": "input", "subtype": null },
-      { "id": "mod-001", "label": "case_routing_rule_registry", "type": "adapter", "subtype": "rule_registry" },
-      { "id": "route_high", "label": "route_high", "type": "output", "subtype": null },
-      { "id": "route_standard", "label": "route_standard", "type": "output", "subtype": null },
-      { "id": "route_low", "label": "route_low", "type": "output", "subtype": null }
+      {
+        "id": "case_classification",
+        "module_id": null,
+        "label": "case_classification",
+        "node_kind": "input",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-001",
+        "module_id": "mod-001",
+        "label": "case_routing_rule_registry",
+        "node_kind": "adapter",
+        "execution_kind": "deterministic",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "router-001",
+        "module_id": null,
+        "label": "priority_router",
+        "node_kind": "router",
+        "execution_kind": null,
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "route_high",
+        "module_id": null,
+        "label": "route_high",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "route_standard",
+        "module_id": null,
+        "label": "route_standard",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "route_low",
+        "module_id": null,
+        "label": "route_low",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      }
     ],
     "edges": [
       {
+        "id": "edge-001",
         "from": "case_classification",
         "to": "mod-001",
-        "data": "classification key",
-        "edge_type": "local",
-        "data_channel": "event_output",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "classification payload",
+        "schema_ref": "CaseClassification",
+        "route_condition": null,
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": "RoutingLookupInput",
-        "route_condition": null
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
+        "id": "edge-002",
         "from": "mod-001",
+        "to": "router-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "rule lookup result",
+        "schema_ref": "RuleResult",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-003",
+        "from": "router-001",
         "to": "route_high",
-        "data": "selected branch when threshold matches high",
-        "edge_type": "local",
-        "data_channel": "route",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "route",
+        "execution_semantics": "conditional",
+        "data_label": "priority == high",
+        "schema_ref": null,
+        "route_condition": "priority == 'high'",
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": null,
-        "route_condition": "route_branch == 'high'"
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
-        "from": "mod-001",
+        "id": "edge-004",
+        "from": "router-001",
         "to": "route_standard",
-        "data": "selected branch when threshold matches standard",
-        "edge_type": "local",
-        "data_channel": "route",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "route",
+        "execution_semantics": "conditional",
+        "data_label": "priority == standard",
+        "schema_ref": null,
+        "route_condition": "priority == 'standard'",
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": null,
-        "route_condition": "route_branch == 'standard'"
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       },
       {
-        "from": "mod-001",
+        "id": "edge-005",
+        "from": "router-001",
         "to": "route_low",
-        "data": "selected branch when threshold matches low",
-        "edge_type": "local",
-        "data_channel": "route",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "route",
+        "execution_semantics": "conditional",
+        "data_label": "default fallback",
+        "schema_ref": null,
+        "route_condition": "default",
         "state_key": null,
         "artifact_key": null,
-        "schema_ref": null,
-        "route_condition": "route_branch == 'low'"
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
       }
-    ]
+    ],
+    "containers": [
+      {
+        "id": "container-root",
+        "module_id": null,
+        "label": "Root graph workflow",
+        "container_kind": "graph_workflow",
+        "adk_mapping": "GraphWorkflow",
+        "contains_node_ids": [
+          "case_classification",
+          "mod-001",
+          "router-001",
+          "route_high",
+          "route_standard",
+          "route_low"
+        ],
+        "entry_node_ids": [
+          "case_classification"
+        ],
+        "exit_node_ids": [
+          "route_high",
+          "route_standard",
+          "route_low"
+        ],
+        "layout_policy": "dag_with_routes",
+        "parent_container_id": null
+      }
+    ],
+    "lanes": [
+      {
+        "id": "input",
+        "label": "input"
+      },
+      {
+        "id": "local_graph",
+        "label": "local_graph"
+      },
+      {
+        "id": "adapter",
+        "label": "adapter"
+      },
+      {
+        "id": "output",
+        "label": "output"
+      }
+    ],
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
   }
 }
