@@ -79,6 +79,57 @@ Core harness rules:
 - ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
 - Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flows, reuse/domain mapping, risk gates, validation output, and decision notes.
 
+## Skill And Subagent Usage
+
+Use skills as execution discipline, not ceremony.
+
+### Superpowers
+
+Use the relevant Superpowers skill before changing behavior:
+
+- Use `superpowers:brainstorming` when the user is still shaping UX, feature behavior, workflow semantics, or screen structure.
+- Use `superpowers:writing-plans` when an approved spec needs to become implementation steps.
+- Use `superpowers:systematic-debugging` when a regression, unexpected UI return, test failure, or confusing runtime behavior appears. Identify the root cause before patching.
+- Use `superpowers:verification-before-completion` before claiming work is complete, fixed, or ready for PR.
+
+Do not skip the user-review gate when a Superpowers workflow explicitly requires it, unless the user has already approved the concrete spec or plan in the same thread.
+
+### Frontend Skill
+
+For any visible workbench UI change, apply `frontend-skill`.
+
+Agent Factory is an operational workbench, not a marketing surface. Prefer:
+
+- dense but readable workspace layouts
+- clear task hierarchy
+- restrained colors and borders
+- utility copy in natural Korean
+- English technical terms where they are clearer, such as `Agent`, `Workflow`, `Adapter`, `Remote A2A`, `Graph IR`, and `Runtime Handoff`
+- cards only when the card is the interaction surface
+
+When changing a screen, verify that removed UI does not still render from a parent shell, context panel, inspector, or shared layout component.
+
+### Subagents
+
+Use subagents only when they materially improve reliability or protect the main context from growing too large.
+
+A subagent is appropriate when:
+
+- the task is bounded and can be reviewed independently
+- the subagent can receive nearly the same relevant context as the main agent
+- the expected output quality should match the main agent's work
+- the work is review, focused investigation, or an isolated implementation slice
+- the main agent can continue useful non-overlapping work while the subagent runs
+
+Do not use a subagent for the immediate blocking step when the main thread must act on that result before doing anything else.
+
+When the user authorizes subagents for Agent Factory work, default subagent model settings are:
+
+- model: `gpt-5.5`
+- reasoning effort: `high`
+
+For code-changing subagents, assign a clear file or module ownership boundary and instruct them not to revert or overwrite unrelated work. For review subagents, ask for concrete findings with file and line references, not broad opinions.
+
 ## Editing Rules
 
 - Keep changes scoped to the requested workbench behavior.
