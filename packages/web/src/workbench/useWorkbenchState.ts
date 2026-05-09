@@ -14,6 +14,7 @@ import type {
   AnalyzerProgressEvent,
   CatalogReference,
   CodexAnalyzerModel,
+  GraphIR,
   ModuleCandidate,
   RequirementDomain,
   RequirementIntakeInput
@@ -89,6 +90,7 @@ type WorkbenchAction =
   | { type: "loadExample"; input: RequirementIntakeInput }
   | { type: "clearAll" }
   | { type: "setModuleCandidates"; moduleCandidates: ModuleCandidate[] }
+  | { type: "setModuleReviewArtifacts"; moduleCandidates: ModuleCandidate[]; processFlow: GraphIR }
   | { type: "setA2AContracts"; contracts: A2AContract[] }
   | { type: "setCatalogEntries"; entries: CatalogEntry[] }
   | { type: "toggleAcceptedMissing"; item: string }
@@ -172,6 +174,19 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
       };
     case "setModuleCandidates":
       return { ...state, moduleCandidates: action.moduleCandidates };
+    case "setModuleReviewArtifacts":
+      return state.analysis
+        ? {
+            ...state,
+            analysis: {
+              ...state.analysis,
+              moduleCandidates: action.moduleCandidates,
+              processFlow: action.processFlow
+            },
+            moduleCandidates: action.moduleCandidates,
+            validationMessage: "모듈 검토 내용을 저장하고 Graph IR을 재생성했습니다."
+          }
+        : state;
     case "setA2AContracts":
       return state.analysis
         ? { ...state, analysis: { ...state.analysis, a2aContracts: action.contracts } }
@@ -319,6 +334,8 @@ export function useWorkbenchState() {
       setAnalyzerModel: (model: CodexAnalyzerModel) => dispatch({ type: "setAnalyzerModel", model }),
       setModuleCandidates: (moduleCandidates: ModuleCandidate[]) =>
         dispatch({ type: "setModuleCandidates", moduleCandidates }),
+      setModuleReviewArtifacts: (moduleCandidates: ModuleCandidate[], processFlow: GraphIR) =>
+        dispatch({ type: "setModuleReviewArtifacts", moduleCandidates, processFlow }),
       setA2AContracts: (contracts: A2AContract[]) => dispatch({ type: "setA2AContracts", contracts }),
       setCatalogEntries: (entries: CatalogEntry[]) => dispatch({ type: "setCatalogEntries", entries }),
       toggleAcceptedMissing: (item: string) => dispatch({ type: "toggleAcceptedMissing", item }),
