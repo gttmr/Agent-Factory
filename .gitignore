@@ -3,6 +3,7 @@ dist/
 .env
 .env.*
 .codex
+.superpowers/
 __pycache__/
 .pytest_cache/
 generated/**/.venv/
