@@ -181,6 +181,10 @@ dt {
   padding-top: 18px;
 }
 
+.ops-layout-no-context {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
 .workflow-rail {
   position: sticky;
   top: 18px;

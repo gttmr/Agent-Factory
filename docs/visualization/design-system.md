@@ -17,7 +17,7 @@
 - 상단: `Agent Factory` 이름과 분석 상태 요약.
 - 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다. `생성`은 승인된 scaffold-plan을 ADK Runtime Handoff로 넘기는 review-gated 영역이다.
 - 중앙: 현재 단계의 주 작업면.
-- 우측: 현재 단계 context 또는 inspector. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
+- 우측: 실제 단계별 context가 있을 때만 표시한다. 현재 공통 상태/검토 게이트 요약 패널은 렌더링하지 않는다. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
 
 980px 이하에서는 좌측 rail을 한 줄 가로 스크롤로 압축하고 context는 작업면 아래로 내려간다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
