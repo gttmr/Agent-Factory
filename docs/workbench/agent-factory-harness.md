@@ -16,6 +16,7 @@ raw requirement
   -> workflow/process flow
   -> catalog reuse and registration review
   -> reviewed catalog and Graph IR decisions
+  -> approved scaffold-plan and ADK Runtime Handoff
 ```
 
 Raw requirements must not directly generate code.
@@ -69,12 +70,15 @@ A Remote A2A candidate must include:
 
 If those fields are unknown, mark the candidate as needing review instead of inventing them.
 
-## Deferred scaffold gate
+## Scaffold and runtime handoff gate
 
-Scaffold export is not part of the current product phase. If it is reintroduced later, scaffolding must consume only approved artifacts:
+ADK Runtime Handoff is part of the current workbench, but it is review-gated. Scaffold-plan generation and source handoff must consume only approved workbench artifacts:
 
-- `scaffold-plan.json`
-- `implementation-handoff.md`
+- reviewed `AnalysisResult`
+- approved module candidates
+- reviewed A2A contracts where Remote A2A is involved
+- reviewed catalog decisions
+- `scaffold-plan` data with `source: approved_workbench_artifact`
 
 Do not scaffold directly from:
 
@@ -84,7 +88,7 @@ Do not scaffold directly from:
 - missing Remote A2A contract details
 - private or organization-specific runtime assumptions
 
-A scaffold plan should make boundaries explicit before code exists. Until that phase is approved, scaffold-plan files in this repository are validation fixtures, not active export targets.
+A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code.
 
 ## Required artifact posture
 
@@ -101,7 +105,7 @@ Expected artifact families:
 - documentation impact decisions
 - risk gates
 - catalog change decisions
-- deferred scaffold-plan fixture when schema work touches it
+- scaffold-plan fixture and runtime handoff validation when schema work touches them
 - validation output
 - decision notes when taxonomy or boundary choices change
 
@@ -117,7 +121,7 @@ Good assistant tasks:
 - extract capabilities
 - classify module candidates
 - draft adapter, agent, workflow, and Remote A2A specs
-- maintain scaffold-plan validation fixtures when schema work touches them
+- maintain scaffold-plan validation fixtures and runtime handoff checks when schema work touches them
 - generate validation cases
 - update catalogs and documentation
 - produce review checklists
@@ -138,7 +142,7 @@ Active source-of-truth areas:
 - `packages/web`: live workbench UI and analyzer flow
 - `schemas`: artifact contracts
 - `catalog`: reusable capability, domain-owner, and risk-gate catalogs
-- `templates`: reviewed artifact templates and deferred scaffold-plan fixtures
+- `templates`: reviewed artifact templates and scaffold-plan fixtures
 - `docs/workbench`: active operating guidance
 - `docs/visualization`: visual design and graph/display guidance
 

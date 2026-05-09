@@ -12,12 +12,11 @@ import type {
 
 export type CatalogProvenance = "seeded" | "session_added" | "session_edited" | "session_deleted";
 
-export type RuntimeBinding = "unresolved" | "mcp" | "stub" | "remote_a2a";
+export type RuntimeBinding = "unresolved" | "mcp" | "remote_a2a";
 
 export const runtimeBindings: readonly RuntimeBinding[] = [
   "unresolved",
   "mcp",
-  "stub",
   "remote_a2a"
 ];
 

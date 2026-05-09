@@ -32,7 +32,7 @@ const agentKinds = new Set(["specialist", "shared"]);
 const workflowKinds = new Set(["orchestration", "graph", "dynamic", "unknown"]);
 const remoteContractKinds = new Set(["a2a", "unknown"]);
 const riskLevels = new Set(["low", "medium", "high"]);
-const moduleStatuses = new Set(["needs_info", "deferred", "rejected"]);
+const moduleStatuses = new Set(["needs_info", "approved", "deferred", "rejected"]);
 const requirementStatuses = new Set(["draft", "reviewed", "approved", "rejected"]);
 const riskSignals = new Set([
   "personal_data",

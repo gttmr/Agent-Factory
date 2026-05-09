@@ -39,16 +39,16 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - Hydrated 결과는 기존 `AnalysisResult` shape와 validator 기준을 통과해야 한다.
 - Draft schema 변경은 analyzer/server contract 변경이므로 `cd packages/web && npm run build` 검증 대상이다.
 
-## Deferred scaffold-plan fixture
+## Scaffold-plan and ADK Runtime Handoff
 
-`scaffold-plan.json` schema와 template은 현재 제품 단계의 export 대상이 아니다.
-이 파일은 향후 구현 handoff가 다시 범위에 들어올 때 사용할 검증 fixture이며, raw requirement를 실행 가능한 business logic으로 바꾸라는 지시가 아니다.
+`scaffold-plan.json` schema와 template은 현재 ADK Runtime Handoff의 검토 게이트 계약이다.
+이 파일은 raw requirement를 실행 가능한 business logic으로 바꾸라는 지시가 아니라, 승인된 module candidate만 source handoff에 포함되는지 검증하는 계약이다.
 
 - source는 `approved_workbench_artifact`여야 한다.
 - `approved` candidate만 포함한다.
 - raw requirement는 직접 코드 생성 입력이 될 수 없다.
 - Catalog-bound Agent, Workflow, Adapter, Remote A2A 항목은 runtime contract로 해석하되, 실제 runtime wiring과 configuration은 reviewed TODO boundary로 남긴다.
-- Mock/test double 산출물은 catalog contract를 입력으로 만드는 별도 후속 기능이며, seed catalog나 scaffold-plan fixture의 기본 의미가 아니다.
+- Mock/test double 산출물은 catalog contract를 입력으로 만드는 별도 후속 기능이며, seed catalog나 scaffold-plan의 기본 의미가 아니다.
 - runnable business logic은 out of scope다.
 
 ## 검증 명령
@@ -61,7 +61,7 @@ cd packages/web && npm run build
 
 문서만 변경한 경우에는 build 대신 구조와 링크 검증을 우선한다.
 TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run build`를 실행한다.
-scaffold-plan fixture나 ADK source generator를 직접 변경한 경우에만 `node scripts/generate-adk-source.mjs ...`와 `python3 -m compileall ...` smoke를 추가한다.
+scaffold-plan 또는 ADK source generator를 직접 변경한 경우에는 `node scripts/generate-adk-source.mjs ...`와 `python3 -m compileall ...` smoke를 추가한다.
 
 ## ADK 공식 문서 확인
 

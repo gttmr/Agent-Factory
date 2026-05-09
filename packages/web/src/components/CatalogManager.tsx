@@ -57,7 +57,6 @@ const provenanceClass: Record<CatalogEntry["provenance"], string> = {
 const runtimeBindingLabels: Record<RuntimeBinding, string> = {
   unresolved: "미정",
   mcp: "MCP",
-  stub: "구현 필요",
   remote_a2a: "Remote A2A"
 };
 
@@ -837,7 +836,7 @@ function bindingLabel(entry: CatalogEntry): string {
   if (entry.module_category === "remote_a2a") return "Remote A2A";
   if (entry.component_source === "remote_a2a") return "Remote A2A";
   if (entry.access_protocol === "mcp" || runtime === "mcp") return "MCP";
-  if (entry.component_source === "stub" || runtime === "stub") return "구현 필요";
+  if (entry.component_source === "stub") return "구현 필요";
   return runtimeBindingLabels[runtime];
 }
 

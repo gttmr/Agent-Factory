@@ -10,9 +10,6 @@ export function deriveRuntimeBinding(entry: CatalogEntry): RuntimeBinding {
   if (entry.access_protocol === "mcp" || (entry.mcp_server && entry.mcp_tool_name)) {
     return "mcp";
   }
-  if (entry.component_source === "stub") {
-    return "stub";
-  }
   return "unresolved";
 }
 

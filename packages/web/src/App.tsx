@@ -6,7 +6,7 @@ import { ModuleReview } from "./components/ModuleReview";
 import { GraphCanvas } from "./components/GraphCanvas";
 import { RequirementIntake, RequirementIntakeContext } from "./components/RequirementIntake";
 import { SavedAnalyses } from "./components/SavedAnalyses";
-import { MetricPill, Panel, SectionHeader } from "./ui/primitives";
+import { Panel, SectionHeader } from "./ui/primitives";
 import { WorkbenchShell } from "./ui/WorkbenchShell";
 import { useWorkbenchState } from "./workbench/useWorkbenchState";
 
@@ -64,8 +64,6 @@ export default function App() {
       return (
         <AnalysisResult
           analysis={state.analysis}
-          acceptedMissing={state.acceptedMissing}
-          onToggleAcceptedMissing={actions.toggleAcceptedMissing}
           onRerun={actions.runAnalysis}
           onContinue={() => actions.setActiveStep("modules")}
         />
@@ -167,25 +165,6 @@ export default function App() {
       );
     }
 
-    return (
-      <div className="context-stack">
-        <Panel tone="muted" className="context-panel-block">
-          <SectionHeader eyebrow="작업 상태" title="현재 분석" />
-          <div className="metric-pill-row">
-            <MetricPill label="모듈" value={state.moduleCandidates.length} />
-            <MetricPill label="Remote A2A" value={a2aContracts.length} />
-            <MetricPill label="누락 확인" value={state.acceptedMissing.length} />
-          </div>
-        </Panel>
-        <Panel tone="muted" className="context-panel-block">
-          <SectionHeader eyebrow="운영 기준" title="검토 게이트" />
-          <ul className="context-check-list">
-            <li>분석 결과를 검토한 뒤 모듈 상태를 승인합니다.</li>
-            <li>Remote A2A는 계약 검토 없이 소스 생성으로 넘기지 않습니다.</li>
-            <li>ADK 소스 생성은 승인된 scaffold plan만 사용합니다.</li>
-          </ul>
-        </Panel>
-      </div>
-    );
+    return null;
   }
 }

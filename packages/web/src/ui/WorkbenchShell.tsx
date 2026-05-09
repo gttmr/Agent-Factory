@@ -38,14 +38,16 @@ export function WorkbenchShell({
         <StatusSummary items={statusItems} />
       </header>
 
-      <div className="ops-layout">
+      <div className={context ? "ops-layout" : "ops-layout ops-layout-no-context"}>
         <WorkflowRail activeStep={activeStep} steps={steps} canOpenStep={canOpenStep} onStepChange={onStepChange} />
         <section className="ops-workspace" aria-label="현재 작업">
           {children}
         </section>
-        <aside className="ops-context" aria-label="작업 컨텍스트">
-          {context}
-        </aside>
+        {context ? (
+          <aside className="ops-context" aria-label="작업 컨텍스트">
+            {context}
+          </aside>
+        ) : null}
       </div>
     </main>
   );
