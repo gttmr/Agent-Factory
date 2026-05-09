@@ -64,8 +64,6 @@ export default function App() {
       return (
         <AnalysisResult
           analysis={state.analysis}
-          acceptedMissing={state.acceptedMissing}
-          onToggleAcceptedMissing={actions.toggleAcceptedMissing}
           onRerun={actions.runAnalysis}
           onContinue={() => actions.setActiveStep("modules")}
         />

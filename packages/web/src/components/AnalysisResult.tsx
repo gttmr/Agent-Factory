@@ -2,83 +2,62 @@ import type { AnalysisResult as AnalyzerResult } from "../analyzer/types";
 
 interface AnalysisResultProps {
   analysis: AnalyzerResult;
-  acceptedMissing: string[];
-  onToggleAcceptedMissing: (item: string) => void;
   onRerun: () => void;
   onContinue: () => void;
 }
 
 export function AnalysisResult({
   analysis,
-  acceptedMissing,
-  onToggleAcceptedMissing,
   onRerun,
   onContinue
 }: AnalysisResultProps) {
   const { evidence, normalizedRequirement } = analysis;
+  const remoteA2ACount = analysis.moduleCandidates.filter((candidate) => candidate.module_category === "remote_a2a").length;
+  const metrics = [
+    { label: "후보 모듈", value: `${analysis.moduleCandidates.length}개` },
+    { label: "Remote A2A", value: `${remoteA2ACount}개` },
+    { label: "누락 정보", value: `${evidence.missing_information.length}개` }
+  ];
+  const contractRows = [
+    {
+      label: "목표",
+      values: [evidence.requested_goal, normalizedRequirement.business_goal],
+      source: "요청 목표 + 정규화 목표"
+    },
+    {
+      label: "도메인",
+      values: [normalizedRequirement.domain, evidence.business_domain_hint],
+      source: "정규화 도메인 + 분석 힌트"
+    },
+    {
+      label: "입력",
+      values: [...evidence.input_data, ...normalizedRequirement.inputs.map((field) => field.name)],
+      source: "입력 데이터"
+    },
+    {
+      label: "출력",
+      values: [...evidence.output_data, ...normalizedRequirement.outputs.map((field) => field.name)],
+      source: "출력 데이터"
+    },
+    {
+      label: "시스템",
+      values: [...evidence.systems_mentioned, ...normalizedRequirement.systems.map((system) => system.name)],
+      source: "언급 시스템"
+    }
+  ];
 
   return (
     <div className="stack">
-      <section className="panel">
-        <div className="section-heading">
-          <p className="eyebrow">근거</p>
-          <h2>분석 결과</h2>
-        </div>
-        <div className="evidence-grid">
-          <EvidenceBlock label="요청 목표" values={[evidence.requested_goal]} />
-          <EvidenceBlock label="도메인" values={[evidence.business_domain_hint]} />
-          <EvidenceBlock label="역할" values={[evidence.user_role]} />
-          <EvidenceBlock label="입력" values={evidence.input_data} />
-          <EvidenceBlock label="출력" values={evidence.output_data} />
-          <EvidenceBlock label="시스템" values={evidence.systems_mentioned} />
-          <EvidenceBlock label="판단" values={evidence.decisions_implied} />
-          <EvidenceBlock label="가정" values={evidence.assumptions} />
-        </div>
-      </section>
-
-      <div className="two-column">
-        <section className="panel">
-          <div className="section-heading">
-            <p className="eyebrow">검토</p>
-            <h2>검토 항목</h2>
+      <section className="panel analysis-brief">
+        <div className="analysis-brief-hero">
+          <div>
+            <p className="eyebrow">이해 확인</p>
+            <h2>분석 이해 확인</h2>
+            <p className="analysis-brief-copy">
+              아래 계약이 요구사항과 맞으면 모듈 검토로 이동합니다. 위험 신호와 가정은 보조 근거에서 확인할 수 있습니다.
+            </p>
           </div>
-          <div className="review-list">
-            <h3>부족한 정보</h3>
-            {evidence.missing_information.length ? (
-              evidence.missing_information.map((item) => (
-                <label className="check-row" key={item}>
-                  <input
-                    type="checkbox"
-                    checked={acceptedMissing.includes(item)}
-                    onChange={() => onToggleAcceptedMissing(item)}
-                  />
-                  <span>{formatDisplayValue(item)}</span>
-                </label>
-              ))
-            ) : (
-              <p className="empty-state">감지된 부족 정보가 없습니다.</p>
-            )}
-          </div>
-          <div className="review-list">
-            <h3>모순</h3>
-            {evidence.contradictions.length ? (
-              <ul className="plain-list">
-                {evidence.contradictions.map((item) => (
-                  <li key={item}>{formatDisplayValue(item)}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="empty-state">감지된 모순이 없습니다.</p>
-            )}
-          </div>
-          <div className="tag-row">
-            {evidence.risk_signals.map((risk) => (
-              <span className="tag risk" key={risk}>
-                {formatDisplayValue(risk)}
-              </span>
-            ))}
-          </div>
-          <div className="actions">
+          <div className="analysis-brief-actions">
             <button type="button" onClick={onRerun}>
               다시 분석
             </button>
@@ -86,27 +65,126 @@ export function AnalysisResult({
               모듈 검토로 이동
             </button>
           </div>
-        </section>
+        </div>
 
-        <section className="panel">
-          <div className="section-heading">
-            <p className="eyebrow">초안</p>
-            <h2>정규화된 요구사항</h2>
+        <div className="analysis-brief-metrics" aria-label="분석 상태 요약">
+          {metrics.map((metric) => (
+            <div className="analysis-brief-metric" key={metric.label}>
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="contract-list" aria-label="핵심 계약">
+          {contractRows.map((row) => (
+            <ContractRow key={row.label} label={row.label} source={row.source} values={row.values} />
+          ))}
+        </div>
+      </section>
+
+      <section className="panel evidence-drawer">
+        <div className="section-heading">
+          <p className="eyebrow">보조 근거</p>
+          <h2>검토자가 필요할 때 펼쳐보는 정보</h2>
+        </div>
+        <EvidenceDetail label="가정" values={evidence.assumptions} />
+        <EvidenceDetail label="누락 정보" values={evidence.missing_information} />
+        <EvidenceDetail label="모순" values={evidence.contradictions} />
+        <EvidenceDetail label="위험 신호" values={evidence.risk_signals} tagRisk />
+        <details className="evidence-detail">
+          <summary>
+            <span className="evidence-summary-main">
+              <span>정규화 JSON</span>
+              <small>
+                {normalizedRequirement.title || normalizedRequirement.id} · {formatDisplayValue(normalizedRequirement.domain)} ·{" "}
+                {normalizedRequirement.status}
+              </small>
+            </span>
+            <strong>{Object.keys(normalizedRequirement).length}개 필드</strong>
+          </summary>
+          <div className="evidence-detail-body">
+            <pre className="json-preview">{JSON.stringify(normalizedRequirement, null, 2)}</pre>
           </div>
-          <pre className="json-preview">{JSON.stringify(normalizedRequirement, null, 2)}</pre>
-        </section>
+        </details>
+      </section>
+    </div>
+  );
+}
+
+function ContractRow({ label, values, source }: { label: string; values: string[]; source: string }) {
+  const preview = previewValues(values);
+
+  return (
+    <div className="contract-row">
+      <div className="contract-label">
+        <strong>{label}</strong>
+        <span>{source}</span>
+      </div>
+      <div className="contract-values">
+        {preview.visible.length ? (
+          preview.visible.map((value) => (
+            <span className="value-chip" key={value}>
+              {value}
+            </span>
+          ))
+        ) : (
+          <span className="value-chip muted">알 수 없음</span>
+        )}
+        {preview.overflow > 0 ? <span className="value-overflow">+{preview.overflow}</span> : null}
       </div>
     </div>
   );
 }
 
-function EvidenceBlock({ label, values }: { label: string; values: string[] }) {
+function EvidenceDetail({ label, values, tagRisk = false }: { label: string; values: string[]; tagRisk?: boolean }) {
+  const formatted = uniqueValues(values);
+  const preview = formatted.length ? `${formatted.slice(0, 2).join(", ")}${formatted.length > 2 ? ` +${formatted.length - 2}` : ""}` : "감지 항목 없음";
+
   return (
-    <div className="evidence-block">
-      <span>{label}</span>
-      <strong>{values.filter(Boolean).map(formatDisplayValue).join(", ") || "알 수 없음"}</strong>
-    </div>
+    <details className="evidence-detail">
+      <summary>
+        <span className="evidence-summary-main">
+          <span>{label}</span>
+          <small>{preview}</small>
+        </span>
+        <strong>{formatted.length}개</strong>
+      </summary>
+      <div className="evidence-detail-body">
+        {formatted.length ? (
+          tagRisk ? (
+            <div className="tag-row compact">
+              {formatted.map((value) => (
+                <span className="tag risk" key={value}>
+                  {value}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <ul className="plain-list">
+              {formatted.map((value) => (
+                <li key={value}>{value}</li>
+              ))}
+            </ul>
+          )
+        ) : (
+          <p className="empty-state">감지된 항목이 없습니다.</p>
+        )}
+      </div>
+    </details>
   );
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean).map(formatDisplayValue)));
+}
+
+function previewValues(values: string[], limit = 3) {
+  const formatted = uniqueValues(values);
+  return {
+    visible: formatted.slice(0, limit),
+    overflow: Math.max(formatted.length - limit, 0)
+  };
 }
 
 function formatDisplayValue(value: string): string {
