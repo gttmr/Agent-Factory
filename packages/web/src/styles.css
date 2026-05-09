@@ -1282,6 +1282,46 @@ td {
   padding: 20px 20px 16px;
 }
 
+.module-review-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 4px;
+}
+
+.module-review-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.module-review-tabs button.active {
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.module-review-tabs span {
+  display: inline-flex;
+  min-width: 24px;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e3f1ec;
+  color: var(--accent-strong);
+  padding: 2px 7px;
+  font-size: 0.74rem;
+}
+
 .review-console {
   display: grid;
   grid-template-columns: minmax(620px, 1fr) minmax(320px, 380px);
@@ -1348,6 +1388,28 @@ td {
 
 .module-action-col {
   width: 300px;
+}
+
+.module-contract-col {
+  width: 160px;
+}
+
+.module-table-new {
+  min-width: 1040px;
+}
+
+.module-table-catalog {
+  min-width: 860px;
+}
+
+.module-empty-region {
+  display: grid;
+  min-height: 220px;
+  align-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 20px;
 }
 
 .module-table th,
@@ -1424,6 +1486,25 @@ td {
   border-color: #a9d6bc;
   background: #e8f6ee;
   color: #17633b;
+}
+
+.catalog-contract-name {
+  display: grid;
+  gap: 4px;
+}
+
+.catalog-contract-name strong {
+  color: #26313d;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.catalog-contract-name small,
+.module-contract-count {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .status-missing-info {
@@ -1553,6 +1634,78 @@ td {
 .review-field-group-body {
   display: grid;
   gap: 8px;
+}
+
+.field-spec-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.field-spec-editor span {
+  color: #26313d;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.field-spec-editor textarea,
+.inspector-textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26313d;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.connection-editor-group .review-field-group-body {
+  gap: 10px;
+}
+
+.connection-editor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.connection-editor-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto minmax(130px, 1fr);
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 8px;
+}
+
+.connection-editor-row select,
+.connection-editor-row input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 0 8px;
+  font-size: 0.78rem;
+}
+
+.connection-editor-row input,
+.connection-editor-row button {
+  grid-column: span 1;
+}
+
+.connection-editor-row .danger {
+  color: var(--red);
+}
+
+.compact-button {
+  width: fit-content;
+  padding: 8px 10px;
+  font-size: 0.82rem;
 }
 
 .readiness-list ul {

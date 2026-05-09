@@ -242,6 +242,7 @@ export interface AdkHints {
 export interface ModuleCandidate {
   id: string;
   source_requirement_id: string;
+  catalog_entry_id?: string | null;
   name: string;
   module_category: ModuleCategory;
   agent_kind?: AgentKind | null;

@@ -119,6 +119,16 @@
 
 한 셀에 카테고리 배지와 서브타입 배지를 세로로 쌓을 때는 `cell-stack` 클래스를 쓴다 (flex column + align-items:flex-start). grid 로 만들면 자식 inline-flex 가 block 으로 변환되어 배지가 두 줄로 깨진다.
 
+## Module Review 탭
+
+Module Review는 같은 테이블을 필터링하는 화면이 아니라 두 작업면을 분리한 review console이다.
+
+- `신규 모듈`: 사람이 승인/보류/반려할 후보를 다룬다. 컬럼은 이름, 분류, 세부 유형, 검토 상태, 입력/출력 계약 요약에 둔다.
+- `카탈로그 계약`: 기존 runtime contract를 다룬다. 카탈로그 원본은 read-only로 표시하고, 현재 분석의 입력/출력 override와 Graph 연결만 편집한다.
+
+위험도, 신뢰도, 재사용 여부는 탭의 메인 컬럼에 두지 않는다.
+필요하면 inspector의 보조 evidence로만 표시한다.
+
 ## Process Flow 시각화
 
 `packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.

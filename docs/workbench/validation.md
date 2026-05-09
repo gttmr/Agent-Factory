@@ -8,6 +8,7 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `module_category`는 `agent`, `workflow`, `adapter`, `remote_a2a` 중 하나다.
 - `workflow_kind`는 `orchestration`, `graph`, `dynamic`, `unknown` 중 하나다.
 - `agent`는 `agent_kind`, `adapter`는 `adapter_kind`, `remote_a2a`는 `remote_contract_kind`를 포함한다.
+- `catalog_entry_id`가 있으면 이 후보는 catalog-bound runtime contract에서 온 항목이다. Module Review는 원본 catalog entry를 직접 수정하지 않고 현재 분석 artifact의 입력/출력 override와 Graph 연결만 저장한다.
 - `status`는 `approved`, `deferred`, `rejected`, `needs_info` 중 하나다.
 - `missing_information`은 후보별로 승인 전 필요한 정보를 담는 문자열 배열이다.
 - `legacy_recommended_type`은 migration metadata로만 사용한다.
@@ -24,6 +25,7 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `human_input` node는 downstream edge가 있어야 한다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
+- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다.
 
 ## Live analyzer draft schema
 

@@ -75,7 +75,8 @@ export default function App() {
         <ModuleReview
           moduleCandidates={state.moduleCandidates}
           catalogEntries={state.catalogEntries}
-          onModuleCandidatesChange={actions.setModuleCandidates}
+          processFlow={processFlow}
+          onReviewSave={actions.setModuleReviewArtifacts}
           onContinue={() => actions.setActiveStep("graph")}
           onNavigateToA2AContracts={hasA2AReviewStep ? () => actions.setActiveStep("a2aContracts") : undefined}
         />

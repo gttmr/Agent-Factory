@@ -253,6 +253,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
         "source_requirement_id": { "type": "string", "pattern": "^req-[a-z0-9-]+$" },
+        "catalog_entry_id": { "$ref": "#/$defs/nullableString" },
         "name": { "type": "string" },
         "module_category": {
           "type": "string",

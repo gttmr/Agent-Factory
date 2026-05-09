@@ -533,6 +533,7 @@ function hydrateModuleCandidates(
     const result: Record<string, unknown> = {
       id: normalizeModuleId(candidate.id, index),
       source_requirement_id: "req-001",
+      catalog_entry_id: catalogEntry?.id ?? null,
       name: catalogEntry?.name ?? stringOr(candidate.name, `module-${index + 1}`),
       module_category: category,
       agent_kind: category === "agent" ? enumOr(subtype, agentKinds, "specialist") : null,
