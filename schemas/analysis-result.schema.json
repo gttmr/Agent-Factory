@@ -313,7 +313,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["needs_info", "deferred", "rejected"]
+          "enum": ["needs_info", "approved", "deferred", "rejected"]
         },
         "missing_information": {
           "type": "array",

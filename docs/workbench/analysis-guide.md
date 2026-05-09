@@ -13,6 +13,7 @@
 6. [Workflow decision guide](./workflow-decision-guide.md)에 따라 process flow를 그린다.
 7. 개발 리더가 Module Review Board에서 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
 8. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
+9. 승인된 후보만 `scaffold-plan`으로 묶고 ADK Runtime Handoff에서 TODO/runtime wiring 경계를 확인한다.
 
 ## 산출물 의미
 
@@ -23,7 +24,7 @@
 - `classification.json`: 선택한 category와 subtype의 근거.
 - `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보 요약. 실제 등록/제외 결정은 Catalog review에서 한다.
 - `catalog-changes.yaml`: Catalog review에서 결정한 신규 등록, 수정, 삭제 예정 변경안.
-- `scaffold-plan.json`: 현재 제품 단계의 export 대상이 아니다. repo 안의 template/schema는 향후 구현 handoff 검증용 fixture로만 둔다.
+- `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
 
 ## 분석 원칙
 
@@ -34,7 +35,7 @@
 - 공통 Workflow가 `runtime_binding: remote_a2a`로 등록되어 있어도 `module_category`는 `workflow`로 유지한다. 독립 원격 Agent 계약 증거가 있을 때만 `module_category: remote_a2a`를 만든다.
 - ADK component는 category가 아니다. 필요하면 module candidate의 ADK hint로 남긴다.
 - 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
-- Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. 현재 범위는 review artifact와 catalog decision을 만드는 단계이며, scaffold export는 별도 승인 전까지 보류한다.
+- Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK Runtime Handoff는 승인된 후보와 `scaffold-plan`만 사용하며, 생성물은 실제 runtime 설정과 비즈니스 로직을 TODO 경계로 남긴다.
 
 ## Live analyzer 실행 계약
 

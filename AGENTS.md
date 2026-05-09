@@ -76,7 +76,7 @@ Core harness rules:
 - Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
 - Keep retrieval, rule registry, and tool/adapter concepts as adapter subtypes, not top-level categories.
 - Treat Remote A2A as high-friction: require independent ownership, protocol boundary, auth, lifecycle, timeout, retry, fallback, and audit details.
-- Scaffolding must consume approved `scaffold-plan.json` and `implementation-handoff.md`, never raw requests or unreviewed analyzer output.
+- ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
 - Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flows, reuse/domain mapping, risk gates, validation output, and decision notes.
 
 ## Editing Rules
@@ -86,8 +86,8 @@ Core harness rules:
 - Do not introduce abstractions, configuration, or extensibility unless the present task requires it.
 - Preserve legacy migration data with `legacy_recommended_type`; do not use it as the primary classifier.
 - Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
-- Scaffolding must consume approved artifacts, not raw user requests.
-- Future scaffold work should use approved `scaffold-plan.json` and `implementation-handoff.md` only.
+- ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
+- Generated source must stay a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic.
 
 ## WSL Browser Verification
 

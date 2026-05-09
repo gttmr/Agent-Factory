@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Scope
 
-This is the Agent Factory workbench — a local-first tool that turns raw requirements into reviewed planning artifacts. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved `scaffold-plan.json` and `implementation-handoff.md` artifacts feed any future scaffold bridge.
+This is the Agent Factory workbench — a local-first tool that turns raw requirements into reviewed planning artifacts and a review-gated ADK Runtime Handoff. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved scaffold-plan data from reviewed workbench artifacts may feed the runtime handoff.
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
@@ -45,16 +45,18 @@ Core rules:
 - Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
 - Retrieval, rule registry, and tool/adapter concepts remain adapter subtypes, not top-level categories.
 - Remote A2A is high-friction and requires explicit ownership, protocol, auth, lifecycle, timeout, retry, fallback, and audit details.
-- Scaffolding must consume approved `scaffold-plan.json` and `implementation-handoff.md`, never raw requests or unreviewed analyzer output.
+- ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
 - Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flow, reuse/domain mapping, risk gates, validation output, and decision notes.
 
 ### Workbench flow (packages/web)
 
-`App.tsx` is a single-page wizard with seven steps held as React state — no router, no backend. Each step renders one component from `src/components/`:
+`App.tsx` is a single-page wizard backed by React state and local server middleware. There is no router; analyzer and ADK runtime actions call the Vite middleware under `packages/web/server`.
 
-`intake → analysis → modules → flow → reuse → domainMap → export`
+Current steps are defined in `packages/web/src/workbench/useWorkbenchState.ts`:
 
-State flows top-down from `App.tsx`: `RequirementIntakeInput` → `AnalysisResult` (normalized requirement + evidence + module candidates) → user-edited `ModuleCandidate[]` → derived `ProcessFlow` (memoized via `buildProcessFlow`) → exported artifacts. The user can mark missing-information items as accepted to unblock export.
+`intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
+
+State flows through `useWorkbenchState`: `RequirementIntakeInput` → live `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + Graph IR) → user-edited `ModuleCandidate[]` and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status and scaffold-plan validation.
 
 ### Analyzer provider boundary
 
@@ -88,11 +90,11 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 
 ### UI design system
 
-`docs/visualization/design-system.md` is the authoritative spec for the web workbench UI: category color tokens, glyph mapping, shared components, Process Flow stage model, and CSS pitfalls. Read it before changing anything visual.
+`docs/visualization/design-system.md` is the authoritative spec for the web workbench UI: category color tokens, glyph mapping, shared components, Graph IR visualization, and CSS pitfalls. Read it before changing anything visual.
 
 Key contracts:
 
-- **Single source of truth for category visuals** — `packages/web/src/components/CategoryBadge.tsx` exports `CategoryBadge`, `SubtypeBadge`, `getSubtypeValue`, `categoryClass`. Never write category labels as raw `<span>` in a new view; import these instead so all four screens (Module Review, Process Flow, Reuse Heatmap, Domain Map) stay in sync.
+- **Single source of truth for category visuals** — `packages/web/src/components/CategoryBadge.tsx` exports `CategoryBadge`, `SubtypeBadge`, `getSubtypeValue`, `categoryClass`. Never write category labels as raw `<span>` in a new view; import these instead so Module Review, Graph IR, Catalog, and A2A Contract Review stay in sync.
 - **Color tokens** — `:root` in `packages/web/src/styles.css` defines `--cat-{agent,workflow,adapter,remote}-{base,soft,line}` plus `input` / `output`. New categories must add all variants together.
 - **Subtype glyphs** — `subtypeGlyph` map in `CategoryBadge.tsx` covers every value in `agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind`. Any new enum value added in `analyzer/types.ts` must be mirrored here or it falls back to `·`.
 - **Graph Workflow markers** — `GraphCanvas.tsx` renders Graph IR through `src/graph/*`. Fan-out/fan-in, loop, human input, route, and Remote A2A are detected from `container_kind`, `node_kind`, `edge_kind`, and `execution_semantics`; update `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, and `containerOverlay.tsx` together when adding a marker.

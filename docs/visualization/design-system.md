@@ -5,8 +5,8 @@
 ## 디자인 원칙
 
 - **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Graph IR, Catalog, A2A Contract Review)이 동일 매핑을 사용한다.
-- **특수 흐름은 시각적으로 부각한다.** `process-flow.md`에서 정의한 fan-out/fan-in, loop, human input, branch marker는 텍스트 라벨만 두지 말고 stage marker와 점선 박스로 표시한다.
-- **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, stage 사이 connector 화살표와 데이터 라벨 chip 으로 통합한다.
+- **특수 흐름은 시각적으로 부각한다.** `process-flow.md`에서 정의한 fan-out/fan-in, loop, human input, branch, Remote A2A boundary는 텍스트 라벨만 두지 말고 노드 형태, edge 스타일, container overlay로 표시한다.
+- **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, ReactFlow edge와 Graph Inspector의 edge detail로 `edge_kind`, `execution_semantics`, `data_label`, state/artifact/A2A metadata를 확인하게 한다.
 - **Workbench 는 운영 콘솔이다.** 첫 화면은 marketing hero가 아니라 개발리더가 상태, 다음 단계, 작업면, context를 바로 읽는 Ops console이어야 한다.
 - **카드는 상호작용 표면에만 쓴다.** 페이지 전체를 카드 모자이크로 만들지 말고 shell, rail, workspace, inspector의 정보 구조를 우선한다.
 
@@ -15,7 +15,7 @@
 `packages/web/src/ui/WorkbenchShell.tsx`가 workbench의 기본 골격이다.
 
 - 상단: `Agent Factory` 이름과 분석 상태 요약.
-- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다. `생성`은 현 UI에 남아 있는 실험적 generator 영역이며 현재 roadmap의 scaffold export 단계는 아니다.
+- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다. `생성`은 승인된 scaffold-plan을 ADK Runtime Handoff로 넘기는 review-gated 영역이다.
 - 중앙: 현재 단계의 주 작업면.
 - 우측: 현재 단계 context 또는 inspector. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
 
@@ -46,7 +46,7 @@
 - `App.tsx`는 상태를 직접 조립하지 않고 shell과 화면 component를 연결한다.
 
 새 기능을 추가할 때는 먼저 reducer action과 step availability를 정의한 뒤 화면 component를 연결한다.
-저장된 분석과 deferred scaffold fixture의 artifact shape는 UI refactor 때문에 바꾸지 않는다.
+저장된 분석과 scaffold-plan artifact shape는 UI refactor 때문에 바꾸지 않는다.
 
 ## 색 토큰
 
@@ -122,25 +122,18 @@
 ## Process Flow 시각화
 
 `packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.
-stage 순서, marker 판정, edge 의미는 `docs/workbench/process-flow.md`의 Graph IR 규칙을 따른다.
+node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md`의 Graph IR 규칙을 따른다.
 
-**Marker 스타일**
-- `parallel`, `human_review`, `loop`, `branch` marker는 `.stage-marker.marker-*` 색을 사용한다.
-- 새 marker를 추가할 때는 Graph IR 의미를 먼저 `process-flow.md`에 정의한 뒤 `markerCopy`의 glyph/label과 CSS 색을 갱신한다.
+**Marker / overlay 스타일**
+- `parallel_region`, `loop_region`, `human_review_region`, `remote_boundary`는 `ContainerOverlay`의 점선 region으로 표시한다.
+- 새 marker를 추가할 때는 Graph IR 의미를 먼저 `process-flow.md`에 정의한 뒤 `containerOverlay.tsx`, `nodeTypes.tsx`, `edgeTypes.tsx`, CSS 색을 함께 갱신한다.
 - container overlay는 흐름의 실제 범위를 가려서는 안 된다. 점선 경계와 낮은 대비 배경으로 node/edge 읽기를 방해하지 않게 한다.
-- Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 `parallel_region`, `human_review_region`, `remote_boundary`는 포함 node의 bounding box를 감싸는 내부 region으로 표시한다.
+- Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 포함 node의 bounding box를 감싸는 내부 region으로 표시한다.
 
-**Stage connector**
-- stage 사이 connector는 화살표와 `data_label` chip을 함께 보여준다.
-- 한 connector는 데이터 라벨을 최대 4개까지만 표시해 stage row가 과도하게 커지지 않게 한다.
-
-**Graph route board**
-- stage view 아래에 모든 edge를 펼쳐 보여준다.
-- route marker, `edge_kind`, `execution_semantics`, payload label, `state_key` / `artifact_key` / `schema_ref` / `route_condition` chip은 한 줄에서 스캔 가능해야 한다.
-
-**Data ledger**
-- 오른쪽 inspector에서 state/artifact edge만 모아 표시한다.
-- edge metadata가 아직 없으면 대표 placeholder key를 보여주되, live analyzer 결과가 들어오면 실제 `state_key` / `artifact_key`를 우선한다.
+**Graph Inspector**
+- 노드 선택 시 `node_kind`, `module_id`, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
+- 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
+- `remote_a2a` edge는 Remote A2A 계약 검토 화면으로 이동할 수 있어야 한다.
 
 ## `adk_hints` UI 블록
 
@@ -171,7 +164,7 @@ stage 순서, marker 판정, edge 의미는 `docs/workbench/process-flow.md`의 
 1. 카테고리·서브타입을 표시한다면 `CategoryBadge` / `SubtypeBadge` 를 import 한다 — 직접 `<span>` 작성 금지.
 2. 카테고리 stripe 가 필요하면 `row-stripe` + `categoryClass()` 를 쓴다.
 3. 새 색·글리프가 필요하면 `:root` 토큰 + `subtypeGlyph` 매핑을 함께 추가한다.
-4. 새 stage marker 가 필요하면 `markerCopy`, 감지 로직, `.stage-marker.marker-*` 색을 모두 갱신한다.
+4. 새 Graph marker 가 필요하면 Graph IR 의미, node/edge/container 렌더러, CSS 색을 모두 갱신한다.
 5. 화면 단위 자손 선택자(`.foo-table td span`) 는 항상 `>` 직계 자식으로 좁힌다.
 6. 변경 후 chrome-devtools MCP 로 스크린샷을 찍어 색 매핑이 맞는지 시각 확인한다.
 

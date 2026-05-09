@@ -7,9 +7,9 @@ This repository contains the workbench application and shared schemas. It is not
 ## Repository Scope
 
 - `packages/web`: React/Vite requirement intake, review, Graph IR, and catalog review workbench.
-- `schemas`: JSON Schemas for normalized requirements, module candidates, process flow, classification, commonization, and deferred scaffold-plan validation artifacts.
+- `schemas`: JSON Schemas for normalized requirements, module candidates, process flow, classification, commonization, and scaffold-plan validation artifacts.
 - `catalog`: MVP YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates.
-- `templates`: generic reviewed artifact templates and deferred scaffold-plan validation fixtures.
+- `templates`: generic reviewed artifact templates and scaffold-plan validation fixtures.
 - `docs`: workbench analysis, taxonomy, workflow-decision, validation, and reference documentation.
 - `.agents/skills`: skill material that may be synchronized later, but is not the primary edit target for this workbench refactor.
 
@@ -22,9 +22,9 @@ This repository contains the workbench application and shared schemas. It is not
 5. Mark modules as approved, deferred, rejected, or `needs_info`.
 6. Review catalog reuse decisions and register/exclude analysis candidates.
 7. Validate the reviewed process flow as Graph IR.
-8. Keep catalog changes and reviewed analysis artifacts ready for a future implementation handoff.
+8. Generate a review-gated scaffold plan and ADK Runtime Handoff when modules are approved.
 
-Raw requirements must never create code directly. Scaffold export and production ADK source generation are not part of the current product phase; any scaffold-plan or generated-source fixture in this repository is a validation harness, not a committed runtime handoff.
+Raw requirements must never create code directly. The current ADK Runtime Handoff consumes only reviewed `AnalysisResult` data, approved module candidates, catalog decisions, and `scaffold-plan` validation. Generated source remains a TODO/runtime wiring handoff: it must not include runnable business logic, private banking endpoints, credentials, or organization-specific deployment code.
 
 ## Taxonomy
 
