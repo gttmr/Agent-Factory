@@ -36,8 +36,8 @@ export function buildScaffoldPlan({
       status: candidate.status,
       reason: `status is ${candidate.status}; only approved modules are eligible for scaffold generation`
     }));
-  const blockers = collectBlockers(modules);
-  const warnings = collectWarnings(modules);
+  const blockers = collectBlockers(modules, moduleCandidates);
+  const warnings = collectWarnings(modules, moduleCandidates);
 
   return {
     requirement_id: normalizedRequirement.id,
@@ -169,26 +169,44 @@ function requiredReviewFieldsFor(candidate: ModuleCandidate): string[] {
   return [...fields];
 }
 
-function collectBlockers(modules: ScaffoldPlanModule[]): string[] {
-  if (!modules.length) {
-    return ["approved module is required before ADK source generation"];
+function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandidate[]): string[] {
+  const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
+  const blockers: string[] = [];
+  if (unresolvedCandidates > 0) {
+    blockers.push(`정보 필요 후보 ${unresolvedCandidates}개를 모듈 검토에서 해결하고 승인하세요.`);
   }
-  return modules.flatMap((module) => {
-    const blockers: string[] = [];
-    if (!module.inputs.length) blockers.push(`${module.name}: input contract is missing`);
-    if (!module.outputs.length) blockers.push(`${module.name}: output contract is missing`);
-    if (!module.developer_todos.length) blockers.push(`${module.name}: developer TODO boundary is missing`);
+  if (!modules.length) {
+    blockers.push("approved module is required before ADK source generation");
     return blockers;
-  });
+  }
+  return [
+    ...blockers,
+    ...modules.flatMap((module) => {
+      const moduleBlockers: string[] = [];
+      if (!module.inputs.length) moduleBlockers.push(`${module.name}: input contract is missing`);
+      if (!module.outputs.length) moduleBlockers.push(`${module.name}: output contract is missing`);
+      if (!module.developer_todos.length) moduleBlockers.push(`${module.name}: developer TODO boundary is missing`);
+      return moduleBlockers;
+    })
+  ];
 }
 
-function collectWarnings(modules: ScaffoldPlanModule[]): string[] {
-  return modules.flatMap((module) => {
+function collectWarnings(modules: ScaffoldPlanModule[], candidates: ModuleCandidate[]): string[] {
+  const moduleWarnings = modules.flatMap((module) => {
     if (module.catalog_binding) {
       return [`${module.name}: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved`];
     }
     return [`${module.name}: generated as new-code TODO boundary because no catalog binding is selected`];
   });
+  const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
+  if (unresolvedCandidates > 0) {
+    moduleWarnings.push(`정보 필요 후보 ${unresolvedCandidates}개 — 모듈 검토에서 해결 메모 필요`);
+  }
+  return moduleWarnings;
+}
+
+function countUnresolvedMissingInfoCandidates(candidates: ModuleCandidate[]): number {
+  return candidates.filter((candidate) => candidate.status === "needs_info" || candidate.missing_information.length > 0).length;
 }
 
 function scaffoldOutputFor(candidate: ModuleCandidate): string {

@@ -45,6 +45,8 @@ const statusLabels: Record<ModuleStatus, string> = {
   rejected: "반려"
 };
 
+const emptyCatalogEntries: CatalogEntry[] = [];
+
 const editableEdgeKinds: EdgeKind[] = ["event_output", "session_state", "artifact", "route", "remote_a2a"];
 
 interface ModuleReviewProps {
@@ -119,6 +121,7 @@ export function ModuleReview({
     () => catalogCandidates.find((candidate) => candidate.id === selectedCatalogId) ?? catalogCandidates[0] ?? null,
     [catalogCandidates, selectedCatalogId]
   );
+  const reviewSummary = useMemo(() => buildReviewSummary(draftCandidates), [draftCandidates]);
 
   function updateCandidate(id: string, changes: Partial<ModuleCandidate>) {
     setDraftCandidates((current) => current.map((candidate) => (candidate.id === id ? { ...candidate, ...changes } : candidate)));
@@ -206,6 +209,25 @@ export function ModuleReview({
         </div>
       </div>
 
+      <div className="module-review-summary" aria-label="모듈 검토 요약">
+        <div>
+          <span>정보 필요 후보</span>
+          <strong>{reviewSummary.needsInfo}</strong>
+        </div>
+        <div>
+          <span>승인 가능</span>
+          <strong>{reviewSummary.approvable}</strong>
+        </div>
+        <div>
+          <span>승인됨</span>
+          <strong>{reviewSummary.approved}</strong>
+        </div>
+        <div>
+          <span>반려/보류</span>
+          <strong>{reviewSummary.closed}</strong>
+        </div>
+      </div>
+
       {activeTab === "new" ? (
         <div className="review-console module-review-console">
           <NewModuleTable
@@ -227,6 +249,7 @@ export function ModuleReview({
         <div className="review-console module-review-console">
           <CatalogContractTable
             candidates={catalogCandidates}
+            catalogEntries={catalogEntries}
             catalogByCandidateId={catalogByCandidateId}
             selectedCandidate={selectedCatalogCandidate}
             connections={connectionDrafts}
@@ -303,6 +326,8 @@ function NewModuleTable({
           <tbody>
             {candidates.map((candidate) => {
               const issues = candidateReviewIssues(candidate, catalogEntries);
+              const unresolved = hasUnresolvedMissingInfo(candidate);
+              const reviewLabel = missingInfoReviewLabel(candidate, catalogEntries);
               return (
                 <SelectableTableRow
                   key={candidate.id}
@@ -348,19 +373,30 @@ function NewModuleTable({
                       <select
                         className="status-select"
                         value={candidate.status}
-                        onChange={(event) => onUpdateCandidate(candidate.id, { status: event.target.value as ModuleStatus })}
+                        onChange={(event) => {
+                          const next = event.target.value as ModuleStatus;
+                          if (next === "approved" && unresolved) {
+                            return;
+                          }
+                          onUpdateCandidate(candidate.id, { status: next });
+                        }}
                       >
-                        {statuses.map((status) => (
-                          <option key={status} value={status}>
-                            {statusLabels[status]}
-                          </option>
-                        ))}
+                        {statuses.map((status) => {
+                          const blocked = status === "approved" && unresolved;
+                          return (
+                            <option key={status} value={status} disabled={blocked}>
+                              {statusLabels[status]}
+                              {blocked ? " (해결 메모 필요)" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       {issues.length > 0 ? (
                         <span className="review-issue-badge">{issues.length}개 확인 필요</span>
                       ) : (
                         <span className="review-issue-badge is-clear">blocker 없음</span>
                       )}
+                      <span className={`status-help ${unresolved ? "is-warning" : "is-clear"}`}>{reviewLabel}</span>
                     </div>
                   </td>
                   <td>
@@ -380,12 +416,14 @@ function NewModuleTable({
 
 function CatalogContractTable({
   candidates,
+  catalogEntries,
   catalogByCandidateId,
   selectedCandidate,
   connections,
   onSelect
 }: {
   candidates: ModuleCandidate[];
+  catalogEntries: CatalogEntry[];
   catalogByCandidateId: Map<string, CatalogEntry>;
   selectedCandidate: ModuleCandidate | null;
   connections: ModuleConnectionDraft[];
@@ -408,12 +446,14 @@ function CatalogContractTable({
             <col className="module-type-col" />
             <col className="module-contract-col" />
             <col className="module-status-col" />
+            <col className="module-contract-col" />
           </colgroup>
           <thead>
             <tr>
               <th>카탈로그 계약</th>
               <th>Runtime</th>
               <th>입출력</th>
+              <th>검토 상태</th>
               <th>Graph 연결</th>
             </tr>
           </thead>
@@ -423,6 +463,7 @@ function CatalogContractTable({
               const linkedEdges = connections.filter(
                 (connection) => connection.fromModuleId === candidate.id || connection.toModuleId === candidate.id
               );
+              const issues = candidateReviewIssues(candidate, catalogEntries);
               return (
                 <SelectableTableRow
                   key={candidate.id}
@@ -447,6 +488,14 @@ function CatalogContractTable({
                     <span className="module-contract-count">
                       입력 {candidate.inputs.length} · 출력 {candidate.outputs.length}
                     </span>
+                  </td>
+                  <td>
+                    <div className="status-cell compact-status-cell">
+                      <span className={`status-pill is-${candidate.status}`}>{statusLabels[candidate.status]}</span>
+                      <span className={issues.length ? "review-issue-badge" : "review-issue-badge is-clear"}>
+                        {issues.length ? `${issues.length}개 확인 필요` : "승인 가능"}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <span className={linkedEdges.length ? "review-issue-badge is-clear" : "review-issue-badge"}>
@@ -493,6 +542,7 @@ function CatalogContractInspector({
   const linkedConnections = connections.filter(
     (connection) => connection.fromModuleId === candidate.id || connection.toModuleId === candidate.id
   );
+  const unresolved = hasUnresolvedMissingInfo(candidate);
   const endpointOptions = [
     { value: REVIEW_INPUT_ENDPOINT, label: "요구사항 입력" },
     ...candidates
@@ -532,6 +582,27 @@ function CatalogContractInspector({
           </div>
         </dl>
       </FieldGroup>
+
+      <FieldGroup title="검토 상태">
+        <select
+          className="status-select"
+          value={candidate.status}
+          onChange={(event) => {
+            const next = event.target.value as ModuleStatus;
+            if (next === "approved" && unresolved) return;
+            onUpdateCandidate(candidate.id, { status: next });
+          }}
+        >
+          {statuses.map((status) => (
+            <option key={status} value={status} disabled={status === "approved" && unresolved}>
+              {statusLabels[status]}
+              {status === "approved" && unresolved ? " (해결 메모 필요)" : ""}
+            </option>
+          ))}
+        </select>
+      </FieldGroup>
+
+      <MissingInfoResolutionPanel candidate={candidate} onUpdateCandidate={onUpdateCandidate} />
 
       <FieldGroup title="입력 / 출력 override">
         <FieldSpecEditor title="입력" fields={candidate.inputs} onChange={(inputs) => onUpdateCandidate(candidate.id, { inputs })} />
@@ -645,6 +716,8 @@ function NewModuleInspector({
         )}
       </FieldGroup>
 
+      <MissingInfoResolutionPanel candidate={candidate} onUpdateCandidate={onUpdateCandidate} />
+
       <FieldGroup title="입력 / 출력 계약">
         <FieldSpecEditor title="입력" fields={candidate.inputs} onChange={(inputs) => onUpdateCandidate(candidate.id, { inputs })} />
         <FieldSpecEditor title="출력" fields={candidate.outputs} onChange={(outputs) => onUpdateCandidate(candidate.id, { outputs })} />
@@ -691,6 +764,74 @@ function NewModuleInspector({
   );
 }
 
+function MissingInfoResolutionPanel({
+  candidate,
+  onUpdateCandidate
+}: {
+  candidate: ModuleCandidate;
+  onUpdateCandidate: (id: string, changes: Partial<ModuleCandidate>) => void;
+}) {
+  const unresolved = hasUnresolvedMissingInfo(candidate);
+  const resolution = candidate.missing_information_resolution ?? "";
+  const resolvedItems = candidate.resolved_missing_information ?? [];
+  const canResolve = unresolved && resolution.trim().length > 0;
+
+  function resolveAndApprove() {
+    if (!canResolve) return;
+    onUpdateCandidate(candidate.id, {
+      status: "approved",
+      missing_information: [],
+      resolved_missing_information: mergeResolvedMissingInformation(resolvedItems, candidate.missing_information),
+      missing_information_resolution: resolution.trim()
+    });
+  }
+
+  return (
+    <FieldGroup
+      title="정보 필요 해결"
+      description="정보 필요 후보는 후보별 해결 메모를 남긴 뒤 승인할 수 있습니다."
+      className={`missing-resolution-panel ${unresolved ? "is-unresolved" : "is-resolved"}`}
+    >
+      {candidate.missing_information.length > 0 ? (
+        <ul className="missing-resolution-list">
+          {candidate.missing_information.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : unresolved ? (
+        <p className="review-muted">정보 필요 상태입니다. 해결 메모를 남긴 뒤 승인하세요.</p>
+      ) : resolvedItems.length > 0 ? (
+        <div className="resolved-missing-list">
+          {resolvedItems.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      ) : (
+        <p className="review-muted">남은 정보 필요 항목이 없습니다.</p>
+      )}
+      <textarea
+        className="inspector-textarea"
+        rows={4}
+        placeholder="후보별 해결 근거를 입력하세요."
+        value={resolution}
+        onChange={(event) => onUpdateCandidate(candidate.id, { missing_information_resolution: event.target.value })}
+      />
+      <div className="resolution-actions">
+        <span className={canResolve ? "review-muted" : "status-help is-warning"}>
+          {canResolve
+            ? "해결하고 승인할 수 있습니다."
+            : unresolved
+              ? "해결 메모가 있어야 승인할 수 있습니다."
+              : "승인 gate가 해소되었습니다."}
+        </span>
+        <button type="button" className="primary compact-button" onClick={resolveAndApprove} disabled={!canResolve}>
+          해결하고 승인
+        </button>
+      </div>
+    </FieldGroup>
+  );
+}
+
 function FieldSpecEditor({ title, fields, onChange }: { title: string; fields: FieldSpec[]; onChange: (fields: FieldSpec[]) => void }) {
   return (
     <label className="field-spec-editor">
@@ -703,6 +844,38 @@ function FieldSpecEditor({ title, fields, onChange }: { title: string; fields: F
       />
     </label>
   );
+}
+
+function buildReviewSummary(candidates: ModuleCandidate[]) {
+  return candidates.reduce(
+    (summary, candidate) => {
+      if (hasUnresolvedMissingInfo(candidate)) summary.needsInfo += 1;
+      if (candidate.status === "approved") summary.approved += 1;
+      if (candidate.status === "deferred" || candidate.status === "rejected") summary.closed += 1;
+      if (!hasUnresolvedMissingInfo(candidate) && candidate.status !== "approved" && candidate.status !== "rejected") {
+        summary.approvable += 1;
+      }
+      return summary;
+    },
+    { needsInfo: 0, approvable: 0, approved: 0, closed: 0 }
+  );
+}
+
+function hasUnresolvedMissingInfo(candidate: ModuleCandidate): boolean {
+  return candidate.status === "needs_info" || candidate.missing_information.length > 0;
+}
+
+function missingInfoReviewLabel(candidate: ModuleCandidate, catalogEntries: CatalogEntry[] = emptyCatalogEntries): string {
+  if (hasUnresolvedMissingInfo(candidate)) {
+    return (candidate.missing_information_resolution ?? "").trim()
+      ? "해결 메모 입력됨"
+      : "해결 메모 필요";
+  }
+  return candidateReviewIssues(candidate, catalogEntries).length ? "계약 확인 필요" : "승인 가능";
+}
+
+function mergeResolvedMissingInformation(current: string[], missing: string[]): string[] {
+  return Array.from(new Set([...current, ...missing].map((item) => item.trim()).filter(Boolean)));
 }
 
 function SubtypeControl({

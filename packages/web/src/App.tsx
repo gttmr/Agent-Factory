@@ -66,6 +66,8 @@ export default function App() {
           analysis={state.analysis}
           onRerun={actions.runAnalysis}
           onContinue={() => actions.setActiveStep("modules")}
+          acceptedMissing={state.acceptedMissing}
+          onToggleAcceptedMissing={actions.toggleAcceptedMissing}
         />
       );
     }
@@ -139,6 +141,7 @@ export default function App() {
           processFlow={processFlow}
           acceptedMissing={state.acceptedMissing}
           catalogEntries={state.catalogEntries}
+          onNavigateToModules={() => actions.setActiveStep("modules")}
         />
       );
     }

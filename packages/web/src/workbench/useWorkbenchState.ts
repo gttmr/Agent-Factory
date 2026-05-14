@@ -8,6 +8,7 @@ import {
   upsertSavedAnalysis,
   type SavedAnalysisRecord
 } from "../analyzer/savedAnalyses";
+import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
 import type {
   A2AContract,
   AnalysisResult,
@@ -218,8 +219,11 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         analyzerModel: action.record.analyzerModel,
         analysisProgress: [],
         currentSavedId: action.record.id,
+        catalogEntries: action.record.catalogEntries.length
+          ? action.record.catalogEntries
+          : state.catalogEntries,
         validationMessage: `저장된 분석을 불러왔습니다: ${action.record.title}`,
-        activeStep: "analysis"
+        activeStep: pickLandingStep(action.record)
       };
     case "deleteSavedAnalysis":
       return {
@@ -296,6 +300,15 @@ export function useWorkbenchState() {
       return;
     }
     const id = state.currentSavedId ?? createSavedAnalysisId();
+    const catalogSnapshot = state.catalogEntries.filter((entry) => entry.provenance !== "session_deleted");
+    const scaffoldPlan = buildScaffoldPlan({
+      normalizedRequirement: state.analysis.normalizedRequirement,
+      moduleCandidates: state.moduleCandidates,
+      processFlow: state.analysis.processFlow,
+      catalogEntries: catalogSnapshot
+    });
+    const graphErrors = state.analysis.processFlow.validation?.errors?.length ?? 0;
+    const scaffoldReady = scaffoldPlan.validation.can_generate_source && graphErrors === 0;
     const record: SavedAnalysisRecord = {
       id,
       title: state.analysis.normalizedRequirement.title || "제목 없는 분석",
@@ -307,7 +320,10 @@ export function useWorkbenchState() {
       },
       moduleCandidates: state.moduleCandidates,
       acceptedMissing: state.acceptedMissing,
-      analyzerModel: state.analyzerModel
+      analyzerModel: state.analyzerModel,
+      catalogEntries: catalogSnapshot,
+      activeStep: state.activeStep,
+      scaffoldReady
     };
     dispatch({
       type: "saveCurrentSucceeded",
@@ -353,6 +369,13 @@ export function useWorkbenchState() {
 function compactProgressEvent(event: AnalyzerProgressEvent): AnalyzerProgressEvent {
   const { result: _result, ...progress } = event;
   return progress;
+}
+
+function pickLandingStep(record: SavedAnalysisRecord): StepId {
+  if (record.scaffoldReady) return "export";
+  const hasNeedsInfo = record.moduleCandidates.some((candidate) => candidate.status === "needs_info");
+  if (!hasNeedsInfo) return "modules";
+  return "analysis";
 }
 
 function normalizeIntakeInput(input: RequirementIntakeInput | Record<string, unknown>): RequirementIntakeInput {

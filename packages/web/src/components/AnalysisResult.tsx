@@ -4,19 +4,26 @@ interface AnalysisResultProps {
   analysis: AnalyzerResult;
   onRerun: () => void;
   onContinue: () => void;
+  acceptedMissing: string[];
+  onToggleAcceptedMissing: (item: string) => void;
 }
 
 export function AnalysisResult({
   analysis,
   onRerun,
-  onContinue
+  onContinue,
+  acceptedMissing,
+  onToggleAcceptedMissing
 }: AnalysisResultProps) {
   const { evidence, normalizedRequirement } = analysis;
   const remoteA2ACount = analysis.moduleCandidates.filter((candidate) => candidate.module_category === "remote_a2a").length;
+  const missingItems = uniqueValues(evidence.missing_information);
+  const acceptedSet = new Set(acceptedMissing);
+  const acceptedCount = missingItems.filter((item) => acceptedSet.has(item)).length;
   const metrics = [
     { label: "후보 모듈", value: `${analysis.moduleCandidates.length}개` },
     { label: "Remote A2A", value: `${remoteA2ACount}개` },
-    { label: "누락 정보", value: `${evidence.missing_information.length}개` }
+    { label: "누락 정보", value: `${missingItems.length}건 / 수용 ${acceptedCount}건` }
   ];
   const contractRows = [
     {
@@ -89,7 +96,11 @@ export function AnalysisResult({
           <h2>검토자가 필요할 때 펼쳐보는 정보</h2>
         </div>
         <EvidenceDetail label="가정" values={evidence.assumptions} />
-        <EvidenceDetail label="누락 정보" values={evidence.missing_information} />
+        <MissingInfoDetail
+          items={missingItems}
+          acceptedSet={acceptedSet}
+          onToggle={onToggleAcceptedMissing}
+        />
         <EvidenceDetail label="모순" values={evidence.contradictions} />
         <EvidenceDetail label="위험 신호" values={evidence.risk_signals} tagRisk />
         <details className="evidence-detail">
@@ -134,6 +145,64 @@ function ContractRow({ label, values, source }: { label: string; values: string[
         {preview.overflow > 0 ? <span className="value-overflow">+{preview.overflow}</span> : null}
       </div>
     </div>
+  );
+}
+
+function MissingInfoDetail({
+  items,
+  acceptedSet,
+  onToggle
+}: {
+  items: string[];
+  acceptedSet: Set<string>;
+  onToggle: (item: string) => void;
+}) {
+  const acceptedCount = items.filter((item) => acceptedSet.has(item)).length;
+  const preview = items.length
+    ? `${items.slice(0, 2).join(", ")}${items.length > 2 ? ` +${items.length - 2}` : ""}`
+    : "감지 항목 없음";
+
+  return (
+    <details className="evidence-detail">
+      <summary>
+        <span className="evidence-summary-main">
+          <span>누락 정보</span>
+          <small>{preview}</small>
+        </span>
+        <strong>
+          {items.length}건 / 수용 {acceptedCount}건
+        </strong>
+      </summary>
+      <div className="evidence-detail-body">
+        {items.length ? (
+          <ul className="missing-info-list">
+            {items.map((item) => {
+              const accepted = acceptedSet.has(item);
+              return (
+                <li className={accepted ? "missing-info-row is-accepted" : "missing-info-row"} key={item}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={accepted}
+                      onChange={() => onToggle(item)}
+                    />
+                    <span>{item}</span>
+                  </label>
+                  <span className="missing-info-status">{accepted ? "수용" : "미처리"}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="empty-state">감지된 항목이 없습니다.</p>
+        )}
+        {items.length ? (
+          <p className="review-muted">
+            "수용"은 reviewer attestation입니다. 모듈 후보의 missing_information은 모듈 검토에서 직접 정리해야 승인할 수 있습니다.
+          </p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 

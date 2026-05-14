@@ -65,8 +65,6 @@ const remoteRequiredFields = [
 ];
 const codexMcpOverrides = [
   "-c",
-  "mcp_servers.stitch.enabled=false",
-  "-c",
   "mcp_servers.chrome-devtools.enabled=false",
   "-c",
   "mcp_servers.adk-docs-mcp.enabled=true"

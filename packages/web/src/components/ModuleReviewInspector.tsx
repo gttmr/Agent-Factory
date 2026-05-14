@@ -32,10 +32,7 @@ export function ModuleReviewInspector({
   }
 
   const subtype = getCandidateSubtype(candidate) ?? moduleCategoryLabels[candidate.module_category];
-  const missingInfoIssues =
-    candidate.status === "needs_info" && candidate.missing_information.length
-      ? candidate.missing_information
-      : [];
+  const missingInfoIssues = candidateMissingInfoIssues(candidate);
   const scaffoldIssues = candidate.status === "approved" ? approvalReadinessIssues(candidate, catalogEntries) : [];
   const followUpFields = candidate.module_category === "remote_a2a" ? remoteA2AFields : candidateNextFields(candidate);
   const hintRows = getAdkHintRows(candidate);
@@ -126,6 +123,9 @@ export function ModuleReviewInspector({
 
 export function approvalReadinessIssues(candidate: ModuleCandidate, catalogEntries: CatalogEntry[]): string[] {
   const issues: string[] = [];
+  if (candidate.missing_information.length) {
+    issues.push(`정보 필요 항목 ${candidate.missing_information.length}건 — 해결 메모를 남긴 뒤 승인`);
+  }
   if (!candidate.inputs.length) issues.push("입력 계약 필요");
   if (!candidate.outputs.length) issues.push("출력 계약 필요");
   const binding = catalogEntries.find(
@@ -142,8 +142,18 @@ export function approvalReadinessIssues(candidate: ModuleCandidate, catalogEntri
 }
 
 export function candidateReviewIssues(candidate: ModuleCandidate, catalogEntries: CatalogEntry[]): string[] {
-  if (candidate.status === "needs_info") return candidate.missing_information;
+  if (candidate.status === "needs_info" || candidate.missing_information.length > 0) {
+    return candidateMissingInfoIssues(candidate);
+  }
   if (candidate.status === "approved") return approvalReadinessIssues(candidate, catalogEntries);
+  return [];
+}
+
+function candidateMissingInfoIssues(candidate: ModuleCandidate): string[] {
+  if (candidate.missing_information.length > 0) return candidate.missing_information;
+  if (candidate.status === "needs_info") {
+    return ["정보 필요 상태입니다. 해결 메모를 남긴 뒤 승인하세요."];
+  }
   return [];
 }
 
