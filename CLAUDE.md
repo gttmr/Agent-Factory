@@ -88,6 +88,16 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 - `catalog/`: YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates. Catalog entries are runtime-oriented contracts, not mocks; mock/test-double generation is a separate future workflow. Risk signals on candidates should align with `catalog/risk-gates.yaml`.
 - `templates/`: artifact templates the validator smoke-checks by default, plus `scaffold-plan.template.json`.
 
+### Missing-information gate & saved-analysis flow
+
+Aligned with `AGENTS.md` and `docs/workbench/agent-factory-harness.md`. Apply these whenever touching the wizard, scaffold-plan validation, or `SavedAnalysisRecord` shape.
+
+- **Two-layer missing-info gate.** Requirement-level `evidence.missing_information` is a **soft** gate — users mark each item via the per-row "수용" toggle on `AnalysisResult` and the result flows into `acceptedMissing` (reviewer attestation only, never blocks scaffold). Candidate-level `ModuleCandidate.missing_information` plus `status === "needs_info"` is a **hard** gate — the Module Review status `<select>` disables the `approved` option while either remains unresolved, and the inspector requires `missing_information_resolution` before `해결하고 승인`.
+- **Scaffold-plan messaging.** `scaffoldPlan.collectBlockers` emits the actionable Korean blocker `정보 필요 후보 N개를 모듈 검토에서 해결하고 승인하세요.` while unresolved candidates remain. Warnings include `정보 필요 후보 N개 — 모듈 검토에서 해결 메모 필요`. The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR has errors.
+- **SavedAnalysisRecord persistence.** The record stores `catalogEntries` (active entries at save time), `activeStep`, and `scaffoldReady` (`can_generate_source && graph errors empty`). `loadSavedAnalysis` chooses the landing step from these: `scaffoldReady → export`, all-non-`needs_info` → `modules`, else → `analysis`. Catalog is restored from the record snapshot, not the seed. Backfill must never auto-promote candidate status.
+- **Smoke 일괄 실행 매크로.** `AdkRuntimeWorkbench` ships a macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially with per-step pass/fail pills and halts on first failure. Individual buttons remain for debugging.
+- **Stub-runtime banner.** When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel renders a yellow banner: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." Do not remove this banner; it differentiates stub output from real business logic per AGENTS.md.
+
 ### UI design system
 
 `docs/visualization/design-system.md` is the authoritative spec for the web workbench UI: category color tokens, glyph mapping, shared components, Graph IR visualization, and CSS pitfalls. Read it before changing anything visual.

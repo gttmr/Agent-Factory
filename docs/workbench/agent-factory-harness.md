@@ -90,6 +90,42 @@ Do not scaffold directly from:
 
 A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code.
 
+### Missing-information two-layer gate
+
+Triage of missing information after analysis follows a two-layer rule.
+
+- Requirement-level `evidence.missing_information` is a soft gate. AnalysisResult exposes a per-row "수용" toggle that writes to `acceptedMissing`. This is reviewer attestation only and does not block scaffold-plan generation. The accepted set is preserved in `SavedAnalysisRecord` and surfaced in the ADK Runtime Handoff header as a "요구사항 누락 수용 N건" chip.
+- Candidate-level `ModuleCandidate.missing_information` and `status === "needs_info"` are hard gates. A candidate cannot transition to `approved` through the status select while either condition remains unresolved. The Module Review inspector requires `missing_information_resolution` before the reviewer can use `해결하고 승인`.
+- `해결하고 승인` copies the current `missing_information` array into `resolved_missing_information`, clears `missing_information`, trims and preserves the reviewer note in `missing_information_resolution`, and sets `status: "approved"`.
+- `buildScaffoldPlan` surfaces unresolved candidates as an actionable blocker ("정보 필요 후보 N개를 모듈 검토에서 해결하고 승인하세요.") and appends "정보 필요 후보 N개 — 모듈 검토에서 해결 메모 필요" to warnings.
+
+The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR errors are present.
+
+### Saved-analysis record fields
+
+`SavedAnalysisRecord` is the persistence contract for the saved-analysis flow.
+
+- `catalogEntries` snapshots the active catalog (`provenance !== "session_deleted"`) at save time and replaces the seed catalog on load. This prevents seed-evolution drift.
+- `activeStep` is the wizard step at save time, used as a migration safety net.
+- `scaffoldReady` is `can_generate_source && Graph IR has no errors` computed at save time. `loadSavedAnalysis` lands on `export` when true; otherwise on `modules` if all candidates are non-`needs_info`, else on `analysis`. Backfill never auto-promotes candidate status.
+
+Saved-analysis fixtures live under `templates/saved-analysis-fixtures/`. They must mirror `moduleCandidates` at both the record top level and `analysis.moduleCandidates`, preserve the saved `catalogEntries` snapshot, and make the intended landing behavior explicit with `scaffoldReady`.
+
+### Catalog contract registry
+
+Catalog entries remain runtime contracts, not mock entries. Test doubles are driven by contract registry files under `catalog/contracts/`.
+
+- MCP registry files define the `mcp_schema_ref` contract body: `inputSchema`, `outputSchema`, success/error examples, and a deterministic `mock_response.structuredContent`.
+- A2A registry files define Agent Card, supported interfaces, message/task/artifact contract, auth, timeout, retry, fallback, audit, data policy, and synthetic task examples.
+
+The registry must use synthetic data only. Do not add private banking endpoints, credentials, deployment scripts, or real customer data.
+
+### Smoke 일괄 실행 매크로 and stub banner
+
+The Runtime Handoff screen ships a `Smoke 일괄 실행` macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially, surfacing per-step pass/fail pills and halting on the first failure. Individual buttons stay available for debugging.
+
+When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel shows a yellow stub-runtime banner so reviewers do not mistake stub output for real business logic.
+
 ## Required artifact posture
 
 For Agent Factory work, produce or preserve reviewable artifacts rather than only code.
