@@ -320,6 +320,11 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "missing_information_resolution": { "type": "string" },
+        "resolved_missing_information": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "side_effect": {
           "anyOf": [
             { "type": "string", "enum": ["none", "read", "write", "read_write", "unknown"] },

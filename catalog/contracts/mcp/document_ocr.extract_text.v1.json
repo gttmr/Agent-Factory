@@ -1,0 +1,80 @@
+{
+  "schema_ref": "catalog.banking.document_ocr.extract_text.v1",
+  "server": "document-ocr-mcp",
+  "tool": "extract_bank_document_text",
+  "title": "Bank document OCR extraction",
+  "description": "Synthetic contract for extracting text and page blocks from banking documents.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["document_uri"],
+    "properties": {
+      "document_uri": { "type": "string" },
+      "mime_type": { "type": "string" },
+      "document_type_hint": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["ocr_text", "page_blocks", "confidence", "extraction_warnings"],
+    "properties": {
+      "ocr_text": { "type": "string" },
+      "page_blocks": {
+        "type": "array",
+        "items": { "type": "object" }
+      },
+      "confidence": { "type": "number" },
+      "extraction_warnings": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "loan_application_pdf",
+      "arguments": {
+        "document_uri": "fixture://documents/loan_application_001.pdf",
+        "mime_type": "application/pdf",
+        "document_type_hint": "loan_application"
+      },
+      "structuredContent": {
+        "ocr_text": "synthetic loan application text",
+        "page_blocks": [
+          { "page": 1, "text": "synthetic loan application text", "confidence": 0.98 }
+        ],
+        "confidence": 0.98,
+        "extraction_warnings": []
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "unsupported_mime_type",
+      "arguments": {
+        "document_uri": "fixture://documents/loan_application_001.bin",
+        "mime_type": "application/octet-stream"
+      },
+      "isError": true,
+      "message": "unsupported mime_type for OCR fixture"
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"confidence\":0.98,\"source\":\"synthetic_fixture\"}"
+      }
+    ],
+    "structuredContent": {
+      "ocr_text": "synthetic loan application text",
+      "page_blocks": [
+        { "page": 1, "text": "synthetic loan application text", "confidence": 0.98 }
+      ],
+      "confidence": 0.98,
+      "extraction_warnings": []
+    },
+    "isError": false
+  }
+}

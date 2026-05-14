@@ -129,6 +129,16 @@
         "minLength": 1
       }
     },
+    "missing_information_resolution": {
+      "type": "string"
+    },
+    "resolved_missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "risk_signals": {
       "type": "array",
       "items": {

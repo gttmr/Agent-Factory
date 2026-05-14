@@ -265,6 +265,8 @@ export interface ModuleCandidate {
   risk_signals: RiskSignal[];
   status: ModuleStatus;
   missing_information: string[];
+  missing_information_resolution?: string;
+  resolved_missing_information?: string[];
   side_effect?: SideEffect;
   auth_required?: boolean;
   audit_required?: boolean;
