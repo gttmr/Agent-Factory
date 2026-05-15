@@ -11,9 +11,11 @@
 4. 후보 모듈을 `agent`, `workflow`, `adapter`, `remote_a2a` 중 하나로 분류한다.
 5. 선택한 category에 맞는 subtype을 채운다.
 6. [Workflow decision guide](./workflow-decision-guide.md)에 따라 process flow를 그린다.
-7. 개발 리더가 Module Review Board에서 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
-8. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
-9. 승인된 후보만 `scaffold-plan`으로 묶고 ADK Runtime Handoff에서 TODO/runtime wiring 경계를 확인한다.
+7. 개발 리더가 Module Review Board에서 후보별 책임, 계약, Graph 연결을 검토한다.
+8. `needs_info` 후보는 Resolution Draft를 생성하고 object schema, patch preview, smoke 계약을 검토한 뒤 `반영 적용`한다.
+9. 개발 리더가 각 후보를 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
+10. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
+11. 승인된 후보만 `scaffold-plan`으로 묶고 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 chat smoke 준비 상태를 확인한다.
 
 ## 분석 결과 화면
 
@@ -27,6 +29,7 @@ Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검�
 - `normalized-requirement.json`: 요구사항을 구조화한 원본 분석 결과.
 - `evidence-summary.json`: 분류 근거, 위험, 누락 정보, 가정.
 - `module-candidates.json`: 검토 대상 모듈 후보.
+- `resolution_draft`: 정보 필요 후보를 승인 가능한 artifact로 바꾸기 위한 후보별 LLM 초안. 자동 적용되지 않고 Module Review에서 검토 후 반영한다.
 - `process-flow.json`: 후보 모듈 사이의 local 또는 Remote A2A 흐름.
 - `classification.json`: 선택한 category와 subtype의 근거.
 - `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보 요약. 실제 등록/제외 결정은 Catalog review에서 한다.
@@ -43,6 +46,7 @@ Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검�
 - ADK component는 category가 아니다. 필요하면 module candidate의 ADK hint로 남긴다.
 - 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
 - Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK Runtime Handoff는 승인된 후보와 `scaffold-plan`만 사용하며, 생성물은 실제 runtime 설정과 비즈니스 로직을 TODO 경계로 남긴다.
+- LLM이 만든 Resolution Draft는 승인 근거가 아니라 검토 초안이다. object schema와 smoke 계약은 개발 리더가 Module Review에서 확인하고 `반영 적용`해야 scaffold/chat smoke 입력으로 쓰인다.
 
 ## Live analyzer 실행 계약
 

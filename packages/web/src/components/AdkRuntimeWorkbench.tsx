@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildAdkSourceBundle } from "../analyzer/adkSource";
 import type { AdkRuntimeMode } from "../analyzer/adkGraph";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
@@ -105,11 +105,22 @@ export function AdkRuntimeWorkbench({
   const graphErrors = bundle.graphIr.issues.filter((issue) => issue.severity === "error");
   const graphWarnings = bundle.graphIr.issues.filter((issue) => issue.severity === "warning");
   const scaffoldReady = scaffoldPlan.validation.can_generate_source && graphErrors.length === 0;
+  const approvedSmokeSpec = scaffoldPlan.modules.find((module) => module.smoke_spec?.ready)?.smoke_spec ?? null;
+  const chatSmokeReady = scaffoldReady && Boolean(approvedSmokeSpec?.sample_user_message.trim());
   const needsInfoCount = moduleCandidates.filter(
-    (candidate) => candidate.status === "needs_info" || candidate.missing_information.length > 0
+    (candidate) =>
+      candidate.missing_information.length > 0 ||
+      (candidate.status === "needs_info" &&
+        !(candidate.resolution_applied_at && candidate.schema_review_state === "applied" && candidate.smoke_spec?.ready))
   ).length;
   const isStubOutput =
     runtimeMode === "stub" || JSON.stringify(lastResponse?.events ?? []).includes("stubbed_runtime_contract");
+
+  useEffect(() => {
+    if (approvedSmokeSpec?.sample_user_message) {
+      setQuery(approvedSmokeSpec.sample_user_message);
+    }
+  }, [approvedSmokeSpec?.sample_user_message]);
 
   async function runAction(action: RuntimeAction): Promise<RuntimeResponse | null> {
     setIsBusy(true);
@@ -126,6 +137,7 @@ export function AdkRuntimeWorkbench({
           normalizedRequirement,
           processFlow,
           scaffoldPlan,
+          smokeSpec: approvedSmokeSpec,
           query,
           port: webPort
         })
@@ -213,6 +225,18 @@ export function AdkRuntimeWorkbench({
               모듈 검토로 이동
             </button>
           </div>
+        ) : !chatSmokeReady ? (
+          <div className="adk-empty-state">
+            <div>
+              <h3>채팅 smoke 준비 미완료</h3>
+              <p className="review-muted">
+                소스 생성은 가능하지만 chat smoke에는 후보별 smoke 계약이 필요합니다. 모듈 검토에서 Resolution Draft를 적용하세요.
+              </p>
+            </div>
+            <button type="button" className="secondary" onClick={onNavigateToModules}>
+              모듈 검토로 이동
+            </button>
+          </div>
         ) : null}
 
         <div className="runtime-controls">
@@ -295,7 +319,7 @@ export function AdkRuntimeWorkbench({
           <button type="button" onClick={() => runAction("check-web")} disabled={isBusy || !scaffoldReady}>
             구조 자동 확인
           </button>
-          <button type="button" onClick={() => runAction("chat-smoke")} disabled={isBusy || !scaffoldReady}>
+          <button type="button" onClick={() => runAction("chat-smoke")} disabled={isBusy || !chatSmokeReady}>
             채팅 smoke
           </button>
         </div>
@@ -310,7 +334,7 @@ export function AdkRuntimeWorkbench({
               type="button"
               className="primary"
               onClick={runSmokeMacro}
-              disabled={isBusy || !scaffoldReady}
+              disabled={isBusy || !chatSmokeReady}
             >
               일괄 실행
             </button>

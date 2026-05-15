@@ -124,7 +124,7 @@ export function ModuleReviewInspector({
 export function approvalReadinessIssues(candidate: ModuleCandidate, catalogEntries: CatalogEntry[]): string[] {
   const issues: string[] = [];
   if (candidate.missing_information.length) {
-    issues.push(`정보 필요 항목 ${candidate.missing_information.length}건 — 해결 메모를 남긴 뒤 승인`);
+    issues.push(`정보 필요 항목 ${candidate.missing_information.length}건 — Resolution Draft를 반영한 뒤 승인`);
   }
   if (!candidate.inputs.length) issues.push("입력 계약 필요");
   if (!candidate.outputs.length) issues.push("출력 계약 필요");
@@ -151,10 +151,21 @@ export function candidateReviewIssues(candidate: ModuleCandidate, catalogEntries
 
 function candidateMissingInfoIssues(candidate: ModuleCandidate): string[] {
   if (candidate.missing_information.length > 0) return candidate.missing_information;
+  if (candidateResolutionReady(candidate)) return [];
   if (candidate.status === "needs_info") {
-    return ["정보 필요 상태입니다. 해결 메모를 남긴 뒤 승인하세요."];
+    return ["정보 필요 상태입니다. 해결 초안을 생성하고 스키마와 smoke 계약을 반영한 뒤 승인하세요."];
   }
   return [];
+}
+
+function candidateResolutionReady(candidate: ModuleCandidate): boolean {
+  return Boolean(
+    candidate.resolution_applied_at &&
+      candidate.schema_review_state === "applied" &&
+      candidate.smoke_spec?.ready &&
+      candidate.inputs.length > 0 &&
+      candidate.outputs.length > 0
+  );
 }
 
 function getAdkHintRows(candidate: ModuleCandidate) {

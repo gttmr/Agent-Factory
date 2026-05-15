@@ -29,8 +29,37 @@
       "properties": {
         "name": { "type": "string" },
         "type": { "type": "string" },
-        "required": { "type": "boolean" }
+        "required": { "type": "boolean" },
+        "schema": { "$ref": "#/$defs/jsonSchema" }
       }
+    },
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "smokeSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_user_message",
+        "synthetic_inputs",
+        "expected_output_shape",
+        "expected_event_markers",
+        "mock_sources",
+        "ready"
+      ],
+      "properties": {
+        "sample_user_message": { "type": "string" },
+        "synthetic_inputs": { "type": "object", "additionalProperties": true },
+        "expected_output_shape": { "$ref": "#/$defs/jsonSchema" },
+        "expected_event_markers": { "type": "array", "items": { "type": "string" } },
+        "mock_sources": { "type": "array", "items": { "type": "string" } },
+        "ready": { "type": "boolean" }
+      }
+    },
+    "resolutionDraft": {
+      "type": "object",
+      "additionalProperties": true
     },
     "system": {
       "type": "object",
@@ -218,6 +247,19 @@
         "resolved_missing_information": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "resolution_draft": {
+          "anyOf": [{ "$ref": "#/$defs/resolutionDraft" }, { "type": "null" }]
+        },
+        "resolution_applied_at": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "schema_review_state": {
+          "type": "string",
+          "enum": ["not_started", "drafted", "applied"]
+        },
+        "smoke_spec": {
+          "anyOf": [{ "$ref": "#/$defs/smokeSpec" }, { "type": "null" }]
         },
         "side_effect": {
           "anyOf": [{ "type": "string", "enum": ["none", "read", "write", "read_write", "unknown"] }, { "type": "null" }]

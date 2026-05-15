@@ -19,12 +19,13 @@ This repository contains the workbench application and shared schemas. It is not
 2. Normalize the requirement into reviewable structured data.
 3. Classify module candidates with the approved taxonomy.
 4. Review process flow and remote-boundary friction.
-5. Mark modules as approved, deferred, rejected, or `needs_info`.
-6. Review catalog reuse decisions and register/exclude analysis candidates.
-7. Validate the reviewed process flow as Graph IR.
-8. Generate a review-gated scaffold plan and ADK Runtime Handoff when modules are approved.
+5. Resolve `needs_info` module candidates through candidate-level Resolution Draft review, object schema inspection, and smoke-contract application.
+6. Mark modules as approved, deferred, rejected, or `needs_info`.
+7. Review catalog reuse decisions and register/exclude analysis candidates.
+8. Validate the reviewed process flow as Graph IR.
+9. Generate a review-gated scaffold plan and ADK Runtime Handoff when modules are approved.
 
-Raw requirements must never create code directly. The current ADK Runtime Handoff consumes only reviewed `AnalysisResult` data, approved module candidates, catalog decisions, and `scaffold-plan` validation. Generated source remains a TODO/runtime wiring handoff: it must not include runnable business logic, private banking endpoints, credentials, or organization-specific deployment code.
+Raw requirements must never create code directly. The current ADK Runtime Handoff consumes only reviewed `AnalysisResult` data, approved module candidates, applied Resolution Draft state, catalog decisions, and `scaffold-plan` validation. Generated source remains a TODO/runtime wiring handoff: it must not include runnable business logic, private banking endpoints, credentials, or organization-specific deployment code.
 
 ## Taxonomy
 

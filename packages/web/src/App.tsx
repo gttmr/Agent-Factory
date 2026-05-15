@@ -75,6 +75,9 @@ export default function App() {
     if (state.activeStep === "modules" && state.analysis) {
       return (
         <ModuleReview
+          normalizedRequirement={state.analysis.normalizedRequirement}
+          evidence={state.analysis.evidence}
+          analyzerModel={state.analyzerModel}
           moduleCandidates={state.moduleCandidates}
           catalogEntries={state.catalogEntries}
           processFlow={processFlow}

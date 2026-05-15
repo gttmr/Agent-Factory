@@ -23,9 +23,10 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `parallel_region`은 두 개 이상의 entry node와 join 경로가 있어야 한다.
 - `loop_region`은 `loop_back`과 `loop_exit` edge가 있어야 한다.
 - `human_input` node는 downstream edge가 있어야 한다.
+- module-bound node는 incoming edge와 outgoing edge를 각각 최소 1개 가져야 한다. 화면에 노드가 렌더링되더라도 고립 후보는 scaffold source가 될 수 없다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
-- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다.
+- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
 
 ## Live analyzer draft schema
 
@@ -68,9 +69,9 @@ ADK Runtime Handoff 화면은 생성된 source bundle을 대상으로 다음 개
 분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
 
 - **Requirement-level (`evidence.missing_information`) — soft gate.** AnalysisResult 화면에서 항목별 "수용" 토글이 제공된다. 토글은 `acceptedMissing` 배열을 갱신하며 reviewer attestation으로만 사용한다. scaffold-plan 생성은 차단하지 않는다. 저장 record와 ADK Runtime Handoff 화면(`요구사항 누락 수용 N건` chip)으로 흐름이 보존된다.
-- **Candidate-level (`ModuleCandidate.missing_information`, `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 상태가 `needs_info`인 후보는 status select로 `approved`를 고를 수 없다. Module Review 인스펙터에서 후보별 `missing_information_resolution`을 입력한 뒤 `해결하고 승인`을 실행해야 한다.
-- **Resolved review state.** `해결하고 승인`은 기존 누락 항목을 `resolved_missing_information`에 보존하고, `missing_information`을 비우며, 후보 상태를 `approved`로 바꾼다. 카탈로그 계약 후보도 같은 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
-- **Scaffold-plan blocker.** `status === "needs_info"`이거나 `missing_information.length > 0`인 후보가 있으면 `scaffold-plan.validation.blockers`는 "정보 필요 후보 N개를 모듈 검토에서 해결하고 승인하세요." 메시지를 emit한다. unresolved 후보 개수는 `validation.warnings`에 "정보 필요 후보 N개 — 모듈 검토에서 해결 메모 필요"로 누적된다.
+- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Module Review 인스펙터에서 후보별 `해결 초안 생성`을 실행하고 object schema와 smoke 계약을 검토한 뒤 `반영 적용`해야 한다.
+- **Resolved review state.** `반영 적용`은 기존 누락 항목을 `resolved_missing_information`에 보존하고, `missing_information`을 비우며, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 현재 분석 artifact에 저장한다. 카탈로그 계약 후보도 같은 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
+- **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인데 Resolution Draft가 아직 적용되지 않은 후보가 있으면 `scaffold-plan.validation.blockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." 메시지를 emit한다. unresolved 후보 개수는 `validation.warnings`에 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요"로 누적된다.
 
 ADK Runtime Handoff 화면은 `scaffoldPlan.validation.can_generate_source` 또는 Graph IR error로 준비되지 않은 경우 상단에 empty-state 패널과 "모듈 검토로 이동" 버튼을 노출한다. 이는 사유 안내와 한 번에 모듈 검토로 돌아가는 deep link 역할을 한다.
 
@@ -81,6 +82,7 @@ ADK Runtime Handoff 화면은 `scaffoldPlan.validation.can_generate_source` 또�
 - `catalogEntries`: 저장 시점 세션의 활성 catalog entry snapshot(`provenance !== "session_deleted"`). 시드 catalog 진화에 따른 silent drift를 차단한다.
 - `activeStep`: 저장 시점 wizard step. 마이그레이션 안전망 역할.
 - `scaffoldReady`: 저장 시점 `buildScaffoldPlan(...).validation.can_generate_source && processFlow.validation.errors.length === 0`.
+- 후보별 review state: `resolution_draft`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`은 현재 분석 안의 검토 산출물이다. backfill은 빈 상태로만 채우며 candidate status를 자동 승격하지 않는다.
 
 `loadSavedAnalysis`는 다음 규칙으로 landing step을 선택한다.
 
@@ -110,7 +112,7 @@ MCP/A2A fixture data는 synthetic sample만 사용한다. private endpoint, cred
 
 ## Smoke 일괄 실행 매크로
 
-ADK Runtime Handoff 화면은 `generate → install → start-web → check-web → chat-smoke` 순서를 자동으로 실행하는 "Smoke 일괄 실행" 매크로를 제공한다. 각 단계의 진행 상태(`pending/running/ok/fail`)를 step list pill로 노출하고 실패 시 후속 단계를 차단한다. 단계별 버튼도 계속 사용 가능하며 디버그 용도다.
+ADK Runtime Handoff 화면은 `generate → install → start-web → check-web → chat-smoke` 순서를 자동으로 실행하는 "Smoke 일괄 실행" 매크로를 제공한다. 각 단계의 진행 상태(`pending/running/ok/fail`)를 step list pill로 노출하고 실패 시 후속 단계를 차단한다. 단계별 버튼도 계속 사용 가능하며 디버그 용도다. `chat-smoke`와 일괄 실행은 승인된 후보의 `smoke_spec.ready`와 `sample_user_message`가 있어야 활성화된다.
 
 runtime mode가 `stub`이거나 chat-smoke 응답 이벤트에 `"stubbed_runtime_contract"` 표식이 포함되면 임베드 패널 상단에 노란 stub 배너가 표시된다: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." 이는 stub 출력이 실제 비즈니스 로직이 아님을 reviewer에게 명시한다.
 

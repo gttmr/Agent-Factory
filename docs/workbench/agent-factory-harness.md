@@ -95,9 +95,10 @@ A scaffold plan should make boundaries explicit before code exists. Generated so
 Triage of missing information after analysis follows a two-layer rule.
 
 - Requirement-level `evidence.missing_information` is a soft gate. AnalysisResult exposes a per-row "수용" toggle that writes to `acceptedMissing`. This is reviewer attestation only and does not block scaffold-plan generation. The accepted set is preserved in `SavedAnalysisRecord` and surfaced in the ADK Runtime Handoff header as a "요구사항 누락 수용 N건" chip.
-- Candidate-level `ModuleCandidate.missing_information` and `status === "needs_info"` are hard gates. A candidate cannot transition to `approved` through the status select while either condition remains unresolved. The Module Review inspector requires `missing_information_resolution` before the reviewer can use `해결하고 승인`.
-- `해결하고 승인` copies the current `missing_information` array into `resolved_missing_information`, clears `missing_information`, trims and preserves the reviewer note in `missing_information_resolution`, and sets `status: "approved"`.
-- `buildScaffoldPlan` surfaces unresolved candidates as an actionable blocker ("정보 필요 후보 N개를 모듈 검토에서 해결하고 승인하세요.") and appends "정보 필요 후보 N개 — 모듈 검토에서 해결 메모 필요" to warnings.
+- Candidate-level `ModuleCandidate.missing_information` and unresolved `status === "needs_info"` are hard gates. A candidate cannot transition to `approved` until its Resolution Draft has been reviewed and applied.
+- Module Review generates the Resolution Draft per candidate through the LLM endpoint. The draft is not applied automatically; the reviewer inspects the missing-item answers, expandable input/output object schemas, patch preview, and smoke contract before pressing `반영 적용`.
+- `반영 적용` copies the current `missing_information` array into `resolved_missing_information`, clears `missing_information`, stores the reviewer note in `missing_information_resolution`, records `resolution_applied_at`, marks `schema_review_state: applied`, and stores `smoke_spec`. The reviewer then uses `검토 승인` or the status select to set `approved`.
+- `buildScaffoldPlan` surfaces unresolved candidates as an actionable blocker ("정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.") and appends "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" to warnings.
 
 The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR errors are present.
 
@@ -108,8 +109,15 @@ The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검�
 - `catalogEntries` snapshots the active catalog (`provenance !== "session_deleted"`) at save time and replaces the seed catalog on load. This prevents seed-evolution drift.
 - `activeStep` is the wizard step at save time, used as a migration safety net.
 - `scaffoldReady` is `can_generate_source && Graph IR has no errors` computed at save time. `loadSavedAnalysis` lands on `export` when true; otherwise on `modules` if all candidates are non-`needs_info`, else on `analysis`. Backfill never auto-promotes candidate status.
+- Candidate review state may include `resolution_draft`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec`. Backfill defaults these to empty review state and must not silently clear missing information or approve a candidate.
 
 Saved-analysis fixtures live under `templates/saved-analysis-fixtures/`. They must mirror `moduleCandidates` at both the record top level and `analysis.moduleCandidates`, preserve the saved `catalogEntries` snapshot, and make the intended landing behavior explicit with `scaffoldReady`.
+
+### Graph IR regeneration from Module Review
+
+Module Review regeneration preserves reviewed edge metadata from the previous Graph IR when it can map edge endpoints back to active module candidates. If the previous graph contains only partial edges, regeneration must not leave active module candidates isolated. The workbench adds fallback `event_output` edges in module review order for candidates that lack incoming or outgoing connections, while `rejected` candidates remain excluded.
+
+Graph IR validation treats any module-bound node without at least one incoming edge and one outgoing edge as an error. A graph that merely renders disconnected nodes is not scaffold-ready.
 
 ### Catalog contract registry
 
@@ -123,6 +131,8 @@ The registry must use synthetic data only. Do not add private banking endpoints,
 ### Smoke 일괄 실행 매크로 and stub banner
 
 The Runtime Handoff screen ships a `Smoke 일괄 실행` macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially, surfacing per-step pass/fail pills and halting on the first failure. Individual buttons stay available for debugging.
+
+Chat smoke requires an approved module `smoke_spec` from Module Review. If source generation is ready but no smoke contract is ready, source/install/web actions remain available, while `chat-smoke` and the smoke macro stay disabled and link back to Module Review.
 
 When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel shows a yellow stub-runtime banner so reviewers do not mistake stub output for real business logic.
 

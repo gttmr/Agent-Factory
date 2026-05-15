@@ -100,7 +100,7 @@ export function createAdkRuntimeMiddleware(repoRoot: string) {
         const query =
           typeof body.query === "string" && body.query.trim()
             ? body.query.trim()
-            : "sample complaint for workflow smoke";
+            : smokeQueryFromBody(body) ?? "sample complaint for workflow smoke";
         const run = await runCommand(
           adk,
           ["run", "--jsonl", "--in_memory", "--timeout", "10s", appName, query],
@@ -136,7 +136,7 @@ export function createAdkRuntimeMiddleware(repoRoot: string) {
         const query =
           typeof body.query === "string" && body.query.trim()
             ? body.query.trim()
-            : "sample complaint for workflow smoke";
+            : smokeQueryFromBody(body) ?? "sample complaint for workflow smoke";
         const result = await runChatSmoke(appName, query, port);
         sendJson(res, 200, {
           appName,
@@ -423,6 +423,12 @@ function normalizePort(value: unknown, fallback: number): number {
     throw new Error("ADK Web port는 1024부터 65535 사이의 정수여야 합니다.");
   }
   return port;
+}
+
+function smokeQueryFromBody(body: Record<string, unknown>): string | null {
+  const smokeSpec = isRecord(body.smokeSpec) ? body.smokeSpec : null;
+  const sample = smokeSpec?.sample_user_message;
+  return typeof sample === "string" && sample.trim() ? sample.trim() : null;
 }
 
 function safeOutputRoot(repoRoot: string, outputDir?: string): string {

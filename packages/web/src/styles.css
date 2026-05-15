@@ -4428,6 +4428,150 @@ button.a2a-review-link:hover {
   white-space: nowrap;
 }
 
+.resolution-draft-preview {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+.resolution-draft-header,
+.field-spec-tree-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.resolution-draft-header div {
+  display: grid;
+  gap: 2px;
+}
+.resolution-draft-header span,
+.resolution-answer-row small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+.resolution-answer-list {
+  display: grid;
+  gap: 6px;
+}
+.resolution-answer-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.4fr) minmax(120px, 0.8fr);
+  gap: 8px;
+  align-items: start;
+  border-top: 1px solid #edf1ee;
+  padding-top: 7px;
+  font-size: 0.8rem;
+}
+.patch-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.field-spec-tree {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.field-spec-tree-heading strong,
+.smoke-contract-preview strong {
+  color: #26313d;
+  font-size: 0.82rem;
+}
+.field-spec-row {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e1e8e3;
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 8px;
+}
+.field-spec-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.field-spec-controls input:not([type="checkbox"]),
+.field-spec-controls select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.field-spec-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #4b5963;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+.schema-tree-node {
+  display: grid;
+  gap: 4px;
+}
+.schema-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: #26313d;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+}
+.schema-tree-toggle:disabled {
+  opacity: 1;
+}
+.schema-tree-toggle code {
+  border: 1px solid #d9e4dc;
+  border-radius: 999px;
+  background: #eef6f1;
+  color: #17633b;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+}
+.schema-tree-children {
+  display: grid;
+  gap: 4px;
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid #dce5df;
+}
+.smoke-contract-preview,
+.patch-notes {
+  display: grid;
+  gap: 8px;
+}
+.patch-notes span {
+  border: 1px solid #d9e4dc;
+  border-radius: 7px;
+  background: #f6f9f7;
+  color: #4b5963;
+  padding: 6px 8px;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 980px) {
+  .patch-preview-grid,
+  .resolution-answer-row {
+    grid-template-columns: 1fr;
+  }
+  .field-spec-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Empty-state panel in ADK Runtime Handoff */
 .adk-empty-state {
   display: grid;

@@ -6,7 +6,7 @@ Module Review Board는 개발 리더가 분석 결과를 승인 가능한 설계
 ## 행 단위 의미
 
 각 행은 하나의 `ModuleCandidate`다.
-개발 리더는 candidate의 책임 경계, subtype, 입력/출력 계약, 상태를 검토한다.
+개발 리더는 candidate의 책임 경계, subtype, 입력/출력 계약, 상태, 후보별 정보 필요 항목을 검토한다.
 Analyzer가 제안한 값은 초안이며, 불명확한 경우 새 값을 만들지 말고 `needs_info`로 둔다.
 
 Module Review Board는 두 작업면으로 나뉜다.
@@ -16,6 +16,24 @@ Module Review Board는 두 작업면으로 나뉜다.
 
 카탈로그에서 온 항목은 기본적으로 수정 대상이 아니다.
 카탈로그 원본을 바꾸려면 Catalog review에서 별도로 처리하고, Module Review에서는 현재 분석 artifact 안의 override와 edge 연결만 저장한다.
+
+## Resolution Draft 작업면
+
+`needs_info` 후보는 메모만으로 승인하지 않는다.
+개발 리더는 후보별 `해결 초안 생성`을 실행해 LLM이 만든 Resolution Draft를 받고, 다음 항목을 Inspector에서 검토한다.
+
+- 누락 항목별 답변과 근거
+- 입력/출력 object schema의 펼침 구조
+- 현재 분석 artifact에 반영될 patch preview
+- ADK chat smoke에 사용할 `smoke_spec`
+
+Resolution Draft는 자동 적용되지 않는다.
+`반영 적용`을 누를 때만 현재 분석의 `moduleCandidates`에 반영된다.
+이때 기존 `missing_information`은 `resolved_missing_information`으로 보존되고, `resolution_applied_at`, `schema_review_state: applied`, `smoke_spec`이 기록된다.
+그 뒤 `검토 승인` 또는 status select로 `approved` 상태를 선택한다.
+
+카탈로그 계약 후보도 같은 review state만 수정한다.
+카탈로그 원본 contract, registry, MCP/A2A binding은 Module Review에서 직접 변경하지 않는다.
 
 ## 주요 필드
 
@@ -27,6 +45,10 @@ Module Review Board는 두 작업면으로 나뉜다.
 - `inputs`
 - `outputs`
 - `missing_information`
+- `resolution_draft`
+- `resolution_applied_at`
+- `schema_review_state`
+- `smoke_spec`
 - `rationale`
 
 Subtype은 `module_category`에 맞는 한 필드만 의미를 갖는다.
@@ -44,6 +66,7 @@ Subtype은 `module_category`에 맞는 한 필드만 의미를 갖는다.
 
 `needs_info` 후보는 `missing_information`에 승인 전 필요한 후보별 정보를 적어야 한다.
 요구사항 전체의 부족 정보와 달리, 이 필드는 특정 module candidate를 승인하지 못하는 직접 이유다.
+`approved`로 전환하려면 누락 항목이 비워져야 하며, 정보 필요 상태였던 후보는 Resolution Draft가 적용되어 object schema와 smoke 계약이 검토된 상태여야 한다.
 
 ## 위험 신호
 
@@ -69,7 +92,7 @@ Module Review에서 저장하면 사용자가 수정한 `moduleCandidates`와 �
 - 신규 모듈의 입력/출력 수정은 해당 module node의 ports와 schema refs로 반영된다.
 - 카탈로그 계약 연결 편집은 Graph edge의 `from`, `to`, `edge_kind`, `data_label`, `schema_ref`, state/artifact/A2A metadata로 반영된다.
 - `rejected` 후보는 regenerated Graph IR에서 제외된다.
-- 불완전한 연결은 Graph IR validation warning/error로 드러내고, 모델이 임의로 보정하지 않는다.
+- 기존 Graph IR에 일부 edge만 남아 있으면 저장 시 유효한 edge metadata를 보존하고, 연결이 빠진 후보는 모듈 검토 순서의 fallback edge로 보강한다. 보강 뒤에도 module-bound node에 incoming/outgoing edge가 없으면 Graph IR validation error로 처리한다.
 
 ## 검토 질문
 
@@ -77,6 +100,8 @@ Module Review에서 저장하면 사용자가 수정한 `moduleCandidates`와 �
 - subtype이 category와 맞는가?
 - Process Flow에서 실행 순서와 boundary가 설명되는가?
 - Catalog-bound contract의 입력과 출력이 Graph IR edge로 설명되는가?
+- object 타입 입력/출력은 Schema Tree에서 하위 필드까지 확인되었는가?
+- `smoke_spec`이 synthetic input, sample message, expected output shape를 갖는가?
 - Adapter로 충분한데 Remote A2A로 과분류하지 않았는가?
 - ADK component hint가 category로 잘못 승격되지 않았는가?
 - `approved`로 올리기 전에 필요한 owner, auth, audit, data policy 정보가 있는가?

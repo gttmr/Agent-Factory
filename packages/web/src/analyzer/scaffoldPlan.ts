@@ -107,7 +107,8 @@ function buildScaffoldModule(candidate: ModuleCandidate, catalogEntries: Catalog
     inputs: candidate.inputs,
     outputs: candidate.outputs,
     risk_signals: mergeRiskSignals(candidate.risk_signals, catalogEntry?.risk_signals ?? []),
-    required_review_fields: requiredReviewFieldsFor(candidate)
+    required_review_fields: requiredReviewFieldsFor(candidate),
+    smoke_spec: candidate.smoke_spec ?? null
   };
 }
 
@@ -173,7 +174,7 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
   const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
   const blockers: string[] = [];
   if (unresolvedCandidates > 0) {
-    blockers.push(`정보 필요 후보 ${unresolvedCandidates}개를 모듈 검토에서 해결하고 승인하세요.`);
+    blockers.push(`정보 필요 후보 ${unresolvedCandidates}개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.`);
   }
   if (!modules.length) {
     blockers.push("approved module is required before ADK source generation");
@@ -200,13 +201,26 @@ function collectWarnings(modules: ScaffoldPlanModule[], candidates: ModuleCandid
   });
   const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
   if (unresolvedCandidates > 0) {
-    moduleWarnings.push(`정보 필요 후보 ${unresolvedCandidates}개 — 모듈 검토에서 해결 메모 필요`);
+    moduleWarnings.push(`정보 필요 후보 ${unresolvedCandidates}개 — 모듈 검토에서 Resolution Draft 반영 필요`);
   }
   return moduleWarnings;
 }
 
 function countUnresolvedMissingInfoCandidates(candidates: ModuleCandidate[]): number {
-  return candidates.filter((candidate) => candidate.status === "needs_info" || candidate.missing_information.length > 0).length;
+  return candidates.filter((candidate) => {
+    if (candidate.missing_information.length > 0) return true;
+    return candidate.status === "needs_info" && !candidateResolutionReady(candidate);
+  }).length;
+}
+
+function candidateResolutionReady(candidate: ModuleCandidate): boolean {
+  return Boolean(
+    candidate.resolution_applied_at &&
+      candidate.schema_review_state === "applied" &&
+      candidate.smoke_spec?.ready &&
+      candidate.inputs.length > 0 &&
+      candidate.outputs.length > 0
+  );
 }
 
 function scaffoldOutputFor(candidate: ModuleCandidate): string {

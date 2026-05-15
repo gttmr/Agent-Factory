@@ -108,7 +108,15 @@ function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCan
         : "",
     resolved_missing_information: Array.isArray(candidate.resolved_missing_information)
       ? candidate.resolved_missing_information
-      : []
+      : [],
+    resolution_draft: candidate.resolution_draft ?? null,
+    resolution_applied_at:
+      typeof candidate.resolution_applied_at === "string" ? candidate.resolution_applied_at : null,
+    schema_review_state:
+      candidate.schema_review_state === "drafted" || candidate.schema_review_state === "applied"
+        ? candidate.schema_review_state
+        : "not_started",
+    smoke_spec: candidate.smoke_spec ?? null
   }));
 }
 
