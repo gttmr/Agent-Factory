@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { normalizeA2A } from "./a2aNormalize";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
+import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -92,10 +93,14 @@ function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
           : "req-001";
       const migrated = normalizeGraphIRForRuntime(r.processFlow, reqId);
       const soft = validateGraphIRSoft(migrated);
-      (r as Record<string, unknown>).processFlow = {
+      const validated = {
         ...migrated,
         validation: mergeGraphIRValidation(migrated.validation, soft)
       };
+      (r as Record<string, unknown>).processFlow =
+        hasModuleCoverageErrors(validated) && Array.isArray(r.moduleCandidates)
+          ? repairGraphIRModuleCoverage(validated, r.moduleCandidates as AnalysisResult["moduleCandidates"])
+          : validated;
     }
   } catch (error) {
     console.warn("[analyzer] graph-ir client migration failed (non-fatal):", error);

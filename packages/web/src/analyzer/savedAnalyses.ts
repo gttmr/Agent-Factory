@@ -1,5 +1,6 @@
 import type { CatalogEntry } from "../catalog/types";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
+import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -70,15 +71,21 @@ export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysi
   const requirementId =
     (analysis as { normalizedRequirement?: { id?: string } }).normalizedRequirement?.id ?? "req-001";
   const migrated = normalizeGraphIRForRuntime(flow, requirementId);
-  const validation = mergeGraphIRValidation(migrated.validation, validateGraphIRSoft(migrated));
   const analysisCandidates = backfillCandidateReviewFields(analysis.moduleCandidates);
   const recordCandidates = backfillCandidateReviewFields(
     withContracts.moduleCandidates.length ? withContracts.moduleCandidates : analysisCandidates
   );
+  const validated = {
+    ...migrated,
+    validation: mergeGraphIRValidation(migrated.validation, validateGraphIRSoft(migrated))
+  };
+  const processFlow = hasModuleCoverageErrors(validated)
+    ? repairGraphIRModuleCoverage(validated, recordCandidates)
+    : validated;
   return backfillExportFields({
     ...withContracts,
     moduleCandidates: recordCandidates,
-    analysis: { ...analysis, moduleCandidates: analysisCandidates, processFlow: { ...migrated, validation } }
+    analysis: { ...analysis, moduleCandidates: analysisCandidates, processFlow }
   });
 }
 

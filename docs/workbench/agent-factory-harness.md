@@ -110,6 +110,7 @@ The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검�
 - `activeStep` is the wizard step at save time, used as a migration safety net.
 - `scaffoldReady` is `can_generate_source && Graph IR has no errors` computed at save time. `loadSavedAnalysis` lands on `export` when true; otherwise on `modules` if all candidates are non-`needs_info`, else on `analysis`. Backfill never auto-promotes candidate status.
 - Candidate review state may include `resolution_draft`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec`. Backfill defaults these to empty review state and must not silently clear missing information or approve a candidate.
+- If a saved Graph IR uses stale node ids or has partial edge coverage, load/backfill may repair connectivity from the saved module candidate order. This is a shape migration only; it does not approve candidates or invent runtime details.
 
 Saved-analysis fixtures live under `templates/saved-analysis-fixtures/`. They must mirror `moduleCandidates` at both the record top level and `analysis.moduleCandidates`, preserve the saved `catalogEntries` snapshot, and make the intended landing behavior explicit with `scaffoldReady`.
 

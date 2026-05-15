@@ -83,6 +83,7 @@ ADK Runtime Handoff 화면은 `scaffoldPlan.validation.can_generate_source` 또�
 - `activeStep`: 저장 시점 wizard step. 마이그레이션 안전망 역할.
 - `scaffoldReady`: 저장 시점 `buildScaffoldPlan(...).validation.can_generate_source && processFlow.validation.errors.length === 0`.
 - 후보별 review state: `resolution_draft`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`은 현재 분석 안의 검토 산출물이다. backfill은 빈 상태로만 채우며 candidate status를 자동 승격하지 않는다.
+- 저장본의 Graph IR에 구버전 node id나 일부 누락 edge가 남아 있으면 load/backfill 단계에서 module candidate 순서를 기준으로 connectivity를 repair한다. 이는 저장 데이터를 승인으로 승격하는 작업이 아니라, 이미 존재하는 후보와 edge metadata를 일관된 Graph IR shape로 복구하는 마이그레이션이다.
 
 `loadSavedAnalysis`는 다음 규칙으로 landing step을 선택한다.
 

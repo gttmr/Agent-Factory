@@ -48,6 +48,10 @@ export function buildConnectionDraftsFromGraphIR(
   }
 
   const nodeToModuleId = new Map<string, string>();
+  nodeToModuleId.set(REVIEW_INPUT_NODE_ID, REVIEW_INPUT_ENDPOINT);
+  nodeToModuleId.set("requirement_input", REVIEW_INPUT_ENDPOINT);
+  nodeToModuleId.set(REVIEW_OUTPUT_NODE_ID, REVIEW_OUTPUT_ENDPOINT);
+  nodeToModuleId.set("workflow_output", REVIEW_OUTPUT_ENDPOINT);
   for (const node of graphIR.nodes ?? []) {
     if (node.node_kind === "input") {
       nodeToModuleId.set(node.id, REVIEW_INPUT_ENDPOINT);
@@ -59,6 +63,7 @@ export function buildConnectionDraftsFromGraphIR(
     }
     if (node.module_id && activeModuleIds.has(node.module_id)) {
       nodeToModuleId.set(node.id, node.module_id);
+      nodeToModuleId.set(node.module_id, node.module_id);
     }
   }
 
@@ -85,6 +90,27 @@ export function buildConnectionDraftsFromGraphIR(
   return drafts.length
     ? normalizeConnectionDraftIds(ensureConnectionCoverage(drafts, moduleCandidates))
     : buildLinearConnectionDrafts(moduleCandidates);
+}
+
+export function repairGraphIRModuleCoverage(
+  graphIR: GraphIR,
+  moduleCandidates: ModuleCandidate[]
+): GraphIR {
+  return buildGraphIRFromModuleReview({
+    requirementId: graphIR.requirement_id,
+    graphId: graphIR.graph_id,
+    moduleCandidates,
+    previousGraphIR: graphIR,
+    connections: buildConnectionDraftsFromGraphIR(graphIR, moduleCandidates)
+  });
+}
+
+export function hasModuleCoverageErrors(graphIR: GraphIR): boolean {
+  return (graphIR.validation?.errors ?? []).some(
+    (issue) =>
+      issue.code === "module_node_missing_incoming" ||
+      issue.code === "module_node_missing_outgoing"
+  );
 }
 
 export function buildLinearConnectionDrafts(moduleCandidates: ModuleCandidate[]): ModuleConnectionDraft[] {
