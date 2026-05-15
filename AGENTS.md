@@ -146,9 +146,11 @@ This repository is often operated from WSL while the visible Chrome window is a 
 
 ## Dev Server Reachability
 
-- When the user asks to run a dev server for manual/browser testing, start it in a network namespace that the user can actually reach. In this environment that usually means requesting approval to run `npm run dev -- --host 0.0.0.0` outside the sandbox instead of first starting an isolated sandbox server.
-- Verify reachability from the same network namespace where the server is bound, for example with `curl -I http://127.0.0.1:<port>/` and, when useful, `lsof -iTCP:<port> -sTCP:LISTEN`.
-- Report the actual port Vite selected. If the default port is occupied and Vite moves to another port, use the moved port in verification and in the final testing URL.
+- Manual/browser testing for `packages/web` uses one fixed port: `5173`.
+- When the user asks to run or restart the dev server, do not let Vite auto-increment to `5174`, `5175`, or another fallback port. Use `npm run dev -- --host 0.0.0.0 --port 5173 --strictPort` outside the sandbox so the server binds where the user can reach it.
+- Before starting, check `lsof -iTCP:5173 -sTCP:LISTEN`. If an existing Agent Factory/Vite process owns the port, stop that stale process and restart on `5173`. If an unrelated process owns the port, report the blocker instead of silently moving ports.
+- Verify reachability from the same network namespace where the server is bound with `curl -I http://127.0.0.1:5173/` and, when useful, `lsof -iTCP:5173 -sTCP:LISTEN`.
+- Report only the fixed testing URL `http://127.0.0.1:5173/` unless the user explicitly approves a different port.
 
 Before using Chrome DevTools MCP navigation, DOM inspection, or screenshots, run this gate from WSL:
 
