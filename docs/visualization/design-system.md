@@ -153,6 +153,7 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 **Graph Inspector**
 - 노드 선택 시 `node_kind`, `module_id`, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
 - 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
+- 선택된 edge는 label 유무와 관계없이 선 자체를 굵게 표시하고 다른 edge보다 위에 렌더링해 선택 상태를 즉시 알 수 있어야 한다.
 - `remote_a2a` edge는 Remote A2A 계약 검토 화면으로 이동할 수 있어야 한다.
 
 ## `adk_hints` UI 블록
