@@ -661,6 +661,20 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
   }
 
+  // Module-bound nodes must be connected into the reviewed workflow. A graph
+  // with isolated candidate nodes can render but cannot be a scaffold source.
+  for (const node of nodes) {
+    if (!node || typeof node.module_id !== "string" || !node.module_id.trim()) continue;
+    const incoming = edges.some((edge) => edge && edge.to === node.id);
+    const outgoing = edges.some((edge) => edge && edge.from === node.id);
+    if (!incoming) {
+      errors.push(`${label}.nodes (${node.id}) module-bound node must have at least one incoming edge.`);
+    }
+    if (!outgoing) {
+      errors.push(`${label}.nodes (${node.id}) module-bound node must have at least one outgoing edge.`);
+    }
+  }
+
   // Container-kind specific structural rules.
   for (const container of containers) {
     if (!container || typeof container !== "object") continue;

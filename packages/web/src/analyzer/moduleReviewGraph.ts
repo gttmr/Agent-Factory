@@ -82,7 +82,9 @@ export function buildConnectionDraftsFromGraphIR(
     })
     .filter((draft): draft is ModuleConnectionDraft => draft !== null);
 
-  return drafts.length ? normalizeConnectionDraftIds(drafts) : buildLinearConnectionDrafts(moduleCandidates);
+  return drafts.length
+    ? normalizeConnectionDraftIds(ensureConnectionCoverage(drafts, moduleCandidates))
+    : buildLinearConnectionDrafts(moduleCandidates);
 }
 
 export function buildLinearConnectionDrafts(moduleCandidates: ModuleCandidate[]): ModuleConnectionDraft[] {
@@ -238,6 +240,71 @@ export function buildGraphIRFromModuleReview({
 
 function normalizeConnectionDraftIds(connections: ModuleConnectionDraft[]): ModuleConnectionDraft[] {
   return connections.map((connection, index) => ({ ...connection, id: padEdgeId(index + 1) }));
+}
+
+function ensureConnectionCoverage(
+  connections: ModuleConnectionDraft[],
+  moduleCandidates: ModuleCandidate[]
+): ModuleConnectionDraft[] {
+  const activeCandidates = moduleCandidates.filter((candidate) => candidate.status !== "rejected");
+  if (!activeCandidates.length) return [];
+
+  const next = [...connections];
+  const connectionKeys = new Set(next.map(connectionKey));
+  const incoming = new Set(next.map((connection) => connection.toModuleId));
+  const outgoing = new Set(next.map((connection) => connection.fromModuleId));
+  const orderedEndpoints = [
+    REVIEW_INPUT_ENDPOINT,
+    ...activeCandidates.map((candidate) => candidate.id),
+    REVIEW_OUTPUT_ENDPOINT
+  ];
+
+  const addCoverageConnection = (fromModuleId: string, toModuleId: string) => {
+    if (fromModuleId === toModuleId) return;
+    const key = `${fromModuleId}->${toModuleId}`;
+    if (connectionKeys.has(key)) return;
+    const connection: ModuleConnectionDraft = {
+      id: padEdgeId(next.length + 1),
+      fromModuleId,
+      toModuleId,
+      edge_kind: "event_output",
+      data_label: defaultEdgeLabel(fromModuleId, toModuleId, activeCandidates),
+      schema_ref: firstSchemaRef(fromModuleId, toModuleId, activeCandidates),
+      route_condition: null,
+      state_key: null,
+      artifact_key: null,
+      a2a_contract_id: null
+    };
+    next.push(connection);
+    connectionKeys.add(key);
+    outgoing.add(fromModuleId);
+    incoming.add(toModuleId);
+  };
+
+  for (const candidate of activeCandidates) {
+    const index = orderedEndpoints.indexOf(candidate.id);
+    const previousEndpoint = orderedEndpoints[index - 1] ?? REVIEW_INPUT_ENDPOINT;
+    const nextEndpoint = orderedEndpoints[index + 1] ?? REVIEW_OUTPUT_ENDPOINT;
+    if (!incoming.has(candidate.id)) {
+      addCoverageConnection(previousEndpoint, candidate.id);
+    }
+    if (!outgoing.has(candidate.id)) {
+      addCoverageConnection(candidate.id, nextEndpoint);
+    }
+  }
+
+  if (!outgoing.has(REVIEW_INPUT_ENDPOINT)) {
+    addCoverageConnection(REVIEW_INPUT_ENDPOINT, activeCandidates[0].id);
+  }
+  if (!incoming.has(REVIEW_OUTPUT_ENDPOINT)) {
+    addCoverageConnection(activeCandidates[activeCandidates.length - 1].id, REVIEW_OUTPUT_ENDPOINT);
+  }
+
+  return next;
+}
+
+function connectionKey(connection: ModuleConnectionDraft): string {
+  return `${connection.fromModuleId}->${connection.toModuleId}`;
 }
 
 function endpointToNodeId(endpoint: string, nodeByModuleId: Map<string, string>): string | null {
