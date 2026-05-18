@@ -6,5 +6,7 @@ dist/
 .superpowers/
 __pycache__/
 .pytest_cache/
+generated/
+.playwright-cli/
 generated/**/.venv/
 generated/**/.adk/

@@ -225,6 +225,7 @@ export function layoutGraphIR(
       source: e.from,
       target: e.to,
       type: e.edge_kind ?? "event_output",
+      zIndex: selection.edgeId === id ? 20 : 1,
       data: {
         graphEdge: e,
         selected: selection.edgeId === id,

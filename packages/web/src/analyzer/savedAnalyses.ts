@@ -1,4 +1,6 @@
+import type { CatalogEntry } from "../catalog/types";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
+import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -9,6 +11,16 @@ import type {
 const STORAGE_KEY = "agent-factory.saved-analyses.v1";
 const MAX_RECORDS = 50;
 
+export type SavedActiveStep =
+  | "intake"
+  | "analysis"
+  | "modules"
+  | "graph"
+  | "a2aContracts"
+  | "catalog"
+  | "saved"
+  | "export";
+
 export interface SavedAnalysisRecord {
   id: string;
   title: string;
@@ -18,6 +30,9 @@ export interface SavedAnalysisRecord {
   moduleCandidates: ModuleCandidate[];
   acceptedMissing: string[];
   analyzerModel: CodexAnalyzerModel;
+  catalogEntries: CatalogEntry[];
+  activeStep: SavedActiveStep;
+  scaffoldReady: boolean;
 }
 
 export function loadSavedAnalyses(): SavedAnalysisRecord[] {
@@ -51,16 +66,65 @@ function backfillA2AContracts(record: SavedAnalysisRecord): SavedAnalysisRecord 
 export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysisRecord {
   const withContracts = backfillA2AContracts(record);
   const analysis = withContracts.analysis as AnalysisResult | undefined;
-  if (!analysis) return withContracts;
+  if (!analysis) return backfillExportFields(withContracts);
   const flow = (analysis as { processFlow?: unknown }).processFlow;
   const requirementId =
     (analysis as { normalizedRequirement?: { id?: string } }).normalizedRequirement?.id ?? "req-001";
   const migrated = normalizeGraphIRForRuntime(flow, requirementId);
-  const validation = mergeGraphIRValidation(migrated.validation, validateGraphIRSoft(migrated));
-  return {
-    ...withContracts,
-    analysis: { ...analysis, processFlow: { ...migrated, validation } }
+  const analysisCandidates = backfillCandidateReviewFields(analysis.moduleCandidates);
+  const recordCandidates = backfillCandidateReviewFields(
+    withContracts.moduleCandidates.length ? withContracts.moduleCandidates : analysisCandidates
+  );
+  const validated = {
+    ...migrated,
+    validation: mergeGraphIRValidation(migrated.validation, validateGraphIRSoft(migrated))
   };
+  const processFlow = hasModuleCoverageErrors(validated)
+    ? repairGraphIRModuleCoverage(validated, recordCandidates)
+    : validated;
+  return backfillExportFields({
+    ...withContracts,
+    moduleCandidates: recordCandidates,
+    analysis: { ...analysis, moduleCandidates: analysisCandidates, processFlow }
+  });
+}
+
+// Older saved records pre-date catalogEntries snapshot, activeStep landing
+// hint, and scaffoldReady flag. Fill safe defaults so smart-load logic and
+// catalog restoration can read them without optional-chaining everywhere.
+function backfillExportFields(record: SavedAnalysisRecord): SavedAnalysisRecord {
+  const next: SavedAnalysisRecord = record;
+  const hasCatalog = Array.isArray((record as { catalogEntries?: unknown }).catalogEntries);
+  const hasStep = typeof (record as { activeStep?: unknown }).activeStep === "string";
+  const hasReady = typeof (record as { scaffoldReady?: unknown }).scaffoldReady === "boolean";
+  if (hasCatalog && hasStep && hasReady) return next;
+  return {
+    ...next,
+    catalogEntries: hasCatalog ? next.catalogEntries : [],
+    activeStep: hasStep ? next.activeStep : "analysis",
+    scaffoldReady: hasReady ? next.scaffoldReady : false
+  };
+}
+
+function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCandidate[] {
+  return candidates.map((candidate) => ({
+    ...candidate,
+    missing_information_resolution:
+      typeof candidate.missing_information_resolution === "string"
+        ? candidate.missing_information_resolution
+        : "",
+    resolved_missing_information: Array.isArray(candidate.resolved_missing_information)
+      ? candidate.resolved_missing_information
+      : [],
+    resolution_draft: candidate.resolution_draft ?? null,
+    resolution_applied_at:
+      typeof candidate.resolution_applied_at === "string" ? candidate.resolution_applied_at : null,
+    schema_review_state:
+      candidate.schema_review_state === "drafted" || candidate.schema_review_state === "applied"
+        ? candidate.schema_review_state
+        : "not_started",
+    smoke_spec: candidate.smoke_spec ?? null
+  }));
 }
 
 export function upsertSavedAnalysis(record: SavedAnalysisRecord): SavedAnalysisRecord[] {
@@ -106,6 +170,15 @@ function normalizeSavedAnalysisRecord(value: unknown): SavedAnalysisRecord[] {
     : Array.isArray((analysis as { moduleCandidates?: unknown }).moduleCandidates)
       ? ((analysis as { moduleCandidates: ModuleCandidate[] }).moduleCandidates)
       : [];
+  const catalogEntries = Array.isArray((record as { catalogEntries?: unknown }).catalogEntries)
+    ? ((record as { catalogEntries: CatalogEntry[] }).catalogEntries)
+    : [];
+  const activeStep = typeof (record as { activeStep?: unknown }).activeStep === "string"
+    ? ((record as { activeStep: SavedActiveStep }).activeStep)
+    : "analysis";
+  const scaffoldReady = typeof (record as { scaffoldReady?: unknown }).scaffoldReady === "boolean"
+    ? ((record as { scaffoldReady: boolean }).scaffoldReady)
+    : false;
   return [
     backfillAnalysisShape({
       id: record.id as string,
@@ -115,7 +188,10 @@ function normalizeSavedAnalysisRecord(value: unknown): SavedAnalysisRecord[] {
       analysis,
       moduleCandidates,
       acceptedMissing: record.acceptedMissing as string[],
-      analyzerModel: record.analyzerModel as CodexAnalyzerModel
+      analyzerModel: record.analyzerModel as CodexAnalyzerModel,
+      catalogEntries,
+      activeStep,
+      scaffoldReady
     })
   ];
 }

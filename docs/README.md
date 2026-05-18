@@ -14,7 +14,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 4. [Process Flow](./workbench/process-flow.md)
    분석 결과를 어떤 node와 edge로 그릴지 설명한다.
 5. [Review Board](./workbench/review-board.md)
-   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다.
+   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하고 Resolution Draft를 검토/반영하는 기준이다.
 6. [Validation](./workbench/validation.md)
    review artifact, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다.
 7. [Agent Factory Harness](./workbench/agent-factory-harness.md)

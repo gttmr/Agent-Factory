@@ -23,9 +23,10 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `parallel_region`은 두 개 이상의 entry node와 join 경로가 있어야 한다.
 - `loop_region`은 `loop_back`과 `loop_exit` edge가 있어야 한다.
 - `human_input` node는 downstream edge가 있어야 한다.
+- module-bound node는 incoming edge와 outgoing edge를 각각 최소 1개 가져야 한다. 화면에 노드가 렌더링되더라도 고립 후보는 scaffold source가 될 수 없다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
-- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다.
+- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
 
 ## Live analyzer draft schema
 
@@ -53,11 +54,76 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - Mock/test double 산출물은 catalog contract를 입력으로 만드는 별도 후속 기능이며, seed catalog나 scaffold-plan의 기본 의미가 아니다.
 - runnable business logic은 out of scope다.
 
+ADK Runtime Handoff 화면은 생성된 source bundle을 대상으로 다음 개발용 smoke를 제공한다.
+
+- generated output directory에 `scaffold-plan.json`과 ADK source bundle을 쓴다.
+- local `.venv`를 만들고 `requirements.txt` 기준으로 ADK dependency를 설치할 수 있다.
+- `compileall`과 `pytest`로 generated source의 구조 검증을 실행한다.
+- `adk web`을 시작하고 선택된 app URL을 workbench 안에 iframe으로 임베딩한다.
+- ADK API server의 session 생성 endpoint와 `/run` endpoint를 호출해 같은 app에 대한 채팅 smoke를 실행한다.
+
+이 임베딩/채팅 smoke는 개발 검증용이다. ADK Web은 공식 문서상 production deployment용 UI가 아니며, 배포 UI나 운영 인증 흐름으로 간주하지 않는다.
+
+## Missing-information 2계층 게이트
+
+분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
+
+- **Requirement-level (`evidence.missing_information`) — soft gate.** AnalysisResult 화면에서 항목별 "수용" 토글이 제공된다. 토글은 `acceptedMissing` 배열을 갱신하며 reviewer attestation으로만 사용한다. scaffold-plan 생성은 차단하지 않는다. 저장 record와 ADK Runtime Handoff 화면(`요구사항 누락 수용 N건` chip)으로 흐름이 보존된다.
+- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Module Review 인스펙터에서 후보별 `해결 초안 생성`을 실행하고 object schema와 smoke 계약을 검토한 뒤 `반영 적용`해야 한다.
+- **Resolved review state.** `반영 적용`은 기존 누락 항목을 `resolved_missing_information`에 보존하고, `missing_information`을 비우며, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 현재 분석 artifact에 저장한다. 카탈로그 계약 후보도 같은 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
+- **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인데 Resolution Draft가 아직 적용되지 않은 후보가 있으면 `scaffold-plan.validation.blockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." 메시지를 emit한다. unresolved 후보 개수는 `validation.warnings`에 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요"로 누적된다.
+
+ADK Runtime Handoff 화면은 `scaffoldPlan.validation.can_generate_source` 또는 Graph IR error로 준비되지 않은 경우 상단에 empty-state 패널과 "모듈 검토로 이동" 버튼을 노출한다. 이는 사유 안내와 한 번에 모듈 검토로 돌아가는 deep link 역할을 한다.
+
+## 저장된 분석 record와 landing step
+
+`SavedAnalysisRecord`는 다음 필드를 포함한다.
+
+- `catalogEntries`: 저장 시점 세션의 활성 catalog entry snapshot(`provenance !== "session_deleted"`). 시드 catalog 진화에 따른 silent drift를 차단한다.
+- `activeStep`: 저장 시점 wizard step. 마이그레이션 안전망 역할.
+- `scaffoldReady`: 저장 시점 `buildScaffoldPlan(...).validation.can_generate_source && processFlow.validation.errors.length === 0`.
+- 후보별 review state: `resolution_draft`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`은 현재 분석 안의 검토 산출물이다. backfill은 빈 상태로만 채우며 candidate status를 자동 승격하지 않는다.
+- 저장본의 Graph IR에 구버전 node id나 일부 누락 edge가 남아 있으면 load/backfill 단계에서 module candidate 순서를 기준으로 connectivity를 repair한다. 이는 저장 데이터를 승인으로 승격하는 작업이 아니라, 이미 존재하는 후보와 edge metadata를 일관된 Graph IR shape로 복구하는 마이그레이션이다.
+
+`loadSavedAnalysis`는 다음 규칙으로 landing step을 선택한다.
+
+- `scaffoldReady === true` → `export`로 진입.
+- 모든 후보가 `needs_info`가 아니지만 `can_generate_source`가 false → `modules`.
+- 그 외 → `analysis`.
+
+Catalog는 시드가 아니라 record snapshot으로 교체된다. backfill은 구버전 record에 안전한 기본값을 채우며 candidate status는 절대 자동 승격하지 않는다.
+
+### 저장 분석 fixture
+
+`templates/saved-analysis-fixtures/`는 localStorage 주입용 `SavedAnalysisRecord` fixture를 보관한다.
+
+- `catalog-needs-info.json`: 요구사항 수준 누락은 `acceptedMissing`으로 수용할 수 있지만 후보 수준 `ModuleCandidate.missing_information`은 승인과 source generation을 막는지 검증한다.
+- `catalog-scaffold-ready.json`: 승인된 catalog-bound 후보가 `scaffoldReady=true`로 저장되고 ADK Runtime Handoff 화면에 바로 진입할 수 있는지 검증한다.
+
+fixture는 `moduleCandidates`를 top-level record와 `analysis.moduleCandidates` 양쪽에 같은 id/order로 저장해야 한다. 저장된 record loader는 top-level `moduleCandidates`를 화면의 검토 상태로 사용하므로 둘이 다르면 visual smoke가 실제 저장 흐름과 달라진다.
+
+## Catalog contract registry
+
+`catalog/contracts/`는 catalog entry를 mock 목록으로 바꾸지 않고, test double을 만들 수 있는 runtime contract 본문을 보관한다.
+
+- `catalog/contracts/mcp/*.json`: `mcp_schema_ref`가 가리키는 MCP tool contract다. 각 파일은 `inputSchema`, `outputSchema`, `success_examples`, `error_examples`, `mock_response.structuredContent`를 포함한다.
+- `catalog/contracts/a2a/*.json`: `runtime_binding: remote_a2a` 또는 Remote A2A 검토에 쓰는 A2A contract 본문이다. Agent Card, interface, message/task/artifact contract, auth, timeout, retry, fallback, audit, data policy와 synthetic task examples를 포함한다.
+
+MCP/A2A fixture data는 synthetic sample만 사용한다. private endpoint, credential, deployment script, 실제 고객/은행 데이터는 catalog contract registry에 넣지 않는다.
+
+## Smoke 일괄 실행 매크로
+
+ADK Runtime Handoff 화면은 `generate → install → start-web → check-web → chat-smoke` 순서를 자동으로 실행하는 "Smoke 일괄 실행" 매크로를 제공한다. 각 단계의 진행 상태(`pending/running/ok/fail`)를 step list pill로 노출하고 실패 시 후속 단계를 차단한다. 단계별 버튼도 계속 사용 가능하며 디버그 용도다. `chat-smoke`와 일괄 실행은 승인된 후보의 `smoke_spec.ready`와 `sample_user_message`가 있어야 활성화된다.
+
+runtime mode가 `stub`이거나 chat-smoke 응답 이벤트에 `"stubbed_runtime_contract"` 표식이 포함되면 임베드 패널 상단에 노란 stub 배너가 표시된다: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." 이는 stub 출력이 실제 비즈니스 로직이 아님을 reviewer에게 명시한다.
+
 ## 검증 명령
 
 ```bash
 node scripts/validate-artifacts.mjs templates
 node scripts/validate-artifacts.mjs templates/regression-scenarios
+node scripts/validate-artifacts.mjs templates/saved-analysis-fixtures
+node scripts/validate-artifacts.mjs catalog/contracts
 cd packages/web && npm run build
 ```
 

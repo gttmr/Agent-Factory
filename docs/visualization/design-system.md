@@ -129,6 +129,16 @@ Module Review는 같은 테이블을 필터링하는 화면이 아니라 두 작
 위험도, 신뢰도, 재사용 여부는 탭의 메인 컬럼에 두지 않는다.
 필요하면 inspector의 보조 evidence로만 표시한다.
 
+정보 필요 후보의 Inspector는 `Resolution Draft`를 하나의 작업면으로 표시한다.
+LLM 초안은 바로 적용하지 않고, 누락 항목 답변, patch preview, `Smoke 계약`을 같은 위치에서 검토하게 한다.
+`object` 또는 `array<object>` 입력/출력은 textarea가 아니라 Schema Tree로 표시한다.
+
+- object 행은 접힘/펼침 가능한 단일 row로 둔다.
+- 하위 field는 들여쓰기와 얇은 divider로 표시하고, 타입은 작은 code pill로 보여준다.
+- 필드 추가, required 토글, type select는 Inspector 안에 두며 테이블 컬럼으로 끌어내지 않는다.
+- raw JSON은 주 편집면이 아니라 보조 확인 수단으로만 쓴다.
+- `반영 적용`과 `검토 승인`은 분리한다. 적용 전 승인 버튼은 disabled 상태여야 한다.
+
 ## Process Flow 시각화
 
 `packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.
@@ -143,6 +153,7 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 **Graph Inspector**
 - 노드 선택 시 `node_kind`, `module_id`, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
 - 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
+- 선택된 edge는 label 유무와 관계없이 선 자체를 굵게 표시하고 다른 edge보다 위에 렌더링해 선택 상태를 즉시 알 수 있어야 한다.
 - `remote_a2a` edge는 Remote A2A 계약 검토 화면으로 이동할 수 있어야 한다.
 
 ## `adk_hints` UI 블록

@@ -635,6 +635,28 @@ export function validateGraphIRSoft(
     }
   }
 
+  for (const node of nodes) {
+    if (!node || typeof node.id !== "string" || !node.module_id) continue;
+    const hasIncoming = edges.some((edge) => edge && edge.to === node.id);
+    const hasOutgoing = edges.some((edge) => edge && edge.from === node.id);
+    if (!hasIncoming) {
+      errors.push({
+        code: "module_node_missing_incoming",
+        message: `Module node ${node.id} has no incoming edge.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (!hasOutgoing) {
+      errors.push({
+        code: "module_node_missing_outgoing",
+        message: `Module node ${node.id} has no outgoing edge.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+  }
+
   for (const container of containers) {
     if (!container) continue;
     if (typeof container.id !== "string" || !/^container-[a-z0-9-]+$/.test(container.id)) {

@@ -1,0 +1,1028 @@
+{
+  "id": "fixture-catalog-needs-info",
+  "title": "Catalog contract review - needs info",
+  "savedAt": "2026-05-14T00:00:00.000+09:00",
+  "input": {
+    "domain": "여신",
+    "rawText": "여신 신청 접수 후 제출 문서 OCR, 정책 근거 조회, 사전 심사 룰 평가를 묶어 검토 가능한 워크플로우로 만들고 싶다. 카탈로그에 등록된 공통 계약을 재사용하되 아직 문서 패키지 형식과 정책 기준일은 리뷰가 필요하다."
+  },
+  "analysis": {
+    "normalizedRequirement": {
+      "id": "req-001",
+      "title": "Loan precheck catalog reuse review",
+      "raw_text": "여신 신청 접수 후 제출 문서 OCR, 정책 근거 조회, 사전 심사 룰 평가를 묶어 검토 가능한 워크플로우로 만들고 싶다. 카탈로그에 등록된 공통 계약을 재사용하되 아직 문서 패키지 형식과 정책 기준일은 리뷰가 필요하다.",
+      "domain": "여신",
+      "requester": {
+        "team": "loan-operations",
+        "role": "business-user"
+      },
+      "business_goal": "카탈로그 재사용 후보의 누락 정보를 reviewer가 확인하고 승인 전 차단되는 흐름을 검증한다.",
+      "current_process": [
+        "여신 신청과 제출 문서를 접수한다.",
+        "문서 OCR과 정책 근거 조회를 검토한다.",
+        "룰 평가와 위험 설명 후보를 모듈 검토에서 승인한다."
+      ],
+      "inputs": [
+        {
+          "name": "loan_application",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "submitted_documents",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "precheck_review_packet",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "systems": [
+        {
+          "name": "document-ocr-mcp",
+          "access": "read"
+        },
+        {
+          "name": "banking-knowledge-mcp",
+          "access": "read"
+        }
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "missing_information": [
+        "문서 패키지 입력 예시",
+        "정책 조회 기준일",
+        "사전 심사 룰셋 승인 여부"
+      ],
+      "contradictions": [],
+      "status": "draft"
+    },
+    "evidence": {
+      "requested_goal": "카탈로그 재사용 기반 여신 사전 검토 흐름을 만든다.",
+      "business_domain_hint": "여신",
+      "user_role": "business-user",
+      "input_data": [
+        "loan_application",
+        "submitted_documents"
+      ],
+      "output_data": [
+        "precheck_review_packet"
+      ],
+      "systems_mentioned": [
+        "document-ocr-mcp",
+        "banking-knowledge-mcp"
+      ],
+      "decisions_implied": [
+        "reuse catalog workflow",
+        "review missing input contract"
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "missing_information": [
+        "문서 패키지 입력 예시",
+        "정책 조회 기준일",
+        "사전 심사 룰셋 승인 여부"
+      ],
+      "contradictions": [],
+      "assumptions": [
+        "카탈로그 항목은 runtime contract이며 mock-only 후보가 아니다.",
+        "요구사항 수준 누락은 reviewer attestation으로 수용할 수 있다."
+      ]
+    },
+    "moduleCandidates": [
+      {
+        "id": "mod-001",
+        "source_requirement_id": "req-001",
+        "catalog_entry_id": "seed-workflow-loan_application_precheck_workflow",
+        "name": "loan_application_precheck_workflow",
+        "module_category": "workflow",
+        "agent_kind": null,
+        "workflow_kind": "graph",
+        "adapter_kind": null,
+        "remote_contract_kind": null,
+        "access_protocol": null,
+        "confidence": 0.86,
+        "rationale": "기존 여신 사전 심사 workflow catalog entry를 재사용하지만 문서 패키지와 룰셋 검토가 남아 있다.",
+        "adk_hints": {
+          "state_memory": "session_state keeps loan_application and submitted_documents",
+          "callbacks": null,
+          "artifacts_events": "emits precheck_review_packet as event_output",
+          "mcp_a2a": "uses catalog-bound adapters after review",
+          "streaming_grounding": null
+        },
+        "inputs": [
+          {
+            "name": "loan_application",
+            "type": "object",
+            "required": true
+          },
+          {
+            "name": "submitted_documents",
+            "type": "array<object>",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "precheck_result",
+            "type": "object",
+            "required": true
+          }
+        ],
+        "reuse_candidate": true,
+        "risk_level": "medium",
+        "risk_signals": [
+          "personal_data",
+          "financial_data",
+          "audit_required"
+        ],
+        "status": "needs_info",
+        "missing_information": [
+          "문서 패키지 입력 예시",
+          "사전 심사 룰셋 승인 여부"
+        ],
+        "side_effect": "read",
+        "auth_required": true,
+        "audit_required": true,
+        "citation_required": false,
+        "grounding_required": false,
+        "source_acl_required": false,
+        "versioned": false,
+        "effective_date_required": true,
+        "owner_domain": "여신",
+        "owner": null,
+        "agent_card": null,
+        "auth": null,
+        "task_lifecycle": null,
+        "timeout": null,
+        "retry": null,
+        "fallback": null,
+        "audit": null,
+        "data_policy": null,
+        "a2a_contract_id": null,
+        "missing_information_resolution": "",
+        "resolved_missing_information": []
+      },
+      {
+        "id": "mod-002",
+        "source_requirement_id": "req-001",
+        "catalog_entry_id": "seed-adapter-bank_document_ocr_adapter",
+        "name": "bank_document_ocr_adapter",
+        "module_category": "adapter",
+        "agent_kind": null,
+        "workflow_kind": null,
+        "adapter_kind": "external_service",
+        "remote_contract_kind": null,
+        "access_protocol": "mcp",
+        "mcp_server": "document-ocr-mcp",
+        "mcp_tool_name": "extract_bank_document_text",
+        "mcp_schema_ref": "catalog.banking.document_ocr.extract_text.v1",
+        "mcp_auth_mode": "runtime_managed_service_account",
+        "confidence": 0.91,
+        "rationale": "문서 OCR은 catalog-bound MCP adapter와 일치하지만 fixture 입력 문서 URI 정책이 필요하다.",
+        "adk_hints": {
+          "state_memory": null,
+          "callbacks": null,
+          "artifacts_events": "emits ocr_text and page_blocks",
+          "mcp_a2a": "MCP tool contract",
+          "streaming_grounding": null
+        },
+        "inputs": [
+          {
+            "name": "document_uri",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "ocr_text",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "page_blocks",
+            "type": "array<object>",
+            "required": true
+          }
+        ],
+        "reuse_candidate": true,
+        "risk_level": "medium",
+        "risk_signals": [
+          "personal_data",
+          "financial_data",
+          "audit_required"
+        ],
+        "status": "needs_info",
+        "missing_information": [
+          "문서 URI fixture policy"
+        ],
+        "side_effect": "read",
+        "auth_required": true,
+        "audit_required": true,
+        "citation_required": false,
+        "grounding_required": false,
+        "source_acl_required": false,
+        "versioned": false,
+        "effective_date_required": false,
+        "owner_domain": "공통",
+        "owner": null,
+        "agent_card": null,
+        "auth": null,
+        "task_lifecycle": null,
+        "timeout": null,
+        "retry": null,
+        "fallback": null,
+        "audit": null,
+        "data_policy": null,
+        "a2a_contract_id": null,
+        "missing_information_resolution": "",
+        "resolved_missing_information": []
+      },
+      {
+        "id": "mod-003",
+        "source_requirement_id": "req-001",
+        "catalog_entry_id": "seed-adapter-banking_policy_retrieval_adapter",
+        "name": "banking_policy_retrieval_adapter",
+        "module_category": "adapter",
+        "agent_kind": null,
+        "workflow_kind": null,
+        "adapter_kind": "retrieval",
+        "remote_contract_kind": null,
+        "access_protocol": "mcp",
+        "mcp_server": "banking-knowledge-mcp",
+        "mcp_tool_name": "search_policy_documents",
+        "mcp_schema_ref": "catalog.banking.knowledge.policy_search.v1",
+        "mcp_auth_mode": "runtime_managed_service_account",
+        "confidence": 0.88,
+        "rationale": "정책 조회 adapter는 재사용 가능하지만 기준일과 출처 ACL 확인이 남아 있다.",
+        "adk_hints": {
+          "state_memory": null,
+          "callbacks": null,
+          "artifacts_events": "emits policy_matches and citations",
+          "mcp_a2a": "MCP retrieval contract",
+          "streaming_grounding": "citations required"
+        },
+        "inputs": [
+          {
+            "name": "query",
+            "type": "text",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "policy_matches",
+            "type": "array<object>",
+            "required": true
+          },
+          {
+            "name": "citations",
+            "type": "array<object>",
+            "required": true
+          }
+        ],
+        "reuse_candidate": true,
+        "risk_level": "medium",
+        "risk_signals": [
+          "audit_required"
+        ],
+        "status": "needs_info",
+        "missing_information": [
+          "정책 조회 기준일",
+          "source ACL"
+        ],
+        "side_effect": "read",
+        "auth_required": true,
+        "audit_required": true,
+        "citation_required": true,
+        "grounding_required": true,
+        "source_acl_required": true,
+        "versioned": false,
+        "effective_date_required": true,
+        "owner_domain": "공통",
+        "owner": null,
+        "agent_card": null,
+        "auth": null,
+        "task_lifecycle": null,
+        "timeout": null,
+        "retry": null,
+        "fallback": null,
+        "audit": null,
+        "data_policy": null,
+        "a2a_contract_id": null,
+        "missing_information_resolution": "",
+        "resolved_missing_information": []
+      }
+    ],
+    "a2aContracts": [],
+    "processFlow": {
+      "requirement_id": "req-001",
+      "graph_id": "graph-001",
+      "root_workflow_module_id": "mod-001",
+      "nodes": [
+        {
+          "id": "requirement_input",
+          "module_id": null,
+          "label": "Requirement input",
+          "node_kind": "input",
+          "execution_kind": null,
+          "adk_node_role": "synthetic",
+          "owner_scope": "local",
+          "container_id": "container-root",
+          "lane_id": "input",
+          "input_ports": [],
+          "output_ports": [],
+          "schema_refs": [],
+          "review_status": "n/a"
+        },
+        {
+          "id": "mod-001",
+          "module_id": "mod-001",
+          "label": "loan_application_precheck_workflow",
+          "node_kind": "workflow",
+          "execution_kind": "workflow",
+          "adk_node_role": "workflow_node",
+          "owner_scope": "local",
+          "container_id": "container-root",
+          "lane_id": "local_graph",
+          "input_ports": [],
+          "output_ports": [],
+          "schema_refs": [],
+          "review_status": "needs_info"
+        },
+        {
+          "id": "workflow_output",
+          "module_id": null,
+          "label": "Workflow output",
+          "node_kind": "output",
+          "execution_kind": null,
+          "adk_node_role": "synthetic",
+          "owner_scope": "local",
+          "container_id": "container-root",
+          "lane_id": "output",
+          "input_ports": [],
+          "output_ports": [],
+          "schema_refs": [],
+          "review_status": "n/a"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-001",
+          "from": "requirement_input",
+          "to": "mod-001",
+          "from_port": null,
+          "to_port": null,
+          "edge_kind": "event_output",
+          "execution_semantics": "normal_transition",
+          "data_label": "review input",
+          "schema_ref": "LoanPrecheckInput",
+          "route_condition": null,
+          "state_key": null,
+          "artifact_key": null,
+          "a2a_contract_id": null,
+          "is_remote_boundary_crossing": false
+        },
+        {
+          "id": "edge-002",
+          "from": "mod-001",
+          "to": "workflow_output",
+          "from_port": null,
+          "to_port": null,
+          "edge_kind": "event_output",
+          "execution_semantics": "normal_transition",
+          "data_label": "precheck review packet",
+          "schema_ref": "PrecheckReviewPacket",
+          "route_condition": null,
+          "state_key": null,
+          "artifact_key": null,
+          "a2a_contract_id": null,
+          "is_remote_boundary_crossing": false
+        }
+      ],
+      "containers": [
+        {
+          "id": "container-root",
+          "module_id": null,
+          "label": "Root graph workflow",
+          "container_kind": "graph_workflow",
+          "adk_mapping": "GraphWorkflow",
+          "contains_node_ids": [
+            "requirement_input",
+            "mod-001",
+            "workflow_output"
+          ],
+          "entry_node_ids": [
+            "requirement_input"
+          ],
+          "exit_node_ids": [
+            "workflow_output"
+          ],
+          "layout_policy": "linear",
+          "parent_container_id": null
+        }
+      ],
+      "lanes": [
+        {
+          "id": "input",
+          "label": "input"
+        },
+        {
+          "id": "local_graph",
+          "label": "local_graph"
+        },
+        {
+          "id": "output",
+          "label": "output"
+        }
+      ],
+      "validation": {
+        "ok": true,
+        "errors": [],
+        "warnings": []
+      }
+    }
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-001",
+      "catalog_entry_id": "seed-workflow-loan_application_precheck_workflow",
+      "name": "loan_application_precheck_workflow",
+      "module_category": "workflow",
+      "agent_kind": null,
+      "workflow_kind": "graph",
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "access_protocol": null,
+      "confidence": 0.86,
+      "rationale": "기존 여신 사전 심사 workflow catalog entry를 재사용하지만 문서 패키지와 룰셋 검토가 남아 있다.",
+      "adk_hints": {
+        "state_memory": "session_state keeps loan_application and submitted_documents",
+        "callbacks": null,
+        "artifacts_events": "emits precheck_review_packet as event_output",
+        "mcp_a2a": "uses catalog-bound adapters after review",
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "loan_application",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "submitted_documents",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "precheck_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "문서 패키지 입력 예시",
+        "사전 심사 룰셋 승인 여부"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": true,
+      "owner_domain": "여신",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null,
+      "missing_information_resolution": "",
+      "resolved_missing_information": []
+    },
+    {
+      "id": "mod-002",
+      "source_requirement_id": "req-001",
+      "catalog_entry_id": "seed-adapter-bank_document_ocr_adapter",
+      "name": "bank_document_ocr_adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "external_service",
+      "remote_contract_kind": null,
+      "access_protocol": "mcp",
+      "mcp_server": "document-ocr-mcp",
+      "mcp_tool_name": "extract_bank_document_text",
+      "mcp_schema_ref": "catalog.banking.document_ocr.extract_text.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "confidence": 0.91,
+      "rationale": "문서 OCR은 catalog-bound MCP adapter와 일치하지만 fixture 입력 문서 URI 정책이 필요하다.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "emits ocr_text and page_blocks",
+        "mcp_a2a": "MCP tool contract",
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "document_uri",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ocr_text",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "page_blocks",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "문서 URI fixture policy"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "공통",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null,
+      "missing_information_resolution": "",
+      "resolved_missing_information": []
+    },
+    {
+      "id": "mod-003",
+      "source_requirement_id": "req-001",
+      "catalog_entry_id": "seed-adapter-banking_policy_retrieval_adapter",
+      "name": "banking_policy_retrieval_adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "retrieval",
+      "remote_contract_kind": null,
+      "access_protocol": "mcp",
+      "mcp_server": "banking-knowledge-mcp",
+      "mcp_tool_name": "search_policy_documents",
+      "mcp_schema_ref": "catalog.banking.knowledge.policy_search.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "confidence": 0.88,
+      "rationale": "정책 조회 adapter는 재사용 가능하지만 기준일과 출처 ACL 확인이 남아 있다.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "emits policy_matches and citations",
+        "mcp_a2a": "MCP retrieval contract",
+        "streaming_grounding": "citations required"
+      },
+      "inputs": [
+        {
+          "name": "query",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "policy_matches",
+          "type": "array<object>",
+          "required": true
+        },
+        {
+          "name": "citations",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "정책 조회 기준일",
+        "source ACL"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": true,
+      "grounding_required": true,
+      "source_acl_required": true,
+      "versioned": false,
+      "effective_date_required": true,
+      "owner_domain": "공통",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null,
+      "missing_information_resolution": "",
+      "resolved_missing_information": []
+    }
+  ],
+  "acceptedMissing": [
+    "문서 패키지 입력 예시"
+  ],
+  "analyzerModel": "gpt-5.3-codex-spark",
+  "catalogEntries": [
+    {
+      "id": "seed-adapter-legacy_core_sql_query_adapter",
+      "name": "legacy_core_sql_query_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "data_query",
+      "access_protocol": "mcp",
+      "mcp_server": "legacy-core-sql-mcp",
+      "mcp_tool_name": "execute_readonly_sql",
+      "mcp_schema_ref": "catalog.banking.legacy_core_sql.execute_readonly_sql.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "data_source_key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "sql_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "query_purpose",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rows",
+          "type": "array<object>"
+        },
+        {
+          "name": "schema",
+          "type": "array<object>"
+        },
+        {
+          "name": "row_count",
+          "type": "number"
+        }
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-adapter-bank_document_ocr_adapter",
+      "name": "bank_document_ocr_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "external_service",
+      "access_protocol": "mcp",
+      "mcp_server": "document-ocr-mcp",
+      "mcp_tool_name": "extract_bank_document_text",
+      "mcp_schema_ref": "catalog.banking.document_ocr.extract_text.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "document_uri",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ocr_text",
+          "type": "text"
+        },
+        {
+          "name": "page_blocks",
+          "type": "array<object>"
+        }
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-adapter-banking_policy_retrieval_adapter",
+      "name": "banking_policy_retrieval_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "retrieval",
+      "access_protocol": "mcp",
+      "mcp_server": "banking-knowledge-mcp",
+      "mcp_tool_name": "search_policy_documents",
+      "mcp_schema_ref": "catalog.banking.knowledge.policy_search.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "query",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "policy_matches",
+          "type": "array<object>"
+        },
+        {
+          "name": "citations",
+          "type": "array<object>"
+        }
+      ],
+      "risk_signals": [
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-adapter-banking_rule_registry_adapter",
+      "name": "banking_rule_registry_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "rule_registry",
+      "access_protocol": "mcp",
+      "mcp_server": "banking-rule-registry-mcp",
+      "mcp_tool_name": "evaluate_rule_set",
+      "mcp_schema_ref": "catalog.banking.rule_registry.evaluate_rule_set.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "rule_set_key",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rule_result",
+          "type": "object"
+        }
+      ],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-adapter-banking_template_registry_adapter",
+      "name": "banking_template_registry_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "template",
+      "access_protocol": "mcp",
+      "mcp_server": "banking-template-registry-mcp",
+      "mcp_tool_name": "get_template",
+      "mcp_schema_ref": "catalog.banking.template_registry.get_template.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "template_key",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "template",
+          "type": "object"
+        }
+      ],
+      "risk_signals": [
+        "external_message",
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-adapter-customer_account_snapshot_adapter",
+      "name": "customer_account_snapshot_adapter",
+      "module_category": "adapter",
+      "adapter_kind": "data_query",
+      "access_protocol": "mcp",
+      "mcp_server": "customer-account-mcp",
+      "mcp_tool_name": "get_customer_account_snapshot",
+      "mcp_schema_ref": "catalog.banking.customer_account.snapshot.v1",
+      "mcp_auth_mode": "runtime_managed_service_account",
+      "component_source": "mcp",
+      "runtime_binding": "mcp",
+      "owner_domain": "고객",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "customer_identifier",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "customer_snapshot",
+          "type": "object"
+        }
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-workflow-common_document_intake_workflow",
+      "name": "common_document_intake_workflow",
+      "module_category": "workflow",
+      "workflow_kind": "graph",
+      "component_source": "remote_a2a",
+      "runtime_binding": "remote_a2a",
+      "owner_domain": "공통",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "document_package",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "document_context",
+          "type": "object"
+        }
+      ],
+      "composition": [
+        "adapter: bank_document_ocr_adapter",
+        "adapter: banking_policy_retrieval_adapter"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-workflow-loan_application_precheck_workflow",
+      "name": "loan_application_precheck_workflow",
+      "module_category": "workflow",
+      "workflow_kind": "graph",
+      "runtime_binding": "unresolved",
+      "owner_domain": "여신",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "loan_application",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "precheck_result",
+          "type": "object"
+        }
+      ],
+      "composition": [
+        "workflow: common_document_intake_workflow",
+        "adapter: banking_rule_registry_adapter"
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-agent-loan_document_review_specialist",
+      "name": "loan_document_review_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "runtime_binding": "unresolved",
+      "owner_domain": "여신",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "document_context",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "document_review_result",
+          "type": "object"
+        }
+      ],
+      "provenance": "seeded"
+    },
+    {
+      "id": "seed-agent-credit_risk_reasoning_specialist",
+      "name": "credit_risk_reasoning_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "runtime_binding": "unresolved",
+      "owner_domain": "리스크",
+      "status": "proposed",
+      "contract_status": "runtime_config_required",
+      "inputs": [
+        {
+          "name": "applicant_context",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "risk_reasoning",
+          "type": "object"
+        }
+      ],
+      "provenance": "seeded"
+    }
+  ],
+  "activeStep": "analysis",
+  "scaffoldReady": false
+}

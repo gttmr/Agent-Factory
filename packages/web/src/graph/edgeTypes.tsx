@@ -140,6 +140,7 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
 
   const label = spec.showLabel && graphEdge ? buildLabel(graphEdge, spec.labelPrefix) : "";
   const isSelected = data?.selected;
+  const selectedStrokeWidth = Math.max(spec.strokeWidth + 3, spec.strokeWidth * 1.8);
 
   return (
     <>
@@ -148,9 +149,13 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
         path={edgePath}
         style={{
           stroke: spec.stroke,
-          strokeWidth: spec.strokeWidth,
+          strokeWidth: isSelected ? selectedStrokeWidth : spec.strokeWidth,
           strokeDasharray: spec.strokeDasharray,
-          opacity: isSelected ? 1 : 0.92
+          opacity: isSelected ? 1 : 0.92,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          filter: isSelected ? "drop-shadow(0 0 3px rgba(30, 122, 77, 0.35))" : undefined,
+          transition: "stroke-width 120ms ease, opacity 120ms ease, filter 120ms ease"
         }}
       />
       {label ? (

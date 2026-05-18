@@ -129,6 +129,29 @@
         "minLength": 1
       }
     },
+    "missing_information_resolution": {
+      "type": "string"
+    },
+    "resolved_missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "resolution_draft": {
+      "anyOf": [{ "$ref": "#/$defs/resolutionDraft" }, { "type": "null" }]
+    },
+    "resolution_applied_at": {
+      "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+    },
+    "schema_review_state": {
+      "type": "string",
+      "enum": ["not_started", "drafted", "applied"]
+    },
+    "smoke_spec": {
+      "anyOf": [{ "$ref": "#/$defs/smokeSpec" }, { "type": "null" }]
+    },
     "risk_signals": {
       "type": "array",
       "items": {
@@ -353,8 +376,39 @@
         "required": {
           "type": "boolean",
           "default": false
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema"
         }
       }
+    },
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "smokeSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_user_message",
+        "synthetic_inputs",
+        "expected_output_shape",
+        "expected_event_markers",
+        "mock_sources",
+        "ready"
+      ],
+      "properties": {
+        "sample_user_message": { "type": "string" },
+        "synthetic_inputs": { "type": "object", "additionalProperties": true },
+        "expected_output_shape": { "$ref": "#/$defs/jsonSchema" },
+        "expected_event_markers": { "type": "array", "items": { "type": "string" } },
+        "mock_sources": { "type": "array", "items": { "type": "string" } },
+        "ready": { "type": "boolean" }
+      }
+    },
+    "resolutionDraft": {
+      "type": "object",
+      "additionalProperties": true
     }
   },
   "examples": [

@@ -185,6 +185,17 @@ export interface FieldSpec {
   name: string;
   type: string;
   required?: boolean;
+  schema?: JsonSchema;
+}
+
+export interface JsonSchema {
+  type?: string;
+  description?: string;
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  required?: string[];
+  enum?: Array<string | number | boolean | null>;
+  additionalProperties?: boolean | JsonSchema;
 }
 
 export interface SystemSpec {
@@ -265,6 +276,12 @@ export interface ModuleCandidate {
   risk_signals: RiskSignal[];
   status: ModuleStatus;
   missing_information: string[];
+  missing_information_resolution?: string;
+  resolved_missing_information?: string[];
+  resolution_draft?: ModuleResolutionDraft | null;
+  resolution_applied_at?: string | null;
+  schema_review_state?: "not_started" | "drafted" | "applied";
+  smoke_spec?: ModuleSmokeSpec | null;
   side_effect?: SideEffect;
   auth_required?: boolean;
   audit_required?: boolean;
@@ -290,6 +307,37 @@ export interface ModuleCandidate {
    */
   a2a_contract_id?: string | null;
   developer_todos?: string[];
+}
+
+export interface ModuleResolutionAnswer {
+  missing_item: string;
+  resolved_value: string;
+  rationale: string;
+  confidence: number;
+  target_artifacts: Array<"inputs" | "outputs" | "runtime_config" | "catalog_test_double" | "graph" | "chat_smoke" | "developer_todos">;
+  status: "draft" | "applied" | "rejected";
+}
+
+export interface ModuleSmokeSpec {
+  sample_user_message: string;
+  synthetic_inputs: Record<string, unknown>;
+  expected_output_shape: JsonSchema;
+  expected_event_markers: string[];
+  mock_sources: string[];
+  ready: boolean;
+}
+
+export interface ModuleResolutionDraft {
+  candidate_id: string;
+  generated_at: string;
+  summary: string;
+  answers: ModuleResolutionAnswer[];
+  input_schema: FieldSpec[];
+  output_schema: FieldSpec[];
+  developer_todos: string[];
+  graph_patch_notes: string[];
+  smoke_spec: ModuleSmokeSpec;
+  reviewer_note: string;
 }
 
 /**
@@ -382,6 +430,7 @@ export interface ScaffoldPlanModule {
   outputs: FieldSpec[];
   risk_signals: RiskSignal[];
   required_review_fields: string[];
+  smoke_spec?: ModuleSmokeSpec | null;
 }
 
 export interface ExcludedScaffoldModule {

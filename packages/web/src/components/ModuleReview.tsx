@@ -17,16 +17,21 @@ import {
   adapterKinds,
   agentKinds,
   moduleCategories,
+  type CodexAnalyzerModel,
   remoteContractKinds,
   workflowKinds,
   type AdapterKind,
   type AgentKind,
   type EdgeKind,
+  type EvidenceSummary,
   type FieldSpec,
   type GraphIR,
+  type JsonSchema,
   type ModuleCandidate,
   type ModuleCategory,
+  type ModuleResolutionDraft,
   type ModuleStatus,
+  type NormalizedRequirement,
   type RemoteContractKind,
   type WorkflowKind
 } from "../analyzer/types";
@@ -45,9 +50,14 @@ const statusLabels: Record<ModuleStatus, string> = {
   rejected: "반려"
 };
 
+const emptyCatalogEntries: CatalogEntry[] = [];
+
 const editableEdgeKinds: EdgeKind[] = ["event_output", "session_state", "artifact", "route", "remote_a2a"];
 
 interface ModuleReviewProps {
+  normalizedRequirement: NormalizedRequirement;
+  evidence: EvidenceSummary;
+  analyzerModel: CodexAnalyzerModel;
   moduleCandidates: ModuleCandidate[];
   catalogEntries: CatalogEntry[];
   processFlow: GraphIR | null;
@@ -57,6 +67,9 @@ interface ModuleReviewProps {
 }
 
 export function ModuleReview({
+  normalizedRequirement,
+  evidence,
+  analyzerModel,
   moduleCandidates,
   catalogEntries,
   processFlow,
@@ -71,6 +84,7 @@ export function ModuleReview({
   );
   const [selectedNewId, setSelectedNewId] = useState<string | null>(moduleCandidates[0]?.id ?? null);
   const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(moduleCandidates[0]?.id ?? null);
+  const [draftRequest, setDraftRequest] = useState<{ candidateId: string; status: "running" | "failed"; message?: string } | null>(null);
 
   useEffect(() => {
     setDraftCandidates(moduleCandidates);
@@ -119,9 +133,45 @@ export function ModuleReview({
     () => catalogCandidates.find((candidate) => candidate.id === selectedCatalogId) ?? catalogCandidates[0] ?? null,
     [catalogCandidates, selectedCatalogId]
   );
+  const reviewSummary = useMemo(() => buildReviewSummary(draftCandidates), [draftCandidates]);
 
   function updateCandidate(id: string, changes: Partial<ModuleCandidate>) {
     setDraftCandidates((current) => current.map((candidate) => (candidate.id === id ? { ...candidate, ...changes } : candidate)));
+  }
+
+  async function generateResolutionDraft(candidate: ModuleCandidate) {
+    setDraftRequest({ candidateId: candidate.id, status: "running" });
+    try {
+      const response = await fetch("/api/resolve-module-candidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: analyzerModel,
+          normalizedRequirement,
+          evidence,
+          candidate,
+          catalogEntry: findCatalogEntryForCandidate(candidate, catalogEntries),
+          processFlow,
+          graphNeighbors: buildGraphNeighborSummary(candidate.id, processFlow)
+        })
+      });
+      const payload = (await response.json()) as { draft?: ModuleResolutionDraft; error?: string };
+      if (!response.ok || !payload.draft) {
+        throw new Error(payload.error ?? "후보 해결 초안 생성 실패");
+      }
+      updateCandidate(candidate.id, {
+        resolution_draft: payload.draft,
+        schema_review_state: "drafted",
+        missing_information_resolution: payload.draft.reviewer_note || payload.draft.summary
+      });
+      setDraftRequest(null);
+    } catch (error) {
+      setDraftRequest({
+        candidateId: candidate.id,
+        status: "failed",
+        message: error instanceof Error ? error.message : "후보 해결 초안 생성 실패"
+      });
+    }
   }
 
   function updateCategory(candidate: ModuleCandidate, module_category: ModuleCategory) {
@@ -206,6 +256,25 @@ export function ModuleReview({
         </div>
       </div>
 
+      <div className="module-review-summary" aria-label="모듈 검토 요약">
+        <div>
+          <span>정보 필요 후보</span>
+          <strong>{reviewSummary.needsInfo}</strong>
+        </div>
+        <div>
+          <span>승인 가능</span>
+          <strong>{reviewSummary.approvable}</strong>
+        </div>
+        <div>
+          <span>승인됨</span>
+          <strong>{reviewSummary.approved}</strong>
+        </div>
+        <div>
+          <span>반려/보류</span>
+          <strong>{reviewSummary.closed}</strong>
+        </div>
+      </div>
+
       {activeTab === "new" ? (
         <div className="review-console module-review-console">
           <NewModuleTable
@@ -221,12 +290,15 @@ export function ModuleReview({
             catalogEntries={catalogEntries}
             onUpdateCandidate={updateCandidate}
             onNavigateToA2AContracts={onNavigateToA2AContracts}
+            onGenerateResolutionDraft={generateResolutionDraft}
+            draftRequest={draftRequest}
           />
         </div>
       ) : (
         <div className="review-console module-review-console">
           <CatalogContractTable
             candidates={catalogCandidates}
+            catalogEntries={catalogEntries}
             catalogByCandidateId={catalogByCandidateId}
             selectedCandidate={selectedCatalogCandidate}
             connections={connectionDrafts}
@@ -241,6 +313,8 @@ export function ModuleReview({
             onUpdateConnection={updateConnection}
             onAddConnection={addConnection}
             onRemoveConnection={removeConnection}
+            onGenerateResolutionDraft={generateResolutionDraft}
+            draftRequest={draftRequest}
           />
         </div>
       )}
@@ -303,6 +377,8 @@ function NewModuleTable({
           <tbody>
             {candidates.map((candidate) => {
               const issues = candidateReviewIssues(candidate, catalogEntries);
+              const unresolved = hasUnresolvedMissingInfo(candidate);
+              const reviewLabel = missingInfoReviewLabel(candidate, catalogEntries);
               return (
                 <SelectableTableRow
                   key={candidate.id}
@@ -348,19 +424,30 @@ function NewModuleTable({
                       <select
                         className="status-select"
                         value={candidate.status}
-                        onChange={(event) => onUpdateCandidate(candidate.id, { status: event.target.value as ModuleStatus })}
+                        onChange={(event) => {
+                          const next = event.target.value as ModuleStatus;
+                          if (next === "approved" && unresolved) {
+                            return;
+                          }
+                          onUpdateCandidate(candidate.id, { status: next });
+                        }}
                       >
-                        {statuses.map((status) => (
-                          <option key={status} value={status}>
-                            {statusLabels[status]}
-                          </option>
-                        ))}
+                        {statuses.map((status) => {
+                          const blocked = status === "approved" && unresolved;
+                          return (
+                            <option key={status} value={status} disabled={blocked}>
+                              {statusLabels[status]}
+                              {blocked ? " (초안 반영 필요)" : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                       {issues.length > 0 ? (
                         <span className="review-issue-badge">{issues.length}개 확인 필요</span>
                       ) : (
                         <span className="review-issue-badge is-clear">blocker 없음</span>
                       )}
+                      <span className={`status-help ${unresolved ? "is-warning" : "is-clear"}`}>{reviewLabel}</span>
                     </div>
                   </td>
                   <td>
@@ -380,12 +467,14 @@ function NewModuleTable({
 
 function CatalogContractTable({
   candidates,
+  catalogEntries,
   catalogByCandidateId,
   selectedCandidate,
   connections,
   onSelect
 }: {
   candidates: ModuleCandidate[];
+  catalogEntries: CatalogEntry[];
   catalogByCandidateId: Map<string, CatalogEntry>;
   selectedCandidate: ModuleCandidate | null;
   connections: ModuleConnectionDraft[];
@@ -408,12 +497,14 @@ function CatalogContractTable({
             <col className="module-type-col" />
             <col className="module-contract-col" />
             <col className="module-status-col" />
+            <col className="module-contract-col" />
           </colgroup>
           <thead>
             <tr>
               <th>카탈로그 계약</th>
               <th>Runtime</th>
               <th>입출력</th>
+              <th>검토 상태</th>
               <th>Graph 연결</th>
             </tr>
           </thead>
@@ -423,6 +514,7 @@ function CatalogContractTable({
               const linkedEdges = connections.filter(
                 (connection) => connection.fromModuleId === candidate.id || connection.toModuleId === candidate.id
               );
+              const issues = candidateReviewIssues(candidate, catalogEntries);
               return (
                 <SelectableTableRow
                   key={candidate.id}
@@ -449,6 +541,14 @@ function CatalogContractTable({
                     </span>
                   </td>
                   <td>
+                    <div className="status-cell compact-status-cell">
+                      <span className={`status-pill is-${candidate.status}`}>{statusLabels[candidate.status]}</span>
+                      <span className={issues.length ? "review-issue-badge" : "review-issue-badge is-clear"}>
+                        {issues.length ? `${issues.length}개 확인 필요` : "승인 가능"}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
                     <span className={linkedEdges.length ? "review-issue-badge is-clear" : "review-issue-badge"}>
                       edge {linkedEdges.length}개
                     </span>
@@ -471,7 +571,9 @@ function CatalogContractInspector({
   onUpdateCandidate,
   onUpdateConnection,
   onAddConnection,
-  onRemoveConnection
+  onRemoveConnection,
+  onGenerateResolutionDraft,
+  draftRequest
 }: {
   candidate: ModuleCandidate | null;
   catalogEntry: CatalogEntry | null;
@@ -481,6 +583,8 @@ function CatalogContractInspector({
   onUpdateConnection: (id: string, changes: Partial<ModuleConnectionDraft>) => void;
   onAddConnection: (fromModuleId: string, toModuleId: string) => void;
   onRemoveConnection: (id: string) => void;
+  onGenerateResolutionDraft: (candidate: ModuleCandidate) => void;
+  draftRequest: { candidateId: string; status: "running" | "failed"; message?: string } | null;
 }) {
   if (!candidate) {
     return (
@@ -493,6 +597,7 @@ function CatalogContractInspector({
   const linkedConnections = connections.filter(
     (connection) => connection.fromModuleId === candidate.id || connection.toModuleId === candidate.id
   );
+  const unresolved = hasUnresolvedMissingInfo(candidate);
   const endpointOptions = [
     { value: REVIEW_INPUT_ENDPOINT, label: "요구사항 입력" },
     ...candidates
@@ -532,6 +637,32 @@ function CatalogContractInspector({
           </div>
         </dl>
       </FieldGroup>
+
+      <FieldGroup title="검토 상태">
+        <select
+          className="status-select"
+          value={candidate.status}
+          onChange={(event) => {
+            const next = event.target.value as ModuleStatus;
+            if (next === "approved" && unresolved) return;
+            onUpdateCandidate(candidate.id, { status: next });
+          }}
+        >
+          {statuses.map((status) => (
+            <option key={status} value={status} disabled={status === "approved" && unresolved}>
+              {statusLabels[status]}
+              {status === "approved" && unresolved ? " (초안 반영 필요)" : ""}
+            </option>
+          ))}
+        </select>
+      </FieldGroup>
+
+      <MissingInfoResolutionPanel
+        candidate={candidate}
+        onUpdateCandidate={onUpdateCandidate}
+        onGenerateResolutionDraft={onGenerateResolutionDraft}
+        draftRequest={draftRequest}
+      />
 
       <FieldGroup title="입력 / 출력 override">
         <FieldSpecEditor title="입력" fields={candidate.inputs} onChange={(inputs) => onUpdateCandidate(candidate.id, { inputs })} />
@@ -599,12 +730,16 @@ function NewModuleInspector({
   candidate,
   catalogEntries,
   onUpdateCandidate,
-  onNavigateToA2AContracts
+  onNavigateToA2AContracts,
+  onGenerateResolutionDraft,
+  draftRequest
 }: {
   candidate: ModuleCandidate | null;
   catalogEntries: CatalogEntry[];
   onUpdateCandidate: (id: string, changes: Partial<ModuleCandidate>) => void;
   onNavigateToA2AContracts?: () => void;
+  onGenerateResolutionDraft: (candidate: ModuleCandidate) => void;
+  draftRequest: { candidateId: string; status: "running" | "failed"; message?: string } | null;
 }) {
   if (!candidate) {
     return (
@@ -644,6 +779,13 @@ function NewModuleInspector({
           <p className="review-muted">현재 상태에서 즉시 표시할 blocker가 없습니다.</p>
         )}
       </FieldGroup>
+
+      <MissingInfoResolutionPanel
+        candidate={candidate}
+        onUpdateCandidate={onUpdateCandidate}
+        onGenerateResolutionDraft={onGenerateResolutionDraft}
+        draftRequest={draftRequest}
+      />
 
       <FieldGroup title="입력 / 출력 계약">
         <FieldSpecEditor title="입력" fields={candidate.inputs} onChange={(inputs) => onUpdateCandidate(candidate.id, { inputs })} />
@@ -691,18 +833,321 @@ function NewModuleInspector({
   );
 }
 
-function FieldSpecEditor({ title, fields, onChange }: { title: string; fields: FieldSpec[]; onChange: (fields: FieldSpec[]) => void }) {
+function MissingInfoResolutionPanel({
+  candidate,
+  onUpdateCandidate,
+  onGenerateResolutionDraft,
+  draftRequest
+}: {
+  candidate: ModuleCandidate;
+  onUpdateCandidate: (id: string, changes: Partial<ModuleCandidate>) => void;
+  onGenerateResolutionDraft: (candidate: ModuleCandidate) => void;
+  draftRequest: { candidateId: string; status: "running" | "failed"; message?: string } | null;
+}) {
+  const unresolved = hasUnresolvedMissingInfo(candidate);
+  const resolvedItems = candidate.resolved_missing_information ?? [];
+  const draft = candidate.resolution_draft ?? null;
+  const isGenerating = draftRequest?.candidateId === candidate.id && draftRequest.status === "running";
+  const draftError = draftRequest?.candidateId === candidate.id && draftRequest.status === "failed" ? draftRequest.message : null;
+  const canApplyDraft = Boolean(draft);
+  const canApprove = candidateResolutionReady(candidate);
+
+  function applyResolutionDraft() {
+    if (!draft) return;
+    onUpdateCandidate(candidate.id, {
+      inputs: draft.input_schema,
+      outputs: draft.output_schema,
+      developer_todos: draft.developer_todos.length ? draft.developer_todos : candidate.developer_todos,
+      missing_information: [],
+      resolved_missing_information: mergeResolvedMissingInformation(resolvedItems, candidate.missing_information),
+      missing_information_resolution: draft.reviewer_note || draft.summary,
+      resolution_applied_at: new Date().toISOString(),
+      schema_review_state: "applied",
+      smoke_spec: draft.smoke_spec
+    });
+  }
+
   return (
-    <label className="field-spec-editor">
-      <span>{title}</span>
-      <textarea
-        rows={Math.max(3, fields.length + 1)}
-        value={fieldsToText(fields)}
-        onChange={(event) => onChange(textToFields(event.target.value))}
-        spellCheck={false}
-      />
-    </label>
+    <FieldGroup
+      title="Resolution Draft"
+      description="LLM 초안은 바로 승인하지 않고, 스키마와 smoke 계약을 검토한 뒤 현재 분석 artifact에 반영합니다."
+      className={`missing-resolution-panel ${unresolved ? "is-unresolved" : "is-resolved"}`}
+    >
+      {candidate.missing_information.length > 0 ? (
+        <ul className="missing-resolution-list">
+          {candidate.missing_information.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : unresolved ? (
+        <p className="review-muted">정보 필요 상태입니다. 해결 초안을 생성하고 반영한 뒤 승인하세요.</p>
+      ) : resolvedItems.length > 0 ? (
+        <div className="resolved-missing-list">
+          {resolvedItems.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      ) : (
+        <p className="review-muted">남은 정보 필요 항목이 없습니다.</p>
+      )}
+
+      <div className="resolution-actions">
+        <button type="button" className="secondary compact-button" onClick={() => onGenerateResolutionDraft(candidate)} disabled={isGenerating}>
+          {isGenerating ? "초안 생성 중" : "해결 초안 생성"}
+        </button>
+        {draftError ? <span className="status-help is-warning">{draftError}</span> : null}
+      </div>
+
+      {draft ? (
+        <div className="resolution-draft-preview">
+          <div className="resolution-draft-header">
+            <div>
+              <strong>{draft.summary}</strong>
+              <span>{new Date(draft.generated_at).toLocaleString()}</span>
+            </div>
+            <span className={`review-issue-badge ${draft.smoke_spec.ready ? "is-clear" : ""}`}>
+              {draft.smoke_spec.ready ? "chat smoke 준비" : "chat smoke 확인 필요"}
+            </span>
+          </div>
+          <div className="resolution-answer-list">
+            {draft.answers.map((answer) => (
+              <div className="resolution-answer-row" key={answer.missing_item}>
+                <span>{answer.missing_item}</span>
+                <strong>{answer.resolved_value || "값 확인 필요"}</strong>
+                <small>{answer.target_artifacts.join(", ")}</small>
+              </div>
+            ))}
+          </div>
+          <div className="patch-preview-grid">
+            <FieldSpecTree title="입력 스키마 초안" fields={draft.input_schema} readOnly />
+            <FieldSpecTree title="출력 스키마 초안" fields={draft.output_schema} readOnly />
+          </div>
+          <div className="smoke-contract-preview">
+            <strong>Smoke 계약</strong>
+            <dl className="review-definition-grid">
+              <div>
+                <dt>sample</dt>
+                <dd>{draft.smoke_spec.sample_user_message}</dd>
+              </div>
+              <div>
+                <dt>mock</dt>
+                <dd>{draft.smoke_spec.mock_sources.join(", ") || "-"}</dd>
+              </div>
+              <div>
+                <dt>markers</dt>
+                <dd>{draft.smoke_spec.expected_event_markers.join(", ") || "-"}</dd>
+              </div>
+            </dl>
+            <SchemaTree schema={draft.smoke_spec.expected_output_shape} name="expected_output_shape" />
+          </div>
+          {draft.graph_patch_notes.length || draft.developer_todos.length ? (
+            <div className="patch-notes">
+              {[...draft.graph_patch_notes, ...draft.developer_todos].map((note) => (
+                <span key={note}>{note}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="resolution-actions">
+        <span className={canApprove ? "review-muted" : "status-help is-warning"}>
+          {canApprove
+            ? "적용된 artifact 기준으로 승인할 수 있습니다."
+            : unresolved
+              ? "초안 생성 후 반영 적용이 필요합니다."
+              : "승인 gate가 해소되었습니다."}
+        </span>
+        <button type="button" className="secondary compact-button" onClick={applyResolutionDraft} disabled={!canApplyDraft}>
+          반영 적용
+        </button>
+        <button
+          type="button"
+          className="primary compact-button"
+          onClick={() => onUpdateCandidate(candidate.id, { status: "approved" })}
+          disabled={!canApprove || candidate.status === "approved"}
+        >
+          검토 승인
+        </button>
+      </div>
+    </FieldGroup>
   );
+}
+
+function FieldSpecEditor({ title, fields, onChange }: { title: string; fields: FieldSpec[]; onChange: (fields: FieldSpec[]) => void }) {
+  return <FieldSpecTree title={title} fields={fields} onChange={onChange} />;
+}
+
+function FieldSpecTree({
+  title,
+  fields,
+  onChange,
+  readOnly = false
+}: {
+  title: string;
+  fields: FieldSpec[];
+  onChange?: (fields: FieldSpec[]) => void;
+  readOnly?: boolean;
+}) {
+  function updateField(index: number, changes: Partial<FieldSpec>) {
+    if (!onChange) return;
+    onChange(fields.map((field, fieldIndex) => (fieldIndex === index ? { ...field, ...changes } : field)));
+  }
+
+  return (
+    <div className="field-spec-tree">
+      <div className="field-spec-tree-heading">
+        <strong>{title}</strong>
+        {!readOnly && onChange ? (
+          <button
+            type="button"
+            className="link"
+            onClick={() => onChange([...fields, { name: "field", type: "string", required: true, schema: { type: "string" } }])}
+          >
+            필드 추가
+          </button>
+        ) : null}
+      </div>
+      {fields.length ? (
+        fields.map((field, index) => (
+          <div className="field-spec-row" key={`${field.name}-${index}`}>
+            <div className="field-spec-controls">
+              {readOnly ? (
+                <strong>{field.name}</strong>
+              ) : (
+                <input value={field.name} onChange={(event) => updateField(index, { name: event.target.value })} />
+              )}
+              {readOnly ? (
+                <span>{field.type}</span>
+              ) : (
+                <select
+                  value={normalizeFieldType(field.type)}
+                  onChange={(event) =>
+                    updateField(index, {
+                      type: event.target.value,
+                      schema: schemaForType(event.target.value)
+                    })
+                  }
+                >
+                  {["string", "number", "boolean", "object", "array"].map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={field.required !== false}
+                  disabled={readOnly}
+                  onChange={(event) => updateField(index, { required: event.target.checked })}
+                />
+                required
+              </label>
+              {!readOnly && onChange ? (
+                <button type="button" className="link danger" onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}>
+                  삭제
+                </button>
+              ) : null}
+            </div>
+            <SchemaTree schema={schemaForField(field)} name={field.name} />
+          </div>
+        ))
+      ) : (
+        <p className="review-muted">등록된 필드가 없습니다.</p>
+      )}
+    </div>
+  );
+}
+
+function SchemaTree({ schema, name }: { schema: JsonSchema | undefined; name: string }) {
+  const [open, setOpen] = useState(false);
+  const normalized = schema ?? { type: "string" };
+  const childEntries = normalized.properties ? Object.entries(normalized.properties) : [];
+  const hasChildren = childEntries.length > 0 || Boolean(normalized.items);
+  const required = new Set(normalized.required ?? []);
+
+  return (
+    <div className="schema-tree-node">
+      <button type="button" className="schema-tree-toggle" onClick={() => setOpen((current) => !current)} disabled={!hasChildren}>
+        <span>{hasChildren ? (open ? "▾" : "▸") : "•"}</span>
+        <strong>{name}</strong>
+        <code>{normalized.type ?? "unknown"}</code>
+      </button>
+      {normalized.description ? <p className="review-muted">{normalized.description}</p> : null}
+      {open ? (
+        <div className="schema-tree-children">
+          {childEntries.map(([childName, childSchema]) => (
+            <SchemaTree key={childName} name={`${childName}${required.has(childName) ? " *" : ""}`} schema={childSchema} />
+          ))}
+          {normalized.items ? <SchemaTree name="items" schema={normalized.items} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function buildReviewSummary(candidates: ModuleCandidate[]) {
+  return candidates.reduce(
+    (summary, candidate) => {
+      if (hasUnresolvedMissingInfo(candidate)) summary.needsInfo += 1;
+      if (candidate.status === "approved") summary.approved += 1;
+      if (candidate.status === "deferred" || candidate.status === "rejected") summary.closed += 1;
+      if (!hasUnresolvedMissingInfo(candidate) && candidate.status !== "approved" && candidate.status !== "rejected") {
+        summary.approvable += 1;
+      }
+      return summary;
+    },
+    { needsInfo: 0, approvable: 0, approved: 0, closed: 0 }
+  );
+}
+
+function hasUnresolvedMissingInfo(candidate: ModuleCandidate): boolean {
+  if (candidate.missing_information.length > 0) return true;
+  return candidate.status === "needs_info" && !candidateResolutionReady(candidate);
+}
+
+function candidateResolutionReady(candidate: ModuleCandidate): boolean {
+  return Boolean(
+    candidate.resolution_applied_at &&
+      candidate.schema_review_state === "applied" &&
+      candidate.smoke_spec?.ready &&
+      candidate.inputs.length > 0 &&
+      candidate.outputs.length > 0
+  );
+}
+
+function missingInfoReviewLabel(candidate: ModuleCandidate, catalogEntries: CatalogEntry[] = emptyCatalogEntries): string {
+  if (hasUnresolvedMissingInfo(candidate)) {
+    if (candidate.resolution_draft) return "초안 검토 필요";
+    return "해결 초안 필요";
+  }
+  return candidateReviewIssues(candidate, catalogEntries).length ? "계약 확인 필요" : "승인 가능";
+}
+
+function schemaForField(field: FieldSpec): JsonSchema {
+  return field.schema ?? schemaForType(field.type);
+}
+
+function schemaForType(type: string): JsonSchema {
+  const normalized = normalizeFieldType(type);
+  if (normalized === "object") return { type: "object", properties: {}, required: [] };
+  if (normalized === "array") return { type: "array", items: { type: "object", properties: {}, required: [] } };
+  return { type: normalized };
+}
+
+function normalizeFieldType(type: string): string {
+  const normalized = type.trim().toLowerCase();
+  if (normalized.includes("object")) return "object";
+  if (normalized.includes("array")) return "array";
+  if (normalized.includes("number")) return "number";
+  if (normalized.includes("boolean")) return "boolean";
+  return "string";
+}
+
+function mergeResolvedMissingInformation(current: string[], missing: string[]): string[] {
+  return Array.from(new Set([...current, ...missing].map((item) => item.trim()).filter(Boolean)));
 }
 
 function SubtypeControl({
@@ -790,6 +1235,30 @@ function findCatalogEntryForCandidate(candidate: ModuleCandidate, catalogEntries
         entry.name.trim().toLowerCase() === normalizedName
     ) ?? null
   );
+}
+
+function buildGraphNeighborSummary(candidateId: string, graph: GraphIR | null) {
+  if (!graph) {
+    return { incoming: [], outgoing: [] };
+  }
+  return {
+    incoming: graph.edges
+      .filter((edge) => edge.to === candidateId)
+      .map((edge) => ({
+        from: edge.from,
+        data_label: edge.data_label,
+        edge_kind: edge.edge_kind,
+        schema_ref: edge.schema_ref
+      })),
+    outgoing: graph.edges
+      .filter((edge) => edge.from === candidateId)
+      .map((edge) => ({
+        to: edge.to,
+        data_label: edge.data_label,
+        edge_kind: edge.edge_kind,
+        schema_ref: edge.schema_ref
+      }))
+  };
 }
 
 function fieldsToText(fields: FieldSpec[]): string {

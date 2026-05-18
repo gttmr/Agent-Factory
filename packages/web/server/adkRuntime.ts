@@ -10,8 +10,11 @@ type MiddlewareNext = (error?: unknown) => void;
 
 interface RuntimeProcess {
   child: ChildProcess;
+  appName: string;
+  outputRoot: string;
   port: number;
   url: string;
+  embedUrl: string;
 }
 
 let webProcess: RuntimeProcess | null = null;
@@ -78,6 +81,12 @@ export function createAdkRuntimeMiddleware(repoRoot: string) {
         return;
       }
 
+      if (body.action === "install") {
+        const steps = await installDependencies(outputRoot);
+        sendJson(res, 200, { appName, outputRoot, steps });
+        return;
+      }
+
       if (body.action === "verify") {
         const python = pythonCommand(outputRoot);
         const compile = await runCommand(python, ["-m", "compileall", appName, "tests"], outputRoot, 30_000);
@@ -91,7 +100,7 @@ export function createAdkRuntimeMiddleware(repoRoot: string) {
         const query =
           typeof body.query === "string" && body.query.trim()
             ? body.query.trim()
-            : "sample complaint for workflow smoke";
+            : smokeQueryFromBody(body) ?? "sample complaint for workflow smoke";
         const run = await runCommand(
           adk,
           ["run", "--jsonl", "--in_memory", "--timeout", "10s", appName, query],
@@ -103,16 +112,40 @@ export function createAdkRuntimeMiddleware(repoRoot: string) {
       }
 
       if (body.action === "start-web") {
-        const port = typeof body.port === "number" ? body.port : 8010;
-        const result = await startAdkWeb(outputRoot, port);
+        const port = normalizePort(body.port, 8010);
+        const result = await startAdkWeb(outputRoot, appName, port);
         sendJson(res, 200, { appName, outputRoot, ...result });
         return;
       }
 
       if (body.action === "check-web") {
-        const port = typeof body.port === "number" ? body.port : webProcess?.port ?? 8010;
+        const port = normalizePort(body.port, webProcess?.port ?? 8010);
         const checks = await checkAdkWeb(outputRoot, appName, port);
-        sendJson(res, checks.every((check) => check.ok) ? 200 : 502, { appName, outputRoot, url: `http://127.0.0.1:${port}/`, checks });
+        sendJson(res, checks.every((check) => check.ok) ? 200 : 502, {
+          appName,
+          outputRoot,
+          url: `http://127.0.0.1:${port}/`,
+          embedUrl: adkWebEmbedUrl(port, appName),
+          checks
+        });
+        return;
+      }
+
+      if (body.action === "chat-smoke") {
+        const port = normalizePort(body.port, webProcess?.port ?? 8010);
+        const query =
+          typeof body.query === "string" && body.query.trim()
+            ? body.query.trim()
+            : smokeQueryFromBody(body) ?? "sample complaint for workflow smoke";
+        const result = await runChatSmoke(appName, query, port);
+        sendJson(res, 200, {
+          appName,
+          outputRoot,
+          url: `http://127.0.0.1:${port}/`,
+          embedUrl: adkWebEmbedUrl(port, appName),
+          query,
+          ...result
+        });
         return;
       }
 
@@ -153,9 +186,23 @@ async function writeBundle(outputRoot: string, files: Record<string, string>) {
   );
 }
 
-async function startAdkWeb(outputRoot: string, port: number) {
+async function installDependencies(outputRoot: string) {
+  const steps: Array<{ name: string; stdout: string; stderr: string; exitCode: number }> = [];
+  steps.push({ name: "python3 -m venv .venv", ...(await runCommand("python3", ["-m", "venv", ".venv"], outputRoot, 60_000)) });
+  const python = pythonCommand(outputRoot);
+  steps.push({
+    name: "pip install -r requirements.txt",
+    ...(await runCommand(python, ["-m", "pip", "install", "-r", "requirements.txt"], outputRoot, 120_000))
+  });
+  return steps;
+}
+
+async function startAdkWeb(outputRoot: string, appName: string, port: number) {
   if (webProcess && !webProcess.child.killed) {
-    return { url: webProcess.url, port: webProcess.port, status: "already_running" };
+    if (webProcess.port === port && webProcess.outputRoot === outputRoot && webProcess.appName === appName) {
+      return { url: webProcess.url, embedUrl: webProcess.embedUrl, port: webProcess.port, status: "already_running" };
+    }
+    stopWebProcess();
   }
   const adk = adkCommand(outputRoot);
   const child = spawn(adk, ["web", "--port", String(port), "--host", "127.0.0.1"], {
@@ -164,8 +211,11 @@ async function startAdkWeb(outputRoot: string, port: number) {
   });
   webProcess = {
     child,
+    appName,
+    outputRoot,
     port,
-    url: `http://127.0.0.1:${port}/`
+    url: `http://127.0.0.1:${port}/`,
+    embedUrl: adkWebEmbedUrl(port, appName)
   };
   child.on("close", () => {
     if (webProcess?.child === child) {
@@ -173,36 +223,97 @@ async function startAdkWeb(outputRoot: string, port: number) {
     }
   });
   await waitForHttp(`http://127.0.0.1:${port}/`, 10_000);
-  return { url: `http://127.0.0.1:${port}/`, port, status: "started" };
+  return { url: `http://127.0.0.1:${port}/`, embedUrl: adkWebEmbedUrl(port, appName), port, status: "started" };
 }
 
 async function checkAdkWeb(outputRoot: string, appName: string, port: number) {
   const baseUrl = `http://127.0.0.1:${port}`;
-  const selectedUrl = `${baseUrl}/dev-ui/?app=${encodeURIComponent(appName)}`;
-  const html = await fetchText(`${baseUrl}/`);
-  const selectedHtml = await fetchText(selectedUrl);
+  const selectedUrl = adkWebEmbedUrl(port, appName);
+  const htmlResponse = await fetchResponse(`${baseUrl}/`);
+  const selectedResponse = await fetchResponse(selectedUrl);
   const appsText = await fetchText(`${baseUrl}/list-apps`);
-  const agentPy = await import("node:fs/promises").then((fs) => fs.readFile(join(outputRoot, appName, "agent.py"), "utf8"));
+  const fs = await import("node:fs/promises");
+  const agentPy = await fs.readFile(join(outputRoot, appName, "agent.py"), "utf8");
+  const manifestText = await fs.readFile(join(outputRoot, appName, "workflow_manifest.json"), "utf8");
+  const manifest = parseJson(manifestText);
   const apps = parseJson(appsText);
   const appListed = Array.isArray(apps) && apps.includes(appName);
+  const framePolicy = framePolicyFor(selectedResponse);
   return [
-    { name: "ADK Web HTML loads", ok: html.includes("Agent Development Kit Dev UI") },
+    { name: "ADK Web HTML loads", ok: htmlResponse.text.includes("Agent Development Kit Dev UI") },
     { name: `GET /list-apps contains ${appName}`, ok: appListed },
     {
       name: `selected app URL loads with ${appName}`,
-      ok: selectedUrl.includes(encodeURIComponent(appName)) && selectedHtml.includes("Agent Development Kit Dev UI")
+      ok: selectedUrl.includes(encodeURIComponent(appName)) && selectedResponse.text.includes("Agent Development Kit Dev UI")
+    },
+    {
+      name: "selected app URL allows iframe embedding",
+      ok: framePolicy.allowsEmbedding
     },
     {
       name: "Agent Structure tokens are present",
-      ok: ["Workflow", "Function", "Join", "START", "END"].every((token) =>
-        token === "Function"
-          ? agentPy.includes("def ")
-          : token === "END"
-            ? true
-            : agentPy.includes(token) || agentPy.includes(`"${token}"`)
-      )
+      ok: hasGeneratedWorkflowStructure(agentPy, manifest)
     }
   ];
+}
+
+function hasGeneratedWorkflowStructure(agentPy: string, manifest: unknown): boolean {
+  if (!agentPy.includes("from google.adk import Event, Workflow")) return false;
+  if (!agentPy.includes("root_agent = Workflow(")) return false;
+  if (!agentPy.includes('"START"')) return false;
+  if (!isRecord(manifest)) return false;
+  const nodes = Array.isArray(manifest.nodes) ? manifest.nodes : [];
+  const activeFunctions = nodes.length
+    ? nodes
+        .filter((node): node is Record<string, unknown> => isRecord(node) && node.active_in_graph !== false)
+        .map((node) => (typeof node.function === "string" ? node.function : ""))
+        .filter(Boolean)
+    : modulesToGeneratedFunctions(manifest);
+  return activeFunctions.every((functionName) => agentPy.includes(`def ${functionName}`));
+}
+
+function modulesToGeneratedFunctions(manifest: Record<string, unknown>): string[] {
+  const modules = Array.isArray(manifest.modules) ? manifest.modules : [];
+  return modules
+    .filter((module): module is Record<string, unknown> => isRecord(module) && typeof module.id === "string")
+    .map((module) => {
+      const id = typeof module.id === "string" ? module.id : "";
+      return `node_${id.replace(/[^A-Za-z0-9_]+/g, "_")}`;
+    });
+}
+
+async function runChatSmoke(appName: string, query: string, port: number) {
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const userId = "agent_factory_smoke";
+  const sessionId = `smoke_${Date.now()}`;
+  const session = await fetchJson(`${baseUrl}/apps/${encodeURIComponent(appName)}/users/${userId}/sessions/${sessionId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+  const events = await fetchJson(`${baseUrl}/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      appName,
+      userId,
+      sessionId,
+      newMessage: {
+        role: "user",
+        parts: [{ text: query }]
+      }
+    })
+  });
+  return {
+    sessionId,
+    userId,
+    session,
+    events,
+    checks: [
+      { name: "ADK session created", ok: isRecord(session) && session.id === sessionId },
+      { name: "ADK /run returned events", ok: Array.isArray(events) && events.length > 0 }
+    ]
+  };
 }
 
 function runCommand(command: string, args: string[], cwd: string, timeoutMs: number) {
@@ -236,6 +347,13 @@ function runCommand(command: string, args: string[], cwd: string, timeoutMs: num
   });
 }
 
+function stopWebProcess() {
+  if (webProcess && !webProcess.child.killed) {
+    webProcess.child.kill("SIGTERM");
+  }
+  webProcess = null;
+}
+
 async function waitForHttp(url: string, timeoutMs: number) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -250,11 +368,39 @@ async function waitForHttp(url: string, timeoutMs: number) {
 }
 
 async function fetchText(url: string) {
+  return (await fetchResponse(url)).text;
+}
+
+async function fetchJson(url: string, init?: RequestInit) {
+  const response = await fetch(url, init);
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${url} 응답 실패: ${response.status} ${text}`);
+  }
+  return parseJson(text);
+}
+
+async function fetchResponse(url: string) {
   const response = await fetch(url);
   if (!response.ok && response.status !== 405) {
     throw new Error(`${url} 응답 실패: ${response.status}`);
   }
-  return response.text();
+  return {
+    text: await response.text(),
+    headers: response.headers
+  };
+}
+
+function framePolicyFor(response: { headers: Headers }) {
+  const xFrameOptions = response.headers.get("x-frame-options")?.toLowerCase() ?? "";
+  const csp = response.headers.get("content-security-policy")?.toLowerCase() ?? "";
+  const frameAncestors = csp.match(/frame-ancestors\s+([^;]+)/)?.[1] ?? "";
+  const allowsEmbedding =
+    xFrameOptions !== "deny" &&
+    xFrameOptions !== "sameorigin" &&
+    !frameAncestors.includes("'none'") &&
+    !frameAncestors.includes("none");
+  return { allowsEmbedding };
 }
 
 function pythonCommand(outputRoot: string): string {
@@ -265,6 +411,24 @@ function pythonCommand(outputRoot: string): string {
 function adkCommand(outputRoot: string): string {
   const local = join(outputRoot, ".venv/bin/adk");
   return existsSync(local) ? local : "adk";
+}
+
+function adkWebEmbedUrl(port: number, appName: string): string {
+  return `http://127.0.0.1:${port}/dev-ui/?app=${encodeURIComponent(appName)}`;
+}
+
+function normalizePort(value: unknown, fallback: number): number {
+  const port = typeof value === "number" ? value : fallback;
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("ADK Web port는 1024부터 65535 사이의 정수여야 합니다.");
+  }
+  return port;
+}
+
+function smokeQueryFromBody(body: Record<string, unknown>): string | null {
+  const smokeSpec = isRecord(body.smokeSpec) ? body.smokeSpec : null;
+  const sample = smokeSpec?.sample_user_message;
+  return typeof sample === "string" && sample.trim() ? sample.trim() : null;
 }
 
 function safeOutputRoot(repoRoot: string, outputDir?: string): string {

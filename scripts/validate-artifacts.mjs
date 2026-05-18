@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 const rawArg = process.argv[2] ?? "templates";
 const root = resolve(rawArg);
@@ -248,6 +248,8 @@ for (const target of targets) {
   validateProcessFlow(target);
   validateAnalysisResult(target);
   validateScaffoldPlan(target);
+  validateSavedAnalysisFixtures(target);
+  validateContractRegistry(target);
 }
 
 if (errors.length) {
@@ -659,6 +661,20 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
   }
 
+  // Module-bound nodes must be connected into the reviewed workflow. A graph
+  // with isolated candidate nodes can render but cannot be a scaffold source.
+  for (const node of nodes) {
+    if (!node || typeof node.module_id !== "string" || !node.module_id.trim()) continue;
+    const incoming = edges.some((edge) => edge && edge.to === node.id);
+    const outgoing = edges.some((edge) => edge && edge.from === node.id);
+    if (!incoming) {
+      errors.push(`${label}.nodes (${node.id}) module-bound node must have at least one incoming edge.`);
+    }
+    if (!outgoing) {
+      errors.push(`${label}.nodes (${node.id}) module-bound node must have at least one outgoing edge.`);
+    }
+  }
+
   // Container-kind specific structural rules.
   for (const container of containers) {
     if (!container || typeof container !== "object") continue;
@@ -762,6 +778,364 @@ function validateScaffoldPlan(dir = root) {
       errors.push(`${label} remote_a2a scaffold output must be contract_placeholder_only.`);
     }
   });
+}
+
+function validateSavedAnalysisFixtures(dir = root) {
+  for (const path of findJsonFiles(dir)) {
+    const record = readJson(path);
+    if (!isSavedAnalysisFixture(record)) continue;
+    validateSavedAnalysisRecord(record, relative(root, path) || path);
+  }
+}
+
+function isSavedAnalysisFixture(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value.id === "string" &&
+    typeof value.savedAt === "string" &&
+    value.analysis &&
+    typeof value.analysis === "object" &&
+    Array.isArray(value.catalogEntries) &&
+    typeof value.scaffoldReady === "boolean"
+  );
+}
+
+function validateSavedAnalysisRecord(record, label) {
+  const requiredStrings = ["id", "title", "savedAt", "analyzerModel", "activeStep"];
+  for (const field of requiredStrings) {
+    if (typeof record[field] !== "string" || !record[field].trim()) {
+      errors.push(`${label}.${field} must be a non-empty string.`);
+    }
+  }
+  if (!["intake", "analysis", "modules", "graph", "a2aContracts", "catalog", "saved", "export"].includes(record.activeStep)) {
+    errors.push(`${label}.activeStep is not a known workbench step.`);
+  }
+  if (!Array.isArray(record.acceptedMissing) || record.acceptedMissing.some((item) => typeof item !== "string")) {
+    errors.push(`${label}.acceptedMissing must be an array of strings.`);
+  }
+  if (!record.input || typeof record.input !== "object" || typeof record.input.rawText !== "string") {
+    errors.push(`${label}.input.rawText is required.`);
+  }
+
+  const analysis = record.analysis;
+  if (!analysis || typeof analysis !== "object" || Array.isArray(analysis)) {
+    errors.push(`${label}.analysis must be an object.`);
+    return;
+  }
+  if (!analysis.normalizedRequirement || typeof analysis.normalizedRequirement !== "object") {
+    errors.push(`${label}.analysis.normalizedRequirement is required.`);
+  }
+  if (!analysis.evidence || typeof analysis.evidence !== "object") {
+    errors.push(`${label}.analysis.evidence is required.`);
+  }
+  if (!Array.isArray(analysis.moduleCandidates)) {
+    errors.push(`${label}.analysis.moduleCandidates must be an array.`);
+    return;
+  }
+  if (!Array.isArray(record.moduleCandidates)) {
+    errors.push(`${label}.moduleCandidates must be an array.`);
+    return;
+  }
+
+  const embeddedIds = analysis.moduleCandidates.map((candidate) => candidate?.id).filter(Boolean).join("|");
+  const recordIds = record.moduleCandidates.map((candidate) => candidate?.id).filter(Boolean).join("|");
+  if (embeddedIds !== recordIds) {
+    errors.push(`${label}.moduleCandidates must mirror analysis.moduleCandidates by id and order.`);
+  }
+
+  const catalogById = new Map();
+  record.catalogEntries.forEach((entry, index) => {
+    validateCatalogEntryObject(entry, `${label}.catalogEntries[${index}]`);
+    if (entry && typeof entry.id === "string") catalogById.set(entry.id, entry);
+  });
+
+  const candidatesById = new Map();
+  let needsInfoCount = 0;
+  for (const [index, candidate] of analysis.moduleCandidates.entries()) {
+    const candidateLabel = `${label}.analysis.moduleCandidates[${index}]`;
+    validateModuleCandidateObject(candidate, candidateLabel);
+    if (candidate && typeof candidate.id === "string") candidatesById.set(candidate.id, candidate);
+    if (candidate?.status === "needs_info") needsInfoCount += 1;
+    if (typeof candidate?.missing_information_resolution !== "string") {
+      errors.push(`${candidateLabel}.missing_information_resolution must be present as a string in saved-analysis fixtures.`);
+    }
+    if (!Array.isArray(candidate?.resolved_missing_information)) {
+      errors.push(`${candidateLabel}.resolved_missing_information must be present as an array in saved-analysis fixtures.`);
+    } else if (candidate.resolved_missing_information.some((item) => typeof item !== "string" || !item.trim())) {
+      errors.push(`${candidateLabel}.resolved_missing_information must contain non-empty strings.`);
+    }
+    if (candidate?.status === "approved" && Array.isArray(candidate.missing_information) && candidate.missing_information.length > 0) {
+      errors.push(`${candidateLabel} is approved but still has candidate-level missing_information.`);
+    }
+    if (typeof candidate?.catalog_entry_id === "string" && candidate.catalog_entry_id) {
+      const catalogEntry = catalogById.get(candidate.catalog_entry_id);
+      if (!catalogEntry) {
+        errors.push(`${candidateLabel}.catalog_entry_id ${candidate.catalog_entry_id} is not in the saved catalog snapshot.`);
+      } else if (catalogEntry.module_category !== candidate.module_category) {
+        errors.push(`${candidateLabel}.catalog_entry_id category does not match saved catalog entry.`);
+      }
+    }
+    if (candidate?.access_protocol === "mcp" && candidate.mcp_schema_ref) {
+      const refs = collectMcpSchemaRefs(resolve("catalog/contracts"));
+      if (refs.size > 0 && !refs.has(candidate.mcp_schema_ref)) {
+        errors.push(`${candidateLabel}.mcp_schema_ref ${candidate.mcp_schema_ref} has no catalog/contracts/mcp contract.`);
+      }
+    }
+  }
+
+  if (record.scaffoldReady && needsInfoCount > 0) {
+    errors.push(`${label}.scaffoldReady cannot be true while needs_info candidates remain.`);
+  }
+  if (record.scaffoldReady && record.activeStep !== "export") {
+    errors.push(`${label}.scaffoldReady fixtures should land on export.`);
+  }
+
+  const contracts = Array.isArray(analysis.a2aContracts) ? analysis.a2aContracts : [];
+  const contractsById = new Map();
+  for (const contract of contracts) {
+    if (contract && typeof contract.contract_id === "string") contractsById.set(contract.contract_id, contract);
+  }
+  if (analysis.processFlow !== undefined) {
+    validateGraphIR(analysis.processFlow, `${label}.analysis.processFlow`, candidatesById, contractsById);
+  }
+}
+
+function validateCatalogEntryObject(entry, label) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (typeof entry.id !== "string" || !entry.id.trim()) errors.push(`${label}.id is required.`);
+  if (typeof entry.name !== "string" || !entry.name.trim()) errors.push(`${label}.name is required.`);
+  if (!categories.has(entry.module_category)) errors.push(`${label}.module_category is invalid.`);
+  if (entry.module_category === "adapter" && !adapterKinds.has(entry.adapter_kind)) {
+    errors.push(`${label}.adapter_kind is invalid.`);
+  }
+  if (entry.module_category === "agent" && !agentKinds.has(entry.agent_kind)) {
+    errors.push(`${label}.agent_kind is invalid.`);
+  }
+  if (entry.module_category === "workflow" && !workflowKinds.has(entry.workflow_kind)) {
+    errors.push(`${label}.workflow_kind is invalid.`);
+  }
+  if (!["seeded", "session_added", "session_edited", "session_deleted"].includes(entry.provenance)) {
+    errors.push(`${label}.provenance is invalid.`);
+  }
+}
+
+function validateModuleCandidateObject(candidate, label) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (typeof candidate.id !== "string" || !candidate.id.trim()) errors.push(`${label}.id is required.`);
+  if (!categories.has(candidate.module_category)) errors.push(`${label}.module_category is invalid.`);
+  if (!["needs_info", "approved", "deferred", "rejected"].includes(candidate.status)) {
+    errors.push(`${label}.status is invalid.`);
+  }
+  if (!Array.isArray(candidate.inputs)) errors.push(`${label}.inputs must be an array.`);
+  if (!Array.isArray(candidate.outputs)) errors.push(`${label}.outputs must be an array.`);
+  if (!Array.isArray(candidate.missing_information)) errors.push(`${label}.missing_information must be an array.`);
+  if (
+    candidate.missing_information_resolution !== undefined &&
+    typeof candidate.missing_information_resolution !== "string"
+  ) {
+    errors.push(`${label}.missing_information_resolution must be a string when present.`);
+  }
+  if (
+    candidate.resolved_missing_information !== undefined &&
+    (!Array.isArray(candidate.resolved_missing_information) ||
+      candidate.resolved_missing_information.some((item) => typeof item !== "string" || !item.trim()))
+  ) {
+    errors.push(`${label}.resolved_missing_information must be an array of non-empty strings when present.`);
+  }
+  if (candidate.module_category === "adapter" && !adapterKinds.has(candidate.adapter_kind)) {
+    errors.push(`${label}.adapter_kind is invalid.`);
+  }
+  if (candidate.module_category === "agent" && !agentKinds.has(candidate.agent_kind)) {
+    errors.push(`${label}.agent_kind is invalid.`);
+  }
+  if (candidate.module_category === "workflow" && !workflowKinds.has(candidate.workflow_kind)) {
+    errors.push(`${label}.workflow_kind is invalid.`);
+  }
+  if (candidate.access_protocol === "mcp" && (!candidate.mcp_server || !candidate.mcp_tool_name || !candidate.mcp_schema_ref)) {
+    errors.push(`${label} access_protocol=mcp requires mcp_server, mcp_tool_name, and mcp_schema_ref.`);
+  }
+}
+
+function validateContractRegistry(dir = root) {
+  for (const path of findJsonFiles(dir)) {
+    const normalizedPath = path.replace(/\\/g, "/");
+    if (!normalizedPath.includes("/catalog/contracts/")) continue;
+    const contract = readJson(path);
+    if (isMcpContract(contract)) {
+      validateMcpContract(contract, relative(root, path) || path);
+    } else if (isA2ARegistryContract(contract)) {
+      validateA2ARegistryContract(contract, relative(root, path) || path);
+    }
+  }
+}
+
+function isMcpContract(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value.schema_ref === "string" &&
+    typeof value.server === "string" &&
+    typeof value.tool === "string" &&
+    value.inputSchema &&
+    value.outputSchema
+  );
+}
+
+function validateMcpContract(contract, label) {
+  for (const field of ["schema_ref", "server", "tool", "title", "description"]) {
+    if (typeof contract[field] !== "string" || !contract[field].trim()) {
+      errors.push(`${label}.${field} must be a non-empty string.`);
+    }
+  }
+  validateJsonSchemaObject(contract.inputSchema, `${label}.inputSchema`);
+  validateJsonSchemaObject(contract.outputSchema, `${label}.outputSchema`);
+  if (!Array.isArray(contract.success_examples) || contract.success_examples.length === 0) {
+    errors.push(`${label}.success_examples must be a non-empty array.`);
+  } else {
+    contract.success_examples.forEach((example, index) => {
+      if (!example || typeof example !== "object" || Array.isArray(example)) {
+        errors.push(`${label}.success_examples[${index}] must be an object.`);
+        return;
+      }
+      validateSchemaInstance(example.arguments, contract.inputSchema, `${label}.success_examples[${index}].arguments`);
+      validateSchemaInstance(example.structuredContent, contract.outputSchema, `${label}.success_examples[${index}].structuredContent`);
+    });
+  }
+  if (!Array.isArray(contract.error_examples) || contract.error_examples.length === 0) {
+    errors.push(`${label}.error_examples must be a non-empty array.`);
+  } else {
+    contract.error_examples.forEach((example, index) => {
+      if (example?.isError !== true) {
+        errors.push(`${label}.error_examples[${index}].isError must be true.`);
+      }
+      if (typeof example?.message !== "string" || !example.message.trim()) {
+        errors.push(`${label}.error_examples[${index}].message is required.`);
+      }
+    });
+  }
+  if (!contract.mock_response || typeof contract.mock_response !== "object" || Array.isArray(contract.mock_response)) {
+    errors.push(`${label}.mock_response must be an object.`);
+    return;
+  }
+  if (contract.mock_response.isError !== false) {
+    errors.push(`${label}.mock_response.isError must be false for the default deterministic response.`);
+  }
+  if (!Array.isArray(contract.mock_response.content) || contract.mock_response.content.length === 0) {
+    errors.push(`${label}.mock_response.content must be a non-empty array.`);
+  }
+  validateSchemaInstance(contract.mock_response.structuredContent, contract.outputSchema, `${label}.mock_response.structuredContent`);
+}
+
+function isA2ARegistryContract(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value.contract_id === "string" &&
+    value.agent_card &&
+    value.task_lifecycle &&
+    value.artifact_contract
+  );
+}
+
+function validateA2ARegistryContract(contract, label) {
+  validateA2AContract(contract, label, new Map(), new Set(), new Map());
+  for (const field of ["success_task_example", "auth_required_example", "failed_task_example"]) {
+    if (!contract[field] || typeof contract[field] !== "object" || Array.isArray(contract[field])) {
+      errors.push(`${label}.${field} must be an object.`);
+    }
+  }
+}
+
+function validateJsonSchemaObject(schema, label) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (schema.type !== "object") {
+    errors.push(`${label}.type must be object.`);
+  }
+  if (!schema.properties || typeof schema.properties !== "object" || Array.isArray(schema.properties)) {
+    errors.push(`${label}.properties must be an object.`);
+  }
+  if (schema.required !== undefined && !Array.isArray(schema.required)) {
+    errors.push(`${label}.required must be an array when present.`);
+  }
+}
+
+function validateSchemaInstance(value, schema, label) {
+  if (!schema || typeof schema !== "object") return;
+  const type = schema.type;
+  if (type === "object") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      errors.push(`${label} must be an object.`);
+      return;
+    }
+    const required = Array.isArray(schema.required) ? schema.required : [];
+    for (const key of required) {
+      if (!(key in value)) errors.push(`${label}.${key} is required by schema.`);
+    }
+    const properties = schema.properties && typeof schema.properties === "object" ? schema.properties : {};
+    for (const [key, childSchema] of Object.entries(properties)) {
+      if (value[key] !== undefined) validateSchemaInstance(value[key], childSchema, `${label}.${key}`);
+    }
+    return;
+  }
+  if (type === "array") {
+    if (!Array.isArray(value)) {
+      errors.push(`${label} must be an array.`);
+      return;
+    }
+    if (schema.items) {
+      value.forEach((item, index) => validateSchemaInstance(item, schema.items, `${label}[${index}]`));
+    }
+    return;
+  }
+  if (type === "string" && typeof value !== "string") errors.push(`${label} must be a string.`);
+  if (type === "number" && typeof value !== "number") errors.push(`${label} must be a number.`);
+  if (type === "boolean" && typeof value !== "boolean") errors.push(`${label} must be a boolean.`);
+}
+
+function collectMcpSchemaRefs(dir) {
+  const refs = new Set();
+  if (!existsSync(dir)) return refs;
+  for (const path of findJsonFiles(dir)) {
+    const contract = readJson(path);
+    if (isMcpContract(contract)) refs.add(contract.schema_ref);
+  }
+  return refs;
+}
+
+function findJsonFiles(dir) {
+  if (!existsSync(dir)) return [];
+  let stat;
+  try {
+    stat = statSync(dir);
+  } catch {
+    return [];
+  }
+  if (!stat.isDirectory()) {
+    return dir.endsWith(".json") ? [dir] : [];
+  }
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...findJsonFiles(path));
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      files.push(path);
+    }
+  }
+  return files;
 }
 
 function readJson(path) {

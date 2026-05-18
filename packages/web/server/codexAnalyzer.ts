@@ -65,8 +65,6 @@ const remoteRequiredFields = [
 ];
 const codexMcpOverrides = [
   "-c",
-  "mcp_servers.stitch.enabled=false",
-  "-c",
   "mcp_servers.chrome-devtools.enabled=false",
   "-c",
   "mcp_servers.adk-docs-mcp.enabled=true"
@@ -781,13 +779,14 @@ function riskSignalArrayOr(value: unknown, fallback: string[] = []): string[] {
 
 function hydrateFields(
   value: unknown,
-  fallback: Array<{ name: string; type: string; required?: boolean }> = []
-): Array<{ name: string; type: string; required: boolean }> {
+  fallback: Array<{ name: string; type: string; required?: boolean; schema?: unknown }> = []
+): Array<{ name: string; type: string; required: boolean; schema?: unknown }> {
   const source = Array.isArray(value) ? value : fallback;
   return source.filter(isRecord).map((field) => ({
     name: stringOr(field.name, "field") ?? "field",
     type: stringOr(field.type, "unknown") ?? "unknown",
-    required: typeof field.required === "boolean" ? field.required : false
+    required: typeof field.required === "boolean" ? field.required : false,
+    ...(isRecord(field.schema) ? { schema: field.schema } : {})
   }));
 }
 
