@@ -94,6 +94,17 @@ export const A2A_STREAM_WRAPPERS = ["task", "message", "taskStatusUpdate", "task
 
 export const A2A_CONTRACT_STATUSES = ["draft", "needs_info", "approved"] as const;
 
+export const RUNTIME_CONTRACT_KINDS = [
+  "mcp_legacy_adapter",
+  "eai_legacy_adapter",
+  "context_manager",
+  "callback_broker",
+  "adk_callback",
+  "async_resume"
+] as const;
+
+export const RUNTIME_CONTRACT_STATUSES = ["draft", "needs_info", "approved", "rejected"] as const;
+
 // Stale terminology that must not appear inside a serialized contract object.
 // Per spec §5 last paragraph: old slash-form ops, legacy request wrapper names,
 // lowercase task states, bare task states without TASK_STATE_ prefix, removed
@@ -175,11 +186,50 @@ export type A2APartField = (typeof A2A_PART_FIELDS)[number];
 export type A2ARole = (typeof A2A_ROLES)[number];
 export type A2AStreamWrapper = (typeof A2A_STREAM_WRAPPERS)[number];
 export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
+export type RuntimeContractKind = (typeof RUNTIME_CONTRACT_KINDS)[number];
+export type RuntimeContractStatus = (typeof RUNTIME_CONTRACT_STATUSES)[number];
 
 export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
 export type ComponentSource = "mcp" | "remote_a2a" | "stub";
+
+export interface RuntimeContract {
+  contract_id: string;
+  contract_kind: RuntimeContractKind;
+  module_id: string | null;
+  title: string;
+  contract_status: RuntimeContractStatus;
+  summary: string;
+  required_review_fields: string[];
+  reviewer_notes: string;
+  runtime_support: {
+    context_manager_required: boolean;
+    callback_broker_required: boolean;
+    human_approval_required: boolean;
+    idempotency_required: boolean;
+    audit_required: boolean;
+    compensation_required: boolean;
+  };
+  operation: {
+    operation_type: "read" | "write" | "approval" | "batch" | "notification" | "unknown";
+    side_effect_level: "none" | "read_only" | "write" | "financial_write" | "customer_notification" | "unknown";
+    callback_expected: boolean;
+    async_resume_required: boolean;
+  };
+  identifiers: string[];
+  policies: {
+    auth_policy: string;
+    timeout_policy: string;
+    retry_policy: string;
+    fallback_policy: string;
+    masking_policy: string;
+    data_policy: string;
+  };
+  graph_ir_annotations: Record<string, string>;
+  synthetic_examples: Array<Record<string, unknown>>;
+  developer_todos: string[];
+}
 
 export interface FieldSpec {
   name: string;
@@ -431,6 +481,22 @@ export interface ScaffoldPlanModule {
   risk_signals: RiskSignal[];
   required_review_fields: string[];
   smoke_spec?: ModuleSmokeSpec | null;
+  runtime_mock?: Record<string, unknown> | null;
+}
+
+export interface ScaffoldPlanRuntimeContract {
+  contract_id: string;
+  contract_kind: RuntimeContractKind;
+  module_id: string | null;
+  title: string;
+  contract_status: RuntimeContractStatus;
+  required_review_fields: string[];
+  runtime_support: RuntimeContract["runtime_support"];
+  operation: RuntimeContract["operation"];
+  identifiers: string[];
+  policies: RuntimeContract["policies"];
+  graph_ir_annotations: Record<string, string>;
+  developer_todos: string[];
 }
 
 export interface ExcludedScaffoldModule {
@@ -445,6 +511,7 @@ export interface ScaffoldPlan {
   source: "approved_workbench_artifact";
   raw_requirement_to_code: false;
   modules: ScaffoldPlanModule[];
+  runtime_contracts: ScaffoldPlanRuntimeContract[];
   excluded_modules: ExcludedScaffoldModule[];
   manifest: {
     catalog_bound_modules: Array<{
@@ -667,6 +734,7 @@ export interface AnalysisResult {
    * is enforced by the validator.
    */
   a2aContracts: A2AContract[];
+  runtimeContracts: RuntimeContract[];
   processFlow: ProcessFlow;
 }
 

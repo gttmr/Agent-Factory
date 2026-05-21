@@ -108,6 +108,21 @@ def _event_output(node_id: str, node_label: str, edge_kind: str, node_input: Any
     }
 
 
+def _contract_stub_output(module_id: str, node_id: str, node_label: str, edge_kind: str, node_input: Any = None):
+    output = _event_output(node_id, node_label, edge_kind, node_input)
+    contract = _component_contract(module_id)
+    output["catalog_binding"] = contract.get("catalog_binding")
+    runtime_mock = contract.get("runtime_mock")
+    if isinstance(runtime_mock, dict):
+        output.update(runtime_mock)
+        output["mock_response"] = runtime_mock
+        output["status"] = "stubbed_runtime_contract"
+    else:
+        output["status"] = "todo_implementation_required"
+        output["developer_todos"] = contract.get("developer_todos", [])
+    return output
+
+
 def _component_contract(module_id: str):
     return COMPONENT_CONTRACTS[module_id]
 
@@ -161,6 +176,11 @@ function buildNodeFunction(node: AdkGraphNode, scaffoldModule: ScaffoldPlanModul
   }
 
   if (node.runtimeRole === "llm_agent") {
+    if (scaffoldModule?.runtime_mock) {
+      return `def ${node.functionName}(node_input: Any = None):
+    """LLM Agent stub generated from catalog runtime_mock."""
+    return Event(output=_contract_stub_output("${scaffoldModule.id}", "${node.id}", "${escapePythonString(node.label)}", "llm_agent", node_input))`;
+    }
     return `def ${node.functionName}(node_input: Any = None):
     """LLM Agent placeholder. Configure model credentials before replacing this stub with a real LLM node."""
     return Event(output=_event_output("${node.id}", "${escapePythonString(node.label)}", "llm_agent", node_input))`;
@@ -178,27 +198,29 @@ function buildNodeFunction(node: AdkGraphNode, scaffoldModule: ScaffoldPlanModul
     return `def ${node.functionName}(node_input: Any = None):
     """MCP Adapter contract placeholder generated from catalog metadata."""
     contract_call = json.loads(${JSON.stringify(JSON.stringify(contractCall))})
-    output = _event_output("${node.id}", "${escapePythonString(node.label)}", "mcp_adapter", node_input)
+    output = ${scaffoldModule ? `_contract_stub_output("${scaffoldModule.id}", "${node.id}", "${escapePythonString(node.label)}", "mcp_adapter", node_input)` : `_event_output("${node.id}", "${escapePythonString(node.label)}", "mcp_adapter", node_input)`}
     output["mcp_contract_call"] = contract_call
-    output["status"] = "runtime_configuration_required"
+    if "mock_response" not in output:
+        output["status"] = "runtime_configuration_required"
     return Event(output=output)`;
   }
 
   if (scaffoldModule) {
     const todoFunctionName = todoImplementationFunctionName(scaffoldModule);
+    const hasRuntimeMock = Boolean(scaffoldModule.runtime_mock);
     return `def ${todoFunctionName}(node_input: Any = None):
     """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
     raise NotImplementedError("${escapePythonString(scaffoldModule.name)} requires developer implementation")
 
 
 def ${node.functionName}(node_input: Any = None):
-    """New-code TODO boundary generated from scaffold-plan."""
-    contract = _component_contract("${scaffoldModule.id}")
+    """${hasRuntimeMock ? "Catalog runtime mock generated from reviewed scaffold-plan." : "New-code TODO boundary generated from scaffold-plan."}"""
+    ${hasRuntimeMock ? `return Event(output=_contract_stub_output("${scaffoldModule.id}", "${node.id}", "${escapePythonString(node.label)}", "${node.runtimeRole}", node_input))` : `contract = _component_contract("${scaffoldModule.id}")
     output = _event_output("${node.id}", "${escapePythonString(node.label)}", "event_output", node_input)
     output["status"] = "todo_implementation_required"
     output["developer_todos"] = contract["developer_todos"]
     output["todo_function"] = "${todoFunctionName}"
-    return Event(output=output)`;
+    return Event(output=output)`}`;
   }
 
   const channel = node.nodeKind === "output" ? "event_message" : "event_output";
@@ -258,6 +280,7 @@ function buildManifest(input: AdkSourceBundleInput, graphIr: AdkGraphIr) {
     },
     catalog_bound_modules: input.scaffoldPlan.manifest.catalog_bound_modules,
     new_code_required: input.scaffoldPlan.manifest.new_code_required,
+    runtime_contracts: input.scaffoldPlan.runtime_contracts,
     nodes: graphIr.nodes.map((node) => ({
       id: node.id,
       label: node.label,
@@ -307,6 +330,7 @@ def test_manifest_has_runtime_guardrails():
     assert '"graph_ir"' in manifest
     assert '"catalog_bound_modules"' in manifest
     assert '"new_code_required"' in manifest
+    assert '"runtime_contracts"' in manifest
 
 
 def test_agent_source_marks_developer_todo_boundaries():
@@ -400,7 +424,8 @@ function buildComponentContracts(scaffoldPlan: ScaffoldPlan) {
         developer_todos: module.developer_todos,
         inputs: module.inputs,
         outputs: module.outputs,
-        risk_signals: module.risk_signals
+        risk_signals: module.risk_signals,
+        runtime_mock: module.runtime_mock ?? null
       }
     ])
   );

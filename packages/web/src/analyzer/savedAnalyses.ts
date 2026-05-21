@@ -1,6 +1,7 @@
 import type { CatalogEntry } from "../catalog/types";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
 import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
+import { buildRuntimeContracts } from "./runtimeContracts";
 import type {
   AnalysisResult,
   CodexAnalyzerModel,
@@ -16,6 +17,7 @@ export type SavedActiveStep =
   | "analysis"
   | "modules"
   | "graph"
+  | "runtimeContracts"
   | "a2aContracts"
   | "catalog"
   | "saved"
@@ -51,13 +53,21 @@ export function loadSavedAnalyses(): SavedAnalysisRecord[] {
 // Older saved records pre-date the a2aContracts field. Default to an empty
 // array on load so they satisfy the AnalysisResult type.
 function backfillA2AContracts(record: SavedAnalysisRecord): SavedAnalysisRecord {
-  if (record.analysis && !Array.isArray((record.analysis as { a2aContracts?: unknown }).a2aContracts)) {
-    return {
-      ...record,
-      analysis: { ...record.analysis, a2aContracts: [] }
-    };
-  }
-  return record;
+  if (!record.analysis) return record;
+  const withA2A = Array.isArray((record.analysis as { a2aContracts?: unknown }).a2aContracts)
+    ? record.analysis
+    : { ...record.analysis, a2aContracts: [] };
+  const runtimeContracts = Array.isArray((withA2A as { runtimeContracts?: unknown }).runtimeContracts)
+    ? withA2A.runtimeContracts
+    : buildRuntimeContracts({
+        normalizedRequirement: withA2A.normalizedRequirement,
+        moduleCandidates: withA2A.moduleCandidates,
+        existingContracts: []
+      });
+  return {
+    ...record,
+    analysis: { ...withA2A, runtimeContracts }
+  };
 }
 
 // Older saved records also pre-date the GraphIR shape on processFlow. If the

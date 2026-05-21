@@ -38,6 +38,17 @@ Use `adapter_kind` as follows:
 - `external_service`: externally owned service capability that is not an independent remote agent boundary.
 - `unknown`: evidence shows `adapter`, but the subtype is not yet safe to pick.
 
+MCP tools, EAI routing, Legacy System access, Context Manager operations, and Callback Broker operations are adapter or runtime support contracts. Do not add them as top-level `module_category` values.
+
+Use these quick rules:
+
+- EAI or Legacy API access -> `module_category: "adapter"`, `adapter_kind: "legacy_api"`.
+- Shared MCP tool for legacy access -> `module_category: "adapter"`, usually `adapter_kind: "legacy_api"`.
+- Context Manager needed for work-item state -> runtime support contract or adapter contract note, not top-level category.
+- Callback Broker needed for external callback receipt -> runtime support contract or adapter contract note, not top-level category.
+- Long-running state flow -> local `workflow` or Graph IR behavior unless it crosses an independent remote agent boundary.
+- Independently owned remote agent runtime -> consider `remote_a2a` only after high-friction evidence is present.
+
 Preserve adapter contract metadata by subtype:
 
 - Retrieval adapters should preserve `citation_required`, `source_acl_required`, `freshness_policy`, and `grounding_required`.
@@ -45,11 +56,20 @@ Preserve adapter contract metadata by subtype:
 - Rule-registry adapters should preserve `managed_rule`, `owner_domain`, `versioned`, `effective_date_required`, and `audit_required`.
 - Every adapter should expose explicit `input_schema` and `output_schema` when enough evidence exists.
 
+For `legacy_api` adapters that touch customer-impacting or financial-write paths, also preserve `operation_type`, `side_effect_level`, `idempotency_required`, `correlation_id_strategy`, `callback_expected`, `context_manager_required`, masking policy, timeout/retry/fallback, audit fields, and manual review or compensation notes.
+
 `rule_registry` is intentionally the migration subtype for older metadata-registry artifacts. Preserve the secondary `registry_kind` as `routing_table`, `capability_catalog`, `schema_registry`, `policy_metadata`, `configuration`, or `unknown`. Do not treat the shared `rule_registry` label as governance approval for production policy rules, capability catalogs, schema metadata, and routing metadata to share one implementation. If those concerns have different owners, controls, or release lifecycles, preserve the distinction in evidence, ownership notes, and implementation handoff TODOs.
 
 ## Remote A2A
 
 Choose `module_category: "remote_a2a"` only when the interaction crosses an independent remote agent boundary. The target must be independently owned, hosted, discovered, or invoked through a protocol boundary. A local function, adapter, retrieval lookup, or local workflow is not A2A.
+
+Do not choose `remote_a2a` merely because:
+
+- an EAI/Legacy operation returns a callback later
+- a workflow has multiple local steps
+- an MCP server exposes a reusable tool
+- a Context Manager or Callback Broker is required
 
 ## Legacy Mapping
 

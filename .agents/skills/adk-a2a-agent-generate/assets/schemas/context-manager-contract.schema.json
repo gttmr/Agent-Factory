@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/adk-a2a-agent-generate/context-manager-contract.schema.json",
+  "title": "Skill Local Context Manager Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_id", "synthetic", "work_item_schema", "state_model", "llm_exposure"],
+  "properties": {
+    "contract_id": { "type": "string", "pattern": "^rtc-[a-z0-9-]+$" },
+    "synthetic": { "type": "boolean", "const": true },
+    "work_item_schema": { "type": "object", "additionalProperties": true },
+    "state_model": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "llm_exposure": { "type": "string", "enum": ["safe_summary_only", "result_ref_only"] }
+  }
+}

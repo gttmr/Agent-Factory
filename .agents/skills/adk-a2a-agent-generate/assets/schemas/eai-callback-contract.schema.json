@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/adk-a2a-agent-generate/eai-callback-contract.schema.json",
+  "title": "Skill Local EAI Callback Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_id", "synthetic", "payload_schema", "signature_verification", "status_mapping"],
+  "properties": {
+    "contract_id": { "type": "string", "pattern": "^rtc-[a-z0-9-]+$" },
+    "synthetic": { "type": "boolean", "const": true },
+    "payload_schema": { "type": "object", "additionalProperties": true },
+    "signature_verification": { "type": "string", "minLength": 1 },
+    "status_mapping": { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

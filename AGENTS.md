@@ -62,7 +62,7 @@ Definitions:
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
 
-Catalog entries are runtime-oriented contracts, not mocks. Mock/test-double generation is a separate future workflow that may read catalog contracts, but seed catalog items should describe intended MCP, Remote A2A, or implementation bindings.
+Catalog entries are runtime-oriented contracts. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
 
 ADK runtime baseline: ADK 2.0 (Beta). `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`. ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis.
 
@@ -78,6 +78,7 @@ Core harness rules:
 - Treat Remote A2A as high-friction: require independent ownership, protocol boundary, auth, lifecycle, timeout, retry, fallback, and audit details.
 - ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
 - Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flows, reuse/domain mapping, risk gates, validation output, and decision notes.
+- Preserve runtime contract review artifacts when legacy, callback, Context Manager, ADK callback, or async resume behavior is involved.
 
 ## Skill And Subagent Usage
 
@@ -138,6 +139,7 @@ For code-changing subagents, assign a clear file or module ownership boundary an
 - Preserve legacy migration data with `legacy_recommended_type`; do not use it as the primary classifier.
 - Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
 - ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
+- Required runtime contracts in `AnalysisResult.runtimeContracts` must be reviewed and approved before Runtime Handoff proceeds.
 - Generated source must stay a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic.
 
 ## WSL Browser Verification

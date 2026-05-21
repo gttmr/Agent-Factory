@@ -9,6 +9,7 @@ import {
   type SavedAnalysisRecord
 } from "../analyzer/savedAnalyses";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
+import { buildRuntimeContracts } from "../analyzer/runtimeContracts";
 import type {
   A2AContract,
   AnalysisResult,
@@ -18,7 +19,8 @@ import type {
   GraphIR,
   ModuleCandidate,
   RequirementDomain,
-  RequirementIntakeInput
+  RequirementIntakeInput,
+  RuntimeContract
 } from "../analyzer/types";
 import { loadSeedCatalog } from "../catalog/seed";
 import type { CatalogEntry } from "../catalog/types";
@@ -30,6 +32,7 @@ export type StepId =
   | "analysis"
   | "modules"
   | "graph"
+  | "runtimeContracts"
   | "a2aContracts"
   | "catalog"
   | "saved"
@@ -54,6 +57,7 @@ export const workbenchSteps: StepDefinition[] = [
   { id: "analysis", label: "분석 결과", group: "review" },
   { id: "modules", label: "모듈 검토", group: "review" },
   { id: "graph", label: "Graph IR", group: "review" },
+  { id: "runtimeContracts", label: "Runtime 계약", group: "review" },
   { id: "a2aContracts", label: "Remote A2A 계약", group: "review" },
   { id: "catalog", label: "카탈로그", group: "assets", alwaysAvailable: true },
   { id: "saved", label: "저장된 분석", group: "assets", alwaysAvailable: true },
@@ -91,8 +95,9 @@ type WorkbenchAction =
   | { type: "loadExample"; input: RequirementIntakeInput }
   | { type: "clearAll" }
   | { type: "setModuleCandidates"; moduleCandidates: ModuleCandidate[] }
-  | { type: "setModuleReviewArtifacts"; moduleCandidates: ModuleCandidate[]; processFlow: GraphIR }
+  | { type: "setModuleReviewArtifacts"; moduleCandidates: ModuleCandidate[]; processFlow: GraphIR; runtimeContracts: RuntimeContract[] }
   | { type: "setA2AContracts"; contracts: A2AContract[] }
+  | { type: "setRuntimeContracts"; contracts: RuntimeContract[] }
   | { type: "setCatalogEntries"; entries: CatalogEntry[] }
   | { type: "toggleAcceptedMissing"; item: string }
   | { type: "saveCurrentSucceeded"; records: SavedAnalysisRecord[]; currentSavedId: string }
@@ -182,7 +187,8 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
             analysis: {
               ...state.analysis,
               moduleCandidates: action.moduleCandidates,
-              processFlow: action.processFlow
+              processFlow: action.processFlow,
+              runtimeContracts: action.runtimeContracts
             },
             moduleCandidates: action.moduleCandidates,
             validationMessage: "모듈 검토 내용을 저장하고 Graph IR을 재생성했습니다."
@@ -191,6 +197,10 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
     case "setA2AContracts":
       return state.analysis
         ? { ...state, analysis: { ...state.analysis, a2aContracts: action.contracts } }
+        : state;
+    case "setRuntimeContracts":
+      return state.analysis
+        ? { ...state, analysis: { ...state.analysis, runtimeContracts: action.contracts } }
         : state;
     case "setCatalogEntries":
       return { ...state, catalogEntries: action.entries };
@@ -249,13 +259,20 @@ export function useWorkbenchState() {
 
   const processFlow = state.analysis?.processFlow ?? null;
   const a2aContracts = state.analysis?.a2aContracts ?? [];
+  const runtimeContracts = state.analysis?.runtimeContracts ?? [];
   const hasRemoteA2ACandidates = state.moduleCandidates.some((candidate) => candidate.module_category === "remote_a2a");
   const hasA2AReviewStep = hasRemoteA2ACandidates || a2aContracts.length > 0;
+  const hasRuntimeContractReviewStep = runtimeContracts.length > 0;
   const canReview = state.analysis !== null;
 
   const visibleSteps = useMemo(
-    () => workbenchSteps.filter((step) => (step.id === "a2aContracts" ? hasA2AReviewStep : true)),
-    [hasA2AReviewStep]
+    () =>
+      workbenchSteps.filter((step) => {
+        if (step.id === "a2aContracts") return hasA2AReviewStep;
+        if (step.id === "runtimeContracts") return hasRuntimeContractReviewStep;
+        return true;
+      }),
+    [hasA2AReviewStep, hasRuntimeContractReviewStep]
   );
 
   function canOpenStep(step: StepDefinition): boolean {
@@ -305,7 +322,8 @@ export function useWorkbenchState() {
       normalizedRequirement: state.analysis.normalizedRequirement,
       moduleCandidates: state.moduleCandidates,
       processFlow: state.analysis.processFlow,
-      catalogEntries: catalogSnapshot
+      catalogEntries: catalogSnapshot,
+      runtimeContracts: state.analysis.runtimeContracts ?? []
     });
     const graphErrors = state.analysis.processFlow.validation?.errors?.length ?? 0;
     const scaffoldReady = scaffoldPlan.validation.can_generate_source && graphErrors === 0;
@@ -340,7 +358,9 @@ export function useWorkbenchState() {
     state,
     processFlow,
     a2aContracts,
+    runtimeContracts,
     hasA2AReviewStep,
+    hasRuntimeContractReviewStep,
     visibleSteps,
     canOpenStep,
     providerLabel: defaultAnalyzerProvider.label,
@@ -350,9 +370,21 @@ export function useWorkbenchState() {
       setAnalyzerModel: (model: CodexAnalyzerModel) => dispatch({ type: "setAnalyzerModel", model }),
       setModuleCandidates: (moduleCandidates: ModuleCandidate[]) =>
         dispatch({ type: "setModuleCandidates", moduleCandidates }),
-      setModuleReviewArtifacts: (moduleCandidates: ModuleCandidate[], processFlow: GraphIR) =>
-        dispatch({ type: "setModuleReviewArtifacts", moduleCandidates, processFlow }),
+      setModuleReviewArtifacts: (moduleCandidates: ModuleCandidate[], processFlow: GraphIR) => {
+        if (!state.analysis) return;
+        dispatch({
+          type: "setModuleReviewArtifacts",
+          moduleCandidates,
+          processFlow,
+          runtimeContracts: buildRuntimeContracts({
+            normalizedRequirement: state.analysis.normalizedRequirement,
+            moduleCandidates,
+            existingContracts: state.analysis.runtimeContracts ?? []
+          })
+        });
+      },
       setA2AContracts: (contracts: A2AContract[]) => dispatch({ type: "setA2AContracts", contracts }),
+      setRuntimeContracts: (contracts: RuntimeContract[]) => dispatch({ type: "setRuntimeContracts", contracts }),
       setCatalogEntries: (entries: CatalogEntry[]) => dispatch({ type: "setCatalogEntries", entries }),
       toggleAcceptedMissing: (item: string) => dispatch({ type: "toggleAcceptedMissing", item }),
       loadExample: () => dispatch({ type: "loadExample", input: getExampleRequirement() }),

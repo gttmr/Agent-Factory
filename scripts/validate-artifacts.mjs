@@ -141,6 +141,15 @@ const a2aPartFields = new Set(["text", "raw", "url", "data"]);
 const a2aRoles = new Set(["ROLE_USER", "ROLE_AGENT"]);
 const a2aStreamWrappers = new Set(["task", "message", "taskStatusUpdate", "taskArtifactUpdate"]);
 const a2aContractStatuses = new Set(["draft", "needs_info", "approved"]);
+const runtimeContractKinds = new Set([
+  "mcp_legacy_adapter",
+  "eai_legacy_adapter",
+  "context_manager",
+  "callback_broker",
+  "adk_callback",
+  "async_resume"
+]);
+const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rejected"]);
 
 // Required string fields on an A2AContract (top-level scalar string fields).
 // Nested object fields are validated separately.
@@ -242,6 +251,7 @@ const a2aStaleAllowlist = new Set([
 // `templates/regression-scenarios` validate every scenario in one command
 // while preserving the legacy single-directory behaviour for `templates/`.
 const targets = collectTargets(root);
+validateCodexOutputSchema(resolve("schemas/analysis-draft.schema.json"));
 
 for (const target of targets) {
   validateModuleCandidates(target);
@@ -258,6 +268,35 @@ if (errors.length) {
 }
 
 console.log("Artifact validation OK");
+
+function validateCodexOutputSchema(path) {
+  if (!existsSync(path)) return;
+  const schema = readJson(path);
+  walkCodexOutputSchema(schema, "codex_output_schema");
+}
+
+function walkCodexOutputSchema(schema, label) {
+  if (!schema || typeof schema !== "object") return;
+  if (schema.type === "object") {
+    if (schema.additionalProperties !== false) {
+      errors.push(`${label} object schema must set additionalProperties to false for Codex response_format.`);
+    }
+    const propertyNames = Object.keys(schema.properties ?? {});
+    const required = new Set(schema.required ?? []);
+    const missingRequired = propertyNames.filter((name) => !required.has(name));
+    if (missingRequired.length) {
+      errors.push(`${label} object schema properties must all be listed in required: ${missingRequired.join(", ")}.`);
+    }
+  }
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "enum" || key === "required") continue;
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => walkCodexOutputSchema(item, `${label}.${key}[${index}]`));
+    } else {
+      walkCodexOutputSchema(value, `${label}.${key}`);
+    }
+  }
+}
 
 function collectTargets(start) {
   if (!existsSync(start)) {
@@ -756,6 +795,13 @@ function validateScaffoldPlan(dir = root) {
     errors.push("scaffold plan modules must be an array.");
     return;
   }
+  if (!Array.isArray(plan.runtime_contracts)) {
+    errors.push("scaffold plan runtime_contracts must be an array.");
+  } else {
+    plan.runtime_contracts.forEach((contract, index) =>
+      validateRuntimeContractObject(contract, `scaffold.runtime_contracts[${index}]`)
+    );
+  }
 
   plan.modules.forEach((module, index) => {
     const label = module.name ?? `scaffold.modules[${index}]`;
@@ -809,7 +855,7 @@ function validateSavedAnalysisRecord(record, label) {
       errors.push(`${label}.${field} must be a non-empty string.`);
     }
   }
-  if (!["intake", "analysis", "modules", "graph", "a2aContracts", "catalog", "saved", "export"].includes(record.activeStep)) {
+  if (!["intake", "analysis", "modules", "graph", "runtimeContracts", "a2aContracts", "catalog", "saved", "export"].includes(record.activeStep)) {
     errors.push(`${label}.activeStep is not a known workbench step.`);
   }
   if (!Array.isArray(record.acceptedMissing) || record.acceptedMissing.some((item) => typeof item !== "string")) {
@@ -900,6 +946,51 @@ function validateSavedAnalysisRecord(record, label) {
   if (analysis.processFlow !== undefined) {
     validateGraphIR(analysis.processFlow, `${label}.analysis.processFlow`, candidatesById, contractsById);
   }
+  if (analysis.runtimeContracts !== undefined) {
+    if (!Array.isArray(analysis.runtimeContracts)) {
+      errors.push(`${label}.analysis.runtimeContracts must be an array when present.`);
+    } else {
+      analysis.runtimeContracts.forEach((contract, index) =>
+        validateRuntimeContractObject(contract, `${label}.analysis.runtimeContracts[${index}]`)
+      );
+    }
+  }
+}
+
+function validateRuntimeContractObject(contract, label) {
+  if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (typeof contract.contract_id !== "string" || !/^rtc-[a-z0-9-]+$/.test(contract.contract_id)) {
+    errors.push(`${label}.contract_id must match rtc-*.`);
+  }
+  if (!runtimeContractKinds.has(contract.contract_kind)) {
+    errors.push(`${label}.contract_kind is invalid.`);
+  }
+  if (!runtimeContractStatuses.has(contract.contract_status)) {
+    errors.push(`${label}.contract_status is invalid.`);
+  }
+  if (contract.module_id !== null && typeof contract.module_id !== "string") {
+    errors.push(`${label}.module_id must be string or null.`);
+  }
+  if (typeof contract.title !== "string" || !contract.title.trim()) {
+    errors.push(`${label}.title is required.`);
+  }
+  if (!Array.isArray(contract.required_review_fields)) {
+    errors.push(`${label}.required_review_fields must be an array.`);
+  }
+  if (!Array.isArray(contract.identifiers)) {
+    errors.push(`${label}.identifiers must be an array.`);
+  }
+  if (!Array.isArray(contract.developer_todos)) {
+    errors.push(`${label}.developer_todos must be an array.`);
+  }
+  ["runtime_support", "operation", "policies", "graph_ir_annotations"].forEach((field) => {
+    if (!contract[field] || typeof contract[field] !== "object" || Array.isArray(contract[field])) {
+      errors.push(`${label}.${field} must be an object.`);
+    }
+  });
 }
 
 function validateCatalogEntryObject(entry, label) {
@@ -1168,6 +1259,13 @@ function validateAnalysisResult(dir = root) {
     errors.push("analysis-result.json a2aContracts must be an array.");
     return;
   }
+  if (!Array.isArray(result.runtimeContracts)) {
+    errors.push("analysis-result.json runtimeContracts must be an array.");
+    return;
+  }
+  result.runtimeContracts.forEach((contract, index) =>
+    validateRuntimeContractObject(contract, `analysis-result.json.runtimeContracts[${index}]`)
+  );
 
   // Anti-regression for spec §11: stages are no longer the workflow semantic
   // unit. Reject any leftover top-level stages array on the analysis result.

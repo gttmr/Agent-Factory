@@ -1,62 +1,16 @@
 adapters:
-  - name: legacy_core_sql_query_adapter
-    adapter_kind: data_query
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    runtime_binding: mcp
-    component_source: mcp
-    mcp_server: legacy-core-sql-mcp
-    mcp_tool_name: execute_readonly_sql
-    mcp_schema_ref: catalog.banking.legacy_core_sql.execute_readonly_sql.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
-    inputs:
-      - name: data_source_key
-        type: string
-        required: true
-      - name: sql_text
-        type: string
-        required: true
-      - name: parameters
-        type: object
-        required: false
-      - name: query_purpose
-        type: string
-        required: true
-    outputs:
-      - name: rows
-        type: array<object>
-      - name: schema
-        type: array<object>
-      - name: row_count
-        type: number
-      - name: query_trace
-        type: object
-    risk_signals:
-      - personal_data
-      - financial_data
-      - audit_required
-    notes: 레거시 코어 DB를 read-only SQL로 조회하는 MCP Adapter 계약. 실제 접속 정보와 권한은 runtime configuration에서 주입하며 catalog에는 credential을 저장하지 않는다.
-  - name: bank_document_ocr_adapter
+  - name: bank_document_ocr_mock_adapter
     adapter_kind: external_service
     owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    runtime_binding: mcp
-    component_source: mcp
-    mcp_server: document-ocr-mcp
-    mcp_tool_name: extract_bank_document_text
-    mcp_schema_ref: catalog.banking.document_ocr.extract_text.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
+    status: approved
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
     inputs:
       - name: document_uri
         type: string
         required: true
-      - name: mime_type
-        type: string
-        required: false
       - name: document_type_hint
         type: string
         required: false
@@ -73,27 +27,33 @@ adapters:
       - personal_data
       - financial_data
       - audit_required
-    notes: 신청서, 증빙서류, 약정서 등 은행 문서에서 텍스트와 위치 블록을 추출하는 OCR MCP Adapter 계약.
-  - name: banking_policy_retrieval_adapter
+    runtime_mock:
+      ocr_text: "[SYNTHETIC] 대출신청서: 신청금액 30,000,000원, 연소득 75,000,000원, 제출서류: 신분증/소득증빙"
+      page_blocks:
+        - page: 1
+          block_id: block-application-summary
+          text: 신청금액 30,000,000원 / 연소득 75,000,000원
+        - page: 2
+          block_id: block-income-proof
+          text: 소득금액증명원 연소득 72,000,000원
+      confidence: 0.97
+      extraction_warnings:
+        - synthetic_ocr_output
+    notes: local smoke에서 항상 동일한 OCR 결과를 반환하는 synthetic Adapter다.
+
+  - name: banking_policy_search_mock_adapter
     adapter_kind: retrieval
     owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    runtime_binding: mcp
-    component_source: mcp
-    mcp_server: banking-knowledge-mcp
-    mcp_tool_name: search_policy_documents
-    mcp_schema_ref: catalog.banking.knowledge.policy_search.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
+    status: approved
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
     inputs:
       - name: query
         type: text
         required: true
       - name: domain_filter
-        type: string
-        required: false
-      - name: effective_date
         type: string
         required: false
     outputs:
@@ -105,19 +65,77 @@ adapters:
         type: object
     risk_signals:
       - audit_required
-    notes: 여신, 수신, 카드, 고객 업무의 정책/업무 가이드를 근거와 함께 조회하는 retrieval Adapter 계약.
-  - name: banking_rule_registry_adapter
+    runtime_mock:
+      policy_matches:
+        - policy_id: LOAN-DOC-REQ-001
+          title: 개인신용대출 필수서류 체크리스트
+          matched_rule: income_certificate_required
+          excerpt: 재직/소득 증빙은 신청일 기준 30일 이내 발급본을 우선 확인한다.
+        - policy_id: LOAN-RISK-DSR-002
+          title: DSR soft-limit 검토 기준
+          matched_rule: dsr_soft_limit_review
+          excerpt: soft-limit 경고는 자동 거절이 아니며 담당자 확인 대상으로 분류한다.
+      citations:
+        - source: synthetic-policy://loan/documents
+          section: 2.1
+        - source: synthetic-policy://loan/dsr
+          section: 4.3
+      freshness:
+        effective_date: "2026-01-01"
+        synthetic: true
+    notes: 정책 검색 결과와 citation shape를 완성한 retrieval mock이다.
+
+  - name: customer_account_snapshot_mock_adapter
+    adapter_kind: data_query
+    owner_domain: 고객
+    status: approved
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
+    inputs:
+      - name: customer_identifier
+        type: string
+        required: true
+      - name: snapshot_scope
+        type: array<string>
+        required: false
+    outputs:
+      - name: customer_snapshot
+        type: object
+      - name: account_summary
+        type: object
+      - name: data_freshness
+        type: object
+    risk_signals:
+      - personal_data
+      - financial_data
+      - audit_required
+    runtime_mock:
+      customer_snapshot:
+        customer_id: CUST-DEMO-001
+        display_name: 김데모
+        kyc_status: verified
+        relationship_years: 7
+        masking: synthetic
+      account_summary:
+        deposit_balance: 18500000
+        monthly_income_estimate: 6000000
+        delinquency_count_12m: 0
+        existing_loan_balance: 42000000
+      data_freshness:
+        as_of: "2026-05-01T09:00:00+09:00"
+        synthetic: true
+    notes: 실제 고객정보 없이 local smoke가 완성된 customer/account shape를 받도록 하는 data query mock이다.
+
+  - name: loan_precheck_rule_mock_adapter
     adapter_kind: rule_registry
-    owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    runtime_binding: mcp
-    component_source: mcp
-    mcp_server: banking-rule-registry-mcp
-    mcp_tool_name: evaluate_rule_set
-    mcp_schema_ref: catalog.banking.rule_registry.evaluate_rule_set.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
+    owner_domain: 리스크
+    status: approved
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
     inputs:
       - name: rule_set_key
         type: string
@@ -125,9 +143,6 @@ adapters:
       - name: case_features
         type: object
         required: true
-      - name: evaluation_date
-        type: string
-        required: false
     outputs:
       - name: rule_result
         type: object
@@ -137,20 +152,34 @@ adapters:
         type: array<string>
     risk_signals:
       - customer_impact
+      - credit_decision_support
       - audit_required
-    notes: 심사, 라우팅, 승인 필요 여부를 versioned rule set으로 평가하는 rule registry Adapter 계약.
-  - name: banking_template_registry_adapter
+    runtime_mock:
+      rule_result:
+        rule_set_key: loan_precheck_demo_v1
+        outcome: review_required
+        score_band: B
+        hard_stop: false
+      matched_rules:
+        - rule_id: DSR_SOFT_LIMIT
+          result: review_required
+          reason: 추정 DSR이 soft threshold 근처입니다.
+        - rule_id: DOCUMENT_COMPLETENESS
+          result: supplement_required
+          reason: 재직증명서가 누락되었습니다.
+      required_actions:
+        - request_employment_certificate
+        - route_to_manual_reviewer
+    notes: 자동 승인/거절 대신 검토 필요 상태를 반환하는 rule registry mock이다.
+
+  - name: customer_notice_template_mock_adapter
     adapter_kind: template
     owner_domain: 공통
-    status: proposed
-    access_protocol: mcp
-    runtime_binding: mcp
-    component_source: mcp
-    mcp_server: banking-template-registry-mcp
-    mcp_tool_name: get_template
-    mcp_schema_ref: catalog.banking.template_registry.get_template.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
+    status: approved
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
     inputs:
       - name: template_key
         type: string
@@ -171,35 +200,95 @@ adapters:
     risk_signals:
       - external_message
       - audit_required
-    notes: 고객 안내문, 보완 요청, 심사 결과 통지 등에 쓰는 승인된 템플릿을 조회하는 Adapter 계약.
-  - name: customer_account_snapshot_adapter
-    adapter_kind: data_query
-    owner_domain: 고객
-    status: proposed
+    runtime_mock:
+      template:
+        template_key: loan_supplement_request_demo
+        locale: ko-KR
+        channel: internal_preview
+        body: "[데모] 대출 사전심사를 위해 {missing_documents} 보완 제출이 필요합니다. 담당자 검토 후 다음 단계를 안내드립니다."
+      required_variables:
+        - missing_documents
+        - reviewer_contact
+      approval_constraints:
+        external_send_allowed: false
+        requires_human_approval: true
+        synthetic: true
+    notes: 고객 발송이 아니라 내부 preview만 가능한 synthetic template mock이다.
+
+  - name: legacy_loan_limit_change_synthetic_adapter
+    adapter_kind: legacy_api
+    owner_domain: 여신
+    status: approved
     access_protocol: mcp
-    runtime_binding: mcp
+    mcp_server: legacy-loan-eai-mcp
+    mcp_tool_name: submit_loan_limit_change
+    mcp_schema_ref: catalog.banking.legacy_loan_limit_change.synthetic.v1
+    mcp_auth_mode: synthetic_service_token
     component_source: mcp
-    mcp_server: customer-account-mcp
-    mcp_tool_name: get_customer_account_snapshot
-    mcp_schema_ref: catalog.banking.customer_account.snapshot.v1
-    mcp_auth_mode: runtime_managed_service_account
-    contract_status: runtime_config_required
+    runtime_binding: mcp
+    contract_status: mock_ready
     inputs:
-      - name: customer_identifier
+      - name: work_item_id
         type: string
         required: true
-      - name: snapshot_scope
-        type: array<string>
-        required: false
+      - name: customer_ref
+        type: string
+        required: true
+      - name: approval_token
+        type: string
+        required: true
+      - name: correlation_id
+        type: string
+        required: true
+      - name: idempotency_key
+        type: string
+        required: true
     outputs:
-      - name: customer_snapshot
+      - name: eai_job_id
+        type: string
+      - name: callback_expected
+        type: boolean
+      - name: safe_summary
+        type: string
+    risk_signals:
+      - financial_data
+      - customer_impact
+      - transaction_write
+      - human_approval_required
+      - audit_required
+    notes: Context Manager와 Callback Broker 검토를 요구하는 synthetic MCP/EAI legacy write 계약이다.
+
+  - name: customer_profile_lookup_synthetic_adapter
+    adapter_kind: legacy_api
+    owner_domain: 고객
+    status: approved
+    access_protocol: mcp
+    mcp_server: customer-profile-eai-mcp
+    mcp_tool_name: lookup_customer_profile
+    mcp_schema_ref: catalog.banking.customer_profile_lookup.synthetic.v1
+    mcp_auth_mode: synthetic_service_token
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: customer_ref
+        type: string
+        required: true
+      - name: lookup_purpose
+        type: string
+        required: true
+      - name: correlation_id
+        type: string
+        required: true
+    outputs:
+      - name: profile_summary
         type: object
-      - name: account_summary
+      - name: holdings_summary
         type: object
-      - name: data_freshness
-        type: object
+      - name: safe_summary
+        type: string
     risk_signals:
       - personal_data
       - financial_data
       - audit_required
-    notes: 고객 기본정보와 계좌 요약을 조회하는 MCP Adapter 계약. 조회 범위와 마스킹 정책은 runtime 권한 설정을 따른다.
+    notes: Sync read-only legacy lookup synthetic 계약이다. callback broker와 Context Manager는 기본 필수값이 아니다.

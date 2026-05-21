@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["normalizedRequirement", "evidence", "moduleCandidates", "a2aContracts", "processFlow"],
+  "required": ["normalizedRequirement", "evidence", "moduleCandidates", "a2aContracts", "runtimeContracts", "processFlow"],
   "properties": {
     "normalizedRequirement": {
       "$ref": "#/$defs/normalizedRequirement"
@@ -21,6 +21,12 @@
         "$ref": "#/$defs/a2aContract"
       }
     },
+    "runtimeContracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/runtimeContract"
+      }
+    },
     "processFlow": {
       "$ref": "#/$defs/processFlow"
     }
@@ -31,6 +37,103 @@
     },
     "nullableBoolean": {
       "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+    },
+    "runtimeContractKind": {
+      "type": "string",
+      "enum": [
+        "mcp_legacy_adapter",
+        "eai_legacy_adapter",
+        "context_manager",
+        "callback_broker",
+        "adk_callback",
+        "async_resume"
+      ]
+    },
+    "runtimeContractStatus": {
+      "type": "string",
+      "enum": ["draft", "needs_info", "approved", "rejected"]
+    },
+    "runtimeContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "contract_kind",
+        "module_id",
+        "title",
+        "contract_status",
+        "summary",
+        "required_review_fields",
+        "reviewer_notes",
+        "runtime_support",
+        "operation",
+        "identifiers",
+        "policies",
+        "graph_ir_annotations",
+        "synthetic_examples",
+        "developer_todos"
+      ],
+      "properties": {
+        "contract_id": { "type": "string", "pattern": "^rtc-[a-z0-9-]+$" },
+        "contract_kind": { "$ref": "#/$defs/runtimeContractKind" },
+        "module_id": { "$ref": "#/$defs/nullableString" },
+        "title": { "type": "string" },
+        "contract_status": { "$ref": "#/$defs/runtimeContractStatus" },
+        "summary": { "type": "string" },
+        "required_review_fields": { "type": "array", "items": { "type": "string" } },
+        "reviewer_notes": { "type": "string" },
+        "runtime_support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context_manager_required",
+            "callback_broker_required",
+            "human_approval_required",
+            "idempotency_required",
+            "audit_required",
+            "compensation_required"
+          ],
+          "properties": {
+            "context_manager_required": { "type": "boolean" },
+            "callback_broker_required": { "type": "boolean" },
+            "human_approval_required": { "type": "boolean" },
+            "idempotency_required": { "type": "boolean" },
+            "audit_required": { "type": "boolean" },
+            "compensation_required": { "type": "boolean" }
+          }
+        },
+        "operation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation_type", "side_effect_level", "callback_expected", "async_resume_required"],
+          "properties": {
+            "operation_type": { "type": "string", "enum": ["read", "write", "approval", "batch", "notification", "unknown"] },
+            "side_effect_level": {
+              "type": "string",
+              "enum": ["none", "read_only", "write", "financial_write", "customer_notification", "unknown"]
+            },
+            "callback_expected": { "type": "boolean" },
+            "async_resume_required": { "type": "boolean" }
+          }
+        },
+        "identifiers": { "type": "array", "items": { "type": "string" } },
+        "policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["auth_policy", "timeout_policy", "retry_policy", "fallback_policy", "masking_policy", "data_policy"],
+          "properties": {
+            "auth_policy": { "type": "string" },
+            "timeout_policy": { "type": "string" },
+            "retry_policy": { "type": "string" },
+            "fallback_policy": { "type": "string" },
+            "masking_policy": { "type": "string" },
+            "data_policy": { "type": "string" }
+          }
+        },
+        "graph_ir_annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "synthetic_examples": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "developer_todos": { "type": "array", "items": { "type": "string" } }
+      }
     },
     "field": {
       "type": "object",

@@ -36,6 +36,13 @@
         }
       ],
       "risk_signals": ["personal_data", "audit_required"],
+      "runtime_mock": {
+        "customer_profile": {
+          "customer_id": "CUST-DEMO-001",
+          "segment": "demo-retail",
+          "kyc_status": "verified"
+        }
+      },
       "required_review_fields": ["auth_required", "timeout", "retry", "side_effect"]
     },
     {
@@ -67,7 +74,53 @@
         }
       ],
       "risk_signals": [],
+      "runtime_mock": null,
       "required_review_fields": ["input_contract", "output_contract", "eval_placeholders"]
+    }
+  ],
+  "runtime_contracts": [
+    {
+      "contract_id": "rtc-001-eai-legacy",
+      "contract_kind": "eai_legacy_adapter",
+      "module_id": "mod-001",
+      "title": "customer_profile_lookup EAI Legacy Adapter",
+      "contract_status": "approved",
+      "required_review_fields": [
+        "policies.auth_policy",
+        "policies.timeout_policy",
+        "policies.retry_policy",
+        "policies.fallback_policy",
+        "policies.masking_policy",
+        "policies.data_policy"
+      ],
+      "runtime_support": {
+        "context_manager_required": false,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": false,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "read",
+        "side_effect_level": "read_only",
+        "callback_expected": false,
+        "async_resume_required": false
+      },
+      "identifiers": ["work_item_id", "correlation_id"],
+      "policies": {
+        "auth_policy": "synthetic reviewer-approved access policy",
+        "timeout_policy": "synthetic timeout policy",
+        "retry_policy": "synthetic retry policy",
+        "fallback_policy": "manual review when synthetic adapter is unavailable",
+        "masking_policy": "safe_summary_only",
+        "data_policy": "synthetic_or_masked_only"
+      },
+      "graph_ir_annotations": {},
+      "developer_todos": [
+        "TODO: Implement EAI client through an approved MCP or adapter contract only.",
+        "TODO: Keep raw legacy payloads outside LLM context."
+      ]
     }
   ],
   "excluded_modules": [

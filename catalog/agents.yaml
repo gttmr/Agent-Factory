@@ -1,21 +1,19 @@
 agents:
-  - name: loan_document_review_specialist
+  - name: loan_document_review_mock_agent
     agent_kind: specialist
     owner_domain: 여신
-    status: proposed
+    status: approved
+    component_source: stub
     runtime_binding: unresolved
-    contract_status: runtime_config_required
-    responsibility: 여신 신청서와 증빙 OCR 결과를 검토해 필수 서류 누락, 불일치, 보완 요청 필요 여부를 판단한다.
+    contract_status: mock_ready
+    responsibility: OCR와 정책 조회 결과를 바탕으로 대출 신청 서류의 누락, 불일치, 보완 필요 사항을 synthetic rule로 정리한다.
     inputs:
       - name: document_context
         type: object
         required: true
       - name: policy_matches
         type: array<object>
-        required: false
-      - name: customer_snapshot
-        type: object
-        required: false
+        required: true
     outputs:
       - name: document_review_result
         type: object
@@ -24,24 +22,44 @@ agents:
       - name: followup_questions
         type: array<string>
     scaffold_output: agent_shell_only
-    notes: 여신 담당자가 검토할 서류 근거와 보완 필요 사항을 정리하는 Agent 계약.
-  - name: credit_risk_reasoning_specialist
+    runtime_mock:
+      document_review_result:
+        decision: supplement_required
+        checked_items:
+          - loan_application_form
+          - income_certificate
+          - identity_document
+        mismatches:
+          - field: annual_income
+            document_value: 72000000
+            application_value: 75000000
+            severity: medium
+        confidence: 0.94
+      missing_documents:
+        - employment_certificate
+      followup_questions:
+        - 재직증명서 최신본을 추가 제출해야 합니다.
+        - 신청서 소득 금액과 소득증빙 금액 차이를 확인해야 합니다.
+    notes: 완전 synthetic local smoke용 Agent 계약이다. 실제 심사 판단이나 고객 통지는 포함하지 않는다.
+
+  - name: credit_risk_reasoning_mock_agent
     agent_kind: specialist
     owner_domain: 리스크
-    status: proposed
+    status: approved
+    component_source: stub
     runtime_binding: unresolved
-    contract_status: runtime_config_required
-    responsibility: 조회된 고객/계좌/여신 정보와 rule result를 근거로 위험 신호, 사람 승인 필요성, 추가 확인 필요성을 설명한다.
+    contract_status: mock_ready
+    responsibility: 고객 snapshot, rule result, 문서 검토 결과를 모아 사람이 확인할 위험 근거와 다음 조치를 설명한다.
     inputs:
-      - name: applicant_context
+      - name: customer_snapshot
         type: object
         required: true
       - name: rule_result
         type: object
         required: true
-      - name: evidence_pack
+      - name: document_review_result
         type: object
-        required: false
+        required: true
     outputs:
       - name: risk_reasoning
         type: object
@@ -50,4 +68,20 @@ agents:
       - name: reviewer_notes
         type: array<string>
     scaffold_output: agent_shell_only
-    notes: 자동 승인/거절 결정이 아니라 심사자 검토를 위한 위험 근거를 정리하는 Agent 계약.
+    runtime_mock:
+      risk_reasoning:
+        summary: 소득 증빙 불일치와 최근 DSR 경고로 담당자 확인이 필요합니다.
+        risk_flags:
+          - income_document_mismatch
+          - dsr_watch
+        evidence:
+          - rule: DSR_SOFT_LIMIT
+            result: review_required
+          - rule: DOCUMENT_COMPLETENESS
+            result: supplement_required
+        recommendation: request_supplement_then_manual_review
+      approval_required: true
+      reviewer_notes:
+        - 자동 승인/거절이 아니라 담당자 검토 큐로 전달합니다.
+        - synthetic demo 데이터이며 실제 신용 판단에 사용할 수 없습니다.
+    notes: 위험 설명만 생성하는 mock Agent다. 실제 credit decision은 하지 않는다.

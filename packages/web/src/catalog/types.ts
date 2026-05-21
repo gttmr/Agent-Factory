@@ -20,6 +20,8 @@ export const runtimeBindings: readonly RuntimeBinding[] = [
   "remote_a2a"
 ];
 
+export type RuntimeMock = Record<string, unknown>;
+
 export interface CatalogEntry {
   id: string;
   name: string;
@@ -45,6 +47,7 @@ export interface CatalogEntry {
   notes?: string;
   contract_status?: string;
   risk_signals?: RiskSignal[];
+  runtime_mock?: RuntimeMock | null;
   required_before_approval?: string[];
   provenance: CatalogProvenance;
   originalSnapshot?: CatalogEntrySnapshot;

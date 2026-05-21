@@ -346,6 +346,7 @@ if (typeof process !== "undefined" && process.env && process.env.NODE_ENV !== "p
     evidence: {} as never,
     moduleCandidates: [],
     a2aContracts: [],
+    runtimeContracts: [],
     processFlow: {} as never
   });
   if (!Array.isArray(baseline.result.a2aContracts) || baseline.result.a2aContracts.length !== 0) {

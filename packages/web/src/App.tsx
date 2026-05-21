@@ -5,6 +5,7 @@ import { AdkRuntimeWorkbench } from "./components/AdkRuntimeWorkbench";
 import { ModuleReview } from "./components/ModuleReview";
 import { GraphCanvas } from "./components/GraphCanvas";
 import { RequirementIntake, RequirementIntakeContext } from "./components/RequirementIntake";
+import { RuntimeContractReview } from "./components/RuntimeContractReview";
 import { SavedAnalyses } from "./components/SavedAnalyses";
 import { Panel, SectionHeader } from "./ui/primitives";
 import { WorkbenchShell } from "./ui/WorkbenchShell";
@@ -15,7 +16,9 @@ export default function App() {
     state,
     processFlow,
     a2aContracts,
+    runtimeContracts,
     hasA2AReviewStep,
+    hasRuntimeContractReviewStep,
     visibleSteps,
     canOpenStep,
     providerLabel,
@@ -95,6 +98,17 @@ export default function App() {
           moduleCandidates={state.moduleCandidates}
           a2aContracts={a2aContracts}
           onNavigateToA2AContracts={hasA2AReviewStep ? () => actions.setActiveStep("a2aContracts") : undefined}
+          onContinue={() => actions.setActiveStep(hasRuntimeContractReviewStep ? "runtimeContracts" : hasA2AReviewStep ? "a2aContracts" : "catalog")}
+        />
+      );
+    }
+
+    if (state.activeStep === "runtimeContracts" && state.analysis && hasRuntimeContractReviewStep) {
+      return (
+        <RuntimeContractReview
+          contracts={runtimeContracts}
+          moduleCandidates={state.moduleCandidates}
+          onContractsChange={actions.setRuntimeContracts}
           onContinue={() => actions.setActiveStep(hasA2AReviewStep ? "a2aContracts" : "catalog")}
         />
       );
@@ -144,6 +158,7 @@ export default function App() {
           processFlow={processFlow}
           acceptedMissing={state.acceptedMissing}
           catalogEntries={state.catalogEntries}
+          runtimeContracts={runtimeContracts}
           onNavigateToModules={() => actions.setActiveStep("modules")}
         />
       );

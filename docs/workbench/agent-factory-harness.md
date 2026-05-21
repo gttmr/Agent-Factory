@@ -14,6 +14,7 @@ raw requirement
   -> evidence and missing-information review
   -> module candidates
   -> workflow/process flow
+  -> runtime contract review for callback, legacy, Context Manager, and async resume behavior
   -> catalog reuse and registration review
   -> reviewed catalog and Graph IR decisions
   -> approved scaffold-plan and ADK Runtime Handoff
@@ -76,6 +77,7 @@ ADK Runtime Handoff is part of the current workbench, but it is review-gated. Sc
 
 - reviewed `AnalysisResult`
 - approved module candidates
+- approved required runtime contracts in `AnalysisResult.runtimeContracts`
 - reviewed A2A contracts where Remote A2A is involved
 - reviewed catalog decisions
 - `scaffold-plan` data with `source: approved_workbench_artifact`
@@ -122,7 +124,7 @@ Graph IR validation treats any module-bound node without at least one incoming e
 
 ### Catalog contract registry
 
-Catalog entries remain runtime contracts, not mock entries. Test doubles are driven by contract registry files under `catalog/contracts/`.
+Catalog entries remain runtime contracts. For local smoke, a seed contract may include deterministic synthetic `runtime_mock` output that is carried into generated ADK source as a test double. Rich MCP/A2A contract bodies are still driven by registry files under `catalog/contracts/`.
 
 - MCP registry files define the `mcp_schema_ref` contract body: `inputSchema`, `outputSchema`, success/error examples, and a deterministic `mock_response.structuredContent`.
 - A2A registry files define Agent Card, supported interfaces, message/task/artifact contract, auth, timeout, retry, fallback, audit, data policy, and synthetic task examples.
@@ -148,6 +150,7 @@ Expected artifact families:
 - missing-information records
 - module candidates with category and subtype
 - process flow nodes and edges
+- runtime contracts for MCP/EAI/Legacy adapters, Context Manager, Callback Broker, ADK callback, and async resume when applicable
 - catalog reuse decisions and registration changes
 - documentation impact decisions
 - risk gates

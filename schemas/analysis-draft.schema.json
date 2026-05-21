@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["normalizedRequirement", "evidence", "moduleCandidates", "a2aContracts", "processFlow"],
+  "required": ["normalizedRequirement", "evidence", "moduleCandidates", "a2aContracts", "runtimeContracts", "processFlow"],
   "properties": {
     "normalizedRequirement": { "$ref": "#/$defs/normalizedRequirementDraft" },
     "evidence": { "$ref": "#/$defs/evidenceDraft" },
@@ -13,6 +13,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/a2aContractDraft" }
     },
+    "runtimeContracts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runtimeContractDraft" }
+    },
     "processFlow": { "$ref": "#/$defs/processFlowDraft" }
   },
   "$defs": {
@@ -22,10 +26,30 @@
     "nullableBoolean": {
       "anyOf": [{ "type": "boolean" }, { "type": "null" }]
     },
+    "runtimeContractDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "contract_kind", "contract_status"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "contract_kind": {
+          "type": "string",
+          "enum": [
+            "mcp_legacy_adapter",
+            "eai_legacy_adapter",
+            "context_manager",
+            "callback_broker",
+            "adk_callback",
+            "async_resume"
+          ]
+        },
+        "contract_status": { "type": "string", "enum": ["draft", "needs_info", "approved", "rejected"] }
+      }
+    },
     "field": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "type", "required"],
+      "required": ["name", "type", "required", "schema"],
       "properties": {
         "name": { "type": "string" },
         "type": { "type": "string" },
@@ -35,7 +59,9 @@
     },
     "jsonSchema": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [],
+      "properties": {}
     },
     "smokeSpec": {
       "type": "object",
@@ -50,7 +76,7 @@
       ],
       "properties": {
         "sample_user_message": { "type": "string" },
-        "synthetic_inputs": { "type": "object", "additionalProperties": true },
+        "synthetic_inputs": { "type": "object", "additionalProperties": false, "required": [], "properties": {} },
         "expected_output_shape": { "$ref": "#/$defs/jsonSchema" },
         "expected_event_markers": { "type": "array", "items": { "type": "string" } },
         "mock_sources": { "type": "array", "items": { "type": "string" } },
@@ -59,7 +85,9 @@
     },
     "resolutionDraft": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "required": [],
+      "properties": {}
     },
     "system": {
       "type": "object",
@@ -195,6 +223,12 @@
         "risk_signals",
         "status",
         "missing_information",
+        "missing_information_resolution",
+        "resolved_missing_information",
+        "resolution_draft",
+        "resolution_applied_at",
+        "schema_review_state",
+        "smoke_spec",
         "side_effect",
         "owner_domain",
         "developer_todos",

@@ -1,0 +1,103 @@
+{
+  "schema_ref": "catalog.banking.customer_profile_lookup.synthetic.v1",
+  "server": "customer-profile-eai-mcp",
+  "tool": "lookup_customer_profile",
+  "title": "Synthetic customer profile legacy lookup",
+  "description": "Synthetic MCP contract for readonly customer profile lookup through an EAI legacy boundary.",
+  "contract_id": "synthetic_customer_profile_eai_adapter",
+  "binding_type": "mcp",
+  "module_category": "adapter",
+  "adapter_kind": "legacy_api",
+  "synthetic": true,
+  "private_endpoint": false,
+  "operation_type": "read",
+  "side_effect_level": "read_only",
+  "callback_expected": false,
+  "context_manager_required": false,
+  "idempotency_required": false,
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["customer_ref", "lookup_purpose", "correlation_id"],
+    "properties": {
+      "customer_ref": { "type": "string" },
+      "lookup_purpose": { "type": "string" },
+      "correlation_id": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["profile_summary", "holdings_summary", "data_freshness", "safe_summary"],
+    "properties": {
+      "profile_summary": { "type": "object" },
+      "holdings_summary": { "type": "object" },
+      "data_freshness": { "type": "object" },
+      "safe_summary": { "type": "string" }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "masked_profile_lookup",
+      "arguments": {
+        "customer_ref": "cust_tok_001",
+        "lookup_purpose": "synthetic consultation summary",
+        "correlation_id": "corr-synthetic-uuid"
+      },
+      "structuredContent": {
+        "profile_summary": {
+          "customer_token": "cust_tok_001",
+          "segment": "synthetic_retail"
+        },
+        "holdings_summary": {
+          "active_products": 3,
+          "delinquency_flag": false
+        },
+        "data_freshness": {
+          "as_of": "2026-01-01T00:00:00Z",
+          "source": "synthetic_fixture"
+        },
+        "safe_summary": "Synthetic masked profile and holdings summary."
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_customer_ref",
+      "arguments": {
+        "lookup_purpose": "invalid synthetic lookup"
+      },
+      "isError": true,
+      "message": "customer_ref is required"
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"customer_token\":\"cust_tok_001\",\"active_products\":3}"
+      }
+    ],
+    "structuredContent": {
+      "profile_summary": {
+        "customer_token": "cust_tok_001",
+        "segment": "synthetic_retail"
+      },
+      "holdings_summary": {
+        "active_products": 3,
+        "delinquency_flag": false
+      },
+      "data_freshness": {
+        "as_of": "2026-01-01T00:00:00Z",
+        "source": "synthetic_fixture"
+      },
+      "safe_summary": "Synthetic masked profile and holdings summary."
+    },
+    "isError": false
+  },
+  "timeout_policy": "synthetic 5s readonly lookup timeout",
+  "retry_policy": "one retry for transient synthetic transport failure",
+  "fallback_policy": "return unavailable safe summary and route to manual consultation note",
+  "audit_policy": "record customer_ref token, lookup_purpose, correlation_id, and safe summary",
+  "data_policy": "synthetic or masked references only; no private customer data"
+}
