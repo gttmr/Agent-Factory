@@ -29,8 +29,9 @@ ADK 2.0은 Beta다. 이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 
 
 ## catalog runtime binding
 
-Catalog에 등록된 개체는 mock 목록이 아니라 실제 실행을 전제로 한 reusable runtime contract다.
-로컬 테스트용 mock이나 test double 생성은 후속 기능에서 catalog contract를 입력으로 만들어야 하며, seed catalog 항목 자체를 mock으로 등록하지 않는다.
+Catalog에 등록된 개체는 재사용 가능한 runtime contract다.
+현재 local MVP에서는 ADK smoke를 완성된 입출력 shape로 실행하기 위해 seed catalog가 deterministic synthetic `runtime_mock`을 함께 가질 수 있다.
+`runtime_mock`은 test double이며, 실제 고객/은행 데이터, private endpoint, credential, deployment script, 운영 business logic을 담지 않는다.
 
 `module_category`는 책임의 종류를 나타내고, `runtime_binding`은 실행/연결 방식을 나타낸다.
 
@@ -40,6 +41,18 @@ Catalog에 등록된 개체는 mock 목록이 아니라 실제 실행을 전제�
 
 공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
 이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
+
+## runtimeContracts
+
+`AnalysisResult.runtimeContracts`는 callback과 runtime support 경계를 검토하는 별도 artifact다. 다음 항목은 top-level `module_category`를 새로 만들지 않아도 Runtime 계약으로 검토할 수 있다.
+
+- MCP/EAI/Legacy Adapter contract
+- Context Manager contract
+- Callback Broker contract
+- ADK callback responsibilities
+- async resume contract
+
+필수 Runtime 계약은 `contract_status: approved`가 되기 전까지 scaffold-plan의 blocker로 남는다. 실제 endpoint, credential, private customer payload, deployment script는 이 artifact에 넣지 않는다.
 
 ## agent_kind
 

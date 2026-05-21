@@ -3,7 +3,7 @@ import { buildAdkSourceBundle } from "../analyzer/adkSource";
 import type { AdkRuntimeMode } from "../analyzer/adkGraph";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
 import type { CatalogEntry } from "../catalog/types";
-import type { EvidenceSummary, ModuleCandidate, NormalizedRequirement, ProcessFlow } from "../analyzer/types";
+import type { EvidenceSummary, ModuleCandidate, NormalizedRequirement, ProcessFlow, RuntimeContract } from "../analyzer/types";
 
 interface AdkRuntimeWorkbenchProps {
   normalizedRequirement: NormalizedRequirement;
@@ -12,6 +12,7 @@ interface AdkRuntimeWorkbenchProps {
   processFlow: ProcessFlow;
   acceptedMissing: string[];
   catalogEntries: CatalogEntry[];
+  runtimeContracts: RuntimeContract[];
   onNavigateToModules: () => void;
 }
 
@@ -68,6 +69,7 @@ export function AdkRuntimeWorkbench({
   moduleCandidates,
   processFlow,
   catalogEntries,
+  runtimeContracts,
   acceptedMissing,
   onNavigateToModules
 }: AdkRuntimeWorkbenchProps) {
@@ -87,9 +89,10 @@ export function AdkRuntimeWorkbench({
         normalizedRequirement,
         moduleCandidates,
         processFlow,
-        catalogEntries
+        catalogEntries,
+        runtimeContracts
       }),
-    [catalogEntries, moduleCandidates, normalizedRequirement, processFlow]
+    [catalogEntries, moduleCandidates, normalizedRequirement, processFlow, runtimeContracts]
   );
 
   const bundle = useMemo(
@@ -365,6 +368,10 @@ export function AdkRuntimeWorkbench({
           <div>
             <span>TODO</span>
             <strong>{scaffoldPlan.manifest.new_code_required.length}</strong>
+          </div>
+          <div>
+            <span>Runtime contracts</span>
+            <strong>{scaffoldPlan.runtime_contracts.length}</strong>
           </div>
           <div>
             <span>Start</span>

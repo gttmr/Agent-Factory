@@ -116,6 +116,7 @@ marker는 Graph IR의 node, edge, container에서 파생되는 해석이다.
 - `human_review`: `human_review_region`, `node_kind: human_input`, 또는 `risk_signals: human_approval_required`가 있을 때
 - `loop`: `loop_region`, `loop_control`, `loop_back`, `loop_exit`가 있을 때
 - `branch`: `edge_kind: route` 또는 `route_condition`이 있을 때
+- callback wait, approval wait, resume requested, manual review, compensation은 새 `workflow_kind`가 아니라 Graph IR label/metadata와 `AnalysisResult.runtimeContracts.graph_ir_annotations`에서 해석한다.
 
 새 marker가 필요하면 먼저 Graph IR에 어떤 node/container/edge semantics로 표현되는지 정의한다.
 UI의 glyph, label, 색은 `docs/visualization/design-system.md`에서 별도로 관리한다.

@@ -1,12 +1,12 @@
 workflows:
-  - name: common_document_intake_workflow
+  - name: common_document_intake_mock_workflow
     workflow_kind: graph
     owner_domain: 공통
-    status: proposed
-    runtime_binding: remote_a2a
-    component_source: remote_a2a
-    contract_status: runtime_config_required
-    responsibility: 여러 도메인에서 제출되는 문서를 수신해 OCR, 정책 근거 조회, 문서 context 생성까지 공통으로 수행한다.
+    status: approved
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
+    responsibility: 제출 문서를 OCR하고 정책 근거를 붙여 후속 업무가 사용할 표준 document_context를 만든다.
     inputs:
       - name: document_package
         type: object
@@ -22,20 +22,38 @@ workflows:
       - name: intake_warnings
         type: array<string>
     composition:
-      - "input: document_package에서 문서 URI, 문서 유형, 업무 도메인을 분리한다."
-      - "adapter: bank_document_ocr_adapter로 텍스트, page_blocks, extraction_warnings를 추출한다."
-      - "adapter: banking_policy_retrieval_adapter로 문서 유형별 필수 항목과 심사 기준을 조회한다."
-      - "merge: OCR 결과와 정책 근거를 document_context와 intake_artifacts로 병합한다."
-      - "output: 후속 도메인 Workflow가 사용할 표준 document_context를 반환한다."
+      - "adapter: bank_document_ocr_mock_adapter가 synthetic OCR 결과를 반환한다."
+      - "adapter: banking_policy_search_mock_adapter가 문서 체크리스트 정책 근거를 반환한다."
+      - "merge: OCR와 policy_matches를 document_context로 병합한다."
     scaffold_output: orchestration_shell_only
-    notes: 공통 Workflow는 다른 도메인에서 Remote A2A 방식으로 호출될 수 있는 runtime contract로 등록한다.
-  - name: loan_application_precheck_workflow
+    runtime_mock:
+      document_context:
+        document_package_id: DOC-PKG-DEMO-001
+        normalized_document_type: loan_application_pack
+        extracted_fields:
+          requested_amount: 30000000
+          stated_annual_income: 75000000
+          proof_annual_income: 72000000
+        policy_basis:
+          - LOAN-DOC-REQ-001
+          - LOAN-RISK-DSR-002
+      intake_artifacts:
+        - artifact_id: art-ocr-demo-001
+          kind: ocr_text
+        - artifact_id: art-policy-demo-001
+          kind: policy_citation_pack
+      intake_warnings:
+        - synthetic_document_context
+    notes: 다른 도메인이 재사용할 수 있는 local graph workflow mock이다. Remote A2A로 승격하지 않는다.
+
+  - name: loan_application_precheck_mock_workflow
     workflow_kind: graph
     owner_domain: 여신
-    status: proposed
+    status: approved
+    component_source: stub
     runtime_binding: unresolved
-    contract_status: runtime_config_required
-    responsibility: 여신 신청 접수 후 문서 intake, 고객/계좌 조회, 정책/룰 평가, 서류 검토, 위험 판단을 묶어 사전 심사 결과를 만든다.
+    contract_status: mock_ready
+    responsibility: 대출 신청을 문서 intake, 고객 snapshot, rule 평가, 문서 검토, 위험 설명, 안내 템플릿 조회 순서로 묶어 local smoke 가능한 사전심사 결과를 만든다.
     inputs:
       - name: loan_application
         type: object
@@ -51,12 +69,27 @@ workflows:
       - name: next_actions
         type: array<string>
     composition:
-      - "workflow: common_document_intake_workflow로 제출 문서를 표준 document_context로 변환한다."
-      - "adapter: legacy_core_sql_query_adapter로 기존 여신, 연체, 심사 이력에 필요한 read-only 데이터를 조회한다."
-      - "adapter: customer_account_snapshot_adapter로 고객 및 계좌 요약을 조회한다."
-      - "adapter: banking_rule_registry_adapter로 여신 사전 심사 rule_set을 평가한다."
-      - "agent: loan_document_review_specialist가 서류 누락과 보완 필요 사항을 판단한다."
-      - "agent: credit_risk_reasoning_specialist가 위험 신호와 사람 승인 필요성을 설명한다."
-      - "adapter: banking_template_registry_adapter로 보완 요청 또는 심사 안내 템플릿을 조회한다."
+      - "workflow: common_document_intake_mock_workflow로 document_context를 만든다."
+      - "adapter: customer_account_snapshot_mock_adapter로 synthetic customer/account snapshot을 조회한다."
+      - "adapter: loan_precheck_rule_mock_adapter로 사전심사 rule을 평가한다."
+      - "agent: loan_document_review_mock_agent가 서류 누락과 불일치를 설명한다."
+      - "agent: credit_risk_reasoning_mock_agent가 위험 근거와 담당자 승인 필요성을 설명한다."
+      - "adapter: customer_notice_template_mock_adapter로 내부 preview 템플릿을 가져온다."
     scaffold_output: orchestration_shell_only
-    notes: 여신 도메인 내부 Workflow이며 실제 실행 방식은 Python import, local package, 또는 별도 runtime binding 검토 후 확정한다.
+    runtime_mock:
+      precheck_result:
+        case_id: LOAN-DEMO-CASE-001
+        outcome: supplement_required_manual_review
+        customer_id: CUST-DEMO-001
+        requested_amount: 30000000
+        summary: 재직증명서 보완 및 담당자 검토가 필요한 synthetic 사전심사 결과입니다.
+        evidence_refs:
+          - LOAN-DOC-REQ-001
+          - DSR_SOFT_LIMIT
+      approval_required: true
+      next_actions:
+        - request_employment_certificate
+        - reconcile_income_mismatch
+        - route_to_manual_reviewer
+        - preview_customer_notice_only
+    notes: 사용자가 여신 사전심사 유즈케이스를 넣었을 때 전체 catalog 조합과 ADK stub run을 검증하기 위한 대표 workflow mock이다.

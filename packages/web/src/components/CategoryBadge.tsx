@@ -4,6 +4,7 @@ import {
   agentKindLabels,
   moduleCategoryLabels,
   remoteContractKindLabels,
+  runtimeContractKindLabels,
   workflowKindLabels
 } from "../analyzer/classificationRules";
 import type { AccessProtocol, ModuleCandidate, ModuleCategory } from "../analyzer/types";
@@ -26,6 +27,12 @@ export const subtypeGlyph: Record<string, string> = {
   template: "T",
   computation: "Σ",
   external_service: "↗",
+  mcp_legacy_adapter: "MCP",
+  eai_legacy_adapter: "EAI",
+  context_manager: "CTX",
+  callback_broker: "CB",
+  adk_callback: "ADK",
+  async_resume: "↻",
   specialist: "S",
   shared: "★",
   a2a: "A2A",
@@ -103,6 +110,7 @@ export function formatSubtypeLabel(value: string): string {
     workflowKindLabels[value as keyof typeof workflowKindLabels] ??
     agentKindLabels[value as keyof typeof agentKindLabels] ??
     remoteContractKindLabels[value as keyof typeof remoteContractKindLabels] ??
+    runtimeContractKindLabels[value as keyof typeof runtimeContractKindLabels] ??
     value
   );
 }

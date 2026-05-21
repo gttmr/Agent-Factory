@@ -8,6 +8,7 @@ import type {
 import { normalizeA2A } from "./a2aNormalize";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
 import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
+import { ensureRuntimeContracts } from "./runtimeContracts";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -105,7 +106,7 @@ function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
   } catch (error) {
     console.warn("[analyzer] graph-ir client migration failed (non-fatal):", error);
   }
-  return normalizeA2A(result).result;
+  return ensureRuntimeContracts(normalizeA2A(result).result);
 }
 
 export const defaultAnalyzerProvider: AnalyzerProvider = new OpenAICompatibleAnalyzerProvider();

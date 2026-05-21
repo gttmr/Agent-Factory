@@ -138,6 +138,7 @@ function buildManifest() {
     },
     catalog_bound_modules: scaffoldPlan.manifest?.catalog_bound_modules ?? [],
     new_code_required: scaffoldPlan.manifest?.new_code_required ?? [],
+    runtime_contracts: scaffoldPlan.runtime_contracts ?? [],
     excluded_modules: scaffoldPlan.excluded_modules ?? [],
     modules: scaffoldPlan.modules
   };
@@ -166,6 +167,7 @@ def test_manifest_uses_scaffold_plan_contract():
     assert '"raw_requirement_to_code": false' in manifest
     assert '"catalog_bound_modules"' in manifest
     assert '"new_code_required"' in manifest
+    assert '"runtime_contracts"' in manifest
 `;
 }
 

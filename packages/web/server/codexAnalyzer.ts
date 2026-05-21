@@ -15,6 +15,7 @@ import { normalizeA2A } from "../src/analyzer/a2aNormalize";
 import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
 import type { AnalysisResult } from "../src/analyzer/types";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "../src/analyzer/graphMigration";
+import { ensureRuntimeContracts } from "../src/analyzer/runtimeContracts";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -31,6 +32,15 @@ const adapterKinds = new Set([
 const agentKinds = new Set(["specialist", "shared"]);
 const workflowKinds = new Set(["orchestration", "graph", "dynamic", "unknown"]);
 const remoteContractKinds = new Set(["a2a", "unknown"]);
+const runtimeContractKinds = new Set([
+  "mcp_legacy_adapter",
+  "eai_legacy_adapter",
+  "context_manager",
+  "callback_broker",
+  "adk_callback",
+  "async_resume"
+]);
+const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rejected"]);
 const riskLevels = new Set(["low", "medium", "high"]);
 const moduleStatuses = new Set(["needs_info", "approved", "deferred", "rejected"]);
 const requirementStatuses = new Set(["draft", "reviewed", "approved", "rejected"]);
@@ -465,6 +475,7 @@ function hydrateAnalysisDraft(draft: unknown, ctx: AnalysisDraftHydrationContext
     evidence,
     moduleCandidates,
     a2aContracts: [],
+    runtimeContracts: [],
     processFlow
   };
 }
@@ -1105,6 +1116,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "",
     "Process flow output — compact Graph IR draft (NOT a stage list):",
     "- processFlow MUST contain nodes, edges, containers, lanes, and validation because the Codex response_format schema requires all object keys. Use [] for containers/lanes when the default root graph container is enough; the server hydrates required Graph IR defaults.",
+    "- Field specs in inputs/outputs MUST include name, type, required, and schema. Use schema: {} when a precise JSON Schema is not known yet.",
     "- Graph IR ids must use canonical final artifact forms: edge ids like edge-001, edge-002, edge-003; container ids like container-root, container-human-review, container-parallel-customer-data. Do not use e-001, c-root, c-human-review, or other shorthand.",
     "- node.container_id and container.parent_container_id must exactly reference an emitted container id. If you are unsure about a custom container boundary, use containers: [] and let the server hydrate the default root container.",
     "- DO NOT emit a top-level `stages` field anywhere. The validator rejects it.",
@@ -1117,7 +1129,8 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Module-bound node kinds (agent, workflow, adapter, remote_a2a) should set module_id to the matching candidate id. Synthetic node kinds should use null or omit module_id.",
     "- Do NOT infer Remote A2A from local complexity. Multi-step local workflow alone is NOT enough to propose a remote_a2a node, edge, or container.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
-    "- a2aContracts may be omitted in the compact draft. The server hydrates placeholder A2A contracts for real remote_a2a candidates.",
+    "- a2aContracts must be present; use [] when there is no Remote A2A draft. The server hydrates placeholder A2A contracts for real remote_a2a candidates.",
+    "- runtimeContracts must be present; use [] unless the compact draft intentionally includes a minimal contract_id/contract_kind/contract_status record. The server derives Runtime contract review drafts for EAI/Legacy, MCP, Context Manager, Callback Broker, ADK callback, and async resume signals.",
     "- adk_hints should be concise and grounded in adk-docs-mcp when relevant. Use only these keys: state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding.",
     "",
     "Taxonomy guardrails:",
@@ -1128,6 +1141,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Pick dynamic when control flow is code-driven (Python conditionals/loops/custom logic) rather than declarative — for example, when the dynamic dimension dominates over the declarative graph (ADK 2.0 dynamic workflow).",
     "- Pick orchestration when the requirement describes high-level coordination but does not yet justify a fully explicit graph or dynamic workflow. Still emit the observable flow as native Graph IR.",
     "- Retrieval and Rule Registry are adapter_kind values, not top-level categories.",
+    "- EAI/Legacy access should be adapter_kind legacy_api. Callback Broker and Context Manager are runtimeContracts that must be reviewed before Runtime Handoff.",
     "- Remote A2A is high-friction and requires an independently owned remote agent protocol boundary, not just multiple local steps.",
     "- Unknown facts belong in missing_information, contradictions, assumptions, rationale, or status; do not ask follow-up questions.",
     "",
@@ -1142,8 +1156,8 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
       "",
       "Registered shared catalog (already-approved reusable agents/workflows/adapters/remote contracts):",
       "- Treat this list as the source of truth for what already exists in the workbench. Prefer reuse over inventing a new module.",
-      "- Catalog entries are real runtime contracts, not mocks. Do not create or classify mock-only modules from catalog metadata.",
-      "- Mock generation is a separate future capability that may use catalog contracts as input; it is not part of requirement analysis output.",
+      "- Catalog entries are reviewed runtime contracts. Some seed entries may include deterministic synthetic runtime_mock payloads for local smoke tests; treat those payloads as test doubles, not private business logic or new module categories.",
+      "- Do not create mock-only analysis modules from catalog metadata. Reuse the catalog contract when the requirement matches; scaffold/runtime handoff may use runtime_mock later.",
       "- When a candidate's responsibility, inputs, outputs, subtype, owner_domain, and access protocol match an existing entry, set the candidate's name to the catalog entry's name verbatim, set reuse_candidate to true, and explain the binding in rationale (mention the catalog entry name and id).",
       "- Copy the catalog inputs and outputs onto a reused candidate unless the requirement narrows them; explain any narrowing in rationale or missing_information.",
       "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information. If runtime_binding is \"remote_a2a\", explain that this is a catalog runtime binding for the workflow, not a new module_category: remote_a2a candidate by itself.",
@@ -1817,9 +1831,41 @@ function validateAnalysisResult(value: unknown): string[] {
   validateNormalizedRequirement(value.normalizedRequirement, errors);
   validateEvidence(value.evidence, errors);
   validateModuleCandidates(value.moduleCandidates, errors);
+  validateRuntimeContracts(value.runtimeContracts, errors);
   validateProcessFlow(value.processFlow, errors);
 
   return errors;
+}
+
+function validateRuntimeContracts(value: unknown, errors: string[]) {
+  if (!Array.isArray(value)) {
+    errors.push("runtimeContracts 배열이 필요합니다.");
+    return;
+  }
+  value.forEach((contract, index) => {
+    const label = `runtimeContracts[${index}]`;
+    if (!isRecord(contract)) {
+      errors.push(`${label} 객체가 필요합니다.`);
+      return;
+    }
+    if (typeof contract.contract_id !== "string" || !/^rtc-[a-z0-9-]+$/.test(contract.contract_id)) {
+      errors.push(`${label}.contract_id는 rtc-* 패턴이어야 합니다.`);
+    }
+    if (typeof contract.contract_kind !== "string" || !runtimeContractKinds.has(contract.contract_kind)) {
+      errors.push(`${label}.contract_kind 값이 올바르지 않습니다.`);
+    }
+    if (typeof contract.contract_status !== "string" || !runtimeContractStatuses.has(contract.contract_status)) {
+      errors.push(`${label}.contract_status 값이 올바르지 않습니다.`);
+    }
+    expectString(contract, "title", errors);
+    expectString(contract, "summary", errors);
+    expectStringArray(contract.required_review_fields, `${label}.required_review_fields`, errors);
+    expectStringArray(contract.identifiers, `${label}.identifiers`, errors);
+    expectStringArray(contract.developer_todos, `${label}.developer_todos`, errors);
+    ["runtime_support", "operation", "policies", "graph_ir_annotations"].forEach((key) => {
+      if (!isRecord(contract[key])) errors.push(`${label}.${key} 객체가 필요합니다.`);
+    });
+  });
 }
 
 function validateNormalizedRequirement(value: unknown, errors: string[]) {
@@ -2222,7 +2268,7 @@ function applyA2ANormalization(value: unknown, ctx: A2ANormalizationContext): un
   if (diagnostics.length > 0) {
     emitA2ADiagnostics(diagnostics, ctx);
   }
-  return result;
+  return ensureRuntimeContracts(result);
 }
 
 function emitA2ADiagnostics(diagnostics: A2ANormalizationDiagnostic[], ctx: A2ANormalizationContext) {

@@ -47,6 +47,7 @@ Core rules:
 - Remote A2A is high-friction and requires explicit ownership, protocol, auth, lifecycle, timeout, retry, fallback, and audit details.
 - ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
 - Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flow, reuse/domain mapping, risk gates, validation output, and decision notes.
+- Preserve runtime contract review artifacts for MCP/EAI/Legacy adapters, Context Manager, Callback Broker, ADK callback, and async resume behavior when those boundaries are involved.
 
 ### Workbench flow (packages/web)
 
@@ -56,7 +57,9 @@ Current steps are defined in `packages/web/src/workbench/useWorkbenchState.ts`:
 
 `intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
 
-State flows through `useWorkbenchState`: `RequirementIntakeInput` → live `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + Graph IR) → user-edited `ModuleCandidate[]` and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status and scaffold-plan validation.
+State flows through `useWorkbenchState`: `RequirementIntakeInput` → live `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation.
+
+`AnalysisResult.runtimeContracts` is the review artifact for callback and runtime support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback responsibilities, and async resume behavior. The `Runtime 계약` wizard step surfaces these contracts before Remote A2A/catalog/export.
 
 ### Analyzer provider boundary
 
@@ -85,7 +88,7 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 ### Schemas, catalog, templates
 
 - `schemas/`: JSON Schemas for normalized requirement, module candidate, process flow, classification, commonization, and scaffold plan.
-- `catalog/`: YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates. Catalog entries are runtime-oriented contracts, not mocks; mock/test-double generation is a separate future workflow. Risk signals on candidates should align with `catalog/risk-gates.yaml`.
+- `catalog/`: YAML catalogs for reusable agents, workflows, adapters, Remote A2A runtime contracts, domain owners, and risk gates. Catalog entries are runtime-oriented contracts and may include deterministic synthetic `runtime_mock` payloads for local smoke only; they must not include private data, endpoints, credentials, deployment scripts, or real business logic. Risk signals on candidates should align with `catalog/risk-gates.yaml`.
 - `templates/`: artifact templates the validator smoke-checks by default, plus `scaffold-plan.template.json`.
 
 ### Missing-information gate & saved-analysis flow

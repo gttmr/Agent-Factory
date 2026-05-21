@@ -1,6 +1,6 @@
 ---
 name: adk-a2a-agent-generate
-description: Plan one Google ADK-based module boundary from a requirement, classify shared reuse and A2A boundaries, and produce evidence, classification, commonization notes, and an implementation handoff with TODO business logic. Use when Codex should help design agent boundaries, workflow composition, adapter reuse, or A2A interactions without assuming private deployment infrastructure.
+description: Plan one Google ADK-based module boundary from a requirement, classify shared reuse, MCP/EAI/Legacy adapter, Context Manager, callback, workflow, and A2A boundaries, and produce evidence, classification, commonization notes, and an implementation handoff with TODO business logic. Use when Codex should help design agent boundaries, workflow composition, adapter reuse, legacy integration, async resume, or A2A interactions without assuming private deployment infrastructure.
 ---
 
 # ADK A2A Agent Generate
@@ -18,6 +18,8 @@ The important work is:
 - preserve internal precision with `agent_kind` and `adapter_kind`
 - decide whether local same-runtime reuse is enough
 - decide whether internal ADK workflow composition is needed
+- decide whether MCP, EAI, or Legacy access belongs in an adapter contract
+- decide whether async callback handling requires a Callback Broker or Context Manager support contract
 - mark A2A only when a remote independent agent boundary is required
 - produce a handoff and scaffold shape with explicit TODOs
 
@@ -55,6 +57,12 @@ Do not require JSONL files as direct skill input. An external orchestrator may i
    - `references/incremental-commonization.md`
    - `references/boundary-decision-rules.md`
    - `references/internal-workflow-composition.md`
+   - `references/eai-legacy-boundary-rules.md`
+   - `references/mcp-legacy-adapter-rules.md`
+   - `references/callback-broker-rules.md`
+   - `references/context-manager-rules.md`
+   - `references/adk-callback-rules.md`
+   - `references/legacy-async-resume-rules.md`
    - `references/a2a-boundary-rules.md`
    - `references/implementation-handoff.md`
    - `references/question-rules.md`
@@ -80,17 +88,37 @@ Do not require JSONL files as direct skill input. An external orchestrator may i
    - `a2a_required`
    - `a2a_interactions`
    - `internal_workflow`
+   - `eai_legacy_boundary_decision`
+   - `mcp_adapter_decision`
+   - `context_manager_decision`
+   - `callback_broker_decision`
+   - `async_resume_decision`
+   - `approval_gate_decision`
+   - `compensation_decision`
    - `reasoning_summary`
    - `todo`
    Use `registry_kind` only when `adapter_kind` is `rule_registry`; otherwise set it to `null`.
 
-6. Build commonization notes.
+6. Apply legacy and callback boundary rules when relevant.
+   If the requirement mentions EAI, core banking, loan, card, customer, risk, batch, callback, job id, approval, transaction write, or customer impact:
+   - classify callable EAI/Legacy access as `module_category: "adapter"` with `adapter_kind: "legacy_api"` unless evidence points to a different adapter subtype
+   - prefer an MCP Legacy Adapter when the capability is reused across agents, needs a stable tool schema, or centralizes auth, timeout, retry, masking, audit, or error mapping
+   - require human approval, idempotency, correlation, audit, timeout/retry/fallback, and manual review or compensation notes for write/customer-impact operations
+   - require Callback Broker and Context Manager decision records for async job/callback flows
+   - never classify Context Manager, Callback Broker, EAI, Legacy System, or MCP itself as a new top-level `module_category`
+
+7. Apply workflow and Remote A2A rules.
+   Use `module_category: "workflow"` only for the selected broad Workflow Agent boundary. Use `workflow_kind: "graph"` or `orchestration` for local flow control, and express sequence, fan-out/fan-in, loop, route, human approval wait, callback wait, resume requested, manual review, and compensation through Graph IR node/container/edge metadata. Do not restore ADK 1.x `SequentialAgent`, `ParallelAgent`, or `LoopAgent` as top-level workflow kinds.
+
+   Use `remote_a2a` only when there is an independent remote agent owner, Agent Card or discovery method, request/response schema, task lifecycle, auth, timeout, retry, fallback, audit, and data policy. A callback, MCP tool, EAI API, or multi-step workflow is not enough.
+
+8. Build commonization notes.
    Record which agents, workflows, adapters, or remote A2A boundaries should be reused, added, updated, or revisited later.
 
-7. Generate the implementation handoff.
-   Produce a machine-validatable JSON handoff and a human-readable markdown handoff that explain the selected boundary, ADK composition pattern, A2A interactions, TODO business logic, and testing notes.
+9. Generate the implementation handoff.
+   Produce a machine-validatable JSON handoff and a human-readable markdown handoff that explain the selected boundary, Graph IR or ADK composition pattern, MCP/EAI/Legacy adapter decision, Context Manager decision, Callback Broker decision, ADK callback responsibilities, A2A interactions, TODO runtime wiring, TODO business logic, and testing notes.
 
-8. Prepare scaffold bridge inputs only when requested.
+10. Prepare scaffold bridge inputs only when requested.
    If the user asks for files, produce reviewed `scaffold-plan.json` and `implementation-handoff.md` content for the selected module shape. Do not write implementation files directly from the raw request; actual file generation must go through the target repository's approved scaffold bridge.
 
 ## Ask The User Only When Required
@@ -115,6 +143,16 @@ Produce:
 - implementation handoff markdown for human review
 - optional scaffold-plan content only when requested
 
+The human-readable handoff must include these decision records when relevant:
+
+- `eai_legacy_boundary_decision`
+- `context_manager_decision`
+- `callback_broker_decision`
+- `mcp_adapter_decision`
+- `async_resume_decision`
+- `approval_gate_decision`
+- `compensation_decision`
+
 Portable JSON schemas live in `assets/schemas/`. External workbenches should validate LLM-produced classification, commonization notes, shared-boundary catalogs, and implementation handoff JSON against those schemas before consuming or storing the artifacts. The markdown handoff is a human-readable rendering of the same selected module, evidence, reuse, A2A, scaffold, TODO, and test information.
 
 When A2A is required, show the remote interaction boundary explicitly. When workflow is required, distinguish a top-level `module_category: "workflow"` deliverable from `internal_workflow` that stays inside a selected ADK agent boundary. Do not automatically promote either workflow form to remote A2A.
@@ -123,6 +161,8 @@ When A2A is required, show the remote interaction boundary explicitly. When work
 
 - Default to `module_category: "agent"` with `agent_kind: "specialist"`.
 - Default to local tool or local sub-agent reuse when the dependency is in the same runtime.
-- Default to A2A only for independent remote agents with their own capability boundary.
-- Default to ADK `SequentialAgent`, `ParallelAgent`, or `LoopAgent` only when deterministic internal control flow is needed.
+- Default EAI or Legacy API calls to `module_category: "adapter"` with `adapter_kind: "legacy_api"`.
+- Default Context Manager and Callback Broker to runtime support or adapter contract notes, not top-level module categories.
+- Default to A2A only for independent remote agents with their own owner, protocol, lifecycle, auth, timeout, retry, fallback, audit, and data policy.
+- Default sequence, fan-out/fan-in, loop, route, human input, callback wait, and resume behavior to Graph IR details instead of new `workflow_kind` values.
 - Default to TODO business logic rather than pretending an incomplete scaffold is production-ready.

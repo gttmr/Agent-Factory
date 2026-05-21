@@ -51,7 +51,9 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `approved` candidate만 포함한다.
 - raw requirement는 직접 코드 생성 입력이 될 수 없다.
 - Catalog-bound Agent, Workflow, Adapter, Remote A2A 항목은 runtime contract로 해석하되, 실제 runtime wiring과 configuration은 reviewed TODO boundary로 남긴다.
-- Mock/test double 산출물은 catalog contract를 입력으로 만드는 별도 후속 기능이며, seed catalog나 scaffold-plan의 기본 의미가 아니다.
+- Catalog 항목에 `runtime_mock`이 있으면 ADK Runtime Handoff는 해당 synthetic payload를 generated source의 deterministic stub output으로 포함할 수 있다.
+- `runtime_mock`은 local smoke용 test double이며 synthetic data만 허용한다. private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 담지 않는다.
+- `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
 - runnable business logic은 out of scope다.
 
 ADK Runtime Handoff 화면은 생성된 source bundle을 대상으로 다음 개발용 smoke를 제공한다.
@@ -115,7 +117,7 @@ MCP/A2A fixture data는 synthetic sample만 사용한다. private endpoint, cred
 
 ADK Runtime Handoff 화면은 `generate → install → start-web → check-web → chat-smoke` 순서를 자동으로 실행하는 "Smoke 일괄 실행" 매크로를 제공한다. 각 단계의 진행 상태(`pending/running/ok/fail`)를 step list pill로 노출하고 실패 시 후속 단계를 차단한다. 단계별 버튼도 계속 사용 가능하며 디버그 용도다. `chat-smoke`와 일괄 실행은 승인된 후보의 `smoke_spec.ready`와 `sample_user_message`가 있어야 활성화된다.
 
-runtime mode가 `stub`이거나 chat-smoke 응답 이벤트에 `"stubbed_runtime_contract"` 표식이 포함되면 임베드 패널 상단에 노란 stub 배너가 표시된다: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." 이는 stub 출력이 실제 비즈니스 로직이 아님을 reviewer에게 명시한다.
+runtime mode가 `stub`이거나 chat-smoke 응답 이벤트에 `"stubbed_runtime_contract"` 표식이 포함되면 임베드 패널 상단에 노란 stub 배너가 표시된다: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." Catalog mock-ready 항목의 `runtime_mock` 출력도 이 stub runtime 범주에 속한다. 즉 로컬 ADK run에서 완성된 입출력 shape를 확인할 수 있지만, 실제 모델/어댑터/은행 시스템 호출이나 운영 비즈니스 로직은 발생하지 않는다.
 
 ## 검증 명령
 

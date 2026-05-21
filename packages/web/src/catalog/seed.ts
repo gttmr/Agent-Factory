@@ -4,7 +4,7 @@ import adaptersYaml from "../../../../catalog/adapters.yaml?raw";
 import workflowsYaml from "../../../../catalog/workflows.yaml?raw";
 import remoteA2aYaml from "../../../../catalog/remote-a2a-contracts.yaml?raw";
 import { ensureRuntimeBinding } from "./runtimeBinding";
-import type { CatalogEntry } from "./types";
+import type { CatalogEntry, RuntimeMock } from "./types";
 
 interface AgentRow {
   name: string;
@@ -18,6 +18,7 @@ interface AgentRow {
   scaffold_output?: string;
   component_source?: string;
   runtime_binding?: string;
+  runtime_mock?: RuntimeMock | null;
   notes?: string;
 }
 
@@ -37,6 +38,7 @@ interface AdapterRow {
   mcp_auth_mode?: string;
   component_source?: string;
   runtime_binding?: string;
+  runtime_mock?: RuntimeMock | null;
   notes?: string;
 }
 
@@ -52,6 +54,7 @@ interface WorkflowRow {
   component_source?: string;
   runtime_binding?: string;
   contract_status?: string;
+  runtime_mock?: RuntimeMock | null;
   notes?: string;
 }
 
@@ -65,6 +68,7 @@ interface RemoteRow {
   component_source?: string;
   runtime_binding?: string;
   contract_status?: string;
+  runtime_mock?: RuntimeMock | null;
   notes?: string;
 }
 
@@ -97,6 +101,7 @@ export function loadSeedCatalog(): CatalogEntry[] {
       scaffold_output: row.scaffold_output,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
       runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
+      runtime_mock: row.runtime_mock ?? null,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -121,6 +126,7 @@ export function loadSeedCatalog(): CatalogEntry[] {
       mcp_auth_mode: row.mcp_auth_mode,
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
       runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
+      runtime_mock: row.runtime_mock ?? null,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -141,6 +147,7 @@ export function loadSeedCatalog(): CatalogEntry[] {
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
       runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
       contract_status: row.contract_status,
+      runtime_mock: row.runtime_mock ?? null,
       notes: row.notes,
       provenance: "seeded"
     });
@@ -159,6 +166,7 @@ export function loadSeedCatalog(): CatalogEntry[] {
       component_source: (row.component_source as CatalogEntry["component_source"]) ?? undefined,
       runtime_binding: (row.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
       contract_status: row.contract_status,
+      runtime_mock: row.runtime_mock ?? null,
       required_before_approval: row.required_before_approval ?? [],
       notes: row.notes,
       provenance: "seeded"

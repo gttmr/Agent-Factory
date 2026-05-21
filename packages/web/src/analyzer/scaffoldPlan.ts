@@ -8,21 +8,26 @@ import type {
   ProcessFlow,
   RiskSignal,
   ScaffoldPlan,
-  ScaffoldPlanModule
+  ScaffoldPlanModule,
+  ScaffoldPlanRuntimeContract,
+  RuntimeContract
 } from "./types";
+import { runtimeContractReadinessIssues } from "./runtimeContracts";
 
 export interface BuildScaffoldPlanInput {
   normalizedRequirement: NormalizedRequirement;
   moduleCandidates: ModuleCandidate[];
   processFlow: ProcessFlow;
   catalogEntries: CatalogEntry[];
+  runtimeContracts?: RuntimeContract[];
 }
 
 export function buildScaffoldPlan({
   normalizedRequirement,
   moduleCandidates,
   processFlow: _processFlow,
-  catalogEntries
+  catalogEntries,
+  runtimeContracts = []
 }: BuildScaffoldPlanInput): ScaffoldPlan {
   const activeCatalog = catalogEntries.filter((entry) => entry.provenance !== "session_deleted");
   const modules = moduleCandidates
@@ -37,13 +42,16 @@ export function buildScaffoldPlan({
       reason: `status is ${candidate.status}; only approved modules are eligible for scaffold generation`
     }));
   const blockers = collectBlockers(modules, moduleCandidates);
-  const warnings = collectWarnings(modules, moduleCandidates);
+  const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
+  blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
+  const warnings = collectWarnings(modules, moduleCandidates, runtimeContracts);
 
   return {
     requirement_id: normalizedRequirement.id,
     source: "approved_workbench_artifact",
     raw_requirement_to_code: false,
     modules,
+    runtime_contracts: runtimeContractPlans,
     excluded_modules: excludedModules,
     manifest: {
       catalog_bound_modules: modules.flatMap((module) =>
@@ -108,7 +116,8 @@ function buildScaffoldModule(candidate: ModuleCandidate, catalogEntries: Catalog
     outputs: candidate.outputs,
     risk_signals: mergeRiskSignals(candidate.risk_signals, catalogEntry?.risk_signals ?? []),
     required_review_fields: requiredReviewFieldsFor(candidate),
-    smoke_spec: candidate.smoke_spec ?? null
+    smoke_spec: candidate.smoke_spec ?? null,
+    runtime_mock: catalogEntry?.runtime_mock ?? null
   };
 }
 
@@ -192,7 +201,19 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
   ];
 }
 
-function collectWarnings(modules: ScaffoldPlanModule[], candidates: ModuleCandidate[]): string[] {
+function collectRuntimeContractBlockers(contracts: RuntimeContract[]): string[] {
+  return contracts.flatMap((contract) => {
+    const issues = runtimeContractReadinessIssues(contract);
+    if (!issues.length) return [];
+    return [`${contract.title}: Runtime 계약 검토/승인이 필요합니다 (${issues.join("; ")})`];
+  });
+}
+
+function collectWarnings(
+  modules: ScaffoldPlanModule[],
+  candidates: ModuleCandidate[],
+  runtimeContracts: RuntimeContract[]
+): string[] {
   const moduleWarnings = modules.flatMap((module) => {
     if (module.catalog_binding) {
       return [`${module.name}: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved`];
@@ -203,7 +224,27 @@ function collectWarnings(modules: ScaffoldPlanModule[], candidates: ModuleCandid
   if (unresolvedCandidates > 0) {
     moduleWarnings.push(`정보 필요 후보 ${unresolvedCandidates}개 — 모듈 검토에서 Resolution Draft 반영 필요`);
   }
+  if (runtimeContracts.length > 0) {
+    moduleWarnings.push(`Runtime 계약 ${runtimeContracts.length}개가 scaffold-plan에 포함됩니다.`);
+  }
   return moduleWarnings;
+}
+
+function toScaffoldRuntimeContract(contract: RuntimeContract): ScaffoldPlanRuntimeContract {
+  return {
+    contract_id: contract.contract_id,
+    contract_kind: contract.contract_kind,
+    module_id: contract.module_id,
+    title: contract.title,
+    contract_status: contract.contract_status,
+    required_review_fields: contract.required_review_fields,
+    runtime_support: contract.runtime_support,
+    operation: contract.operation,
+    identifiers: contract.identifiers,
+    policies: contract.policies,
+    graph_ir_annotations: contract.graph_ir_annotations,
+    developer_todos: contract.developer_todos
+  };
 }
 
 function countUnresolvedMissingInfoCandidates(candidates: ModuleCandidate[]): number {

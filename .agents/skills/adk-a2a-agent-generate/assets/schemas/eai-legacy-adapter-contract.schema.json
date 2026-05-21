@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/adk-a2a-agent-generate/eai-legacy-adapter-contract.schema.json",
+  "title": "Skill Local EAI Legacy Adapter Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adapter_name",
+    "module_category",
+    "adapter_kind",
+    "operation_type",
+    "input_schema",
+    "output_schema",
+    "synthetic"
+  ],
+  "properties": {
+    "adapter_name": { "type": "string", "minLength": 1 },
+    "module_category": { "type": "string", "const": "adapter" },
+    "adapter_kind": { "type": "string", "const": "legacy_api" },
+    "operation_type": { "type": "string", "enum": ["read", "write", "approval", "batch", "notification"] },
+    "input_schema": { "type": "object", "additionalProperties": true },
+    "output_schema": { "type": "object", "additionalProperties": true },
+    "synthetic": { "type": "boolean", "const": true }
+  }
+}

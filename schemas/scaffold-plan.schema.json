@@ -4,7 +4,7 @@
   "title": "Scaffold Plan",
   "type": "object",
   "additionalProperties": false,
-  "required": ["requirement_id", "source", "raw_requirement_to_code", "modules", "excluded_modules", "manifest", "validation"],
+  "required": ["requirement_id", "source", "raw_requirement_to_code", "modules", "runtime_contracts", "excluded_modules", "manifest", "validation"],
   "properties": {
     "requirement_id": {
       "type": "string",
@@ -22,6 +22,12 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/module"
+      }
+    },
+    "runtime_contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/runtime_contract"
       }
     },
     "excluded_modules": {
@@ -74,7 +80,8 @@
         "outputs",
         "required_review_fields",
         "developer_todos",
-        "risk_signals"
+        "risk_signals",
+        "runtime_mock"
       ],
       "properties": {
         "id": {
@@ -161,7 +168,52 @@
               "audit_required"
             ]
           }
+        },
+        "runtime_mock": {
+          "anyOf": [{ "type": "object" }, { "type": "null" }]
         }
+      }
+    },
+    "runtime_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "contract_kind",
+        "module_id",
+        "title",
+        "contract_status",
+        "required_review_fields",
+        "runtime_support",
+        "operation",
+        "identifiers",
+        "policies",
+        "graph_ir_annotations",
+        "developer_todos"
+      ],
+      "properties": {
+        "contract_id": { "type": "string", "pattern": "^rtc-[a-z0-9-]+$" },
+        "contract_kind": {
+          "type": "string",
+          "enum": [
+            "mcp_legacy_adapter",
+            "eai_legacy_adapter",
+            "context_manager",
+            "callback_broker",
+            "adk_callback",
+            "async_resume"
+          ]
+        },
+        "module_id": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "title": { "type": "string", "minLength": 1 },
+        "contract_status": { "type": "string", "enum": ["draft", "needs_info", "approved", "rejected"] },
+        "required_review_fields": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "runtime_support": { "type": "object", "additionalProperties": { "type": "boolean" } },
+        "operation": { "type": "object", "additionalProperties": true },
+        "identifiers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "policies": { "type": "object", "additionalProperties": { "type": "string" } },
+        "graph_ir_annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "developer_todos": { "type": "array", "items": { "type": "string", "minLength": 1 } }
       }
     },
     "catalog_binding": {

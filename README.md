@@ -1,8 +1,8 @@
 # Agent Factory Workbench
 
-Agent Factory is a local-first workbench for turning raw requirements into reviewed Agent/Workflow/Adapter/Remote A2A design artifacts. It is the source of truth for requirement intake, normalized requirement structure, module classification, process-flow review, catalog reuse decisions, and Graph IR validation.
+Agent Factory is a local-first workbench for turning raw requirements into reviewed Agent/Workflow/Adapter/Remote A2A design artifacts. It is the source of truth for requirement intake, normalized requirement structure, module classification, process-flow review, catalog reuse decisions, Graph IR validation, and reviewed ADK Runtime Handoff.
 
-This repository contains the workbench application and shared schemas. It is not a banking deployment, does not include private endpoints or credentials, and does not generate runnable business logic directly from raw user requests.
+The current MVP uses banking-domain language so reviewers can test realistic boundaries for customer, deposit, loan, card, and risk workflows. That domain is a review scaffold, not a banking deployment. This repository contains the workbench application and shared schemas, does not include private endpoints or credentials, and does not generate runnable business logic directly from raw user requests.
 
 ## Repository Scope
 
@@ -12,6 +12,19 @@ This repository contains the workbench application and shared schemas. It is not
 - `templates`: generic reviewed artifact templates and scaffold-plan validation fixtures.
 - `docs`: workbench analysis, taxonomy, workflow-decision, validation, and reference documentation.
 - `.agents/skills`: skill material that may be synchronized later, but is not the primary edit target for this workbench refactor.
+
+## Reviewer Journey
+
+The intended first user is a development leader who needs to turn an ambiguous business request into reviewable architecture artifacts before implementation starts.
+
+1. Confirm the normalized goal, domain, inputs, outputs, and systems in the analysis result.
+2. Review candidate modules and resolve `needs_info` items before approval.
+3. Inspect the process flow as Graph IR, including local workflow edges and any high-friction Remote A2A boundary.
+4. Review runtime contracts for MCP/EAI/Legacy adapters, Context Manager, Callback Broker, ADK callbacks, and async resume when the requirement implies callback or legacy execution state.
+5. Decide which catalog contracts are reused, registered, or excluded.
+6. Generate an ADK Runtime Handoff only from approved workbench artifacts.
+
+ADK Runtime Handoff is therefore a review gate and source-bundle handoff, not a deployment step. Its generated files keep runtime wiring, private configuration, and business logic as explicit TODO boundaries while allowing structural smoke checks such as dependency install, compile, pytest, ADK Web launch, and chat smoke.
 
 ## Workbench Flow
 
@@ -23,9 +36,12 @@ This repository contains the workbench application and shared schemas. It is not
 6. Mark modules as approved, deferred, rejected, or `needs_info`.
 7. Review catalog reuse decisions and register/exclude analysis candidates.
 8. Validate the reviewed process flow as Graph IR.
-9. Generate a review-gated scaffold plan and ADK Runtime Handoff when modules are approved.
+9. Review and approve required runtime contracts for legacy, callback, Context Manager, and async resume behavior.
+10. Generate a review-gated scaffold plan and ADK Runtime Handoff when modules and runtime contracts are approved.
 
 Raw requirements must never create code directly. The current ADK Runtime Handoff consumes only reviewed `AnalysisResult` data, approved module candidates, applied Resolution Draft state, catalog decisions, and `scaffold-plan` validation. Generated source remains a TODO/runtime wiring handoff: it must not include runnable business logic, private banking endpoints, credentials, or organization-specific deployment code.
+
+Runtime contracts are reviewed artifacts inside `AnalysisResult.runtimeContracts`. They capture MCP/EAI/Legacy adapter contracts, Context Manager state contracts, Callback Broker contracts, ADK callback responsibilities, and async resume behavior. Required runtime contracts must be reviewed and approved before scaffold-plan generation can proceed.
 
 ## Taxonomy
 
@@ -56,7 +72,7 @@ Definitions:
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and managed rule registries remain visible as Adapter subtypes through `adapter_kind`.
 
-Catalog entries are runtime-oriented contracts, not mocks. Mock generation is a separate future workflow that may read these contracts to create local test doubles, but the catalog itself should describe the intended MCP, Remote A2A, or implementation binding.
+Catalog entries are runtime-oriented contracts. For the local MVP they may also carry deterministic synthetic `runtime_mock` payloads so the generated ADK source can run smoke tests without private systems. These mocks are test doubles for local review only: they must use synthetic data, must not contain private banking endpoints or credentials, and must not be treated as deployed business logic.
 
 ## Remote A2A Policy
 

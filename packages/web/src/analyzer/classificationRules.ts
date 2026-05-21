@@ -5,6 +5,7 @@ import type {
   ModuleCandidate,
   ModuleCategory,
   RemoteContractKind,
+  RuntimeContractKind,
   WorkflowKind
 } from "./types";
 
@@ -50,6 +51,15 @@ export const accessProtocolLabels: Record<AccessProtocol, string> = {
   grpc: "gRPC",
   message_queue: "Message Queue",
   unknown: "Unknown"
+};
+
+export const runtimeContractKindLabels: Record<RuntimeContractKind, string> = {
+  mcp_legacy_adapter: "MCP Legacy Adapter",
+  eai_legacy_adapter: "EAI Legacy Adapter",
+  context_manager: "Context Manager",
+  callback_broker: "Callback Broker",
+  adk_callback: "ADK Callback",
+  async_resume: "Async Resume"
 };
 
 export const classificationRules: Record<ModuleCategory, string> = {
