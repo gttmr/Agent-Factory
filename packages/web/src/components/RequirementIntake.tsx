@@ -1,4 +1,5 @@
 import type { ChangeEvent } from "react";
+import { summarizeAfRunManifest, type AfRunManifest } from "../analyzer/afRunManifest";
 import {
   codexAnalyzerModels,
   requirementDomains,
@@ -26,8 +27,12 @@ interface RequirementIntakeProps {
 interface RequirementIntakeContextProps {
   input: RequirementIntakeInput;
   onInputChange: (input: RequirementIntakeInput) => void;
+  onImportAnalysisArtifact: (source: string, fileName: string) => void;
+  onImportRunManifest: (source: string, fileName: string) => void;
+  runManifest: AfRunManifest | null;
   analysisProgress: AnalyzerProgressEvent[];
   analyzerModel: CodexAnalyzerModel;
+  isAnalyzing: boolean;
 }
 
 export function RequirementIntake({
@@ -113,8 +118,12 @@ export function RequirementIntake({
 export function RequirementIntakeContext({
   input,
   onInputChange,
+  onImportAnalysisArtifact,
+  onImportRunManifest,
+  runManifest,
   analysisProgress,
-  analyzerModel
+  analyzerModel,
+  isAnalyzing
 }: RequirementIntakeContextProps) {
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -122,22 +131,112 @@ export function RequirementIntakeContext({
       return;
     }
 
+    const inputElement = event.currentTarget;
     const reader = new FileReader();
     reader.onload = () => {
       onInputChange({ ...input, rawText: String(reader.result ?? "") });
+      inputElement.value = "";
+    };
+    reader.onerror = () => {
+      inputElement.value = "";
     };
     reader.readAsText(file);
   }
 
+  function handleArtifactUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const inputElement = event.currentTarget;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onImportAnalysisArtifact(String(reader.result ?? ""), file.name);
+      inputElement.value = "";
+    };
+    reader.onerror = () => {
+      onImportAnalysisArtifact("", file.name);
+      inputElement.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function handleManifestUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const inputElement = event.currentTarget;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onImportRunManifest(String(reader.result ?? ""), file.name);
+      inputElement.value = "";
+    };
+    reader.onerror = () => {
+      onImportRunManifest("", file.name);
+      inputElement.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  const manifestSummary = runManifest ? summarizeAfRunManifest(runManifest) : null;
+
   return (
     <div className="context-stack">
       <Panel tone="muted" className="context-panel-block">
-        <SectionHeader eyebrow="가져오기" title="텍스트 파일" />
-        <FileField label="파일 선택" accept=".txt,.md,.yaml,.yml" onChange={handleUpload} />
+        <SectionHeader eyebrow="가져오기" title="파일 입력" />
+        <div className="artifact-import-stack">
+          <FileField
+            label="원문 파일"
+            accept=".txt,.md,.yaml,.yml"
+            onChange={handleUpload}
+            disabled={isAnalyzing}
+          />
+          <FileField
+            label="analysis-result.json"
+            accept=".json,application/json"
+            hint="af-analyze-requirement 산출물을 현재 Workbench 검토 상태로 불러옵니다."
+            onChange={handleArtifactUpload}
+            disabled={isAnalyzing}
+          />
+          <FileField
+            label="af-run-manifest.json"
+            accept=".json,application/json"
+            hint="DLC 단계, 승인, 검증 상태를 Workbench 상태 요약에 연결합니다."
+            onChange={handleManifestUpload}
+            disabled={isAnalyzing}
+          />
+        </div>
         <div className="metric-pill-row">
           <MetricPill label="문자 수" value={input.rawText.length} />
           <MetricPill label="도메인" value={input.domain} />
         </div>
+        {manifestSummary ? (
+          <div className="manifest-summary-panel" aria-label="DLC run manifest 요약">
+            <div>
+              <span>현재 단계</span>
+              <strong>
+                {manifestSummary.stageLabel} · {manifestSummary.stageStatusLabel}
+              </strong>
+            </div>
+            <div>
+              <span>단계 완료</span>
+              <strong>
+                {manifestSummary.completedStages}/{manifestSummary.totalStages}
+              </strong>
+            </div>
+            <div>
+              <span>승인</span>
+              <strong>{manifestSummary.approvalCount}/4</strong>
+            </div>
+            <div>
+              <span>검증</span>
+              <strong>{manifestSummary.validationStatusLabel}</strong>
+            </div>
+          </div>
+        ) : null}
       </Panel>
 
       <Panel tone="muted" className="context-panel-block">

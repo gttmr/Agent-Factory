@@ -5,16 +5,15 @@
 
 ## ADK 확인 기준
 
-2026-05-08 기준으로 `adk-docs-mcp`에서 `list_doc_sources -> https://adk.dev/llms.txt -> fetch_docs` 순서로 다음 문서를 확인했다.
-같은 URL을 `/tmp/adk-official-docs`에 `curl -L`로 내려받아 MCP 반환 내용과 비교했고, taxonomy 판단을 바꿀 차이는 없었다.
+2026-05-22 기준으로 `adk-docs-mcp`에서 `list_doc_sources -> https://adk.dev/llms.txt -> fetch_docs` 순서로 다음 문서를 확인했다.
+ADK 2.0 문서가 GA 기준을 제공하므로 active taxonomy는 ADK 2.0을 기본 baseline으로 둔다.
 
-- `https://adk.dev/workflows/index.md`: ADKPython v2.0.0Beta graph-based workflows는 node와 edge로 agent logic을 정의한다.
-- `https://adk.dev/workflows/graph-routes/index.md`: route, fan-out, `JoinNode`, nested workflow를 graph edge 구조로 표현한다.
-- `https://adk.dev/workflows/dynamic/index.md`: dynamic workflow는 코드의 loop, conditional, recursion, `ctx.run_node`가 제어 흐름을 직접 결정할 때 쓴다.
-- `https://adk.dev/workflows/human-input/index.md`: human input은 graph workflow 안의 `RequestInput` node로 표현한다.
-- `https://adk.dev/a2a/index.md`: ADK A2A는 local sub-agent와 구분되는 remote A2A agent 통신을 다룬다.
+- `https://adk.dev/2.0/index.md`: ADK Python 2.0 GA는 2026년 5월 19일 release로 문서화되어 있고, graph-based workflows, dynamic workflows, collaborative workflows를 핵심 기능으로 둔다.
+- `https://adk.dev/graphs/index.md`: graph-based workflows는 Agents, Tools, Functions를 node로 두고 edge로 routing, branching, state management를 정의한다.
+- `https://adk.dev/workflows/index.md`: ADK workflows는 graph-based, dynamic, collaborative, template workflow를 구분한다.
+- `https://adk.dev/a2a/index.md`: ADK A2A는 remote A2A agent와의 통신을 다루며 local sub-agent, adapter, MCP tool 호출과 구분한다.
 
-ADK 2.0은 Beta다. 이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
+이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
 
 ## module_category
 
@@ -32,6 +31,7 @@ ADK 2.0은 Beta다. 이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 
 Catalog에 등록된 개체는 재사용 가능한 runtime contract다.
 현재 local MVP에서는 ADK smoke를 완성된 입출력 shape로 실행하기 위해 seed catalog가 deterministic synthetic `runtime_mock`을 함께 가질 수 있다.
 `runtime_mock`은 test double이며, 실제 고객/은행 데이터, private endpoint, credential, deployment script, 운영 business logic을 담지 않는다.
+Skill-led 실행은 검토 artifact를 `artifacts/af/<req-id>/` 아래에 둘 수 있다. 이 파일들도 동일한 schema와 catalog runtime-binding 규칙을 따라야 한다.
 
 `module_category`는 책임의 종류를 나타내고, `runtime_binding`은 실행/연결 방식을 나타낸다.
 
@@ -77,7 +77,7 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 그 작은 흐름은 `processFlow` Graph IR의 `node_kind`, `container_kind`, `edge_kind`, `execution_semantics`로 표현한다.
 
 - `orchestration`: 여러 Agent/Adapter/Workflow를 상위에서 조율하지만 아직 명시적 graph topology가 핵심 산출물이 아닐 때.
-- `graph`: ADK 2.0 graph workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
+- `graph`: ADK 2.0 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
 - `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
 - `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
 

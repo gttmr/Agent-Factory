@@ -7,6 +7,7 @@ import { GraphCanvas } from "./components/GraphCanvas";
 import { RequirementIntake, RequirementIntakeContext } from "./components/RequirementIntake";
 import { RuntimeContractReview } from "./components/RuntimeContractReview";
 import { SavedAnalyses } from "./components/SavedAnalyses";
+import { summarizeAfRunManifest } from "./analyzer/afRunManifest";
 import { Panel, SectionHeader } from "./ui/primitives";
 import { WorkbenchShell } from "./ui/WorkbenchShell";
 import { useWorkbenchState } from "./workbench/useWorkbenchState";
@@ -24,11 +25,23 @@ export default function App() {
     providerLabel,
     actions
   } = useWorkbenchState();
+  const runManifestSummary = state.runManifest ? summarizeAfRunManifest(state.runManifest) : null;
 
   const statusItems = [
-    { label: "상태", value: state.isAnalyzing ? "Codex CLI 분석 중" : state.analysis ? "초안 분석 완료" : "분석 전" },
+    {
+      label: "상태",
+      value: state.isAnalyzing
+        ? "Codex CLI 분석 중"
+        : state.analysisSourceLabel
+          ? "Artifact 불러옴"
+          : state.analysis
+            ? "초안 분석 완료"
+            : "분석 전"
+    },
     { label: "모듈", value: `${state.moduleCandidates.length}개` },
+    ...(runManifestSummary ? [{ label: "DLC", value: `${runManifestSummary.stageLabel} ${runManifestSummary.stageStatusLabel}` }] : []),
     { label: "저장", value: `${state.savedAnalyses.length}개` },
+    ...(state.analysisSourceLabel ? [{ label: "Source", value: state.analysisSourceLabel }] : []),
     { label: "Analyzer", value: providerLabel }
   ];
 
@@ -108,6 +121,7 @@ export default function App() {
         <RuntimeContractReview
           contracts={runtimeContracts}
           moduleCandidates={state.moduleCandidates}
+          normalizedRequirement={state.analysis.normalizedRequirement}
           onContractsChange={actions.setRuntimeContracts}
           onContinue={() => actions.setActiveStep(hasA2AReviewStep ? "a2aContracts" : "catalog")}
         />
@@ -141,8 +155,12 @@ export default function App() {
         <SavedAnalyses
           records={state.savedAnalyses}
           hasCurrentAnalysis={state.analysis !== null}
+          hasRunManifest={state.runManifest !== null}
           currentSavedId={state.currentSavedId}
+          actionMessage={state.validationMessage}
           onSaveCurrent={actions.saveCurrentAnalysis}
+          onExportCurrent={actions.exportCurrentAnalysisArtifact}
+          onExportRunManifest={actions.exportRunManifest}
           onLoad={actions.loadSavedAnalysis}
           onDelete={actions.removeSavedAnalysis}
         />
@@ -181,8 +199,12 @@ export default function App() {
         <RequirementIntakeContext
           input={state.input}
           onInputChange={actions.setInput}
+          onImportAnalysisArtifact={actions.importAnalysisArtifact}
+          onImportRunManifest={actions.importRunManifest}
+          runManifest={state.runManifest}
           analysisProgress={state.analysisProgress}
           analyzerModel={state.analyzerModel}
+          isAnalyzing={state.isAnalyzing}
         />
       );
     }

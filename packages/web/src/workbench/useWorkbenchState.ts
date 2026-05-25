@@ -1,5 +1,8 @@
 import { useMemo, useReducer, useRef } from "react";
+import { parseAfRunManifest, serializeAfRunManifest, type AfRunManifest } from "../analyzer/afRunManifest";
 import { getExampleRequirement, getRemoteA2AExampleRequirement } from "../analyzer/exampleRequirement";
+import { serializeAnalysisResultArtifact } from "../analyzer/analysisArtifactExport";
+import { parseAnalysisResultArtifact, type ImportedAnalysisArtifact } from "../analyzer/analysisArtifactImport";
 import { defaultAnalyzerProvider } from "../analyzer/providers";
 import {
   createSavedAnalysisId,
@@ -79,6 +82,8 @@ export interface WorkbenchState {
   isAnalyzing: boolean;
   analyzerModel: CodexAnalyzerModel;
   analysisProgress: AnalyzerProgressEvent[];
+  analysisSourceLabel: string | null;
+  runManifest: AfRunManifest | null;
   catalogEntries: CatalogEntry[];
   savedAnalyses: SavedAnalysisRecord[];
   currentSavedId: string | null;
@@ -91,6 +96,8 @@ type WorkbenchAction =
   | { type: "analysisStarted" }
   | { type: "analysisProgress"; event: AnalyzerProgressEvent }
   | { type: "analysisSucceeded"; analysis: AnalysisResult }
+  | { type: "importAnalysisArtifactSucceeded"; artifact: ImportedAnalysisArtifact; fileName: string }
+  | { type: "importRunManifestSucceeded"; manifest: AfRunManifest; fileName: string }
   | { type: "analysisFailed"; message: string }
   | { type: "loadExample"; input: RequirementIntakeInput }
   | { type: "clearAll" }
@@ -101,6 +108,8 @@ type WorkbenchAction =
   | { type: "setCatalogEntries"; entries: CatalogEntry[] }
   | { type: "toggleAcceptedMissing"; item: string }
   | { type: "saveCurrentSucceeded"; records: SavedAnalysisRecord[]; currentSavedId: string }
+  | { type: "exportAnalysisArtifactSucceeded"; fileName: string }
+  | { type: "exportRunManifestSucceeded"; fileName: string }
   | { type: "loadSavedAnalysis"; record: SavedAnalysisRecord }
   | { type: "deleteSavedAnalysis"; records: SavedAnalysisRecord[]; deletedId: string }
   | { type: "setValidation"; message: string; step?: StepId };
@@ -116,6 +125,8 @@ function createInitialState(catalogEntries: CatalogEntry[]): WorkbenchState {
     isAnalyzing: false,
     analyzerModel: "gpt-5.3-codex-spark",
     analysisProgress: [],
+    analysisSourceLabel: null,
+    runManifest: null,
     catalogEntries,
     savedAnalyses: loadSavedAnalyses(),
     currentSavedId: null
@@ -135,6 +146,7 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         ...state,
         isAnalyzing: true,
         analysisProgress: [],
+        analysisSourceLabel: null,
         validationMessage: ""
       };
     case "analysisProgress":
@@ -150,20 +162,52 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         acceptedMissing: [],
         currentSavedId: null,
         validationMessage: "",
-        isAnalyzing: false
+        isAnalyzing: false,
+        analysisSourceLabel: null,
+        runManifest: compatibleManifest(state.runManifest, action.analysis.normalizedRequirement.id)
+      };
+    case "importAnalysisArtifactSucceeded":
+      {
+        const keptManifest = compatibleManifest(state.runManifest, action.artifact.analysis.normalizedRequirement.id);
+        const manifestNote =
+          state.runManifest && !keptManifest ? " 기존 manifest는 requirement_id가 달라 연결을 해제했습니다." : "";
+        return {
+          ...state,
+          activeStep: pickLandingStepForAnalysis(action.artifact.analysis, action.artifact.moduleCandidates),
+          input: action.artifact.input,
+          analysis: action.artifact.analysis,
+          moduleCandidates: action.artifact.moduleCandidates,
+          acceptedMissing: [],
+          validationMessage: `${action.fileName} artifact를 불러왔습니다: ${action.artifact.title}${manifestNote}`,
+          isAnalyzing: false,
+          analysisProgress: [],
+          analysisSourceLabel: action.fileName,
+          runManifest: keptManifest,
+          currentSavedId: null
+        };
+      }
+    case "importRunManifestSucceeded":
+      return {
+        ...state,
+        runManifest: action.manifest,
+        validationMessage: `${action.fileName} manifest를 불러왔습니다: ${action.manifest.requirement_id}`,
+        currentSavedId: null
       };
     case "analysisFailed":
       return {
         ...state,
         validationMessage: action.message,
         activeStep: "intake",
-        isAnalyzing: false
+        isAnalyzing: false,
+        analysisSourceLabel: null
       };
     case "loadExample":
       return {
         ...state,
         input: action.input,
         validationMessage: "",
+        analysisSourceLabel: null,
+        runManifest: null,
         currentSavedId: null
       };
     case "clearAll":
@@ -176,13 +220,15 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         acceptedMissing: [],
         validationMessage: "",
         analysisProgress: [],
+        analysisSourceLabel: null,
+        runManifest: null,
         currentSavedId: null
       };
     case "setModuleCandidates":
       return { ...state, moduleCandidates: action.moduleCandidates };
     case "setModuleReviewArtifacts":
-      return state.analysis
-        ? {
+      if (!state.analysis) return state;
+      return {
             ...state,
             analysis: {
               ...state.analysis,
@@ -191,16 +237,20 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
               runtimeContracts: action.runtimeContracts
             },
             moduleCandidates: action.moduleCandidates,
+            runManifest: refreshManifestRuntimeApproval(state.runManifest, action.runtimeContracts),
             validationMessage: "모듈 검토 내용을 저장하고 Graph IR을 재생성했습니다."
-          }
-        : state;
+          };
     case "setA2AContracts":
       return state.analysis
         ? { ...state, analysis: { ...state.analysis, a2aContracts: action.contracts } }
         : state;
     case "setRuntimeContracts":
       return state.analysis
-        ? { ...state, analysis: { ...state.analysis, runtimeContracts: action.contracts } }
+        ? {
+            ...state,
+            analysis: { ...state.analysis, runtimeContracts: action.contracts },
+            runManifest: refreshManifestRuntimeApproval(state.runManifest, action.contracts)
+          }
         : state;
     case "setCatalogEntries":
       return { ...state, catalogEntries: action.entries };
@@ -219,6 +269,18 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         validationMessage: "현재 분석을 저장했습니다.",
         activeStep: "saved"
       };
+    case "exportAnalysisArtifactSucceeded":
+      return {
+        ...state,
+        validationMessage: `${action.fileName} 다운로드를 준비했습니다.`,
+        activeStep: "saved"
+      };
+    case "exportRunManifestSucceeded":
+      return {
+        ...state,
+        validationMessage: `${action.fileName} 다운로드를 준비했습니다.`,
+        activeStep: "saved"
+      };
     case "loadSavedAnalysis":
       return {
         ...state,
@@ -229,6 +291,8 @@ function reducer(state: WorkbenchState, action: WorkbenchAction): WorkbenchState
         analyzerModel: action.record.analyzerModel,
         analysisProgress: [],
         currentSavedId: action.record.id,
+        analysisSourceLabel: "저장된 분석",
+        runManifest: action.record.runManifest,
         catalogEntries: action.record.catalogEntries.length
           ? action.record.catalogEntries
           : state.catalogEntries,
@@ -262,7 +326,10 @@ export function useWorkbenchState() {
   const runtimeContracts = state.analysis?.runtimeContracts ?? [];
   const hasRemoteA2ACandidates = state.moduleCandidates.some((candidate) => candidate.module_category === "remote_a2a");
   const hasA2AReviewStep = hasRemoteA2ACandidates || a2aContracts.length > 0;
-  const hasRuntimeContractReviewStep = runtimeContracts.length > 0;
+  // Show the Runtime 계약 step whenever there are generated contracts OR
+  // catalog-bound candidates that the reviewer may override on this analysis.
+  const hasCatalogBoundCandidates = state.moduleCandidates.some((candidate) => Boolean(candidate.catalog_entry_id));
+  const hasRuntimeContractReviewStep = runtimeContracts.length > 0 || hasCatalogBoundCandidates;
   const canReview = state.analysis !== null;
 
   const visibleSteps = useMemo(
@@ -339,6 +406,7 @@ export function useWorkbenchState() {
       moduleCandidates: state.moduleCandidates,
       acceptedMissing: state.acceptedMissing,
       analyzerModel: state.analyzerModel,
+      runManifest: state.runManifest,
       catalogEntries: catalogSnapshot,
       activeStep: state.activeStep,
       scaffoldReady
@@ -352,6 +420,66 @@ export function useWorkbenchState() {
 
   function removeSavedAnalysis(id: string) {
     dispatch({ type: "deleteSavedAnalysis", records: deleteSavedAnalysis(id), deletedId: id });
+  }
+
+  function importAnalysisArtifact(source: string, fileName: string) {
+    try {
+      const artifact = parseAnalysisResultArtifact(source, fileName);
+      dispatch({ type: "importAnalysisArtifactSucceeded", artifact, fileName });
+    } catch (error) {
+      dispatch({
+        type: "setValidation",
+        message: error instanceof Error ? error.message : "analysis-result.json artifact를 불러오지 못했습니다.",
+        step: "intake"
+      });
+    }
+  }
+
+  function importRunManifest(source: string, fileName: string) {
+    try {
+      const manifest = parseAfRunManifest(source, fileName);
+      if (state.analysis && manifest.requirement_id !== state.analysis.normalizedRequirement.id) {
+        dispatch({
+          type: "setValidation",
+          message: `${fileName} requirement_id(${manifest.requirement_id})가 현재 분석(${state.analysis.normalizedRequirement.id})과 다릅니다.`,
+          step: "intake"
+        });
+        return;
+      }
+      dispatch({ type: "importRunManifestSucceeded", manifest, fileName });
+    } catch (error) {
+      dispatch({
+        type: "setValidation",
+        message: error instanceof Error ? error.message : "af-run-manifest.json을 불러오지 못했습니다.",
+        step: "intake"
+      });
+    }
+  }
+
+  function exportCurrentAnalysisArtifact() {
+    if (!state.analysis) {
+      dispatch({ type: "setValidation", message: "내보낼 분석 결과가 없습니다.", step: "saved" });
+      return;
+    }
+    const fileName = `${safeFileStem(state.analysis.normalizedRequirement.id || "analysis")}-analysis-result.json`;
+    const content = serializeAnalysisResultArtifact({
+      analysis: state.analysis,
+      moduleCandidates: state.moduleCandidates,
+      a2aContracts: state.analysis.a2aContracts ?? [],
+      runtimeContracts: state.analysis.runtimeContracts ?? []
+    });
+    downloadJson(fileName, content);
+    dispatch({ type: "exportAnalysisArtifactSucceeded", fileName });
+  }
+
+  function exportRunManifest() {
+    if (!state.runManifest) {
+      dispatch({ type: "setValidation", message: "내보낼 DLC run manifest가 없습니다.", step: "saved" });
+      return;
+    }
+    const fileName = `${safeFileStem(state.runManifest.requirement_id || "af-run")}-af-run-manifest.json`;
+    downloadJson(fileName, serializeAfRunManifest(state.runManifest));
+    dispatch({ type: "exportRunManifestSucceeded", fileName });
   }
 
   return {
@@ -392,6 +520,10 @@ export function useWorkbenchState() {
       clearAll: () => dispatch({ type: "clearAll" }),
       runAnalysis,
       saveCurrentAnalysis,
+      importAnalysisArtifact,
+      importRunManifest,
+      exportCurrentAnalysisArtifact,
+      exportRunManifest,
       loadSavedAnalysis: (record: SavedAnalysisRecord) => dispatch({ type: "loadSavedAnalysis", record }),
       removeSavedAnalysis
     }
@@ -405,8 +537,17 @@ function compactProgressEvent(event: AnalyzerProgressEvent): AnalyzerProgressEve
 
 function pickLandingStep(record: SavedAnalysisRecord): StepId {
   if (record.scaffoldReady) return "export";
-  const hasNeedsInfo = record.moduleCandidates.some((candidate) => candidate.status === "needs_info");
-  if (!hasNeedsInfo) return "modules";
+  return pickLandingStepForAnalysis(record.analysis, record.moduleCandidates);
+}
+
+function pickLandingStepForAnalysis(analysis: AnalysisResult, moduleCandidates: ModuleCandidate[]): StepId {
+  const hasNeedsInfo = moduleCandidates.some((candidate) => candidate.status === "needs_info");
+  const hasRequirementGaps =
+    analysis.normalizedRequirement.missing_information.length > 0 ||
+    analysis.normalizedRequirement.contradictions.length > 0 ||
+    analysis.evidence.missing_information.length > 0 ||
+    analysis.evidence.contradictions.length > 0;
+  if (!hasNeedsInfo && !hasRequirementGaps) return "modules";
   return "analysis";
 }
 
@@ -425,6 +566,40 @@ function normalizeRequirementDomain(value: string): RequirementDomain {
   return value === "고객" || value === "수신" || value === "여신" || value === "카드" || value === "리스크"
     ? value
     : "공통";
+}
+
+function compatibleManifest(manifest: AfRunManifest | null, requirementId: string): AfRunManifest | null {
+  if (!manifest) return null;
+  return manifest.requirement_id === requirementId ? manifest : null;
+}
+
+function refreshManifestRuntimeApproval(manifest: AfRunManifest | null, contracts: RuntimeContract[]): AfRunManifest | null {
+  if (!manifest) return null;
+  const runtimeContractsApproved = contracts.every((contract) => contract.contract_status === "approved");
+  return {
+    ...manifest,
+    approvals: {
+      ...manifest.approvals,
+      runtime_contracts_approved: runtimeContractsApproved
+    }
+  };
+}
+
+function safeFileStem(value: string): string {
+  const normalized = value.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || "analysis";
+}
+
+function downloadJson(fileName: string, content: string) {
+  const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function buildCatalogReferences(entries: CatalogEntry[]): CatalogReference[] {

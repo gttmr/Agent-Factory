@@ -5,19 +5,24 @@ This document is the project-specific operating harness for Agent Factory work. 
 ## Purpose
 
 Agent Factory should turn vague requirements into reviewed, reusable planning artifacts before any implementation step begins.
+The preferred operating path is skill-led: `.agents/skills/af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, and `af-verify-feedback` produce and verify schema artifacts, while the web workbench visualizes and supports guided partial edits.
 
 The goal is repeatable agent design review, not one-off code generation. Coding agents working in this repository must preserve a controlled pipeline:
 
 ```text
 raw requirement
+  -> af-analyze-requirement
   -> normalized requirement
   -> evidence and missing-information review
   -> module candidates
   -> workflow/process flow
+  -> af-design-boundaries
   -> runtime contract review for callback, legacy, Context Manager, and async resume behavior
   -> catalog reuse and registration review
   -> reviewed catalog and Graph IR decisions
   -> approved scaffold-plan and ADK Runtime Handoff
+  -> af-build-runtime-stub
+  -> af-verify-feedback
 ```
 
 Raw requirements must not directly generate code.
@@ -40,7 +45,7 @@ Do not update `docs/archive/**` for current behavior unless the task explicitly 
 
 ## Classification first
 
-Before building implementation plans, classify each requested capability into the active taxonomy.
+Before building implementation plans, classify each requested capability into the active taxonomy. For skill-led runs, `af-analyze-requirement` creates first-pass candidates and `af-design-boundaries` performs the review/approval pass.
 
 Top-level categories:
 
@@ -73,7 +78,7 @@ If those fields are unknown, mark the candidate as needing review instead of inv
 
 ## Scaffold and runtime handoff gate
 
-ADK Runtime Handoff is part of the current workbench, but it is review-gated. Scaffold-plan generation and source handoff must consume only approved workbench artifacts:
+ADK Runtime Handoff is part of the current workbench, but it is review-gated. Scaffold-plan generation and source handoff must consume only approved artifacts:
 
 - reviewed `AnalysisResult`
 - approved module candidates
@@ -90,7 +95,7 @@ Do not scaffold directly from:
 - missing Remote A2A contract details
 - private or organization-specific runtime assumptions
 
-A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code.
+A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code. The default stub output location for skill-led runs is `artifacts/af/<req-id>/runtime-stub/`.
 
 ### Missing-information two-layer gate
 
@@ -175,6 +180,8 @@ Good assistant tasks:
 - generate validation cases
 - update catalogs and documentation
 - produce review checklists
+- produce `artifacts/af/<req-id>/` skill artifacts and `af-run-manifest.json`
+- propose `catalog-delta.yaml` feedback without directly editing runtime catalogs
 
 Human-governed decisions:
 
@@ -189,7 +196,8 @@ Human-governed decisions:
 
 Active source-of-truth areas:
 
-- `packages/web`: live workbench UI and analyzer flow
+- `.agents/skills`: AF DLC operating skills and shared stage references
+- `packages/web`: live workbench UI, artifact visualization, guided edits, and analyzer flow
 - `schemas`: artifact contracts
 - `catalog`: reusable capability, domain-owner, and risk-gate catalogs
 - `templates`: reviewed artifact templates and scaffold-plan fixtures

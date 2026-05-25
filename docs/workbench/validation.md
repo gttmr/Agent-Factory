@@ -2,6 +2,11 @@
 
 Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전에 검증해야 한다.
 검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
+Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰고 `af-run-manifest.json`으로 단계를 연결한다.
+Workbench는 `analysis-result.json`과 `af-run-manifest.json`을 browser file import로 읽어 현재 검토 상태와 DLC lifecycle 상태를 표시한다.
+Manifest import는 `artifact_root`나 `outputs[]` 경로의 파일을 자동으로 따라가지 않는다. 경로에 있는 다른 artifact가 필요하면 사용자가 별도 파일로 제공해야 한다.
+현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)를 tolerant하게 읽는다.
+`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
 
 ## module-candidates.json
 
@@ -55,6 +60,7 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 - `runtime_mock`은 local smoke용 test double이며 synthetic data만 허용한다. private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 담지 않는다.
 - `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
 - runnable business logic은 out of scope다.
+- `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성하며 TODO runtime wiring handoff로만 취급한다.
 
 ADK Runtime Handoff 화면은 생성된 source bundle을 대상으로 다음 개발용 smoke를 제공한다.
 
@@ -126,15 +132,18 @@ node scripts/validate-artifacts.mjs templates
 node scripts/validate-artifacts.mjs templates/regression-scenarios
 node scripts/validate-artifacts.mjs templates/saved-analysis-fixtures
 node scripts/validate-artifacts.mjs catalog/contracts
+node scripts/validate-artifacts.mjs artifacts/af/<req-id>
+node scripts/generate-adk-source.mjs artifacts/af/<req-id> artifacts/af/<req-id>/runtime-stub
+cd packages/web && npm run test:analyzer
 cd packages/web && npm run build
 ```
 
 문서만 변경한 경우에는 build 대신 구조와 링크 검증을 우선한다.
-TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run build`를 실행한다.
+TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run test:analyzer`와 `cd packages/web && npm run build`를 실행한다.
 scaffold-plan 또는 ADK source generator를 직접 변경한 경우에는 `node scripts/generate-adk-source.mjs ...`와 `python3 -m compileall ...` smoke를 추가한다.
 
 ## ADK 공식 문서 확인
 
 ADK 공식 설명은 repo에 복제하지 않고 `adk-docs-mcp`에서 확인한다.
-이번 taxonomy 기준은 `https://adk.dev/llms.txt`에서 출발해 `workflows`, `graph-routes`, `dynamic`, `human-input`, `a2a` 문서를 확인한 결과에 맞춘다.
+이번 taxonomy 기준은 `https://adk.dev/llms.txt`에서 출발해 `2.0`, `graphs`, `workflows`, `dynamic`, `human-input`, `a2a` 문서를 확인한 결과에 맞춘다.
 공식 문서 다운로드본과 MCP 결과가 다르거나 모호하면 사용자에게 질문한다.

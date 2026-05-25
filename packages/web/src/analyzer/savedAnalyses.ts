@@ -1,4 +1,6 @@
 import type { CatalogEntry } from "../catalog/types";
+import type { AfRunManifest } from "./afRunManifest";
+import { backfillCandidateReviewFields } from "./analysisResultNormalization";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
 import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
 import { buildRuntimeContracts } from "./runtimeContracts";
@@ -32,6 +34,7 @@ export interface SavedAnalysisRecord {
   moduleCandidates: ModuleCandidate[];
   acceptedMissing: string[];
   analyzerModel: CodexAnalyzerModel;
+  runManifest: AfRunManifest | null;
   catalogEntries: CatalogEntry[];
   activeStep: SavedActiveStep;
   scaffoldReady: boolean;
@@ -57,12 +60,15 @@ function backfillA2AContracts(record: SavedAnalysisRecord): SavedAnalysisRecord 
   const withA2A = Array.isArray((record.analysis as { a2aContracts?: unknown }).a2aContracts)
     ? record.analysis
     : { ...record.analysis, a2aContracts: [] };
-  const runtimeContracts = Array.isArray((withA2A as { runtimeContracts?: unknown }).runtimeContracts)
+  const storedRuntimeContracts = (withA2A as { runtimeContracts?: unknown }).runtimeContracts;
+  const hasStoredRuntimeContracts = Array.isArray(storedRuntimeContracts);
+  const runtimeContracts = hasStoredRuntimeContracts
     ? withA2A.runtimeContracts
     : buildRuntimeContracts({
         normalizedRequirement: withA2A.normalizedRequirement,
         moduleCandidates: withA2A.moduleCandidates,
-        existingContracts: []
+        existingContracts: [],
+        autofillCatalogDefaults: true
       });
   return {
     ...record,
@@ -104,37 +110,18 @@ export function backfillAnalysisShape(record: SavedAnalysisRecord): SavedAnalysi
 // catalog restoration can read them without optional-chaining everywhere.
 function backfillExportFields(record: SavedAnalysisRecord): SavedAnalysisRecord {
   const next: SavedAnalysisRecord = record;
+  const hasManifest = (record as { runManifest?: unknown }).runManifest !== undefined;
   const hasCatalog = Array.isArray((record as { catalogEntries?: unknown }).catalogEntries);
   const hasStep = typeof (record as { activeStep?: unknown }).activeStep === "string";
   const hasReady = typeof (record as { scaffoldReady?: unknown }).scaffoldReady === "boolean";
-  if (hasCatalog && hasStep && hasReady) return next;
+  if (hasManifest && hasCatalog && hasStep && hasReady) return next;
   return {
     ...next,
+    runManifest: hasManifest ? next.runManifest : null,
     catalogEntries: hasCatalog ? next.catalogEntries : [],
     activeStep: hasStep ? next.activeStep : "analysis",
     scaffoldReady: hasReady ? next.scaffoldReady : false
   };
-}
-
-function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCandidate[] {
-  return candidates.map((candidate) => ({
-    ...candidate,
-    missing_information_resolution:
-      typeof candidate.missing_information_resolution === "string"
-        ? candidate.missing_information_resolution
-        : "",
-    resolved_missing_information: Array.isArray(candidate.resolved_missing_information)
-      ? candidate.resolved_missing_information
-      : [],
-    resolution_draft: candidate.resolution_draft ?? null,
-    resolution_applied_at:
-      typeof candidate.resolution_applied_at === "string" ? candidate.resolution_applied_at : null,
-    schema_review_state:
-      candidate.schema_review_state === "drafted" || candidate.schema_review_state === "applied"
-        ? candidate.schema_review_state
-        : "not_started",
-    smoke_spec: candidate.smoke_spec ?? null
-  }));
 }
 
 export function upsertSavedAnalysis(record: SavedAnalysisRecord): SavedAnalysisRecord[] {
@@ -199,6 +186,7 @@ function normalizeSavedAnalysisRecord(value: unknown): SavedAnalysisRecord[] {
       moduleCandidates,
       acceptedMissing: record.acceptedMissing as string[],
       analyzerModel: record.analyzerModel as CodexAnalyzerModel,
+      runManifest: ((record as { runManifest?: AfRunManifest | null }).runManifest ?? null),
       catalogEntries,
       activeStep,
       scaffoldReady

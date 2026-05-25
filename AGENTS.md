@@ -3,10 +3,10 @@
 ## Repository Role
 
 - This is the primary Agent Factory workbench repository.
-- Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active workbench source of truth.
+- Treat `.agents/skills`, `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active Agent Factory source of truth.
 - Do not treat this repository as only a public skill-source extract.
 - Do not add private banking data, private endpoints, credentials, deployment scripts, or organization-specific runtime code.
-- Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
+- Edit `.agents/skills` only when the task explicitly asks for skill, DLC workflow, or skill-sync work.
 
 ## Source Of Truth Map
 
@@ -14,7 +14,8 @@
 - `AGENTS.md`: model-facing repository index and working rules.
 - `CLAUDE.md`: Claude Code-facing repository guide; keep it aligned with this file on load-bearing rules.
 - `docs/workbench/agent-factory-harness.md`: project-specific Agent Factory operating harness for intake, classification, scaffold gating, review artifacts, and verification.
-- `packages/web`: requirement intake, analysis review, process flow, Graph IR, and ADK runtime handoff UI.
+- `.agents/skills`: Agent Factory DLC skills. The active stage skills are `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, and `af-verify-feedback`; `_shared` contains shared references, not a triggerable skill.
+- `packages/web`: artifact visualization, review, guided partial edits, process flow, Graph IR, and ADK runtime handoff UI.
 - `schemas`: normalized requirement, module candidate, and process-flow schemas.
 - `catalog`: YAML catalogs for reusable runtime contracts, domain owners, and risk gates.
 - `templates`: generic artifact and scaffold-plan templates.
@@ -23,7 +24,7 @@
 ## Markdown Documentation Ownership
 
 - `docs/README.md` indexes human-facing workbench documentation under `docs/`.
-- `.agents/skills/**` Markdown is governed by the nearest `SKILL.md` and should not be moved or linked from `docs/README.md` unless the task explicitly asks for a skill-sync step.
+- `.agents/skills/**` Markdown is governed by the nearest `SKILL.md`. The stage skills may be linked from `docs/README.md` because Agent Factory now treats them as the DLC operating entrypoints.
 - Historical review records belong under `docs/archive/` and must not override the canonical policy files listed above.
 
 ## Documentation Impact Discipline
@@ -64,15 +65,18 @@ Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level
 
 Catalog entries are runtime-oriented contracts. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
 
-ADK runtime baseline: ADK 2.0 (Beta). `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`. ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis.
+ADK runtime baseline: ADK 2.0. ADK Python 2.0 is GA as of May 19, 2026. `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`. ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis.
 
 ## Agent Factory Harness
 
-Before non-trivial analysis, taxonomy, scaffold, or export work, apply `docs/workbench/agent-factory-harness.md`.
+Before non-trivial analysis, taxonomy, scaffold, export, or DLC skill work, apply `docs/workbench/agent-factory-harness.md`.
 
 Core harness rules:
 
-- Convert raw requirements into reviewed artifacts before implementation.
+- Use `af-analyze-requirement` for schema-first analysis artifacts before implementation.
+- Use `af-design-boundaries` for module, Graph IR, runtime contract, Remote A2A, and reuse approval.
+- Use `af-build-runtime-stub` only after approved scaffold-plan artifacts exist.
+- Use `af-verify-feedback` to record validation evidence and catalog delta proposals.
 - Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
 - Keep retrieval, rule registry, and tool/adapter concepts as adapter subtypes, not top-level categories.
 - Treat Remote A2A as high-friction: require independent ownership, protocol boundary, auth, lifecycle, timeout, retry, fallback, and audit details.

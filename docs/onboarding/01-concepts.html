@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>1. ADK 기본 개념 — Agent Factory 온보딩</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="icon" href="data:," />
+</head>
+<body data-page="01">
+  <div class="layout">
+    <nav class="sidebar" aria-label="목차"></nav>
+    <main class="main">
+      <div class="page-eyebrow">개념 · 1/9</div>
+      <h1 class="page-title">1. ADK 기본 개념</h1>
+      <p class="page-lede">
+        이 장은 워크벤치를 설명하기 전에 ADK / A2A / MCP / EAI / Callback / Graph 같은 용어를
+        “이게 도대체 어디에 있는 거냐”라는 관점에서 한 번 정리한다. 다음 장부터 화면을 보면서
+        이 그림을 머릿속에 띄워두면 결정이 빨라진다.
+      </p>
+
+      <section class="block">
+        <h2>전체 그림</h2>
+        <p>요구사항이 들어오면 워크벤치는 그것을 네 종류의 모듈 후보로 나눈다.</p>
+        <div class="legend-row">
+          <span class="cat-badge agent"><span class="glyph">◆</span> agent</span>
+          <span class="cat-badge workflow"><span class="glyph">▶</span> workflow</span>
+          <span class="cat-badge adapter"><span class="glyph">⚙</span> adapter</span>
+          <span class="cat-badge remote"><span class="glyph">⇨</span> remote_a2a</span>
+        </div>
+        <div class="graph-mock">┌────────── 사용자 요청 ──────────┐
+│                                  │
+│         workflow (▶)             │   ← 언제 무엇을 실행할지 조율
+│        ┌─────┴───────┐           │
+│        ▼             ▼           │
+│   agent (◆)     adapter (⚙)      │   ← 판단        ← 호출 가능 기능
+│        │             │           │
+│        └─────┬───────┘           │
+│              ▼                   │
+│      remote_a2a (⇨)              │   ← 독립 원격 에이전트
+│                                  │
+└──────────────────────────────────┘</div>
+        <p>이 네 가지가 워크벤치의 단일 분류 기준이다. <em>retrieval</em>, <em>rule_registry</em>, <em>tool</em>, <em>MCP</em> 같은 것들은 모두 <code>adapter</code> 아래 subtype으로 들어간다. 별도 top-level이 아니다.</p>
+      </section>
+
+      <section class="block">
+        <h2>각 모듈의 책임</h2>
+        <table class="ref-table">
+          <thead>
+            <tr>
+              <th style="width:140px">분류</th>
+              <th style="width:170px">한 줄 정의</th>
+              <th>일상 비유</th>
+              <th>대표 신호</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="cat-badge agent"><span class="glyph">◆</span> agent</span></td>
+              <td>판단/요약/분류/추천 같은 <strong>추론 책임</strong>.</td>
+              <td>“판사” — 입력을 보고 의견·등급·결정 사유를 만든다.</td>
+              <td>“판단해라”, “요약해라”, “등급을 매겨라”, “triage 해라”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge workflow"><span class="glyph">▶</span> workflow</span></td>
+              <td>여러 단계를 <strong>어떻게/언제</strong> 실행할지 조율.</td>
+              <td>“프로젝트 매니저” — 누가 먼저, 누가 다음, 병렬은 누구.</td>
+              <td>“순서대로”, “병렬로”, “재시도 후”, “승인 후 진행”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge adapter"><span class="glyph">⚙</span> adapter</span></td>
+              <td>외부 시스템·데이터·계산을 부를 수 있는 <strong>호출 가능 기능</strong>.</td>
+              <td>“도구” — DB 조회, OCR, MCP 툴, 정책 검색 같은 callable.</td>
+              <td>“조회하라”, “OCR 결과”, “API 호출”, “정책 검색”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge remote"><span class="glyph">⇨</span> remote_a2a</span></td>
+              <td>독립 owner를 가진 <strong>원격 에이전트와의 프로토콜 경계</strong>.</td>
+              <td>“다른 회사 직원” — 내가 관리 안 하는 사람, 계약서로 부른다.</td>
+              <td>“다른 팀이 이미 운영하는 에이전트”, “Agent Card 존재”, “A2A 프로토콜”</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <div class="icon">!</div>
+          <div class="body">
+            <p><strong>흔한 오해:</strong> 여러 단계가 있다고 해서 <code>remote_a2a</code>가 되는 것은 아니다. Local workflow 안에서 처리할 수 있는 다단계는 <code>workflow</code>다. <code>remote_a2a</code>는 <strong>독립 소유 + 독립 배포 + 자체 lifecycle</strong>이 증거로 나올 때만 사용한다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>ADK (Agent Development Kit)란?</h2>
+        <p>ADK는 Google이 만든 에이전트 구축 프레임워크다. 이 워크벤치의 baseline은 <strong>ADK Python 2.0 GA</strong>(2026년 5월 19일 기준)이며, 다음을 제공한다.</p>
+        <ul>
+          <li><strong>LLM Agent</strong> — 추론을 맡는 에이전트.</li>
+          <li><strong>Workflow Agent</strong> — 여러 노드/엣지로 흐름을 만든다. ADK 2.0에서는 graph workflow와 dynamic workflow로 표현.</li>
+          <li><strong>Tools</strong> — 결정적인 외부 동작을 부른다 (워크벤치에서는 <code>adapter</code>로 분류).</li>
+          <li><strong>State / Artifact / Event</strong> — 노드 사이에 데이터를 전달하는 채널. Graph IR의 <code>edge_kind</code>에 대응.</li>
+        </ul>
+        <p>이 가이드에서 ADK 1.x의 SequentialAgent/ParallelAgent/LoopAgent 같은 1세대 workflow agent class는 <em>등장하지 않는다</em>. 대신 그 흐름은 Graph IR 내부의 container와 edge로 표현한다. 자세한 매핑은 <a href="04-workflow-decision.html">4장</a>과 <a href="05-process-flow.html">5장</a>에서 다룬다.</p>
+      </section>
+
+      <section class="block">
+        <h2>Agent Factory DLC 4단계</h2>
+        <p>현재 운영은 단일 스킬 하나가 아니라 네 개의 stage skill이 산출물을 넘겨주는 방식이다.</p>
+        <table class="ref-table">
+          <thead>
+            <tr><th style="width:190px">단계</th><th>스킬</th><th>대표 산출물</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>분석</td><td><code>af-analyze-requirement</code></td><td><code>analysis-result.json</code>, <code>module-candidates.json</code>, <code>process-flow.json</code></td></tr>
+            <tr><td>설계</td><td><code>af-design-boundaries</code></td><td>승인된 module boundary, Runtime 계약, catalog reuse, <code>scaffold-plan.json</code></td></tr>
+            <tr><td>개발</td><td><code>af-build-runtime-stub</code></td><td>TODO-only ADK source bundle, runtime wiring handoff</td></tr>
+            <tr><td>검증</td><td><code>af-verify-feedback</code></td><td><code>validation-report.md</code>, <code>catalog-delta.yaml</code></td></tr>
+          </tbody>
+        </table>
+        <p><code>af-run-manifest.json</code>은 이 네 단계를 이어주는 상태표다. Workbench는 이 파일을 import해 현재 단계, 완료 단계 수, 승인 수, 검증 결과를 상태 요약에 표시한다.</p>
+      </section>
+
+      <section class="block">
+        <h2>A2A (Agent-to-Agent)와 MCP (Model Context Protocol)</h2>
+        <table class="ref-table">
+          <thead>
+            <tr>
+              <th style="width:80px">약어</th>
+              <th style="width:230px">한 줄 정의</th>
+              <th>워크벤치에서의 자리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>A2A</strong></td>
+              <td>에이전트 간 통신 프로토콜. Agent Card, Task lifecycle, message/artifact 계약을 정의한다.</td>
+              <td><code>module_category: remote_a2a</code> 후보의 계약 검토. 일반 워크플로우 안에서 <em>공통 workflow</em>를 <code>runtime_binding: remote_a2a</code>로 부를 수도 있는데, 이때는 분류는 <code>workflow</code>를 유지한다.</td>
+            </tr>
+            <tr>
+              <td><strong>MCP</strong></td>
+              <td>LLM이 외부 도구·데이터에 접근하기 위한 표준 프로토콜. <code>inputSchema</code>/<code>outputSchema</code>로 tool을 정의한다.</td>
+              <td>대부분의 MCP 도구는 <code>module_category: adapter</code>로 들어간다. 계약 본문은 <code>catalog/contracts/mcp/*.json</code>에서 관리되고, 런타임 계약 검토 화면에서 검토한다.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout info">
+          <div class="icon">i</div>
+          <div class="body">
+            <p>“에이전트가 외부 기능을 호출한다”는 표현이 나오면 먼저 <code>adapter</code>로 분류해보자. 그게 뚜렷한 <em>독립 에이전트</em>가 아니면 보통 <code>adapter</code>가 맞다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>EAI / Legacy Adapter / Callback / Context Manager</h2>
+        <p>은행 도메인에서 흔히 등장하는 단어들이다. 이들은 top-level 분류가 아니라 <strong>Runtime 계약</strong>으로 검토한다 (<a href="07-runtime-contracts.html">7장</a> 참조).</p>
+        <table class="ref-table">
+          <thead>
+            <tr>
+              <th style="width:170px">개념</th>
+              <th>설명</th>
+              <th>워크벤치 자리</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>EAI / Legacy Adapter</strong></td>
+              <td>기존 EAI(Enterprise Application Integration) 버스나 메인프레임 API를 호출하는 어댑터.</td>
+              <td><code>adapter_kind: legacy_api</code>로 분류하고, MCP/EAI/Legacy adapter 계약은 <code>runtimeContracts</code>에서 별도로 검토.</td>
+            </tr>
+            <tr>
+              <td><strong>Context Manager</strong></td>
+              <td>여러 호출에 걸쳐 세션 상태/사용자 상태를 관리하는 책임.</td>
+              <td>Runtime 계약 — <em>Context Manager contract</em>.</td>
+            </tr>
+            <tr>
+              <td><strong>Callback Broker</strong></td>
+              <td>비동기 콜백 결과를 다시 에이전트 흐름으로 라우팅하는 책임.</td>
+              <td>Runtime 계약 — <em>Callback Broker contract</em>.</td>
+            </tr>
+            <tr>
+              <td><strong>ADK Callback</strong></td>
+              <td>ADK가 노출하는 before/after model, before/after tool 같은 콜백 훅.</td>
+              <td>Runtime 계약 — <em>ADK callback responsibilities</em>.</td>
+            </tr>
+            <tr>
+              <td><strong>Async Resume</strong></td>
+              <td>긴 처리 후 재개해야 하는 흐름(예: 야간 배치 결과 후 이어서 통보).</td>
+              <td>Runtime 계약 — <em>async resume contract</em>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>Graph IR — 작은 흐름은 모두 여기로</h2>
+        <p>“순차 실행”, “병렬”, “loop”, “사람 승인”은 더 이상 <code>workflow_kind</code> 값이 아니다. 모두 <strong>Graph IR</strong>(node/edge/container)로 표현한다.</p>
+        <div class="graph-mock">container: parallel_region
+   ┌────────────┐         ┌────────────┐
+   │ adapter A  │         │ adapter B  │   ← fan_out
+   └─────┬──────┘         └─────┬──────┘
+         │                      │
+         └──────► join ◄────────┘            ← fan_in
+                    │
+                    ▼
+              agent (판단)
+                    │
+                    ▼
+            human_input (승인)             ← container: human_review_region
+                    │
+                    ▼  route_condition="approved"
+              output</div>
+        <p>이 그림이 곧 <code>workflow_kind: graph</code>로 분류되는 후보의 내부다. 자세한 노드/엣지 종류는 <a href="05-process-flow.html">5장</a>에서 본다.</p>
+      </section>
+
+      <section class="block">
+        <h2>스스로 점검</h2>
+        <div class="quiz" data-correct="adapter">
+          <div class="quiz-question">Q. 요구사항: “신청서 PDF를 OCR로 읽어서 텍스트로 변환한다.” 이 책임의 분류는?</div>
+          <div class="quiz-options">
+            <button data-value="agent">agent — 판단을 한다</button>
+            <button data-value="workflow">workflow — 여러 단계가 있다</button>
+            <button data-value="adapter">adapter — 외부 기능을 호출한다</button>
+            <button data-value="remote">remote_a2a — 다른 에이전트를 호출한다</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: adapter</strong> — OCR은 결정적인 외부 처리이므로 <code>adapter_kind: external_service</code>(혹은 별도 정의된 OCR adapter)로 둔다. 판단이 아니므로 agent가 아니고, 흐름 조율이 아니므로 workflow도 아니다. 독립 원격 에이전트 계약이 따로 명시되지 않았으므로 remote_a2a도 아니다.</p>
+          </div>
+        </div>
+
+        <div class="quiz" data-correct="workflow">
+          <div class="quiz-question">Q. 요구사항: “OCR 결과와 정책 검색 결과를 동시에 가져와서 둘 다 모이면 판단 에이전트로 넘긴다.” 이 “동시에 가져와서 모이면” 책임은?</div>
+          <div class="quiz-options">
+            <button data-value="agent">agent</button>
+            <button data-value="workflow">workflow (graph) — 병렬 fan-out/fan-in</button>
+            <button data-value="adapter">adapter</button>
+            <button data-value="remote">remote_a2a</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: workflow</strong> — 누구를 언제 호출하고 어떻게 모을지는 조율 책임이므로 workflow이고, <code>parallel_region + fan_out + join + fan_in</code>이 명시적이므로 <code>workflow_kind: graph</code>가 적합하다.</p>
+          </div>
+        </div>
+
+        <div class="quiz" data-correct="no-remote">
+          <div class="quiz-question">Q. 요구사항: “고객 조회 → 정책 검색 → 추천 사유 작성 — 이 세 단계를 순서대로 실행한다.” 이 흐름 전체를 <code>remote_a2a</code>로 만들어야 할까?</div>
+          <div class="quiz-options">
+            <button data-value="yes-remote">예, 단계가 셋이니까</button>
+            <button data-value="no-remote">아니오 — local workflow로 충분하고 독립 원격 에이전트 증거가 없다</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: 아니오.</strong> Remote A2A는 <em>독립 소유 + 독립 배포 + 자체 lifecycle + auth/timeout/retry/fallback/audit 계약</em>이 보일 때만 사용한다. 단지 “단계가 여러 개”인 것은 local <code>workflow</code> 후보의 이유이지 remote_a2a의 이유가 아니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <nav class="pager" aria-label="페이지 이동"></nav>
+    </main>
+  </div>
+  <script src="assets/app.js"></script>
+</body>
+</html>

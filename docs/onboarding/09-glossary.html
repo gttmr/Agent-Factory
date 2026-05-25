@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>9. 용어집 — Agent Factory 온보딩</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="icon" href="data:," />
+</head>
+<body data-page="09">
+  <div class="layout">
+    <nav class="sidebar" aria-label="목차"></nav>
+    <main class="main">
+      <div class="page-eyebrow">REFERENCE · 9/9</div>
+      <h1 class="page-title">9. 용어집</h1>
+      <p class="page-lede">
+        이 가이드와 워크벤치 화면에 등장하는 모든 용어를 한 곳에서 검색한다. 키워드를 입력하면
+        실시간으로 필터링된다.
+      </p>
+
+      <input type="search" class="glossary-search" placeholder="검색: 예) graph, MCP, smoke, needs_info ..." aria-label="용어 검색" />
+
+      <section class="block">
+        <div class="glossary-list">
+
+          <div class="glossary-entry">
+            <h4>ADK <span class="term-tag">Agent Development Kit</span></h4>
+            <p>Google이 만든 에이전트 구축 프레임워크. 이 워크벤치의 baseline은 ADK Python 2.0 GA다. LLM Agent, Workflow Agent, Tools, State/Artifact/Event를 제공한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>ADK Runtime Handoff</h4>
+            <p>승인된 workbench artifact와 manifest approval만 입력으로 받아 ADK source bundle을 만들고 smoke 검증을 실행하는 review-gated 단계. <em>배포가 아니다.</em></p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>af-run-manifest.json</h4>
+            <p>Skill-led DLC 실행의 단계 상태, 출력 경로, 승인 상태, 검증 결과를 연결하는 lightweight manifest. Workbench는 browser file import로 이 파일을 읽고 DLC 상태 요약을 표시한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>af-analyze-requirement / af-design-boundaries / af-build-runtime-stub / af-verify-feedback</h4>
+            <p>Agent Factory 4단계 DLC skill. 분석 artifact 생성, boundary/runtime/catalog 설계 승인, TODO-only ADK runtime stub 생성, 검증과 feedback 기록을 순서대로 담당한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>A2A <span class="term-tag">Agent-to-Agent protocol</span></h4>
+            <p>에이전트 간 통신 프로토콜. Agent Card, Task lifecycle, message/artifact 계약을 정의한다. 워크벤치에서는 <code>remote_a2a</code> 후보의 계약 검토와 catalog 안의 공통 Workflow runtime binding으로 등장한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Agent Card</h4>
+            <p>원격 에이전트가 자신의 capability/interface/auth를 알리는 discovery metadata. Remote A2A 후보를 승인하려면 이 정보가 필요하다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>agent_kind</h4>
+            <p><code>module_category: agent</code>일 때 subtype. <code>specialist</code> 또는 <code>shared</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>adapter_kind</h4>
+            <p><code>module_category: adapter</code>일 때 subtype. <code>legacy_api</code>, <code>retrieval</code>, <code>rule_registry</code>, <code>data_query</code>, <code>template</code>, <code>computation</code>, <code>external_service</code>, <code>unknown</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>AnalysisResult</h4>
+            <p>워크벤치가 raw requirement를 정규화해 만든 canonical combined artifact. normalized requirement, evidence, module candidates, A2A contracts, runtime contracts, Graph IR을 포함한다. Browser import/export 파일명은 보통 <code>analysis-result.json</code>이다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>acceptedMissing</h4>
+            <p>AnalysisResult 행마다 “수용” 토글이 만드는 배열. requirement-level missing-info의 soft attestation 기록.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Callback Broker</h4>
+            <p>비동기 callback 결과를 다시 에이전트 흐름으로 라우팅하는 책임. Runtime 계약 종류 중 하나.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Catalog</h4>
+            <p>재사용 가능한 agents/workflows/adapters/remote_a2a runtime contract YAML 모음. <code>catalog/</code> 디렉터리에 있다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>catalog_entry_id</h4>
+            <p>ModuleCandidate가 catalog 항목에서 온 경우 그 출처 id. 있으면 Module Review에서 <em>카탈로그 계약</em> 탭으로 분기된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>chat-smoke</h4>
+            <p>generated ADK app에 대해 session을 만들고 <code>/run</code> endpoint를 호출해 응답을 확인하는 dev smoke. 승인된 후보의 <code>smoke_spec</code>이 있어야 활성화된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Codex CLI</h4>
+            <p>이 워크벤치의 live analyzer를 실행하는 CLI. <code>/api/analyze-requirement</code> SSE endpoint를 통해 호출되고, compact draft artifact를 반환한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>DLC</h4>
+            <p>Agent Factory에서는 분석, 설계, 개발, 검증으로 이어지는 delivery lifecycle을 뜻한다. 한 기능 생성이 아니라 여러 Agent/Workflow/Adapter/Remote A2A의 연결, 스키마, MCP, 재사용 상태까지 산출물로 관리한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>container_kind</h4>
+            <p>Graph IR container의 종류. <code>graph_workflow</code>, <code>dynamic_workflow</code>, <code>parallel_region</code>, <code>loop_region</code>, <code>human_review_region</code>, <code>remote_boundary</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Context Manager</h4>
+            <p>여러 호출에 걸친 상태(session/temp/user/app)의 소유와 lifecycle을 관리하는 책임. Runtime 계약 종류 중 하나.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>dynamic (workflow_kind)</h4>
+            <p>Python 코드(조건/loop/recursion/<code>ctx.run_node</code>)가 런타임 경로를 결정해야 할 때. Graph IR에서는 <code>dynamic_workflow</code> container.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>EAI <span class="term-tag">Enterprise Application Integration</span></h4>
+            <p>기업 내 시스템들을 연결하는 통합 버스/미들웨어. 워크벤치에서는 <code>adapter_kind: legacy_api</code>와 Runtime 계약(Legacy Adapter contract)으로 다룬다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>edge_kind</h4>
+            <p>Graph IR edge의 데이터/제어 채널 종류. <code>event_output</code>, <code>event_message</code>, <code>session_state</code>, <code>temp_state</code>, <code>user_state</code>, <code>app_state</code>, <code>artifact</code>, <code>route</code>, <code>control</code>, <code>remote_a2a</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>execution_semantics</h4>
+            <p>edge가 어떤 흐름 의미를 갖는지. <code>normal_transition</code>, <code>fan_out</code>, <code>fan_in</code>, <code>loop_back</code>, <code>loop_exit</code>, <code>conditional</code>, <code>boundary_crossing</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>fan_out / fan_in / join</h4>
+            <p>병렬 흐름의 시작/모음/합류. <code>parallel_region</code> container와 함께 사용한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>graph (workflow_kind)</h4>
+            <p>ADK 2.0 graph workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때. Source generator는 검토된 Graph IR edge를 generated workflow skeleton edge로 사용한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Graph IR</h4>
+            <p>Process Flow의 내부 표현. node/edge/container로 흐름을 정의한다. <code>processFlow</code>라는 필드 이름은 호환성 때문에 유지된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>human_input</h4>
+            <p>사람 승인/보완 요청을 graph 안의 일시정지/재개 노드로 표현. <code>human_review_region</code> container 안에 둔다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>legacy_recommended_type</h4>
+            <p>마이그레이션용 메타데이터. primary classifier로 다시 쓰지 않는다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>loop_region / loop_control / loop_back / loop_exit</h4>
+            <p>반복 흐름의 container와 edge. 정해진 종료 조건이 있는 반복을 static graph로 표현할 때 사용한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>MCP <span class="term-tag">Model Context Protocol</span></h4>
+            <p>LLM이 외부 도구/데이터에 접근하기 위한 표준 프로토콜. <code>inputSchema</code>/<code>outputSchema</code>로 tool을 정의한다. 워크벤치에서는 대부분 <code>adapter</code>로 분류된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>missing_information (요구사항 수준)</h4>
+            <p><code>evidence.missing_information</code>. AnalysisResult에서 “수용” 토글이 가능한 soft gate. scaffold 생성을 막지 않는다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>missing_information (후보 수준)</h4>
+            <p><code>ModuleCandidate.missing_information</code>. unresolved <code>needs_info</code>와 함께 hard gate를 만든다. Resolution Draft 반영 후 비워진다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>module_category</h4>
+            <p>최상위 분류. <code>agent</code>, <code>workflow</code>, <code>adapter</code>, <code>remote_a2a</code> 4개만 허용.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>ModuleCandidate</h4>
+            <p>분석이 만든 후보 모듈 하나. Module Review에서 status를 결정한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>needs_info (status)</h4>
+            <p>후보 승인 전 추가 정보가 필요한 상태. Resolution Draft 절차로 푼다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>node_kind</h4>
+            <p>Graph IR node의 종류. <code>input</code>, <code>output</code>, <code>agent</code>, <code>function</code>, <code>tool</code>, <code>adapter</code>, <code>human_input</code>, <code>workflow</code>, <code>remote_a2a</code>, <code>join</code>, <code>router</code>, <code>loop_control</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>orchestration (workflow_kind)</h4>
+            <p>상위 조율 책임은 보이지만 graph topology가 아직 핵심 산출물이 아닐 때. 구현 handoff에서 추가 설계가 필요.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>processFlow</h4>
+            <p><code>AnalysisResult.processFlow</code>. 내부 shape는 Graph IR이지만 필드명은 마이그레이션 호환 때문에 유지된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>remote_a2a (module_category)</h4>
+            <p>독립 owner를 가진 원격 에이전트와의 protocol boundary. high-friction. <code>risk_level: high</code>와 owner/agent_card/auth/task_lifecycle/timeout/retry/fallback/audit 필수.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>remote_boundary</h4>
+            <p>Graph IR container 종류 중 하나. <code>remote_a2a</code> 노드를 감싼다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>remote_contract_kind</h4>
+            <p><code>module_category: remote_a2a</code>일 때 subtype. <code>a2a</code> 또는 <code>unknown</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Resolution Draft</h4>
+            <p>LLM이 만든 needs_info 후보의 검토 초안. 자동 적용되지 않으며 Module Review에서 “반영 적용”을 눌러야 현재 분석에 반영된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>resolved_missing_information</h4>
+            <p>반영 적용 시 기존 <code>missing_information</code>이 이동되는 자리. 흔적으로 남는다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>risk_signals</h4>
+            <p>analyzer가 후보에 붙이는 위험 신호. <code>personal_data</code>, <code>financial_data</code>, <code>credit_decision_support</code>, <code>customer_impact</code>, <code>external_message</code>, <code>transaction_write</code>, <code>human_approval_required</code>, <code>audit_required</code>. 자동 차단은 아니다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>route_condition</h4>
+            <p><code>edge_kind: route</code>의 필수 metadata. 어떤 조건일 때 이 edge가 선택되는지 적는다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>runtimeContracts</h4>
+            <p><code>AnalysisResult.runtimeContracts</code>. MCP/EAI/Legacy adapter contract, Context Manager, Callback Broker, ADK callback, async resume의 review artifact. 필수 계약은 <code>contract_status: approved</code>가 되어야 scaffold/source generation을 통과한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>runtime_binding</h4>
+            <p>catalog 항목의 호출 방식. <code>mcp</code>, <code>remote_a2a</code>, <code>unresolved</code>. <code>module_category</code>와는 다르다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>runtime_mock</h4>
+            <p>seed catalog가 가질 수 있는 deterministic synthetic 응답. local smoke를 위한 test double. private endpoint/credential/실데이터 금지.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>scaffold-plan</h4>
+            <p><code>scaffold-plan.json</code>. 승인된 workbench artifact만 입력으로 받는 ADK Runtime Handoff의 검토 게이트 계약. manifest approval, 승인된 module candidate, approved runtime contract, Graph IR coverage와 함께 source generation gate가 된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>scaffoldReady</h4>
+            <p>SavedAnalysisRecord 필드. <code>can_generate_source &amp;&amp; Graph IR errors.length === 0</code>. true면 다음 load 때 <code>export</code>로 landing.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>SavedAnalysisRecord</h4>
+            <p>저장된 분석. <code>catalogEntries</code> snapshot, <code>activeStep</code>, <code>scaffoldReady</code>를 포함한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>schema_review_state</h4>
+            <p>후보의 schema 검토 상태. Resolution Draft 반영 시 <code>applied</code>가 된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Schema Tree</h4>
+            <p>Module Review Inspector에서 object/array&lt;object&gt; 입력/출력을 펼침 가능한 트리로 보여주는 컴포넌트. raw JSON 대신.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Smoke 일괄 실행 macro</h4>
+            <p>ADK Runtime Handoff 화면의 매크로. <code>generate → install → start-web → check-web → chat-smoke</code> 순차 실행, 첫 실패에서 정지.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>smoke_spec</h4>
+            <p>승인된 후보의 chat smoke 입력. synthetic input, sample message, expected output shape를 포함.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>specialist / shared (agent_kind)</h4>
+            <p>특정 도메인/임무 전용 agent / 여러 도메인에서 재사용하는 공통 agent.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>State / Artifact / Event</h4>
+            <p>ADK가 노드 사이 데이터 전달에 쓰는 채널. Graph IR edge_kind의 <code>session_state</code>, <code>temp_state</code>, <code>user_state</code>, <code>app_state</code>, <code>artifact</code>, <code>event_output</code>, <code>event_message</code>에 대응.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>status</h4>
+            <p>ModuleCandidate의 검토 상태. <code>approved</code>, <code>deferred</code>, <code>rejected</code>, <code>needs_info</code>.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>stub runtime</h4>
+            <p>generated ADK app이 실제 모델/어댑터/은행 시스템 호출 없이 graph 구조만 검증하는 모드. 노란 stub 배너 필수.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Taxonomy</h4>
+            <p>워크벤치의 단일 분류 기준. <code>module_category</code>와 각 subtype enum. <code>docs/workbench/taxonomy.md</code>가 단일 활성 기준.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>unknown</h4>
+            <p>workflow_kind / adapter_kind / remote_contract_kind에 공통으로 있는 “증거 부족” 값. 새 enum을 만들지 말고 unknown으로 두고 needs_info에 남긴다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>workflow_kind</h4>
+            <p><code>module_category: workflow</code>일 때 subtype. <code>orchestration</code>, <code>graph</code>, <code>dynamic</code>, <code>unknown</code> 4개만 허용.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <nav class="pager" aria-label="페이지 이동"></nav>
+    </main>
+  </div>
+  <script src="assets/app.js"></script>
+</body>
+</html>

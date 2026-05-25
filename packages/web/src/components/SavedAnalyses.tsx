@@ -3,8 +3,12 @@ import type { SavedAnalysisRecord } from "../analyzer/savedAnalyses";
 interface SavedAnalysesProps {
   records: SavedAnalysisRecord[];
   hasCurrentAnalysis: boolean;
+  hasRunManifest: boolean;
   currentSavedId: string | null;
+  actionMessage?: string;
   onSaveCurrent: () => void;
+  onExportCurrent: () => void;
+  onExportRunManifest: () => void;
   onLoad: (record: SavedAnalysisRecord) => void;
   onDelete: (id: string) => void;
 }
@@ -12,8 +16,12 @@ interface SavedAnalysesProps {
 export function SavedAnalyses({
   records,
   hasCurrentAnalysis,
+  hasRunManifest,
   currentSavedId,
+  actionMessage,
   onSaveCurrent,
+  onExportCurrent,
+  onExportRunManifest,
   onLoad,
   onDelete
 }: SavedAnalysesProps) {
@@ -28,8 +36,15 @@ export function SavedAnalyses({
           <button type="button" className="primary" onClick={onSaveCurrent} disabled={!hasCurrentAnalysis}>
             현재 분석 저장
           </button>
+          <button type="button" onClick={onExportCurrent} disabled={!hasCurrentAnalysis}>
+            analysis-result.json 내보내기
+          </button>
+          <button type="button" onClick={onExportRunManifest} disabled={!hasRunManifest}>
+            af-run-manifest.json 내보내기
+          </button>
           <span className="saved-analysis-count">{records.length}개 저장됨</span>
         </div>
+        {actionMessage ? <p className="saved-analysis-message">{actionMessage}</p> : null}
       </section>
 
       <section className="saved-analysis-list" aria-label="저장된 분석 목록">

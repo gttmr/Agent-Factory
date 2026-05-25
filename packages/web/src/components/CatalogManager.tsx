@@ -98,8 +98,14 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
 
   const selectedEntry =
     entries.find((entry) => entry.id === selectedEntryId) ?? filteredEntries[0] ?? entries.find(Boolean) ?? null;
+  // Only new candidates (no catalog_entry_id and no name match against an active catalog
+  // entry) should reach the registration decision table. Already-registered modules belong
+  // in the catalog list above; surfacing them here as disabled rows was misleading.
   const candidateRows = useMemo(
-    () => moduleCandidates.map((candidate) => ({ candidate, match: findMatchingEntry(candidate, entries) })),
+    () =>
+      moduleCandidates
+        .filter((candidate) => !candidate.catalog_entry_id && !findMatchingEntry(candidate, entries))
+        .map((candidate) => ({ candidate, match: undefined as CatalogEntry | undefined })),
     [moduleCandidates, entries]
   );
 
@@ -272,10 +278,10 @@ export function CatalogManager({ entries, onEntriesChange, moduleCandidates, onC
           <section className="catalog-candidate-section">
             <header>
               <div>
-                <p className="eyebrow">분석 후보</p>
+                <p className="eyebrow">신규 모듈</p>
                 <h3>등록 결정</h3>
               </div>
-              <span>{candidateRows.length}개 후보</span>
+              <span>{candidateRows.length}개 신규 후보</span>
             </header>
             <CandidateDecisionTable rows={candidateRows} onPromote={promoteCandidate} />
           </section>
@@ -384,7 +390,13 @@ interface CandidateDecisionTableProps {
 }
 
 function CandidateDecisionTable({ rows, onPromote }: CandidateDecisionTableProps) {
-  if (!rows.length) return <p className="empty-state">분석 후보가 아직 없습니다.</p>;
+  if (!rows.length) {
+    return (
+      <p className="empty-state">
+        등록할 신규 모듈이 없습니다. 분석 후보가 모두 카탈로그에 이미 존재합니다.
+      </p>
+    );
+  }
   return (
     <div className="review-table-wrap catalog-candidate-table-wrap">
       <table className="review-table catalog-candidate-table">
@@ -393,12 +405,11 @@ function CandidateDecisionTable({ rows, onPromote }: CandidateDecisionTableProps
             <th>후보</th>
             <th>분류</th>
             <th>Analyzer 제안</th>
-            <th>카탈로그 상태</th>
             <th>작업</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ candidate, match }) => (
+          {rows.map(({ candidate }) => (
             <tr key={candidate.id}>
               <td>
                 <strong>{candidate.name}</strong>
@@ -414,9 +425,8 @@ function CandidateDecisionTable({ rows, onPromote }: CandidateDecisionTableProps
                   <span className="status-pill neutral">신규 후보</span>
                 )}
               </td>
-              <td>{match ? `등록됨: ${match.name}` : "미등록"}</td>
               <td>
-                <button type="button" disabled={Boolean(match)} onClick={() => onPromote(candidate)}>
+                <button type="button" onClick={() => onPromote(candidate)}>
                   카탈로그에 등록
                 </button>
               </td>

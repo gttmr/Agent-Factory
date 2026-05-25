@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Analyze Requirement"
+  short_description: "요구사항을 검토 가능한 AF artifact로 정규화"
+  default_prompt: "Use $af-analyze-requirement to turn this raw requirement into reviewed Agent Factory analysis artifacts."

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Scope
 
-This is the Agent Factory workbench — a local-first tool that turns raw requirements into reviewed planning artifacts and a review-gated ADK Runtime Handoff. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved scaffold-plan data from reviewed workbench artifacts may feed the runtime handoff.
+This is the Agent Factory workbench — a local-first, skill-led tool that turns raw requirements into reviewed planning artifacts and a review-gated ADK Runtime Handoff. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved scaffold-plan data from reviewed artifacts may feed the runtime handoff.
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
@@ -51,13 +51,13 @@ Core rules:
 
 ### Workbench flow (packages/web)
 
-`App.tsx` is a single-page wizard backed by React state and local server middleware. There is no router; analyzer and ADK runtime actions call the Vite middleware under `packages/web/server`.
+`App.tsx` is a single-page wizard backed by React state and local server middleware. There is no router; analyzer and ADK runtime actions call the Vite middleware under `packages/web/server`. The long-term product direction is skill-led: repo-local AF skills produce artifacts under `artifacts/af/<req-id>/`, and the workbench visualizes, reviews, and supports guided partial edits of those artifacts.
 
 Current steps are defined in `packages/web/src/workbench/useWorkbenchState.ts`:
 
 `intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
 
-State flows through `useWorkbenchState`: `RequirementIntakeInput` → live `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation.
+State flows through `useWorkbenchState`: `RequirementIntakeInput` or imported skill artifact → live/reviewed `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation.
 
 `AnalysisResult.runtimeContracts` is the review artifact for callback and runtime support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback responsibilities, and async resume behavior. The `Runtime 계약` wizard step surfaces these contracts before Remote A2A/catalog/export.
 
@@ -77,7 +77,7 @@ Adapter `adapter_kind`: `legacy_api`, `retrieval`, `rule_registry`, `data_query`
 
 Rules baked into the schemas, validator, and analyzer:
 
-- ADK runtime baseline: ADK 2.0 (Beta). `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
+- ADK runtime baseline: ADK 2.0. ADK Python 2.0 is GA as of May 19, 2026. `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
 - Tool/Adapter, Knowledge Retrieval, and Metadata Registry are **no longer** top-level categories. Retrieval and rule registries appear only as `adapter_kind` subtypes.
 - `legacy_recommended_type` is migration metadata; never use it as the primary classifier.
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.
@@ -134,7 +134,7 @@ Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take
 - Keep changes scoped to the requested workbench behavior. No drive-by abstractions, configuration, or extensibility.
 - Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
 - Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active source of truth.
-- Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
+- Edit `.agents/skills` only when the task explicitly asks for skill, DLC workflow, or skill-sync work.
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.
 - The UI labels are in Korean (`App.tsx`, components). Preserve that when editing copy.
 - Visual changes must follow `docs/visualization/design-system.md` and be verified with a chrome-devtools MCP screenshot before being reported as done.

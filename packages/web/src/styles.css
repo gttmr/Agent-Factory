@@ -266,6 +266,37 @@ dt {
   padding: 16px;
 }
 
+.artifact-import-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.manifest-summary-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.manifest-summary-panel div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.manifest-summary-panel span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.manifest-summary-panel strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
 .context-check-list {
   display: grid;
   gap: 8px;
@@ -565,6 +596,13 @@ dt {
   color: var(--text-muted);
   font-size: 0.9rem;
   font-weight: 800;
+}
+
+.saved-analysis-message {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .saved-analysis-list {
@@ -4742,6 +4780,61 @@ button.a2a-review-link:hover {
 }
 .stub-banner > span {
   font-size: 0.84rem;
+}
+
+.runtime-contract-catalog {
+  border: 1px solid var(--border, #e2e6ef);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 12px 0 16px;
+  background: var(--surface, #fafbff);
+}
+.runtime-contract-catalog header h4 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+.runtime-contract-catalog header p {
+  margin: 0 0 10px;
+  color: var(--text-soft, #4a5168);
+  font-size: 0.85rem;
+}
+.runtime-contract-catalog ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.runtime-contract-catalog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e6ef);
+  border-radius: 8px;
+  background: #fff;
+}
+.runtime-contract-catalog-row.is-overridden {
+  border-color: #b85b00;
+  background: #fff7ec;
+}
+.runtime-contract-catalog-row .row-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.runtime-contract-catalog-row .row-meta strong {
+  display: block;
+  font-size: 0.93rem;
+}
+.runtime-contract-catalog-row .row-meta-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-soft, #4a5168);
+  font-family: var(--mono, ui-monospace, monospace);
 }
 
 .runtime-contract-console {

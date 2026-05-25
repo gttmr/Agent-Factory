@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3. Taxonomy 결정 — Agent Factory 온보딩</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="icon" href="data:," />
+</head>
+<body data-page="03">
+  <div class="layout">
+    <nav class="sidebar" aria-label="목차"></nav>
+    <main class="main">
+      <div class="page-eyebrow">결정 기준 · 3/9</div>
+      <h1 class="page-title">3. Taxonomy 결정</h1>
+      <p class="page-lede">
+        Module Review에서 한 후보의 분류를 정하는 단계다. taxonomy를 마음대로 늘리지 않는 것이
+        분석 일관성을 유지하는 핵심이다. 이 장은 top-level <code>module_category</code>와 그에
+        딸린 subtype을 어떻게 고르는지 결정표와 분류기 위젯으로 설명한다.
+      </p>
+
+      <section class="block">
+        <h2>module_category — 네 개 뿐이다</h2>
+        <table class="ref-table">
+          <thead>
+            <tr><th style="width:160px">값</th><th style="width:200px">한 줄 정의</th><th>대표 신호</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="cat-badge agent"><span class="glyph">◆</span> agent</span></td>
+              <td>판단/요약/분류/추천/triage 같은 reasoning 책임</td>
+              <td>“판단”, “요약”, “등급”, “추천 사유 작성”, “비교 후 의견”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge workflow"><span class="glyph">▶</span> workflow</span></td>
+              <td>여러 Agent/Adapter/Workflow를 조율하는 control flow</td>
+              <td>“순서”, “병렬”, “fan-out/fan-in”, “loop”, “human 승인”, “route”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge adapter"><span class="glyph">⚙</span> adapter</span></td>
+              <td>호출 가능한 capability (MCP tool, API, retrieval, rule, 외부 서비스 등)</td>
+              <td>“API 호출”, “OCR”, “정책 검색”, “규정 조회”, “데이터 조회”</td>
+            </tr>
+            <tr>
+              <td><span class="cat-badge remote"><span class="glyph">⇨</span> remote_a2a</span></td>
+              <td>독립 owner를 가진 원격 에이전트와의 프로토콜 경계</td>
+              <td>“다른 팀이 운영하는 에이전트”, “Agent Card 있음”, “A2A 프로토콜로 호출”</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <div class="icon">!</div>
+          <div class="body">
+            <p>모호하면 새 카테고리를 만들지 말고 <code>evidence.assumptions</code>나 <code>missing_information</code>에 남긴다. 분석 화면에서 후보를 <code>needs_info</code>로 두는 것이 가짜 분류보다 항상 낫다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>subtype enum</h2>
+
+        <h3>agent_kind <span class="code-pill">module_category=agent일 때만</span></h3>
+        <table class="ref-table">
+          <thead><tr><th>값</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><code>specialist</code></td><td>특정 도메인/임무에 특화된 reasoning agent.</td></tr>
+            <tr><td><code>shared</code></td><td>여러 도메인에서 재사용하는 공통 reasoning agent.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>workflow_kind <span class="code-pill">module_category=workflow일 때만</span></h3>
+        <table class="ref-table">
+          <thead><tr><th>값</th><th>의미</th><th>대표 신호</th></tr></thead>
+          <tbody>
+            <tr><td><code>orchestration</code></td><td>상위 조율 책임은 있지만 graph topology가 아직 핵심 산출물이 아님</td><td>“여러 모듈을 묶는 흐름은 있는데 route/join이 명확치 않다”</td></tr>
+            <tr><td><code>graph</code></td><td>ADK 2.0 graph workflow처럼 node/edge/route/join/loop/human input이 명시적 산출물</td><td>“병렬 fan-out → join”, “재시도 loop”, “사람 승인 게이트”</td></tr>
+            <tr><td><code>dynamic</code></td><td>Python 조건/loop/recursion/<code>ctx.run_node</code>가 런타임 경로를 결정</td><td>“호출마다 분기 수가 달라짐”, “코드가 흐름을 결정함”</td></tr>
+            <tr><td><code>unknown</code></td><td>요구사항 증거 부족</td><td>“workflow 후보는 맞는데 subtype 근거 부족”</td></tr>
+          </tbody>
+        </table>
+        <p>구체적 결정 트리는 <a href="04-workflow-decision.html">4장</a>에서 본다.</p>
+
+        <h3>adapter_kind <span class="code-pill">module_category=adapter일 때만</span></h3>
+        <table class="ref-table">
+          <thead><tr><th>값</th><th>의미</th><th>예시</th></tr></thead>
+          <tbody>
+            <tr><td><code>legacy_api</code></td><td>기존 EAI/Legacy 시스템 호출</td><td>코어뱅킹 계좌 조회, 메인프레임 잔액 조회</td></tr>
+            <tr><td><code>retrieval</code></td><td>벡터/문서 검색</td><td>정책 문서 검색, FAQ retrieval</td></tr>
+            <tr><td><code>rule_registry</code></td><td>관리되는 업무 규칙 lookup</td><td>한도 룰, 금리 룰, 컴플라이언스 규정</td></tr>
+            <tr><td><code>data_query</code></td><td>구조화된 데이터 질의</td><td>SQL/노SQL DB query</td></tr>
+            <tr><td><code>template</code></td><td>템플릿 렌더링</td><td>안내문 생성 템플릿, 이메일 템플릿</td></tr>
+            <tr><td><code>computation</code></td><td>결정적 계산</td><td>이자 계산, 한도 계산, 점수 계산</td></tr>
+            <tr><td><code>external_service</code></td><td>그 외 외부 서비스 호출 (MCP tool 등)</td><td>OCR, 외부 신용평가 API</td></tr>
+            <tr><td><code>unknown</code></td><td>호출 방식이 아직 불명확</td><td>증거 부족 — needs_info로 둔다</td></tr>
+          </tbody>
+        </table>
+
+        <h3>remote_contract_kind <span class="code-pill">module_category=remote_a2a일 때만</span></h3>
+        <table class="ref-table">
+          <thead><tr><th>값</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><code>a2a</code></td><td>A2A protocol로 호출되는 원격 에이전트</td></tr>
+            <tr><td><code>unknown</code></td><td>원격 protocol 종류 미상</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="block">
+        <h2>더 이상 top-level이 아닌 것</h2>
+        <table class="ref-table">
+          <thead><tr><th>예전 표현</th><th>지금 표현</th></tr></thead>
+          <tbody>
+            <tr><td>Tool / Adapter (top-level)</td><td><code>module_category: adapter</code></td></tr>
+            <tr><td>Knowledge Retrieval (top-level)</td><td><code>adapter_kind: retrieval</code></td></tr>
+            <tr><td>Metadata / Rule Registry (top-level)</td><td><code>adapter_kind: rule_registry</code></td></tr>
+            <tr><td>SequentialAgent / ParallelAgent / LoopAgent</td><td>Graph IR container와 edge (<a href="05-process-flow.html">5장</a>)</td></tr>
+          </tbody>
+        </table>
+        <p><code>legacy_recommended_type</code> 필드는 마이그레이션용 메타데이터일 뿐이다. primary classifier로 다시 사용하지 않는다.</p>
+        <div class="callout info">
+          <div class="icon">i</div>
+          <div class="body">
+            <p>Runtime 계약도 top-level category가 아니다. MCP, EAI/Legacy, Context Manager, Callback Broker, ADK callback, async resume는 후보의 책임 분류를 유지한 채 <code>runtimeContracts</code>에서 별도 승인 artifact로 검토한다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>분류기 — 신호 체크해보기</h2>
+        <p>아래 위젯에서 요구사항이 보이는 신호를 체크하면, 워크벤치가 어떤 <code>module_category</code>를 제안할지 보여준다. <em>실제 워크벤치의 분류기가 아니며 학습 보조용</em>이다.</p>
+
+        <div class="classifier"
+             data-rules="reason,judge,summarize::agent::판단/요약/분류/추천 책임이 분명하다. → module_category: agent로 두고 specialist/shared를 고른다.|orchestrate,parallel,loop,approve::workflow::여러 단계를 언제/어떻게 실행할지 정해야 하는 control flow다. → module_category: workflow. graph/orchestration/dynamic은 4장에서 결정한다.|api,db,ocr,policy,mcp::adapter::callable capability다. → module_category: adapter. adapter_kind는 legacy_api/retrieval/rule_registry/data_query/template/computation/external_service 중 가장 가까운 값으로.|remote,owner,agentcard,a2a::remote_a2a::독립 owner와 원격 protocol 계약이 있는 에이전트다. → module_category: remote_a2a. risk_level은 high로 두고 auth/timeout/retry/fallback/audit을 별도 검토.">
+          <div class="quiz-question">이 후보의 요구사항에서 보이는 신호를 모두 체크해보세요.</div>
+          <div class="options">
+            <label><input type="checkbox" value="reason" /><span>“판단해라 / 의견을 만들어라 / 등급을 매겨라”</span></label>
+            <label><input type="checkbox" value="judge" /><span>“근거를 만들어 추천해라”</span></label>
+            <label><input type="checkbox" value="summarize" /><span>“요약해라 / 분류해라”</span></label>
+            <label><input type="checkbox" value="orchestrate" /><span>“순서대로 / 다음 단계는 / 조건이 맞으면”</span></label>
+            <label><input type="checkbox" value="parallel" /><span>“동시에 / 병렬로 / 둘 다 모이면”</span></label>
+            <label><input type="checkbox" value="loop" /><span>“만족할 때까지 반복 / 재시도”</span></label>
+            <label><input type="checkbox" value="approve" /><span>“사람 승인 게이트 / 보완 요청”</span></label>
+            <label><input type="checkbox" value="api" /><span>“기존 시스템 API / 메인프레임 호출”</span></label>
+            <label><input type="checkbox" value="db" /><span>“DB 조회 / 데이터 질의”</span></label>
+            <label><input type="checkbox" value="ocr" /><span>“OCR / 결정적 계산 / 템플릿 렌더링”</span></label>
+            <label><input type="checkbox" value="policy" /><span>“정책 / 규정 / FAQ 검색”</span></label>
+            <label><input type="checkbox" value="mcp" /><span>“MCP tool 또는 외부 서비스 호출”</span></label>
+            <label><input type="checkbox" value="remote" /><span>“다른 팀이 운영하는 에이전트”</span></label>
+            <label><input type="checkbox" value="owner" /><span>“독립 owner / 독립 배포 lifecycle”</span></label>
+            <label><input type="checkbox" value="agentcard" /><span>“Agent Card 또는 discovery metadata가 있다”</span></label>
+            <label><input type="checkbox" value="a2a" /><span>“A2A 프로토콜로 호출”</span></label>
+          </div>
+          <div class="verdict"></div>
+        </div>
+        <div class="callout info">
+          <div class="icon">i</div>
+          <div class="body">
+            <p>여러 카테고리 신호가 함께 보이면 일반적으로 후보가 <em>둘 이상</em>일 가능성이 높다. 예: “OCR(adapter) → 정책 검색(adapter) → 판단(agent)”은 세 개의 후보로 분리하고, 이들을 묶는 흐름이 명시적이면 별도 workflow 후보를 추가한다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>실전 미니 퀴즈</h2>
+
+        <div class="quiz" data-correct="adapter-retrieval">
+          <div class="quiz-question">Q1. “여신 정책 문서를 벡터 검색으로 가져온다.”</div>
+          <div class="quiz-options">
+            <button data-value="agent-shared">agent / shared</button>
+            <button data-value="adapter-retrieval">adapter / retrieval</button>
+            <button data-value="adapter-rule">adapter / rule_registry</button>
+            <button data-value="remote-a2a">remote_a2a / a2a</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: adapter / retrieval</strong> — 검색은 callable capability이고, 벡터/문서 검색이므로 <code>adapter_kind: retrieval</code>이 가장 가깝다. <code>rule_registry</code>는 “관리되는 정책 룰 lookup”일 때 쓴다.</p>
+          </div>
+        </div>
+
+        <div class="quiz" data-correct="workflow-graph">
+          <div class="quiz-question">Q2. “OCR과 정책 검색을 동시에 호출하고 둘 다 끝나면 판단 에이전트를 실행한다. 판단 결과가 보완 요청이면 사람 검토로 보낸다.”</div>
+          <div class="quiz-options">
+            <button data-value="agent-specialist">agent / specialist</button>
+            <button data-value="workflow-orchestration">workflow / orchestration</button>
+            <button data-value="workflow-graph">workflow / graph</button>
+            <button data-value="workflow-dynamic">workflow / dynamic</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: workflow / graph</strong> — fan-out/fan-in과 명시적 human input 라우팅이 분명하므로 graph workflow다. orchestration은 graph topology가 아직 모호할 때다.</p>
+          </div>
+        </div>
+
+        <div class="quiz" data-correct="adapter-legacy">
+          <div class="quiz-question">Q3. “코어뱅킹 계좌 잔액 API(EAI 경유)를 호출해서 잔액을 가져온다.”</div>
+          <div class="quiz-options">
+            <button data-value="adapter-legacy">adapter / legacy_api</button>
+            <button data-value="adapter-data_query">adapter / data_query</button>
+            <button data-value="remote-a2a">remote_a2a / a2a</button>
+            <button data-value="workflow-orchestration">workflow / orchestration</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: adapter / legacy_api</strong> — EAI/Legacy 시스템 호출은 <code>legacy_api</code>다. 추가로 MCP/EAI/Legacy adapter contract를 <em>Runtime 계약</em>에서 검토한다(<a href="07-runtime-contracts.html">7장</a>).</p>
+          </div>
+        </div>
+
+        <div class="quiz" data-correct="workflow">
+          <div class="quiz-question">Q4. catalog에 등록된 공통 Workflow가 <code>runtime_binding: remote_a2a</code>로 호출되고 있다. 이 후보의 <code>module_category</code>는?</div>
+          <div class="quiz-options">
+            <button data-value="workflow">workflow (그대로)</button>
+            <button data-value="remote_a2a">remote_a2a로 승격</button>
+          </div>
+          <div class="quiz-feedback">
+            <p><strong>정답: workflow.</strong> <code>runtime_binding</code>은 “어떻게 호출되는가”이지 “책임 종류”가 아니다. 독립 원격 에이전트 계약 자체를 새로 설계한다는 증거가 없으면 카테고리는 <code>workflow</code>를 유지한다.</p>
+          </div>
+        </div>
+      </section>
+
+      <nav class="pager" aria-label="페이지 이동"></nav>
+    </main>
+  </div>
+  <script src="assets/app.js"></script>
+</body>
+</html>

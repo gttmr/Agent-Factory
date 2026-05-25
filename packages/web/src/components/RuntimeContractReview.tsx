@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ModuleCandidate, RuntimeContract, RuntimeContractStatus } from "../analyzer/types";
-import { runtimeContractReadinessIssues } from "../analyzer/runtimeContracts";
+import type { ModuleCandidate, NormalizedRequirement, RuntimeContract, RuntimeContractStatus } from "../analyzer/types";
+import {
+  buildRuntimeContractsForCandidate,
+  runtimeContractReadinessIssues
+} from "../analyzer/runtimeContracts";
 import { EmptyState, SectionHeader } from "../ui/primitives";
 import { ReadinessList } from "../ui/review";
 import { CategoryBadge, SubtypeBadge } from "./CategoryBadge";
@@ -8,6 +11,7 @@ import { CategoryBadge, SubtypeBadge } from "./CategoryBadge";
 interface RuntimeContractReviewProps {
   contracts: RuntimeContract[];
   moduleCandidates: ModuleCandidate[];
+  normalizedRequirement: NormalizedRequirement;
   onContractsChange: (contracts: RuntimeContract[]) => void;
   onContinue: () => void;
 }
@@ -31,11 +35,41 @@ const kindLabels: Record<RuntimeContract["contract_kind"], string> = {
 export function RuntimeContractReview({
   contracts,
   moduleCandidates,
+  normalizedRequirement,
   onContractsChange,
   onContinue
 }: RuntimeContractReviewProps) {
   const candidatesById = useMemo(() => new Map(moduleCandidates.map((candidate) => [candidate.id, candidate])), [moduleCandidates]);
+  const catalogCandidates = useMemo(
+    () => moduleCandidates.filter((candidate) => Boolean(candidate.catalog_entry_id)),
+    [moduleCandidates]
+  );
+  const contractsByModuleId = useMemo(() => {
+    const map = new Map<string, RuntimeContract[]>();
+    for (const contract of contracts) {
+      if (!contract.module_id) continue;
+      const bucket = map.get(contract.module_id) ?? [];
+      bucket.push(contract);
+      map.set(contract.module_id, bucket);
+    }
+    return map;
+  }, [contracts]);
   const [selectedId, setSelectedId] = useState<string | null>(contracts[0]?.contract_id ?? null);
+
+  function enableCatalogOverride(candidate: ModuleCandidate) {
+    const generated = buildRuntimeContractsForCandidate(candidate, normalizedRequirement);
+    const existingIds = new Set(contracts.map((contract) => contract.contract_id));
+    const additions = generated.filter((contract) => !existingIds.has(contract.contract_id));
+    if (!additions.length) return;
+    const next = [...contracts, ...additions];
+    onContractsChange(next);
+    setSelectedId(additions[0].contract_id);
+  }
+
+  function disableCatalogOverride(candidateId: string) {
+    const next = contracts.filter((contract) => contract.module_id !== candidateId);
+    onContractsChange(next);
+  }
 
   useEffect(() => {
     if (contracts.length === 0) {
@@ -79,8 +113,48 @@ export function RuntimeContractReview({
         </div>
       ) : null}
 
+      {catalogCandidates.length > 0 ? (
+        <section className="runtime-contract-catalog">
+          <header>
+            <h4>카탈로그 계약 모듈</h4>
+            <p>
+              카탈로그에 등록된 모듈은 기본 계약이 자동으로 채워집니다. 아래에서 모듈을 클릭하면 정책을
+              검토/수정할 수 있고, 필요하면 <strong>기본값으로 되돌리기</strong>로 비웠다가
+              <strong>기본값 생성</strong>으로 다시 채울 수 있습니다.
+            </p>
+          </header>
+          <ul>
+            {catalogCandidates.map((candidate) => {
+              const filled = (contractsByModuleId.get(candidate.id) ?? []).length;
+              return (
+                <li key={candidate.id} className={`runtime-contract-catalog-row ${filled ? "is-overridden" : ""}`}>
+                  <div className="row-meta">
+                    <CategoryBadge category={candidate.module_category} />
+                    <div>
+                      <strong>{candidate.name}</strong>
+                      <span className="row-meta-sub">
+                        {candidate.catalog_entry_id} · {filled ? `기본값 ${filled}건 적용 중` : "비어 있음"}
+                      </span>
+                    </div>
+                  </div>
+                  {filled ? (
+                    <button type="button" className="ghost" onClick={() => disableCatalogOverride(candidate.id)}>
+                      기본값으로 되돌리기
+                    </button>
+                  ) : (
+                    <button type="button" className="secondary" onClick={() => enableCatalogOverride(candidate)}>
+                      기본값 생성
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
       {contracts.length === 0 ? (
-        <EmptyState title="검토할 Runtime 계약이 없습니다." description="Legacy, callback, async resume 신호가 있는 후보가 생기면 자동으로 계약 초안이 생성됩니다." />
+        <EmptyState title="검토할 Runtime 계약이 없습니다." description="Legacy, callback, async resume 신호가 있는 신규 후보가 생기면 자동으로 계약 초안이 생성됩니다. 카탈로그 모듈은 위에서 ‘기본값 생성’으로 다시 채울 수 있습니다." />
       ) : (
         <div className="runtime-contract-console">
           <aside className="runtime-contract-list" aria-label="Runtime 계약 목록">

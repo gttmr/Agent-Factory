@@ -5,10 +5,7 @@ import type {
   CodexAnalyzerModel,
   RequirementIntakeInput
 } from "./types";
-import { normalizeA2A } from "./a2aNormalize";
-import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration";
-import { hasModuleCoverageErrors, repairGraphIRModuleCoverage } from "./moduleReviewGraph";
-import { ensureRuntimeContracts } from "./runtimeContracts";
+import { normalizeAnalysisResultForWorkbench } from "./analysisResultNormalization";
 
 export interface AnalyzerRunOptions {
   model: CodexAnalyzerModel;
@@ -62,51 +59,11 @@ export class OpenAICompatibleAnalyzerProvider implements AnalyzerProvider {
     const contentType = response.headers.get("Content-Type") ?? "";
     if (!contentType.includes("text/event-stream") || !response.body) {
       const payload = await response.json().catch(() => null);
-      return ensureA2AContractsField(payload as AnalysisResult);
+      return normalizeAnalysisResultForWorkbench(payload as AnalysisResult);
     }
 
-    return ensureA2AContractsField(await readProgressStream(response.body, options.onProgress));
+    return normalizeAnalysisResultForWorkbench(await readProgressStream(response.body, options.onProgress));
   }
-}
-
-// Boundary helper: defend the client AnalysisResult shape regardless of
-// whether the server-side normalization ran. Mirrors the same placeholder-fill
-// and orphan-drop rules via the shared a2aNormalize module so the UI never
-// has to handle missing fields. Diagnostics are dropped here — the server
-// already emits them onto the SSE diagnostic channel; the client boundary is
-// the silent backstop.
-function ensureA2AContractsField(result: AnalysisResult): AnalysisResult {
-  if (!result || typeof result !== "object") {
-    return result;
-  }
-  // Defensive client-side migration: if a server bypassed the migration pass
-  // (legacy cached result, older server, etc.), still convert stage-flow to
-  // Graph IR so the UI never sees the legacy shape. NEVER throw — degraded
-  // graphs render with the validation banner instead.
-  try {
-    const r = result as unknown as Record<string, unknown>;
-    if (r && typeof r === "object" && r.processFlow && typeof r.processFlow === "object") {
-      const reqId =
-        r.normalizedRequirement &&
-        typeof r.normalizedRequirement === "object" &&
-        typeof (r.normalizedRequirement as Record<string, unknown>).id === "string"
-          ? ((r.normalizedRequirement as Record<string, unknown>).id as string)
-          : "req-001";
-      const migrated = normalizeGraphIRForRuntime(r.processFlow, reqId);
-      const soft = validateGraphIRSoft(migrated);
-      const validated = {
-        ...migrated,
-        validation: mergeGraphIRValidation(migrated.validation, soft)
-      };
-      (r as Record<string, unknown>).processFlow =
-        hasModuleCoverageErrors(validated) && Array.isArray(r.moduleCandidates)
-          ? repairGraphIRModuleCoverage(validated, r.moduleCandidates as AnalysisResult["moduleCandidates"])
-          : validated;
-    }
-  } catch (error) {
-    console.warn("[analyzer] graph-ir client migration failed (non-fatal):", error);
-  }
-  return ensureRuntimeContracts(normalizeA2A(result).result);
 }
 
 export const defaultAnalyzerProvider: AnalyzerProvider = new OpenAICompatibleAnalyzerProvider();

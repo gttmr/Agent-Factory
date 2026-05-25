@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:analyzer": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/analyzer/afRunManifest.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/analyzer/analysisArtifactImport.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

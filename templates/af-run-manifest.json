@@ -1,0 +1,43 @@
+{
+  "requirement_id": "req-001",
+  "artifact_root": "artifacts/af/req-001",
+  "current_stage": "design",
+  "stages": {
+    "analyze": {
+      "status": "complete",
+      "outputs": [
+        "analysis-result.json",
+        "normalized-requirement.json",
+        "module-candidates.json",
+        "process-flow.json"
+      ]
+    },
+    "design": {
+      "status": "complete",
+      "outputs": [
+        "boundary-design.md",
+        "scaffold-plan.json"
+      ]
+    },
+    "build": {
+      "status": "pending",
+      "outputs": []
+    },
+    "verify": {
+      "status": "pending",
+      "outputs": []
+    }
+  },
+  "approvals": {
+    "analysis_reviewed": true,
+    "boundaries_approved": true,
+    "runtime_contracts_approved": true,
+    "stub_ready_for_followup": false
+  },
+  "validation": {
+    "commands": [
+      "node scripts/validate-artifacts.mjs artifacts/af/req-001"
+    ],
+    "last_result": "not_run"
+  }
+}
