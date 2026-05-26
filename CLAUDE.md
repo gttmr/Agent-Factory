@@ -131,7 +131,7 @@ npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 Manual/browser testing must stay on the fixed Agent Factory port `5173`. Before starting or restarting, check `lsof -iTCP:5173 -sTCP:LISTEN`; stop a stale Agent Factory/Vite process if it owns the port, but report an unrelated owner as a blocker. Do not let Vite auto-increment to `5174` or another fallback port. Verify with `curl -I http://127.0.0.1:5173/` and report `http://127.0.0.1:5173/` as the testing URL.
 
-Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow lives in `src/analyzer/exampleRequirement.ts` and exercises every category and Graph IR markers — load it with `예시 불러오기` then `요구사항 분석`.
+Then in MCP: `new_page` → `evaluate_script` to drive route navigation / button clicks → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. Smoke seeding pattern: `POST /api/af { requirement_id: "req-001" }` then `PUT /api/af/req-001/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
 
 ## Editing Rules (from AGENTS.md)
 

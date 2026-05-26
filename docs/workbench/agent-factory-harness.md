@@ -178,7 +178,7 @@ Expected artifact families:
 - validation output
 - decision notes when taxonomy or boundary choices change
 
-Live analyzer note: Codex CLI may return a compact draft artifact first. That draft is an internal transport contract only; the workbench must hydrate and validate the existing review artifacts before presenting or saving results.
+Analyzer pipeline note: the canonical `analysis-result.json` is produced by the `af-analyze-requirement` skill (or any equivalent producer that emits the same schema). The workbench `/api/analyze-requirement` SSE endpoint that shells out to the Codex CLI still exists in `packages/web/server/codexAnalyzer.ts`, but the router shell does not call it — analysis must be imported via Landing or the stage import button. The server validates the imported file via `validateAnalysisResult` on PUT.
 
 ## Local/offline-friendly assistant behavior
 
