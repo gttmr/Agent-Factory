@@ -51,29 +51,26 @@ Core rules:
 
 ### Workbench flow (packages/web)
 
-The workbench is mid-migration from a single SPA wizard to a router-driven, artifact-root-first model. `App.tsx` mounts `AppRouter` (`src/routes/router.tsx`) inside `BrowserRouter` + `QueryClientProvider`. New routes are skill-scoped and read/write the local file system via Vite middleware under `packages/web/server`:
+The workbench is a router-driven, artifact-root-first React app. `App.tsx` mounts `AppRouter` (`src/routes/router.tsx`) inside `BrowserRouter` + `QueryClientProvider`. All routes are skill-scoped and read/write the local file system via Vite middleware under `packages/web/server`:
 
-- `/` Landing — choose or create an artifact root (`POST /api/af`, import `analysis-result.json`).
-- `/af/:reqId/analyze` — af-analyze-requirement workbench. Reads `analysis-result.json` and toggles `analysis_reviewed` on `af-run-manifest.json`.
-- `/af/:reqId/design`, `/af/:reqId/build`, `/af/:reqId/verify` — placeholders pending PR3/PR4.
-- `/catalog` — Reuse Hub placeholder pending PR5.
-- `/legacy` — the prior single-page wizard, preserved until PR6.
+- `/` Landing — list / create artifact roots (`POST /api/af`), import an `analysis-result.json` produced by the `af-analyze-requirement` skill.
+- `/af/:reqId/analyze` — review the imported analysis through `AnalysisResult`, mark `missing_information` as accepted, toggle `analysis_reviewed` on `af-run-manifest.json`.
+- `/af/:reqId/design` — 3-pane Graph IR review with node/edge-anchored comments under `collaboration/comments.json`. Toggles `boundaries_approved` when every module candidate is `status === "approved"` and Graph IR validation errors are zero.
+- `/af/:reqId/build` — derive `scaffold-plan.json` client-side from the analysis + seed catalog, spawn `scripts/generate-adk-source.mjs` to populate `runtime-stub/`, edit `implementation-handoff.md`, and toggle `stub_ready_for_followup`.
+- `/af/:reqId/verify` — run an allow-list of three commands (`validate-artifacts.mjs`, `npm run build`, `npm run test:analyzer`), edit `validation-report.md` and `catalog-delta.yaml`.
+- `/catalog` — Reuse Hub: search Agent/Workflow/Adapter/Remote A2A catalog cards, pin one to a candidate in the active root (`PUT analysis-result.json`), or propose a new entry by appending to `catalog-delta.yaml`. `catalog/*.yaml` is never edited from the UI.
 
-State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog, and approval gates are fetched/mutated through `packages/web/src/state/*` hooks (`useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useRecentRoots`). `manifest.approvals.*` is the single source of truth for gate UI; do not rebuild gate state from derived candidate status.
+There is no in-browser analyzer or fallback. Analysis must be produced by running the `.agents/skills/af-analyze-requirement` skill (or any compatible producer) and imported into the workbench via Landing or the per-stage import button.
 
-The legacy wizard, still reachable at `/legacy`, is defined in `packages/web/src/routes/LegacyWizard.tsx`. Its steps come from `packages/web/src/workbench/useWorkbenchState.ts`:
+State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog, collaboration, scaffold-plan, and runtime-stub data are fetched/mutated through `packages/web/src/state/*` hooks (`useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots`). `manifest.approvals.*` is the single source of truth for gate UI; the server mirrors approval state onto `stages.<stage>.status` so external tooling (`scripts/generate-adk-source.mjs`) reads a consistent stage progression. Do not rebuild gate state from derived candidate status.
 
-`intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
+`localStorage` is reserved for two read-only caches: `agent-factory:recent-artifact-roots` and `agent-factory:author-{name,role}` for the comment composer. No stage state is persisted to `localStorage` — the artifact root is the canonical store.
 
-State in the legacy wizard flows through `useWorkbenchState`: `RequirementIntakeInput` or imported skill artifact → live/reviewed `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation. Treat the legacy wizard as a fallback authoring path — new stage UI should land under `src/routes/*` and read from `artifacts/af/<req-id>/`, not from `useWorkbenchState`.
+`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. Runtime contract review UI is still pending a follow-up PR; for now the `runtime_contracts_approved` toggle is manual and DesignWorkbench surfaces the contract list read-only.
 
-`AnalysisResult.runtimeContracts` is the review artifact for callback and runtime support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback responsibilities, and async resume behavior. The `Runtime 계약` wizard step surfaces these contracts before Remote A2A/catalog/export.
+### Analyzer pipeline
 
-### Analyzer provider boundary
-
-`src/analyzer/providers.ts` defines the `AnalyzerProvider` interface and `OpenAICompatibleAnalyzerProvider`, which posts to the local `/api/analyze-requirement` SSE endpoint served by `packages/web/server/codexAnalyzer.ts`. That middleware shells out to the Codex CLI to do the real analysis. `defaultAnalyzerProvider` is the single export consumed by `App.tsx` and is the live Codex CLI provider — there is no in-browser fallback analyzer.
-
-The example requirement preloaded by `예시 불러오기` lives in `src/analyzer/exampleRequirement.ts` (`getExampleRequirement`). It exercises every category and Graph IR markers such as fan-out/fan-in, loop control, human input, and route branches when run through the live analyzer.
+`packages/web/server/codexAnalyzer.ts` still exposes the SSE `/api/analyze-requirement` endpoint that shells out to the Codex CLI. The router-shell does not call it directly — the af-analyze-requirement skill (or any external producer) is expected to drive analysis and produce a canonical `analysis-result.json`. The workbench validates that file via `validateAnalysisResult` (re-exported from `server/validators.ts`) on PUT.
 
 ### Taxonomy contract (load-bearing)
 
@@ -101,13 +98,12 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 
 ### Missing-information gate & saved-analysis flow
 
-Aligned with `AGENTS.md` and `docs/workbench/agent-factory-harness.md`. Apply these whenever touching the wizard, scaffold-plan validation, or `SavedAnalysisRecord` shape.
+Aligned with `AGENTS.md` and `docs/workbench/agent-factory-harness.md`. Apply these whenever touching analysis import, scaffold-plan validation, or approval gate logic.
 
-- **Two-layer missing-info gate.** Requirement-level `evidence.missing_information` is a **soft** gate — users mark each item via the per-row "수용" toggle on `AnalysisResult` and the result flows into `acceptedMissing` (reviewer attestation only, never blocks scaffold). Candidate-level `ModuleCandidate.missing_information` plus unresolved `status === "needs_info"` is a **hard** gate — Module Review generates a candidate-level Resolution Draft, the reviewer inspects expandable object schemas and smoke contract, then `반영 적용` records `resolution_applied_at`, `schema_review_state`, and `smoke_spec` before approval.
-- **Scaffold-plan messaging.** `scaffoldPlan.collectBlockers` emits the actionable Korean blocker `정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.` while unresolved candidates remain. Warnings include `정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요`. The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR has errors.
-- **SavedAnalysisRecord persistence.** The record stores `catalogEntries` (active entries at save time), `activeStep`, and `scaffoldReady` (`can_generate_source && graph errors empty`). `loadSavedAnalysis` chooses the landing step from these: `scaffoldReady → export`, all-non-`needs_info` → `modules`, else → `analysis`. Catalog is restored from the record snapshot, not the seed. Backfill must never auto-promote candidate status.
-- **Smoke 일괄 실행 매크로.** `AdkRuntimeWorkbench` ships a macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially with per-step pass/fail pills and halts on first failure. Individual buttons remain for debugging. `chat-smoke` and the macro require an approved module `smoke_spec`; source/install/web actions may remain available when only chat smoke is missing.
-- **Stub-runtime banner.** When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel renders a yellow banner: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." Do not remove this banner; it differentiates stub output from real business logic per AGENTS.md.
+- **Two-layer missing-info gate.** Requirement-level `evidence.missing_information` is a **soft** gate — `AnalyzeWorkbench` exposes a per-row "수용" toggle and only enables `analysis_reviewed` once every item is accepted (the `acceptedMissing` state lives in the component because the gate fires immediately on toggle). Candidate-level `ModuleCandidate.missing_information` plus unresolved `status === "needs_info"` is a **hard** gate — `scaffoldPlan.collectBlockers` keeps the scaffold-plan unbuildable until the producer (skill or external editor) clears them.
+- **Scaffold-plan messaging.** `scaffoldPlan.collectBlockers` emits the actionable Korean blocker `정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.` while unresolved candidates remain. Warnings include `정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요`. `BuildWorkbench` renders these inline and refuses to spawn `generate-adk-source.mjs` until `can_generate_source` flips to true.
+- **Stage status mirroring.** `PATCH /api/af/:id/manifest/approvals` writes both the approval boolean and the matching `stages.<stage>.status = "complete"` (analyze ↔ `analysis_reviewed`, design ↔ `boundaries_approved && runtime_contracts_approved`, build ↔ `stub_ready_for_followup`). External scripts read stage status, not just approvals.
+- **`catalog-delta.yaml` is the only feedback channel.** Reuse Hub never edits `catalog/*.yaml`; the workbench writes `proposed_additions[]` entries to `catalog-delta.yaml` in the active root, and a human PR later merges them into the catalog.
 
 ### UI design system
 

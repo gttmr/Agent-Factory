@@ -69,7 +69,7 @@ export default function AnalyzeWorkbench() {
   }
 
   function handleRerun() {
-    setActionMessage("재분석은 PR2 범위 밖입니다. Legacy wizard에서 분석 후 결과를 import 하세요.");
+    setActionMessage("이 워크벤치는 결과 import 만 지원합니다. 분석 자체는 .agents/skills/af-analyze-requirement 스킬에서 실행하고 analysis-result.json 을 import 하세요.");
   }
 
   function handleToggleAnalysisReviewed() {
@@ -117,9 +117,6 @@ export default function AnalyzeWorkbench() {
                 분석 결과 import…
                 <input type="file" accept="application/json,.json" onChange={handleImport} hidden />
               </label>
-              <Link className="ui-button ui-button-ghost" to="/legacy">
-                Legacy 분석기
-              </Link>
             </div>
           }
         />

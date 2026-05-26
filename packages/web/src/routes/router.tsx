@@ -9,8 +9,6 @@ const DesignWorkbench = lazy(() => import("./DesignWorkbench"));
 const BuildWorkbench = lazy(() => import("./BuildWorkbench"));
 const VerifyWorkbench = lazy(() => import("./VerifyWorkbench"));
 const ReuseHubPage = lazy(() => import("./ReuseHubPage"));
-const StagePlaceholder = lazy(() => import("./StagePlaceholder"));
-const LegacyWizard = lazy(() => import("./LegacyWizard"));
 
 function PageFallback() {
   return (
@@ -24,7 +22,6 @@ export function AppRouter() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
-        <Route path="/legacy" element={<LegacyWizard />} />
         <Route
           path="/"
           element={

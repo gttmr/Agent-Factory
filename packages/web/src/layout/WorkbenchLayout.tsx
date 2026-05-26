@@ -49,12 +49,6 @@ export function WorkbenchLayout({ children }: WorkbenchLayoutProps) {
           >
             Reuse Hub
           </NavLink>
-          <NavLink
-            to="/legacy"
-            className={({ isActive }) => `af-stage-link af-stage-link-aux${isActive ? " af-stage-link-active" : ""}`}
-          >
-            Legacy
-          </NavLink>
         </nav>
         <div className="af-gate-row" aria-label="승인 게이트">
           {manifest ? (
