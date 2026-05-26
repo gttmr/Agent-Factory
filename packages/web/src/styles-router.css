@@ -631,3 +631,165 @@
   font-size: 0.7rem;
   color: rgba(0, 0, 0, 0.4);
 }
+
+/* ===== Build & Verify ===== */
+
+.af-blocker-list {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.af-blocker-list summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.af-blocker-list ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.af-blocker-list pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 320px;
+  font-size: 0.8rem;
+}
+
+.af-build-stub-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .af-build-stub-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.af-build-file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.af-build-file-button {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.af-build-file-button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.af-build-file-button-active {
+  background: rgba(31, 41, 55, 0.08);
+  border-color: rgba(31, 41, 55, 0.32);
+}
+
+.af-build-file-button code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+.af-build-file-button small {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 0.7rem;
+}
+
+.af-build-file-preview pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 480px;
+  font-size: 0.78rem;
+  white-space: pre;
+}
+
+.af-markdown-editor {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.af-yaml-editor {
+  background: #fafbff;
+}
+
+.af-verify-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.af-verify-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.af-verify-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.af-verify-card code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-verify-card p {
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.65);
+  margin: 0;
+}
+
+.af-verify-result {
+  margin-top: 12px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.af-verify-result pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 8px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 320px;
+  font-size: 0.75rem;
+  white-space: pre;
+}

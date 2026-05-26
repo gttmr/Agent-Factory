@@ -6,6 +6,8 @@ import { Panel } from "../ui/primitives";
 const LandingPage = lazy(() => import("./LandingPage"));
 const AnalyzeWorkbench = lazy(() => import("./AnalyzeWorkbench"));
 const DesignWorkbench = lazy(() => import("./DesignWorkbench"));
+const BuildWorkbench = lazy(() => import("./BuildWorkbench"));
+const VerifyWorkbench = lazy(() => import("./VerifyWorkbench"));
 const StagePlaceholder = lazy(() => import("./StagePlaceholder"));
 const LegacyWizard = lazy(() => import("./LegacyWizard"));
 
@@ -58,7 +60,7 @@ export function AppRouter() {
           path="/af/:reqId/build"
           element={
             <WorkbenchLayout>
-              <StagePlaceholder stage="build" pr="PR4" />
+              <BuildWorkbench />
             </WorkbenchLayout>
           }
         />
@@ -66,7 +68,7 @@ export function AppRouter() {
           path="/af/:reqId/verify"
           element={
             <WorkbenchLayout>
-              <StagePlaceholder stage="verify" pr="PR4" />
+              <VerifyWorkbench />
             </WorkbenchLayout>
           }
         />

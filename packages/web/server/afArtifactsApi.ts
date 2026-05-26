@@ -1,4 +1,7 @@
+import { spawn } from "node:child_process";
+import { stat, readdir, readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { join, relative, resolve, sep } from "node:path";
 import {
   ArtifactConflictError,
   ArtifactRootStore,
@@ -32,6 +35,21 @@ const JSON_ARTIFACT_PATHS = new Set([
 ]);
 
 const YAML_PATHS = new Set(["catalog-delta.yaml"]);
+
+const VERIFY_COMMANDS: Record<string, { argv: string[]; description: string }> = {
+  validate_artifact_root: {
+    argv: ["node", "scripts/validate-artifacts.mjs"],
+    description: "validate-artifacts.mjs against the artifact root"
+  },
+  build_web: {
+    argv: ["npm", "run", "build", "--prefix", "packages/web"],
+    description: "tsc --noEmit && vite build"
+  },
+  test_analyzer: {
+    argv: ["npm", "run", "test:analyzer", "--prefix", "packages/web"],
+    description: "analyzer unit tests"
+  }
+};
 
 export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
@@ -116,6 +134,53 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
         return;
       }
 
+      // /api/af/:id/runtime-stub  → list generated files
+      if (sub === "runtime-stub") {
+        if (req.method === "GET") return await handleListRuntimeStub(store, reqId, res);
+        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+        return;
+      }
+
+      // /api/af/:id/runtime-stub/build  → spawn scripts/generate-adk-source.mjs
+      if (sub === "runtime-stub/build") {
+        if (req.method === "POST") return await handleBuildRuntimeStub(repoRoot, store, reqId, res);
+        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+        return;
+      }
+
+      // /api/af/:id/runtime-stub/files/<relative>  → read a generated file's text
+      if (sub.startsWith("runtime-stub/files/")) {
+        const relativeFile = sub.slice("runtime-stub/files/".length);
+        if (req.method === "GET") return await handleReadRuntimeStubFile(store, reqId, relativeFile, res);
+        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+        return;
+      }
+
+      // /api/af/:id/verify/run  → execute an allowed command
+      if (sub === "verify/run") {
+        if (req.method === "POST") return await handleVerifyRun(repoRoot, store, reqId, req, res);
+        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+        return;
+      }
+
+      // /api/af/:id/verify/commands  → list available command keys
+      if (sub === "verify/commands") {
+        if (req.method === "GET") {
+          sendJson(
+            res,
+            200,
+            Object.entries(VERIFY_COMMANDS).map(([key, value]) => ({
+              key,
+              argv: value.argv,
+              description: value.description
+            }))
+          );
+          return;
+        }
+        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+        return;
+      }
+
       sendJson(res, 404, { error: `알 수 없는 아티팩트 경로입니다: ${sub}` });
     } catch (error) {
       handleError(error, res, next);
@@ -173,23 +238,44 @@ async function handlePatchApprovals(
   }
   const ifMatch = req.headers["if-match"];
   const { manifest } = await store.readManifest(reqId);
+  const approvals = {
+    analysis_reviewed:
+      typeof body.analysis_reviewed === "boolean" ? body.analysis_reviewed : manifest.approvals.analysis_reviewed,
+    boundaries_approved:
+      typeof body.boundaries_approved === "boolean"
+        ? body.boundaries_approved
+        : manifest.approvals.boundaries_approved,
+    runtime_contracts_approved:
+      typeof body.runtime_contracts_approved === "boolean"
+        ? body.runtime_contracts_approved
+        : manifest.approvals.runtime_contracts_approved,
+    stub_ready_for_followup:
+      typeof body.stub_ready_for_followup === "boolean"
+        ? body.stub_ready_for_followup
+        : manifest.approvals.stub_ready_for_followup
+  };
+  // Mirror approval state onto stage status so downstream tools
+  // (scripts/generate-adk-source.mjs, validate-artifacts.mjs) can read it.
   const next: AfRunManifest = {
     ...manifest,
-    approvals: {
-      analysis_reviewed:
-        typeof body.analysis_reviewed === "boolean" ? body.analysis_reviewed : manifest.approvals.analysis_reviewed,
-      boundaries_approved:
-        typeof body.boundaries_approved === "boolean"
-          ? body.boundaries_approved
-          : manifest.approvals.boundaries_approved,
-      runtime_contracts_approved:
-        typeof body.runtime_contracts_approved === "boolean"
-          ? body.runtime_contracts_approved
-          : manifest.approvals.runtime_contracts_approved,
-      stub_ready_for_followup:
-        typeof body.stub_ready_for_followup === "boolean"
-          ? body.stub_ready_for_followup
-          : manifest.approvals.stub_ready_for_followup
+    approvals,
+    stages: {
+      ...manifest.stages,
+      analyze: {
+        ...manifest.stages.analyze,
+        status: approvals.analysis_reviewed ? "complete" : manifest.stages.analyze.status
+      },
+      design: {
+        ...manifest.stages.design,
+        status:
+          approvals.boundaries_approved && approvals.runtime_contracts_approved
+            ? "complete"
+            : manifest.stages.design.status
+      },
+      build: {
+        ...manifest.stages.build,
+        status: approvals.stub_ready_for_followup ? "complete" : manifest.stages.build.status
+      }
     }
   };
   const written = await store.writeManifest(reqId, next, ifMatchHeader(ifMatch));
@@ -300,6 +386,173 @@ async function handlePutText(
   const written = await store.writeArtifact(reqId, relative, content, ifMatchHeader(req.headers["if-match"]));
   res.setHeader("ETag", written.etag);
   sendJson(res, 200, { ok: true, bytes: written.bytes, etag: written.etag });
+}
+
+async function handleListRuntimeStub(
+  store: ArtifactRootStore,
+  reqId: string,
+  res: ServerResponse
+): Promise<void> {
+  const rootDir = store.resolveRootDir(reqId);
+  const stubDir = join(rootDir, "runtime-stub");
+  const exists = await stat(stubDir).then((s) => s.isDirectory()).catch(() => false);
+  if (!exists) {
+    sendJson(res, 200, { exists: false, files: [] });
+    return;
+  }
+  const files = await collectFiles(stubDir, stubDir);
+  sendJson(res, 200, { exists: true, files });
+}
+
+async function collectFiles(root: string, current: string): Promise<Array<{ path: string; bytes: number }>> {
+  const entries = await readdir(current, { withFileTypes: true });
+  const result: Array<{ path: string; bytes: number }> = [];
+  for (const entry of entries) {
+    const abs = join(current, entry.name);
+    if (entry.isDirectory()) {
+      result.push(...(await collectFiles(root, abs)));
+    } else if (entry.isFile()) {
+      const fileStat = await stat(abs);
+      result.push({ path: relative(root, abs).split(sep).join("/"), bytes: fileStat.size });
+    }
+  }
+  result.sort((a, b) => a.path.localeCompare(b.path));
+  return result;
+}
+
+async function handleReadRuntimeStubFile(
+  store: ArtifactRootStore,
+  reqId: string,
+  relativeFile: string,
+  res: ServerResponse
+): Promise<void> {
+  if (relativeFile.includes("..") || relativeFile.startsWith("/")) {
+    sendJson(res, 403, { error: "허용되지 않은 경로입니다." });
+    return;
+  }
+  const rootDir = store.resolveRootDir(reqId);
+  const stubDir = join(rootDir, "runtime-stub");
+  const target = resolve(stubDir, relativeFile);
+  if (!target.startsWith(stubDir + sep) && target !== stubDir) {
+    sendJson(res, 403, { error: "허용되지 않은 경로입니다." });
+    return;
+  }
+  const fileStat = await stat(target).catch(() => null);
+  if (!fileStat?.isFile()) {
+    sendJson(res, 404, { error: `파일을 찾을 수 없습니다: ${relativeFile}` });
+    return;
+  }
+  if (fileStat.size > 500_000) {
+    sendJson(res, 413, { error: "파일이 500KB 를 초과합니다." });
+    return;
+  }
+  const content = await readFile(target, "utf8");
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.end(content);
+}
+
+async function handleBuildRuntimeStub(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  reqId: string,
+  res: ServerResponse
+): Promise<void> {
+  const rootDir = store.resolveRootDir(reqId);
+  const stubDir = join(rootDir, "runtime-stub");
+  const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];
+  const result = await runProcess(repoRoot, "node", args);
+  if (result.code !== 0) {
+    sendJson(res, 422, {
+      error: "runtime-stub 생성 실패",
+      exit_code: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      command: `node ${args.join(" ")}`
+    });
+    return;
+  }
+  const files = await collectFiles(stubDir, stubDir);
+  sendJson(res, 200, {
+    ok: true,
+    files,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    command: `node ${args.join(" ")}`
+  });
+}
+
+async function handleVerifyRun(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  reqId: string,
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const body = await readJsonBody(req);
+  if (!isRecord(body)) {
+    sendJson(res, 400, { error: "본문은 객체여야 합니다." });
+    return;
+  }
+  const key = typeof body.command === "string" ? body.command : "";
+  const command = VERIFY_COMMANDS[key];
+  if (!command) {
+    sendJson(res, 400, { error: `허용되지 않은 명령입니다: ${key}` });
+    return;
+  }
+  const rootDir = store.resolveRootDir(reqId);
+  const argv =
+    key === "validate_artifact_root" ? [...command.argv, rootDir] : [...command.argv];
+  const result = await runProcess(repoRoot, argv[0], argv.slice(1));
+  const passed = result.code === 0;
+
+  // Update manifest.validation
+  const { manifest } = await store.readManifest(reqId);
+  const next: AfRunManifest = {
+    ...manifest,
+    validation: {
+      commands: [`${argv.join(" ")}`],
+      last_result: passed ? "passed" : "failed"
+    }
+  };
+  await store.writeManifest(reqId, next, null);
+
+  sendJson(res, passed ? 200 : 422, {
+    ok: passed,
+    exit_code: result.code,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    command: argv.join(" "),
+    command_key: key
+  });
+}
+
+interface ProcessResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+function runProcess(cwd: string, command: string, args: string[]): Promise<ProcessResult> {
+  return new Promise((resolvePromise) => {
+    const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+      if (stdout.length > 200_000) stdout = stdout.slice(-200_000);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+      if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
+    });
+    child.on("error", (error) => {
+      resolvePromise({ code: -1, stdout, stderr: `${stderr}\n[spawn-error] ${error.message}` });
+    });
+    child.on("close", (code) => {
+      resolvePromise({ code: code ?? -1, stdout, stderr });
+    });
+  });
 }
 
 async function mintRequirementId(store: ArtifactRootStore): Promise<string> {
