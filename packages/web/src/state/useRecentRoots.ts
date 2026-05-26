@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "agent-factory:recent-artifact-roots";
 const MAX_ENTRIES = 20;
@@ -43,17 +43,17 @@ export function useRecentRoots() {
     writeStorage(entries);
   }, [entries]);
 
-  function touch(requirementId: string): void {
+  const touch = useCallback((requirementId: string): void => {
     setEntries((prev) => {
       const filtered = prev.filter((entry) => entry.requirement_id !== requirementId);
       const next: RecentRoot[] = [{ requirement_id: requirementId, last_opened: new Date().toISOString() }, ...filtered];
       return next.slice(0, MAX_ENTRIES);
     });
-  }
+  }, []);
 
-  function remove(requirementId: string): void {
+  const remove = useCallback((requirementId: string): void => {
     setEntries((prev) => prev.filter((entry) => entry.requirement_id !== requirementId));
-  }
+  }, []);
 
   return { entries, touch, remove };
 }

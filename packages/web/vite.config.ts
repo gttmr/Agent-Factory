@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 import { createAdkRuntimeMiddleware } from "./server/adkRuntime";
 import { createAfArtifactsMiddleware } from "./server/afArtifactsApi";
 import { createAfCatalogMiddleware } from "./server/afCatalogApi";
+import { createAfCollaborationMiddleware } from "./server/afCollaborationApi";
 import { createCodexAnalyzerMiddleware } from "./server/codexAnalyzer";
 import { createModuleResolutionMiddleware } from "./server/moduleResolution";
 
@@ -31,6 +32,7 @@ function agentFactoryServerPlugin(): Plugin {
       server.middlewares.use("/api/analyze-requirement", createCodexAnalyzerMiddleware(repoRoot));
       server.middlewares.use("/api/resolve-module-candidate", createModuleResolutionMiddleware(repoRoot));
       server.middlewares.use("/api/adk-runtime", createAdkRuntimeMiddleware(repoRoot));
+      server.middlewares.use("/api/af-collab", createAfCollaborationMiddleware(repoRoot));
       server.middlewares.use("/api/af", createAfArtifactsMiddleware(repoRoot));
       server.middlewares.use("/api/catalog", createAfCatalogMiddleware(repoRoot));
     },
@@ -38,6 +40,7 @@ function agentFactoryServerPlugin(): Plugin {
       server.middlewares.use("/api/analyze-requirement", createCodexAnalyzerMiddleware(repoRoot));
       server.middlewares.use("/api/resolve-module-candidate", createModuleResolutionMiddleware(repoRoot));
       server.middlewares.use("/api/adk-runtime", createAdkRuntimeMiddleware(repoRoot));
+      server.middlewares.use("/api/af-collab", createAfCollaborationMiddleware(repoRoot));
       server.middlewares.use("/api/af", createAfArtifactsMiddleware(repoRoot));
       server.middlewares.use("/api/catalog", createAfCatalogMiddleware(repoRoot));
     }

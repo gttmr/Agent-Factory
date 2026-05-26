@@ -5,6 +5,7 @@ import { Panel } from "../ui/primitives";
 
 const LandingPage = lazy(() => import("./LandingPage"));
 const AnalyzeWorkbench = lazy(() => import("./AnalyzeWorkbench"));
+const DesignWorkbench = lazy(() => import("./DesignWorkbench"));
 const StagePlaceholder = lazy(() => import("./StagePlaceholder"));
 const LegacyWizard = lazy(() => import("./LegacyWizard"));
 
@@ -49,7 +50,7 @@ export function AppRouter() {
           path="/af/:reqId/design"
           element={
             <WorkbenchLayout>
-              <StagePlaceholder stage="design" pr="PR3" />
+              <DesignWorkbench />
             </WorkbenchLayout>
           }
         />

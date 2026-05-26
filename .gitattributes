@@ -1,0 +1,5 @@
+# Collaboration artifacts are append-heavy and conflict-prone in code review.
+# `merge=union` keeps both sides' entries on conflict; the server enforces
+# `created_at` ordering so the union remains stable.
+artifacts/af/*/collaboration/comments.json merge=union
+artifacts/af/*/collaboration/highlights.json merge=union

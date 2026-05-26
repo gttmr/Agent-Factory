@@ -153,10 +153,14 @@ The workbench is moving from a single SPA wizard to a router-driven, artifact-ro
 
 Active stages today:
 - Landing creates `artifacts/af/<req-id>/` plus an empty `af-run-manifest.json`, or imports `analysis-result.json`.
-- `/af/:reqId/analyze` renders the imported analysis through the existing `AnalysisResult` component and toggles `analysis_reviewed`. `boundaries_approved` / `runtime_contracts_approved` / `stub_ready_for_followup` remain reviewer-visible chips but their toggles ship with the design/build PRs.
+- `/af/:reqId/analyze` renders the imported analysis through the existing `AnalysisResult` component and toggles `analysis_reviewed`.
+- `/af/:reqId/design` mounts a 3-pane Design workbench (left tabs `모듈 / Graph IR / Comments`, center `GraphCanvas` reused from the legacy wizard, right inspector with node/edge-anchored comment thread). The `boundaries_approved` gate enables only when `analysis_reviewed === true`, every module candidate is `status === "approved"`, and Graph IR validation errors are zero.
+- `runtime_contracts_approved` / `stub_ready_for_followup` toggles ship with PR4.
 - Other stage routes are placeholders pointing back at `/legacy` until their PR lands.
 
-When adding a stage workbench, do not bypass approval gates derived from the manifest, do not invent new artifact files outside the write whitelist in `packages/web/server/artifactRootStore.ts`, and do not persist stage state to `localStorage` — `localStorage` is reserved for the recent-artifact-roots cache only.
+Collaboration layer (`/api/af-collab/:reqId/{comments,highlights}`) writes `artifacts/af/<req-id>/collaboration/{comments,highlights}.json`. Comments are entry-anchored (`node` / `edge` / `container` / `path` / `section`), keyed by `created_at` order on disk, with `merge=union` configured in `.gitattributes` to keep PR diffs clean. Author identity is held in `localStorage(agent-factory:author-name|role)` only — there is no auth, and comments must never carry secrets, real customer data, or private endpoints. Highlights follow the same shape (`path` / `node_group` / `edge_group` / `container_focus`) but the canvas-overlay rendering is deferred to a follow-up; PR3 ships only persistence and CRUD.
+
+When adding a stage workbench, do not bypass approval gates derived from the manifest, do not invent new artifact files outside the write whitelist in `packages/web/server/artifactRootStore.ts`, and do not persist stage state to `localStorage` — `localStorage` is reserved for the recent-artifact-roots cache and the author-identity preferences only.
 
 ## Required artifact posture
 
