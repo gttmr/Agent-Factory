@@ -1,6 +1,7 @@
 # Analysis Guide
 
-이 문서는 사용자 요구사항을 Agent Factory 분석 워크벤치 산출물로 바꾸는 기본 절차다.
+이 문서는 사용자 요구사항을 Agent Factory 분석 산출물로 바꾸는 기본 절차다.
+현재 기본 운영 모델은 skill-led DLC 흐름이다. `af-analyze-requirement`가 schema-first artifact를 만들고, workbench는 그 artifact를 시각화하고 단계별 부분 수정을 돕는다.
 첫 사용자는 개발 리더이며, v1.0의 임시 은행 도메인은 `고객`, `수신`, `여신`, `카드`, `리스크`다.
 
 ## 분석 순서
@@ -15,7 +16,8 @@
 8. `needs_info` 후보는 Resolution Draft를 생성하고 object schema, patch preview, smoke 계약을 검토한 뒤 `반영 적용`한다.
 9. 개발 리더가 각 후보를 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
 10. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
-11. 승인된 후보만 `scaffold-plan`으로 묶고 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 chat smoke 준비 상태를 확인한다.
+11. 승인된 후보만 `scaffold-plan`으로 묶고 `af-build-runtime-stub` 또는 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 chat smoke 준비 상태를 확인한다.
+12. `af-verify-feedback`로 검증 결과와 catalog delta 제안을 남긴다.
 
 ## 분석 결과 화면
 
@@ -24,17 +26,29 @@ Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검�
 가정, 누락 정보, 모순, 위험 신호, 정규화 JSON은 보조 근거 drawer에 둔다.
 은행 도메인 요구사항은 위험 신호가 자주 발생하므로 위험 신호는 이 단계의 통과 조건이나 경고 피로를 만드는 주 배너로 쓰지 않는다.
 
+## Workbench import
+
+Skill-led 운영에서 `af-analyze-requirement`가 `artifacts/af/<req-id>/analysis-result.json`과 `af-run-manifest.json`을 만들면, Workbench의 요구사항 접수 화면 오른쪽 `파일 입력` 패널에서 두 JSON을 직접 import한다.
+현재 연결 방식은 browser file import다. Workbench가 로컬 `artifacts/af` 디렉터리를 자동 감시하거나 manifest의 `artifact_root`와 `outputs[]` 경로를 따라 host filesystem을 직접 읽지는 않는다.
+Import된 artifact는 live analyzer 응답과 같은 client-side normalization을 거쳐 `AnalysisResult`, `ModuleCandidate[]`, Runtime 계약, A2A 계약, Graph IR 상태로 hydrate된다.
+Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마지막 검증 결과를 상태 요약으로 보여준다. `requirement_id`가 현재 분석 artifact와 다르면 연결하지 않는다.
+누락 정보나 모순이 남아 있으면 `분석 결과` 단계로, 그렇지 않으면 `모듈 검토` 단계로 이동해 reviewer가 검토를 계속한다.
+검토 후 `저장된 분석` 화면의 `analysis-result.json 내보내기`와 `af-run-manifest.json 내보내기`를 사용하면 현재 Workbench 상태의 reviewed artifact와 연결된 DLC manifest를 browser download로 받을 수 있다.
+
 ## 산출물 의미
 
-- `normalized-requirement.json`: 요구사항을 구조화한 원본 분석 결과.
-- `evidence-summary.json`: 분류 근거, 위험, 누락 정보, 가정.
+- `analysis-result.json`: `normalizedRequirement`, evidence, module candidates, Graph IR, Runtime 계약, A2A 계약을 담는 canonical combined artifact다.
+- `normalized-requirement.json`: 요구사항을 구조화한 split convenience artifact다.
+- `analysis-summary.md`: 분류 근거, 위험, 누락 정보, 가정을 사람이 빠르게 검토할 수 있게 요약한 문서다.
 - `module-candidates.json`: 검토 대상 모듈 후보.
 - `resolution_draft`: 정보 필요 후보를 승인 가능한 artifact로 바꾸기 위한 후보별 LLM 초안. 자동 적용되지 않고 Module Review에서 검토 후 반영한다.
 - `process-flow.json`: 후보 모듈 사이의 local 또는 Remote A2A 흐름.
-- `classification.json`: 선택한 category와 subtype의 근거.
 - `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보 요약. 실제 등록/제외 결정은 Catalog review에서 한다.
-- `catalog-changes.yaml`: Catalog review에서 결정한 신규 등록, 수정, 삭제 예정 변경안.
 - `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
+- `af-run-manifest.json`: `artifacts/af/<req-id>/` 안에서 단계 상태, 출력 경로, 승인 상태, 검증 evidence를 연결하는 가벼운 manifest다.
+- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 TODO-only source bundle이다. 실제 runtime wiring과 business logic은 후속 구현 task에서 채운다.
+- `validation-report.md`: 검증 명령과 결과, 남은 위험을 기록한다.
+- `catalog-delta.yaml`: catalog 재사용/등록/수정 제안이다. 실제 `catalog/*.yaml` 변경은 별도 승인 작업으로 처리한다.
 
 ## 분석 원칙
 
@@ -50,8 +64,8 @@ Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검�
 
 ## Live analyzer 실행 계약
 
-Live analyzer는 Codex CLI가 필요한 repo 문맥을 직접 확인할 수 있게 shell 접근을 유지한다.
-단, CLI가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다.
+Live analyzer는 기존 workbench 경로를 위해 남아 있다. Skill-led 운영에서는 `af-analyze-requirement`가 직접 `analysis-result.json`을 만들 수 있고, workbench는 후속 import, 시각화, guided edit의 보조 표면이 된다.
+단, 현재 live analyzer CLI가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다는 기존 계약은 유지한다.
 
 - CLI에는 `schemas/analysis-draft.schema.json` compact draft schema를 `--output-schema`로 전달한다.
 - 실행 시 `/tmp/agent-factory-codex-*/analyzer-context-index.md`를 만들어 active docs, schema, catalog 위치와 주요 section을 안내한다.
@@ -63,7 +77,7 @@ Live analyzer는 Codex CLI가 필요한 repo 문맥을 직접 확인할 수 있�
 ## ADK 문서 사용
 
 ADK 공식 문서는 repo에 모두 복제하지 않는다.
-필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. 2.0 (Beta) 섹션(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)을 우선 조회한다.
-이 저장소의 활성 문서는 ADK 2.0 (Beta)을 기본 baseline으로 작성한다.
+필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. ADK 2.0 문서(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)를 우선 조회한다.
+이 저장소의 활성 문서는 ADK 2.0을 기본 baseline으로 작성한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화되어 있다.
 작은 순차, 병렬, 반복, 사람 입력 흐름은 `workflow_kind`가 아니라 Graph IR node/container/edge로 표현한다.
 MCP 결과와 직접 내려받은 공식 문서가 다르거나 현재 taxonomy와 충돌하면 구현을 멈추고 사용자에게 질문한다.

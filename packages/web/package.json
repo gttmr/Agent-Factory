@@ -6,14 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:analyzer": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/analyzer/afRunManifest.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/analyzer/analysisArtifactImport.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.62.0",
     "@types/js-yaml": "^4.0.9",
     "dagre": "^0.8.5",
     "js-yaml": "^4.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^6.28.0",
     "reactflow": "^11.11.4"
   },
   "devDependencies": {

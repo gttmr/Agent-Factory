@@ -1,3 +1,0 @@
-display_name: ADK A2A Agent Generate
-short_description: Plan ADK agent scaffolds and A2A boundaries from sparse requirements.
-default_prompt: Use the ADK A2A agent generate skill to classify this requirement, decide local reuse versus A2A, and produce a concise implementation handoff.

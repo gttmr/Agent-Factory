@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Scope
 
-This is the Agent Factory workbench — a local-first tool that turns raw requirements into reviewed planning artifacts and a review-gated ADK Runtime Handoff. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved scaffold-plan data from reviewed workbench artifacts may feed the runtime handoff.
+This is the Agent Factory workbench — a local-first, skill-led tool that turns raw requirements into reviewed planning artifacts and a review-gated ADK Runtime Handoff. It is **not** a banking deployment and must never contain private endpoints, credentials, deployment scripts, or organization-specific runtime code. Raw requirements never drive code generation; only approved scaffold-plan data from reviewed artifacts may feed the runtime handoff.
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
@@ -51,21 +51,26 @@ Core rules:
 
 ### Workbench flow (packages/web)
 
-`App.tsx` is a single-page wizard backed by React state and local server middleware. There is no router; analyzer and ADK runtime actions call the Vite middleware under `packages/web/server`.
+The workbench is a router-driven, artifact-root-first React app. `App.tsx` mounts `AppRouter` (`src/routes/router.tsx`) inside `BrowserRouter` + `QueryClientProvider`. All routes are skill-scoped and read/write the local file system via Vite middleware under `packages/web/server`:
 
-Current steps are defined in `packages/web/src/workbench/useWorkbenchState.ts`:
+- `/` Landing — list / create artifact roots (`POST /api/af`), import an `analysis-result.json` produced by the `af-analyze-requirement` skill.
+- `/af/:reqId/analyze` — review the imported analysis through `AnalysisResult`, mark `missing_information` as accepted, toggle `analysis_reviewed` on `af-run-manifest.json`.
+- `/af/:reqId/design` — 3-pane Graph IR review with node/edge-anchored comments under `collaboration/comments.json`. Toggles `boundaries_approved` when every module candidate is `status === "approved"` and Graph IR validation errors are zero.
+- `/af/:reqId/build` — derive `scaffold-plan.json` client-side from the analysis + seed catalog, spawn `scripts/generate-adk-source.mjs` to populate `runtime-stub/`, edit `implementation-handoff.md`, and toggle `stub_ready_for_followup`.
+- `/af/:reqId/verify` — run an allow-list of three commands (`validate-artifacts.mjs`, `npm run build`, `npm run test:analyzer`), edit `validation-report.md` and `catalog-delta.yaml`.
+- `/catalog` — Reuse Hub: search Agent/Workflow/Adapter/Remote A2A catalog cards, pin one to a candidate in the active root (`PUT analysis-result.json`), or propose a new entry by appending to `catalog-delta.yaml`. `catalog/*.yaml` is never edited from the UI.
 
-`intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
+There is no in-browser analyzer or fallback. Analysis must be produced by running the `.agents/skills/af-analyze-requirement` skill (or any compatible producer) and imported into the workbench via Landing or the per-stage import button.
 
-State flows through `useWorkbenchState`: `RequirementIntakeInput` → live `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation.
+State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog, collaboration, scaffold-plan, and runtime-stub data are fetched/mutated through `packages/web/src/state/*` hooks (`useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots`). `manifest.approvals.*` is the single source of truth for gate UI; the server mirrors approval state onto `stages.<stage>.status` so external tooling (`scripts/generate-adk-source.mjs`) reads a consistent stage progression. Do not rebuild gate state from derived candidate status.
 
-`AnalysisResult.runtimeContracts` is the review artifact for callback and runtime support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback responsibilities, and async resume behavior. The `Runtime 계약` wizard step surfaces these contracts before Remote A2A/catalog/export.
+`localStorage` is reserved for two read-only caches: `agent-factory:recent-artifact-roots` and `agent-factory:author-{name,role}` for the comment composer. No stage state is persisted to `localStorage` — the artifact root is the canonical store.
 
-### Analyzer provider boundary
+`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. Runtime contract review UI is still pending a follow-up PR; for now the `runtime_contracts_approved` toggle is manual and DesignWorkbench surfaces the contract list read-only.
 
-`src/analyzer/providers.ts` defines the `AnalyzerProvider` interface and `OpenAICompatibleAnalyzerProvider`, which posts to the local `/api/analyze-requirement` SSE endpoint served by `packages/web/server/codexAnalyzer.ts`. That middleware shells out to the Codex CLI to do the real analysis. `defaultAnalyzerProvider` is the single export consumed by `App.tsx` and is the live Codex CLI provider — there is no in-browser fallback analyzer.
+### Analyzer pipeline
 
-The example requirement preloaded by `예시 불러오기` lives in `src/analyzer/exampleRequirement.ts` (`getExampleRequirement`). It exercises every category and Graph IR markers such as fan-out/fan-in, loop control, human input, and route branches when run through the live analyzer.
+`packages/web/server/codexAnalyzer.ts` still exposes the SSE `/api/analyze-requirement` endpoint that shells out to the Codex CLI. The router-shell does not call it directly — the af-analyze-requirement skill (or any external producer) is expected to drive analysis and produce a canonical `analysis-result.json`. The workbench validates that file via `validateAnalysisResult` (re-exported from `server/validators.ts`) on PUT.
 
 ### Taxonomy contract (load-bearing)
 
@@ -77,7 +82,7 @@ Adapter `adapter_kind`: `legacy_api`, `retrieval`, `rule_registry`, `data_query`
 
 Rules baked into the schemas, validator, and analyzer:
 
-- ADK runtime baseline: ADK 2.0 (Beta). `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
+- ADK runtime baseline: ADK 2.0. ADK Python 2.0 is GA as of May 19, 2026. `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
 - Tool/Adapter, Knowledge Retrieval, and Metadata Registry are **no longer** top-level categories. Retrieval and rule registries appear only as `adapter_kind` subtypes.
 - `legacy_recommended_type` is migration metadata; never use it as the primary classifier.
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.
@@ -93,13 +98,12 @@ The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the va
 
 ### Missing-information gate & saved-analysis flow
 
-Aligned with `AGENTS.md` and `docs/workbench/agent-factory-harness.md`. Apply these whenever touching the wizard, scaffold-plan validation, or `SavedAnalysisRecord` shape.
+Aligned with `AGENTS.md` and `docs/workbench/agent-factory-harness.md`. Apply these whenever touching analysis import, scaffold-plan validation, or approval gate logic.
 
-- **Two-layer missing-info gate.** Requirement-level `evidence.missing_information` is a **soft** gate — users mark each item via the per-row "수용" toggle on `AnalysisResult` and the result flows into `acceptedMissing` (reviewer attestation only, never blocks scaffold). Candidate-level `ModuleCandidate.missing_information` plus unresolved `status === "needs_info"` is a **hard** gate — Module Review generates a candidate-level Resolution Draft, the reviewer inspects expandable object schemas and smoke contract, then `반영 적용` records `resolution_applied_at`, `schema_review_state`, and `smoke_spec` before approval.
-- **Scaffold-plan messaging.** `scaffoldPlan.collectBlockers` emits the actionable Korean blocker `정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.` while unresolved candidates remain. Warnings include `정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요`. The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR has errors.
-- **SavedAnalysisRecord persistence.** The record stores `catalogEntries` (active entries at save time), `activeStep`, and `scaffoldReady` (`can_generate_source && graph errors empty`). `loadSavedAnalysis` chooses the landing step from these: `scaffoldReady → export`, all-non-`needs_info` → `modules`, else → `analysis`. Catalog is restored from the record snapshot, not the seed. Backfill must never auto-promote candidate status.
-- **Smoke 일괄 실행 매크로.** `AdkRuntimeWorkbench` ships a macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially with per-step pass/fail pills and halts on first failure. Individual buttons remain for debugging. `chat-smoke` and the macro require an approved module `smoke_spec`; source/install/web actions may remain available when only chat smoke is missing.
-- **Stub-runtime banner.** When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel renders a yellow banner: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." Do not remove this banner; it differentiates stub output from real business logic per AGENTS.md.
+- **Two-layer missing-info gate.** Requirement-level `evidence.missing_information` is a **soft** gate — `AnalyzeWorkbench` exposes a per-row "수용" toggle and only enables `analysis_reviewed` once every item is accepted (the `acceptedMissing` state lives in the component because the gate fires immediately on toggle). Candidate-level `ModuleCandidate.missing_information` plus unresolved `status === "needs_info"` is a **hard** gate — `scaffoldPlan.collectBlockers` keeps the scaffold-plan unbuildable until the producer (skill or external editor) clears them.
+- **Scaffold-plan messaging.** `scaffoldPlan.collectBlockers` emits the actionable Korean blocker `정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.` while unresolved candidates remain. Warnings include `정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요`. `BuildWorkbench` renders these inline and refuses to spawn `generate-adk-source.mjs` until `can_generate_source` flips to true.
+- **Stage status mirroring.** `PATCH /api/af/:id/manifest/approvals` writes both the approval boolean and the matching `stages.<stage>.status = "complete"` (analyze ↔ `analysis_reviewed`, design ↔ `boundaries_approved && runtime_contracts_approved`, build ↔ `stub_ready_for_followup`). External scripts read stage status, not just approvals.
+- **`catalog-delta.yaml` is the only feedback channel.** Reuse Hub never edits `catalog/*.yaml`; the workbench writes `proposed_additions[]` entries to `catalog-delta.yaml` in the active root, and a human PR later merges them into the catalog.
 
 ### UI design system
 
@@ -127,14 +131,14 @@ npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 Manual/browser testing must stay on the fixed Agent Factory port `5173`. Before starting or restarting, check `lsof -iTCP:5173 -sTCP:LISTEN`; stop a stale Agent Factory/Vite process if it owns the port, but report an unrelated owner as a blocker. Do not let Vite auto-increment to `5174` or another fallback port. Verify with `curl -I http://127.0.0.1:5173/` and report `http://127.0.0.1:5173/` as the testing URL.
 
-Then in MCP: `new_page` → `evaluate_script` to click stepper buttons → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. The example flow lives in `src/analyzer/exampleRequirement.ts` and exercises every category and Graph IR markers — load it with `예시 불러오기` then `요구사항 분석`.
+Then in MCP: `new_page` → `evaluate_script` to drive route navigation / button clicks → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. Smoke seeding pattern: `POST /api/af { requirement_id: "req-001" }` then `PUT /api/af/req-001/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
 
 ## Editing Rules (from AGENTS.md)
 
 - Keep changes scoped to the requested workbench behavior. No drive-by abstractions, configuration, or extensibility.
 - Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
 - Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active source of truth.
-- Do not edit `.agents/skills` during workbench taxonomy refactors unless the task explicitly asks for a separate skill-sync step.
+- Edit `.agents/skills` only when the task explicitly asks for skill, DLC workflow, or skill-sync work.
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.
 - The UI labels are in Korean (`App.tsx`, components). Preserve that when editing copy.
 - Visual changes must follow `docs/visualization/design-system.md` and be verified with a chrome-devtools MCP screenshot before being reported as done.

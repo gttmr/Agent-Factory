@@ -39,14 +39,13 @@
 
 ## 상태 구조
 
-`packages/web/src/workbench/useWorkbenchState.ts`가 화면 상태 전이의 기준이다.
+상태는 `@tanstack/react-query` 기반이며 화면 별로 hook 이 분리되어 있다 (`packages/web/src/state/*`).
 
-- `StepId`, `StepDefinition`, 단계 그룹 label을 이 파일에서 관리한다.
-- 분석 실행, 저장/불러오기, 모듈 후보 변경, A2A 계약 변경, catalog 변경은 reducer action으로 처리한다.
-- `App.tsx`는 상태를 직접 조립하지 않고 shell과 화면 component를 연결한다.
+- 각 route 는 `useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots` 중 필요한 hook 만 사용한다.
+- `af-run-manifest.json` 의 `approvals.*` 가 모든 게이트 UI 의 source of truth 이다. 후보 status 로부터 다시 계산하지 않는다.
+- `localStorage` 는 최근 root 목록과 코멘트 작성자 이름/역할 캐시에만 사용한다. 단계 상태나 분석 결과는 절대 `localStorage` 에 두지 않는다.
 
-새 기능을 추가할 때는 먼저 reducer action과 step availability를 정의한 뒤 화면 component를 연결한다.
-저장된 분석과 scaffold-plan artifact shape는 UI refactor 때문에 바꾸지 않는다.
+새 기능을 추가할 때는 우선 어느 artifact 가 source of truth 인지 확인하고, 필요한 hook 을 `state/` 에 둔 다음 화면 component 가 그 hook 만 호출하도록 연결한다. analysis-result, scaffold-plan, manifest 의 schema 는 UI refactor 때문에 바꾸지 않는다.
 
 ## 색 토큰
 

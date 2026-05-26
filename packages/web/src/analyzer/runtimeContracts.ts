@@ -1,19 +1,38 @@
-import type { AnalysisResult, ModuleCandidate, NormalizedRequirement, RuntimeContract } from "./types";
+import {
+  RUNTIME_CONTRACT_KINDS,
+  RUNTIME_CONTRACT_STATUSES,
+  type AnalysisResult,
+  type ModuleCandidate,
+  type NormalizedRequirement,
+  type RuntimeContract,
+  type RuntimeContractKind,
+  type RuntimeContractStatus
+} from "./types";
 
 interface RuntimeContractBuildInput {
   normalizedRequirement: NormalizedRequirement;
   moduleCandidates: ModuleCandidate[];
   existingContracts?: RuntimeContract[];
+  /**
+   * When true, catalog-bound candidates without any existing contract get a
+   * full default set seeded so reviewers see something concrete to edit
+   * instead of an empty page. Used by analyzer-result hydration and saved-
+   * analysis backfill — NOT by Module Review save, otherwise clearing a
+   * contract via "기본값으로 되돌리기" would silently regenerate it.
+   */
+  autofillCatalogDefaults?: boolean;
 }
 
 export function ensureRuntimeContracts(result: AnalysisResult): AnalysisResult {
   if (!result || typeof result !== "object") return result;
+  const hasRuntimeContracts = Array.isArray((result as { runtimeContracts?: unknown }).runtimeContracts);
   return {
     ...result,
     runtimeContracts: buildRuntimeContracts({
       normalizedRequirement: result.normalizedRequirement,
       moduleCandidates: result.moduleCandidates,
-      existingContracts: Array.isArray(result.runtimeContracts) ? result.runtimeContracts : []
+      existingContracts: hasRuntimeContracts ? result.runtimeContracts : [],
+      autofillCatalogDefaults: !hasRuntimeContracts
     })
   };
 }
@@ -21,9 +40,11 @@ export function ensureRuntimeContracts(result: AnalysisResult): AnalysisResult {
 export function buildRuntimeContracts({
   normalizedRequirement,
   moduleCandidates,
-  existingContracts = []
+  existingContracts = [],
+  autofillCatalogDefaults = false
 }: RuntimeContractBuildInput): RuntimeContract[] {
-  const existingById = new Map(existingContracts.map((contract) => [contract.contract_id, contract]));
+  const normalizedExistingContracts = existingContracts.flatMap(normalizeRuntimeContractInput);
+  const existingById = new Map(normalizedExistingContracts.map((contract) => [contract.contract_id, contract]));
   const next: RuntimeContract[] = [];
   const usedIds = new Set<string>();
 
@@ -35,6 +56,10 @@ export function buildRuntimeContracts({
   };
 
   for (const candidate of moduleCandidates) {
+    // Catalog-bound candidates use the catalog's own runtime defaults.
+    // The reviewer opts into per-analysis overrides via the Runtime 계약 screen
+    // ("수정 시작"), which writes contracts through the existingContracts pass below.
+    if (candidate.catalog_entry_id) continue;
     if (!needsLegacyContract(candidate, normalizedRequirement)) continue;
     addContract(buildLegacyAdapterContract(candidate, normalizedRequirement));
 
@@ -49,13 +74,54 @@ export function buildRuntimeContracts({
     }
   }
 
-  for (const existing of existingContracts) {
+  if (autofillCatalogDefaults) {
+    const existingModuleIds = new Set(
+      normalizedExistingContracts.filter((contract) => contract.module_id).map((contract) => contract.module_id as string)
+    );
+    for (const candidate of moduleCandidates) {
+      if (!candidate.catalog_entry_id) continue;
+      if (existingModuleIds.has(candidate.id)) continue;
+      for (const contract of buildRuntimeContractsForCandidate(candidate, normalizedRequirement)) {
+        addContract(contract);
+      }
+    }
+  }
+
+  for (const existing of normalizedExistingContracts) {
     if (!usedIds.has(existing.contract_id) && existing.contract_status !== "rejected") {
       next.push(existing);
     }
   }
 
   return next;
+}
+
+/**
+ * Used when the reviewer explicitly opts a catalog-bound candidate into runtime
+ * contract editing on the Runtime 계약 screen. Returns at least one contract so
+ * the override is observable; if every category-gated heuristic says skip, an
+ * ADK Callback baseline is emitted as the editable starting point.
+ */
+export function buildRuntimeContractsForCandidate(
+  candidate: ModuleCandidate,
+  requirement: NormalizedRequirement
+): RuntimeContract[] {
+  const contracts: RuntimeContract[] = [];
+  if (needsLegacyContract(candidate, requirement)) {
+    contracts.push(buildLegacyAdapterContract(candidate, requirement));
+  }
+  if (needsAdkCallbackContract(candidate, requirement)) {
+    contracts.push(buildAdkCallbackContract(candidate, requirement));
+  }
+  if (needsAsyncRuntimeSupport(candidate, requirement)) {
+    contracts.push(buildContextManagerContract(candidate, requirement));
+    contracts.push(buildCallbackBrokerContract(candidate, requirement));
+    contracts.push(buildAsyncResumeContract(candidate, requirement));
+  }
+  if (contracts.length === 0) {
+    contracts.push(buildAdkCallbackContract(candidate, requirement));
+  }
+  return contracts;
 }
 
 export function runtimeContractReadinessIssues(contract: RuntimeContract): string[] {
@@ -100,7 +166,105 @@ function mergeRuntimeContract(previous: RuntimeContract, base: RuntimeContract):
   };
 }
 
+function normalizeRuntimeContractInput(value: unknown): RuntimeContract[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Partial<RuntimeContract>;
+  if (typeof record.contract_id !== "string" || !record.contract_id.trim()) return [];
+  const contractKind: RuntimeContractKind = RUNTIME_CONTRACT_KINDS.includes(record.contract_kind as RuntimeContractKind)
+    ? (record.contract_kind as RuntimeContractKind)
+    : "adk_callback";
+  const contractStatus: RuntimeContractStatus = RUNTIME_CONTRACT_STATUSES.includes(record.contract_status as RuntimeContractStatus)
+    ? (record.contract_status as RuntimeContractStatus)
+    : "needs_info";
+  return [
+    {
+      contract_id: record.contract_id,
+      contract_kind: contractKind,
+      module_id: typeof record.module_id === "string" ? record.module_id : null,
+      title: typeof record.title === "string" && record.title.trim() ? record.title : record.contract_id,
+      contract_status: contractStatus,
+      summary: typeof record.summary === "string" ? record.summary : "",
+      required_review_fields: Array.isArray(record.required_review_fields)
+        ? record.required_review_fields.filter((item): item is string => typeof item === "string")
+        : [],
+      reviewer_notes: typeof record.reviewer_notes === "string" ? record.reviewer_notes : "",
+      runtime_support: normalizeRuntimeSupport(record.runtime_support),
+      operation: normalizeOperation(record.operation),
+      identifiers: Array.isArray(record.identifiers)
+        ? record.identifiers.filter((item): item is string => typeof item === "string")
+        : [],
+      policies: { ...defaultPolicies(), ...objectValue(record.policies) },
+      graph_ir_annotations: stringRecord(record.graph_ir_annotations),
+      synthetic_examples: Array.isArray(record.synthetic_examples)
+        ? record.synthetic_examples.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+        : [],
+      developer_todos: Array.isArray(record.developer_todos)
+        ? record.developer_todos.filter((item): item is string => typeof item === "string")
+        : []
+    }
+  ];
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+  );
+}
+
+function normalizeRuntimeSupport(value: unknown): RuntimeContract["runtime_support"] {
+  const record = objectValue(value);
+  return {
+    context_manager_required: record.context_manager_required === true,
+    callback_broker_required: record.callback_broker_required === true,
+    human_approval_required: record.human_approval_required === true,
+    idempotency_required: record.idempotency_required === true,
+    audit_required: record.audit_required === true,
+    compensation_required: record.compensation_required === true
+  };
+}
+
+function normalizeOperation(value: unknown): RuntimeContract["operation"] {
+  const record = objectValue(value);
+  return {
+    operation_type: isOperationType(record.operation_type) ? record.operation_type : "unknown",
+    side_effect_level: isSideEffectLevel(record.side_effect_level) ? record.side_effect_level : "unknown",
+    callback_expected: record.callback_expected === true,
+    async_resume_required: record.async_resume_required === true
+  };
+}
+
+function isOperationType(value: unknown): value is RuntimeContract["operation"]["operation_type"] {
+  return (
+    value === "read" ||
+    value === "write" ||
+    value === "approval" ||
+    value === "batch" ||
+    value === "notification" ||
+    value === "unknown"
+  );
+}
+
+function isSideEffectLevel(value: unknown): value is RuntimeContract["operation"]["side_effect_level"] {
+  return (
+    value === "none" ||
+    value === "read_only" ||
+    value === "write" ||
+    value === "financial_write" ||
+    value === "customer_notification" ||
+    value === "unknown"
+  );
+}
+
 function needsLegacyContract(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
+  // Legacy/MCP adapter contracts apply only to adapter candidates. Agent and
+  // workflow candidates that merely orchestrate adapters do not get their own
+  // legacy contract — that lives on the adapter they call.
+  if (candidate.module_category !== "adapter") return false;
   return (
     candidate.adapter_kind === "legacy_api" ||
     candidate.access_protocol === "mcp" ||
@@ -109,6 +273,9 @@ function needsLegacyContract(candidate: ModuleCandidate, requirement: Normalized
 }
 
 function needsAdkCallbackContract(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
+  // ADK callback contract is meaningful for local agent/workflow/adapter only.
+  // Remote A2A boundaries are reviewed in their own A2A contract review.
+  if (candidate.module_category === "remote_a2a") return false;
   return (
     needsLegacyContract(candidate, requirement) ||
     Boolean(candidate.adk_hints?.callbacks?.trim()) ||
@@ -118,6 +285,11 @@ function needsAdkCallbackContract(candidate: ModuleCandidate, requirement: Norma
 }
 
 function needsAsyncRuntimeSupport(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
+  // Async runtime support (Context Manager / Callback Broker / Async Resume)
+  // is tied to the adapter that actually performs the async call. Workflows
+  // can still describe wait/resume behavior in Graph IR; they do not get a
+  // duplicate set of runtime contracts here.
+  if (candidate.module_category !== "adapter") return false;
   const text = evidenceText(candidate, requirement);
   return (
     /callback|콜백|async|비동기|job[_ -]?id|resume|재개|대기/i.test(text) ||

@@ -173,6 +173,7 @@
       "data_policy": "needs_info"
     }
   ],
+  "runtimeContracts": [],
   "processFlow": {
     "requirement_id": "req-001",
     "graph_id": "graph-001",

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 const rawArg = process.argv[2] ?? "templates";
 const root = resolve(rawArg);
@@ -150,6 +150,9 @@ const runtimeContractKinds = new Set([
   "async_resume"
 ]);
 const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rejected"]);
+const afRunStages = new Set(["analyze", "design", "build", "verify"]);
+const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
+const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
 
 // Required string fields on an A2AContract (top-level scalar string fields).
 // Nested object fields are validated separately.
@@ -257,6 +260,7 @@ for (const target of targets) {
   validateModuleCandidates(target);
   validateProcessFlow(target);
   validateAnalysisResult(target);
+  validateAfRunManifest(target);
   validateScaffoldPlan(target);
   validateSavedAnalysisFixtures(target);
   validateContractRegistry(target);
@@ -310,21 +314,30 @@ function collectTargets(start) {
     errors.push(`Cannot stat ${start}: ${error.message}`);
     return [];
   }
+  if (stat.isFile()) {
+    const parent = dirname(start);
+    if (looksLikeArtifactDir(parent)) {
+      return [parent];
+    }
+    errors.push(`Path is not a recognized artifact file: ${start}.`);
+    return [];
+  }
   if (!stat.isDirectory()) {
-    errors.push(`Path is not a directory: ${start}.`);
+    errors.push(`Path is not a directory or artifact file: ${start}.`);
     return [];
   }
 
   // If this directory itself looks like a leaf artifact directory, validate
   // it directly. We treat the presence of analysis-result.json,
-  // module-candidates.json, process-flow.json, or scaffold-plan(.template).json
+  // module-candidates.json, process-flow.json, scaffold-plan(.template).json,
+  // or af-run-manifest.json
   // as the leaf signal so the existing templates/ smoke check still works.
   if (looksLikeArtifactDir(start)) {
     return [start];
   }
 
-  // Otherwise walk one level deep and pick up every subdirectory that
-  // contains an analysis-result.json file.
+  // Otherwise walk one level deep and pick up every subdirectory that looks
+  // like an artifact leaf.
   const found = [];
   let entries;
   try {
@@ -336,7 +349,7 @@ function collectTargets(start) {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const child = join(start, entry.name);
-    if (existsSync(join(child, "analysis-result.json"))) {
+    if (looksLikeArtifactDir(child)) {
       found.push(child);
     }
   }
@@ -355,7 +368,8 @@ function looksLikeArtifactDir(dir) {
     existsSync(join(dir, "module-candidates.json")) ||
     existsSync(join(dir, "process-flow.json")) ||
     existsSync(join(dir, "scaffold-plan.json")) ||
-    existsSync(join(dir, "scaffold-plan.template.json"))
+    existsSync(join(dir, "scaffold-plan.template.json")) ||
+    existsSync(join(dir, "af-run-manifest.json"))
   );
 }
 
@@ -432,6 +446,99 @@ function validateProcessFlow(dir = root) {
   }
   const flow = readJson(path);
   validateGraphIR(flow, "process-flow.json", new Map(), new Map());
+}
+
+function validateAfRunManifest(dir = root) {
+  const path = join(dir, "af-run-manifest.json");
+  if (!existsSync(path)) {
+    return;
+  }
+  const manifest = readJson(path);
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    errors.push("af-run-manifest.json must contain an object.");
+    return;
+  }
+
+  const label = "af-run-manifest.json";
+  requireNonEmptyString(manifest.requirement_id, `${label}.requirement_id`);
+  const artifactRootOk = requireNonEmptyString(manifest.artifact_root, `${label}.artifact_root`);
+  if (artifactRootOk && manifest.artifact_root.includes("\\")) {
+    errors.push(`${label}.artifact_root must use POSIX-style / separators.`);
+  }
+  if (!afRunStages.has(manifest.current_stage)) {
+    errors.push(`${label}.current_stage must be one of ${Array.from(afRunStages).join(", ")}.`);
+  }
+
+  if (!manifest.stages || typeof manifest.stages !== "object" || Array.isArray(manifest.stages)) {
+    errors.push(`${label}.stages must be an object.`);
+  } else {
+    for (const stage of afRunStages) {
+      validateAfRunStage(manifest.stages[stage], `${label}.stages.${stage}`);
+    }
+  }
+
+  if (!manifest.approvals || typeof manifest.approvals !== "object" || Array.isArray(manifest.approvals)) {
+    errors.push(`${label}.approvals must be an object.`);
+  } else {
+    for (const key of [
+      "analysis_reviewed",
+      "boundaries_approved",
+      "runtime_contracts_approved",
+      "stub_ready_for_followup"
+    ]) {
+      if (typeof manifest.approvals[key] !== "boolean") {
+        errors.push(`${label}.approvals.${key} must be a boolean.`);
+      }
+    }
+  }
+
+  if (!manifest.validation || typeof manifest.validation !== "object" || Array.isArray(manifest.validation)) {
+    errors.push(`${label}.validation must be an object.`);
+  } else {
+    if (!Array.isArray(manifest.validation.commands)) {
+      errors.push(`${label}.validation.commands must be an array.`);
+    } else {
+      manifest.validation.commands.forEach((command, index) => {
+        if (typeof command !== "string" || !command.trim()) {
+          errors.push(`${label}.validation.commands[${index}] must be a non-empty string.`);
+        }
+      });
+    }
+    if (!afRunValidationResults.has(manifest.validation.last_result)) {
+      errors.push(`${label}.validation.last_result must be one of ${Array.from(afRunValidationResults).join(", ")}.`);
+    }
+  }
+}
+
+function validateAfRunStage(stage, label) {
+  if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
+    errors.push(`${label} must be an object.`);
+    return;
+  }
+  if (!afRunStageStatuses.has(stage.status)) {
+    errors.push(`${label}.status must be one of ${Array.from(afRunStageStatuses).join(", ")}.`);
+  }
+  if (!Array.isArray(stage.outputs)) {
+    errors.push(`${label}.outputs must be an array.`);
+    return;
+  }
+  stage.outputs.forEach((output, index) => {
+    if (typeof output !== "string" || !output.trim()) {
+      errors.push(`${label}.outputs[${index}] must be a non-empty string.`);
+      return;
+    }
+    if (output.includes("\\")) {
+      errors.push(`${label}.outputs[${index}] must use POSIX-style / separators.`);
+    }
+  });
+}
+
+function requireNonEmptyString(value, label) {
+  if (typeof value !== "string" || !value.trim()) {
+    errors.push(`${label} must be a non-empty string.`);
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -801,6 +908,11 @@ function validateScaffoldPlan(dir = root) {
     plan.runtime_contracts.forEach((contract, index) =>
       validateRuntimeContractObject(contract, `scaffold.runtime_contracts[${index}]`)
     );
+    plan.runtime_contracts.forEach((contract, index) => {
+      if (contract?.contract_status !== "approved") {
+        errors.push(`scaffold.runtime_contracts[${index}].contract_status must be approved.`);
+      }
+    });
   }
 
   plan.modules.forEach((module, index) => {

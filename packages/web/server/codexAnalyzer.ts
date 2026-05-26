@@ -1824,7 +1824,7 @@ function parseJsonObject(value: string): unknown {
   }
 }
 
-function validateAnalysisResult(value: unknown): string[] {
+export function validateAnalysisResult(value: unknown): string[] {
   const errors: string[] = [];
   if (!isRecord(value)) return ["응답 최상위 값은 객체여야 합니다."];
 

@@ -26,10 +26,14 @@ interface GraphCanvasProps {
   moduleCandidates: ModuleCandidate[];
   a2aContracts: A2AContract[];
   onNavigateToA2AContracts?: () => void;
-  onContinue: () => void;
+  onContinue?: () => void;
+  continueLabel?: string;
+  selection?: Selection;
+  onSelectionChange?: (selection: Selection) => void;
+  hideInspector?: boolean;
 }
 
-interface Selection {
+export interface Selection {
   nodeId: string | null;
   edgeId: string | null;
 }
@@ -39,9 +43,19 @@ export function GraphCanvas({
   moduleCandidates,
   a2aContracts,
   onNavigateToA2AContracts,
-  onContinue
+  onContinue,
+  continueLabel,
+  selection: selectionProp,
+  onSelectionChange,
+  hideInspector = false
 }: GraphCanvasProps) {
-  const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
+  const [internalSelection, setInternalSelection] = useState<Selection>({ nodeId: null, edgeId: null });
+  const isControlled = selectionProp !== undefined;
+  const selection = isControlled ? selectionProp! : internalSelection;
+  const setSelection = (next: Selection) => {
+    if (!isControlled) setInternalSelection(next);
+    onSelectionChange?.(next);
+  };
 
   const handleSelect = (kind: "node" | "edge", id: string) => {
     setSelection(kind === "node" ? { nodeId: id, edgeId: null } : { nodeId: null, edgeId: id });
@@ -121,22 +135,26 @@ export function GraphCanvas({
 
         <ValidationBanner validation={graphIR.validation} onFocus={focusOn} />
 
-        <div className="actions align-end graph-canvas-actions">
-          <button type="button" className="primary" onClick={onContinue}>
-            다음 단계
-          </button>
-        </div>
+        {onContinue ? (
+          <div className="actions align-end graph-canvas-actions">
+            <button type="button" className="primary" onClick={onContinue}>
+              {continueLabel ?? "다음 단계"}
+            </button>
+          </div>
+        ) : null}
       </section>
 
-      <GraphInspector
-        selectedNode={selectedNode}
-        selectedEdge={selectedEdge}
-        nodeLabel={nodeLabel}
-        candidate={selectedCandidate}
-        a2aContracts={a2aContracts}
-        onNavigateToA2AContracts={onNavigateToA2AContracts}
-        onClose={() => setSelection({ nodeId: null, edgeId: null })}
-      />
+      {hideInspector ? null : (
+        <GraphInspector
+          selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
+          nodeLabel={nodeLabel}
+          candidate={selectedCandidate}
+          a2aContracts={a2aContracts}
+          onNavigateToA2AContracts={onNavigateToA2AContracts}
+          onClose={() => setSelection({ nodeId: null, edgeId: null })}
+        />
+      )}
     </div>
   );
 }

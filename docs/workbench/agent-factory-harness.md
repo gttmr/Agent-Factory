@@ -5,19 +5,24 @@ This document is the project-specific operating harness for Agent Factory work. 
 ## Purpose
 
 Agent Factory should turn vague requirements into reviewed, reusable planning artifacts before any implementation step begins.
+The preferred operating path is skill-led: `.agents/skills/af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, and `af-verify-feedback` produce and verify schema artifacts, while the web workbench visualizes and supports guided partial edits.
 
 The goal is repeatable agent design review, not one-off code generation. Coding agents working in this repository must preserve a controlled pipeline:
 
 ```text
 raw requirement
+  -> af-analyze-requirement
   -> normalized requirement
   -> evidence and missing-information review
   -> module candidates
   -> workflow/process flow
+  -> af-design-boundaries
   -> runtime contract review for callback, legacy, Context Manager, and async resume behavior
   -> catalog reuse and registration review
   -> reviewed catalog and Graph IR decisions
   -> approved scaffold-plan and ADK Runtime Handoff
+  -> af-build-runtime-stub
+  -> af-verify-feedback
 ```
 
 Raw requirements must not directly generate code.
@@ -40,7 +45,7 @@ Do not update `docs/archive/**` for current behavior unless the task explicitly 
 
 ## Classification first
 
-Before building implementation plans, classify each requested capability into the active taxonomy.
+Before building implementation plans, classify each requested capability into the active taxonomy. For skill-led runs, `af-analyze-requirement` creates first-pass candidates and `af-design-boundaries` performs the review/approval pass.
 
 Top-level categories:
 
@@ -73,7 +78,7 @@ If those fields are unknown, mark the candidate as needing review instead of inv
 
 ## Scaffold and runtime handoff gate
 
-ADK Runtime Handoff is part of the current workbench, but it is review-gated. Scaffold-plan generation and source handoff must consume only approved workbench artifacts:
+ADK Runtime Handoff is part of the current workbench, but it is review-gated. Scaffold-plan generation and source handoff must consume only approved artifacts:
 
 - reviewed `AnalysisResult`
 - approved module candidates
@@ -90,7 +95,7 @@ Do not scaffold directly from:
 - missing Remote A2A contract details
 - private or organization-specific runtime assumptions
 
-A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code.
+A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code. The default stub output location for skill-led runs is `artifacts/af/<req-id>/runtime-stub/`.
 
 ### Missing-information two-layer gate
 
@@ -104,17 +109,11 @@ Triage of missing information after analysis follows a two-layer rule.
 
 The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR errors are present.
 
-### Saved-analysis record fields
+### Artifact root persistence
 
-`SavedAnalysisRecord` is the persistence contract for the saved-analysis flow.
+There is no in-browser save record any more. The artifact root directory `artifacts/af/<req-id>/` is the single store: `af-run-manifest.json` (stage status + approval gates + last validation result), `analysis-result.json` plus its split conveniences, `commonization-notes.json`, `boundary-design.md`, `a2a-contracts.json`, `scaffold-plan.json`, `runtime-stub/`, `implementation-handoff.md`, `validation-report.md`, `catalog-delta.yaml`, and `collaboration/{comments,highlights}.json`. The workbench reads and writes those paths through `/api/af/*` and `/api/af-collab/*`; `localStorage` only caches the recent-artifact-root list and the comment-composer author identity.
 
-- `catalogEntries` snapshots the active catalog (`provenance !== "session_deleted"`) at save time and replaces the seed catalog on load. This prevents seed-evolution drift.
-- `activeStep` is the wizard step at save time, used as a migration safety net.
-- `scaffoldReady` is `can_generate_source && Graph IR has no errors` computed at save time. `loadSavedAnalysis` lands on `export` when true; otherwise on `modules` if all candidates are non-`needs_info`, else on `analysis`. Backfill never auto-promotes candidate status.
-- Candidate review state may include `resolution_draft`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec`. Backfill defaults these to empty review state and must not silently clear missing information or approve a candidate.
-- If a saved Graph IR uses stale node ids or has partial edge coverage, load/backfill may repair connectivity from the saved module candidate order. This is a shape migration only; it does not approve candidates or invent runtime details.
-
-Saved-analysis fixtures live under `templates/saved-analysis-fixtures/`. They must mirror `moduleCandidates` at both the record top level and `analysis.moduleCandidates`, preserve the saved `catalogEntries` snapshot, and make the intended landing behavior explicit with `scaffoldReady`.
+Saved-analysis fixtures under `templates/saved-analysis-fixtures/` are now only consumed by `scripts/validate-artifacts.mjs` regression smoke. They should still mirror the canonical `analysis-result.json` shape.
 
 ### Graph IR regeneration from Module Review
 
@@ -139,6 +138,26 @@ Chat smoke requires an approved module `smoke_spec` from Module Review. If sourc
 
 When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel shows a yellow stub-runtime banner so reviewers do not mistake stub output for real business logic.
 
+## Workbench surface
+
+The workbench is a router-driven, artifact-root-first React app (`packages/web/src/routes/router.tsx`) — skill-scoped routes: `/` Landing, `/af/:reqId/analyze`, `/af/:reqId/design`, `/af/:reqId/build`, `/af/:reqId/verify`, `/catalog` Reuse Hub. State sits on `@tanstack/react-query`; `manifest.approvals.*` from `af-run-manifest.json` is the single source of truth for gate UI. All reads/writes go through Vite middleware (`/api/af/*`, `/api/af-collab/*`, `/api/catalog`) against `artifacts/af/<req-id>/` on the local file system. There is no in-browser analyzer or fallback path — analysis is produced by the `af-analyze-requirement` skill (or an equivalent producer) and imported through Landing or the per-stage import button.
+
+Active stages:
+- Landing creates `artifacts/af/<req-id>/` plus an empty `af-run-manifest.json`, or imports `analysis-result.json`.
+- `/af/:reqId/analyze` renders the imported analysis through the existing `AnalysisResult` component and toggles `analysis_reviewed`.
+- `/af/:reqId/design` mounts a 3-pane Design workbench (left tabs `모듈 / Graph IR / Comments`, center `GraphCanvas`, right inspector with node/edge-anchored comment thread). The `boundaries_approved` gate enables only when `analysis_reviewed === true`, every module candidate is `status === "approved"`, and Graph IR validation errors are zero. `runtime_contracts_approved` is currently flipped via direct manifest PATCH until a dedicated contract review UI ships.
+- `/af/:reqId/build` mounts a BuildWorkbench that derives a scaffold-plan client-side from the analysis + seed catalog, PUTs it to `scaffold-plan.json`, then POSTs `runtime-stub/build` to spawn `scripts/generate-adk-source.mjs` against the artifact root. Generated files are listed and previewed (text only, < 500KB). `implementation-handoff.md` is edited inline. The `stub_ready_for_followup` toggle is reviewer-driven and gated on the stub directory being non-empty.
+- `/af/:reqId/verify` mounts a VerifyWorkbench that runs a hard-coded allow-list of three commands (`validate-artifacts.mjs <root>`, `npm run build --prefix packages/web`, `npm run test:analyzer --prefix packages/web`) via child_process, captures stdout/stderr, and writes `manifest.validation.{commands,last_result}`. `validation-report.md` and `catalog-delta.yaml` are edited inline; **catalog/*.yaml is never edited directly** — only the per-run `catalog-delta.yaml` proposal.
+- `/catalog` mounts a Reuse Hub that surfaces the catalog YAML index (`GET /api/catalog`) as searchable category-tabbed cards. Two write paths exist, both targeting the active artifact root (selected via dropdown or `?req=` query param):
+  * "현재 root 에 핀" opens a dialog listing the root's module candidates filtered to the same `module_category` as the catalog entry; on save the workbench PUTs `analysis-result.json` with `catalog_entry_id`, `reuse_candidate=true`, the catalog name, and (when the candidate has empty I/O) the catalog's inputs/outputs.
+  * "신규 등록 제안" opens a drawer that appends a `proposed_additions[]` entry to the root's `catalog-delta.yaml`. The Reuse Hub never writes to `catalog/*.yaml` — that remains a manual reviewer merge from the delta proposal.
+
+Stage status mirroring: when `PATCH /api/af/:id/manifest/approvals` flips an approval, the server also marks the matching `stages.<stage>.status = "complete"` (analyze ↔ `analysis_reviewed`, design ↔ `boundaries_approved && runtime_contracts_approved`, build ↔ `stub_ready_for_followup`). `scripts/generate-adk-source.mjs` reads `stages.design.status === "complete"` as a hard precondition, so the design gate must be flipped before runtime-stub generation will succeed.
+
+Collaboration layer (`/api/af-collab/:reqId/{comments,highlights}`) writes `artifacts/af/<req-id>/collaboration/{comments,highlights}.json`. Comments are entry-anchored (`node` / `edge` / `container` / `path` / `section`), keyed by `created_at` order on disk, with `merge=union` configured in `.gitattributes` to keep PR diffs clean. Author identity is held in `localStorage(agent-factory:author-name|role)` only — there is no auth, and comments must never carry secrets, real customer data, or private endpoints. Highlights follow the same shape (`path` / `node_group` / `edge_group` / `container_focus`) but the canvas-overlay rendering is deferred to a follow-up; the current shell ships only persistence and CRUD.
+
+When adding a stage workbench, do not bypass approval gates derived from the manifest, do not invent new artifact files outside the write whitelist in `packages/web/server/artifactRootStore.ts`, and do not persist stage state to `localStorage` — `localStorage` is reserved for the recent-artifact-roots cache and the author-identity preferences only.
+
 ## Required artifact posture
 
 For Agent Factory work, produce or preserve reviewable artifacts rather than only code.
@@ -159,7 +178,7 @@ Expected artifact families:
 - validation output
 - decision notes when taxonomy or boundary choices change
 
-Live analyzer note: Codex CLI may return a compact draft artifact first. That draft is an internal transport contract only; the workbench must hydrate and validate the existing review artifacts before presenting or saving results.
+Analyzer pipeline note: the canonical `analysis-result.json` is produced by the `af-analyze-requirement` skill (or any equivalent producer that emits the same schema). The workbench `/api/analyze-requirement` SSE endpoint that shells out to the Codex CLI still exists in `packages/web/server/codexAnalyzer.ts`, but the router shell does not call it — analysis must be imported via Landing or the stage import button. The server validates the imported file via `validateAnalysisResult` on PUT.
 
 ## Local/offline-friendly assistant behavior
 
@@ -175,6 +194,8 @@ Good assistant tasks:
 - generate validation cases
 - update catalogs and documentation
 - produce review checklists
+- produce `artifacts/af/<req-id>/` skill artifacts and `af-run-manifest.json`
+- propose `catalog-delta.yaml` feedback without directly editing runtime catalogs
 
 Human-governed decisions:
 
@@ -189,7 +210,8 @@ Human-governed decisions:
 
 Active source-of-truth areas:
 
-- `packages/web`: live workbench UI and analyzer flow
+- `.agents/skills`: AF DLC operating skills and shared stage references
+- `packages/web`: live workbench UI, artifact visualization, guided edits, and analyzer flow
 - `schemas`: artifact contracts
 - `catalog`: reusable capability, domain-owner, and risk-gate catalogs
 - `templates`: reviewed artifact templates and scaffold-plan fixtures

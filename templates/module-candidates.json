@@ -24,8 +24,8 @@
     "reuse_candidate": true,
     "risk_level": "medium",
     "risk_signals": ["personal_data", "financial_data", "audit_required"],
-    "status": "needs_info",
-    "missing_information": ["reviewed API contract", "auth method", "timeout and retry policy"],
+    "status": "approved",
+    "missing_information": [],
     "side_effect": "read",
     "auth_required": true,
     "audit_required": true
@@ -59,8 +59,8 @@
     "reuse_candidate": true,
     "risk_level": "medium",
     "risk_signals": ["audit_required"],
-    "status": "needs_info",
-    "missing_information": ["approved source list", "citation policy", "source access control"],
+    "status": "approved",
+    "missing_information": [],
     "citation_required": true,
     "grounding_required": true,
     "source_acl_required": true

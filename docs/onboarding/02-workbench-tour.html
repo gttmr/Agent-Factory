@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>2. 워크벤치 한 바퀴 — Agent Factory 온보딩</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="icon" href="data:," />
+</head>
+<body data-page="02">
+  <div class="layout">
+    <nav class="sidebar" aria-label="목차"></nav>
+    <main class="main">
+      <div class="page-eyebrow">화면 투어 · 2/9</div>
+      <h1 class="page-title">2. 워크벤치 한 바퀴</h1>
+      <p class="page-lede">
+        Agent Factory 워크벤치는 단일 페이지 wizard다. 좌측 rail에는 항상 보이는 단계와
+        산출물 상태에 따라 열리는 조건부 단계가 있다. 각 단계는 “무엇을 결정하는 화면인지”가
+        분명히 다르다. 이 장은 각 단계가 어떤 입력을 받고 어떤 산출물을 만드는지 한 번에 본다.
+      </p>
+
+      <section class="block">
+        <h2>워크벤치 단계 한눈에</h2>
+        <div class="graph-mock">intake → analysis → modules → graph → [runtimeContracts] → [a2aContracts] → catalog → saved → export
+  ↓        ↓          ↓        ↓            ↓                  ↓             ↓        ↓        ↓
+ 입력    이해 확인   판단/승인  흐름검증     Runtime 계약        Remote A2A     재사용   저장    ADK 소스 생성</div>
+        <p>좌측 rail은 의미 단위로 4개 그룹이다:</p>
+        <ul>
+          <li><strong>입력</strong> — intake, analysis</li>
+          <li><strong>검토</strong> — modules, graph, runtimeContracts, a2aContracts</li>
+          <li><strong>자산화</strong> — catalog, saved</li>
+          <li><strong>생성</strong> — export (ADK Runtime Handoff)</li>
+        </ul>
+        <p><code>runtimeContracts</code>는 Runtime 계약 후보나 catalog-bound 후보가 있을 때 열리고, <code>a2aContracts</code>는 Remote A2A 후보나 A2A 계약이 있을 때 열린다. 조건이 없으면 rail에 나타나지 않는다.</p>
+      </section>
+
+      <section class="block">
+        <h2>각 단계의 책임</h2>
+
+        <div class="step-rail">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h4>intake — 요구사항 입력</h4>
+              <p>raw requirement 텍스트와 requester context를 넣는다. 워크벤치는 여기서 코드를 만들지 않는다. 오른쪽 <em>파일 입력</em> 패널에서는 <code>analysis-result.json</code>과 <code>af-run-manifest.json</code>을 browser file import로 불러올 수 있다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h4>analysis — 이해 확인</h4>
+              <p>Codex CLI가 raw requirement를 정규화한다. 화면 상단의 핵심 계약 5개(<code>목표</code>, <code>도메인</code>, <code>입력</code>, <code>출력</code>, <code>시스템</code>)가 맞는지 본다. 가정/누락 정보/모순/위험 신호는 보조 drawer에 둔다. <strong>이 화면은 보고서가 아니라 “모듈 검토로 넘어가도 되는가”를 보는 게이트다.</strong></p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h4>modules — Module Review Board</h4>
+              <p>각 ModuleCandidate를 <code>approved</code>/<code>deferred</code>/<code>rejected</code>/<code>needs_info</code>로 판단한다. <em>신규 모듈</em>과 <em>카탈로그 계약</em> 두 탭으로 나뉜다. <code>needs_info</code>는 “해결 초안 생성” → <em>Resolution Draft 검토</em> → <em>반영 적용</em> → <em>승인</em> 순서로 푼다 (<a href="06-review-board.html">6장</a>).</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h4>graph — Process Flow 검증</h4>
+              <p>승인된 모듈로 Graph IR을 본다. 고립된 node, 누락된 join, route_condition이 없는 route edge 같은 구조 오류를 잡는다. Module Review에서 저장하면 deterministic하게 재생성된다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <h4>runtimeContracts — Runtime 계약 검토</h4>
+              <p>MCP, EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약을 검토한다. 필수 계약은 <code>contract_status: approved</code>가 되기 전까지 scaffold/source generation blocker다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">6</div>
+            <div class="step-body">
+              <h4>a2aContracts — Remote A2A 계약 검토</h4>
+              <p><code>remote_a2a</code> 후보가 있으면 Agent Card, 인터페이스, message/task/artifact 계약, auth, timeout, retry, fallback, audit, data policy를 검토한다. 없으면 rail에서 숨겨진다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">7</div>
+            <div class="step-body">
+              <h4>catalog — 재사용 결정</h4>
+              <p>기존 catalog의 agent/workflow/adapter/remote_a2a 계약 중 어떤 것을 재사용할지, 어떤 후보를 새로 등록할지 정한다. 이 단계가 “신규 vs 재사용”을 가르는 곳이다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">8</div>
+            <div class="step-body">
+              <h4>saved — 저장된 분석</h4>
+              <p>현재 분석을 <code>SavedAnalysisRecord</code>로 저장하거나 이전 record를 불러온다. 여기서 현재 검토 상태의 <code>analysis-result.json</code>과 연결된 <code>af-run-manifest.json</code>을 내보낼 수 있다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">9</div>
+            <div class="step-body">
+              <h4>export — ADK Runtime Handoff</h4>
+              <p>승인된 산출물로 <code>scaffold-plan.json</code>을 만들고 ADK source bundle을 생성한다. Manifest 승인, Runtime 계약 승인, Graph IR coverage가 맞지 않으면 source generation이 차단된다 (<a href="08-validation-handoff.html">8장</a>).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>화면 골격 (WorkbenchShell)</h2>
+        <div class="graph-mock">┌──────────────────────────────────────────────────────────────┐
+│  Agent Factory                  분석 상태 요약 (metric pills) │  ← 상단
+├──────────┬───────────────────────────────────────┬────────────┤
+│ 입력      │                                        │            │
+│  intake  │                                        │  Context   │
+│  analysis│         현재 단계의 주 작업면            │  (단계에   │
+│ 검토      │         (Module Review / Graph 등)     │   따라     │
+│  modules │                                        │   다름)    │
+│  graph   │                                        │            │
+│  runtime │                                        │            │
+│  a2a     │                                        │            │
+│ 자산화    │                                        │            │
+│  catalog │                                        │            │
+│  saved   │                                        │            │
+│ 생성      │                                        │            │
+│  export  │                                        │            │
+└──────────┴───────────────────────────────────────┴────────────┘
+   좌측: 워크플로우 rail        가운데: 작업면            우측: context</div>
+      </section>
+
+      <section class="block">
+        <h2>색·글리프 한 줄</h2>
+        <p>워크벤치는 카테고리를 항상 색과 글리프로 즉시 구분한다. 가이드 안에서도 같은 매핑을 쓴다.</p>
+        <table class="ref-table">
+          <thead>
+            <tr><th>카테고리</th><th>색</th><th>글리프</th><th>의미</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="cat-badge agent"><span class="glyph">◆</span> agent</span></td><td>보라</td><td>◆</td><td>reasoning 책임</td></tr>
+            <tr><td><span class="cat-badge workflow"><span class="glyph">▶</span> workflow</span></td><td>주황</td><td>▶</td><td>control flow / orchestration</td></tr>
+            <tr><td><span class="cat-badge adapter"><span class="glyph">⚙</span> adapter</span></td><td>청록</td><td>⚙</td><td>callable capability</td></tr>
+            <tr><td><span class="cat-badge remote"><span class="glyph">⇨</span> remote_a2a</span></td><td>빨강</td><td>⇨</td><td>원격 protocol boundary</td></tr>
+          </tbody>
+        </table>
+        <p>빨강은 Remote A2A 외에는 쓰지 않는다. 위험 신호(<code>risk_signals</code>)는 별도 핑크 배경 체계이며 자동 반려 조건이 아니다.</p>
+      </section>
+
+      <section class="block">
+        <h2>처음 실행해보는 추천 순서</h2>
+        <ol>
+          <li><code>cd packages/web &amp;&amp; npm install &amp;&amp; npm run dev -- --host 0.0.0.0 --port 5173 --strictPort</code> 후 <code>http://127.0.0.1:5173/</code>에서 워크벤치를 연다.</li>
+          <li>intake 단계에서 <strong>예시 불러오기</strong>를 누른다.</li>
+          <li><strong>요구사항 분석</strong>으로 analysis를 본다 — 핵심 계약 5개가 맞는지 확인한다.</li>
+          <li>modules 단계에서 후보 목록을 본다. <code>needs_info</code>가 있으면 6장 절차를 따른다.</li>
+          <li>graph 단계에서 fan-out/join/loop/human input이 보이는지 확인한다.</li>
+          <li>Runtime 계약과 Remote A2A 계약 단계가 나타나면 모두 승인 상태인지 확인한다.</li>
+          <li>모두 <code>approved</code>면 export에서 ADK Runtime Handoff와 smoke macro를 실행한다.</li>
+        </ol>
+        <div class="callout info">
+          <div class="icon">i</div>
+          <div class="body">
+            <p>매뉴얼 브라우저 테스트는 <strong>고정 포트 5173</strong>에서만 한다. 다른 포트로 fallback되면 안 된다. 자세한 정책은 <a href="../../CLAUDE.md">CLAUDE.md</a>의 dev server reachability 절을 참고.</p>
+          </div>
+        </div>
+      </section>
+
+      <nav class="pager" aria-label="페이지 이동"></nav>
+    </main>
+  </div>
+  <script src="assets/app.js"></script>
+</body>
+</html>
