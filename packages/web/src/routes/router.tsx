@@ -8,6 +8,7 @@ const AnalyzeWorkbench = lazy(() => import("./AnalyzeWorkbench"));
 const DesignWorkbench = lazy(() => import("./DesignWorkbench"));
 const BuildWorkbench = lazy(() => import("./BuildWorkbench"));
 const VerifyWorkbench = lazy(() => import("./VerifyWorkbench"));
+const ReuseHubPage = lazy(() => import("./ReuseHubPage"));
 const StagePlaceholder = lazy(() => import("./StagePlaceholder"));
 const LegacyWizard = lazy(() => import("./LegacyWizard"));
 
@@ -36,7 +37,7 @@ export function AppRouter() {
           path="/catalog"
           element={
             <WorkbenchLayout>
-              <StagePlaceholder stage="catalog" pr="PR5" />
+              <ReuseHubPage />
             </WorkbenchLayout>
           }
         />
