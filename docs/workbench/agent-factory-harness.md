@@ -144,6 +144,20 @@ Chat smoke requires an approved module `smoke_spec` from Module Review. If sourc
 
 When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel shows a yellow stub-runtime banner so reviewers do not mistake stub output for real business logic.
 
+## Workbench surface (router-shell migration)
+
+The workbench is moving from a single SPA wizard to a router-driven, artifact-root-first model. Both surfaces are live during the migration:
+
+- New router shell (`packages/web/src/routes/router.tsx`) — skill-scoped routes: `/` Landing, `/af/:reqId/analyze`, `/af/:reqId/design`, `/af/:reqId/build`, `/af/:reqId/verify`, `/catalog` Reuse Hub. State sits on `@tanstack/react-query`; `manifest.approvals.*` from `af-run-manifest.json` is the single source of truth for gate UI. All reads/writes go through Vite middleware (`/api/af/*`, `/api/catalog`) against `artifacts/af/<req-id>/` on the local file system.
+- Legacy wizard (`/legacy`, defined in `packages/web/src/routes/LegacyWizard.tsx`) — the prior 9-step `intake → … → export` flow backed by `useWorkbenchState`. Preserved until PR6 of the migration plan. New stage UI must land in `src/routes/*` and read from the artifact root, not from `useWorkbenchState`.
+
+Active stages today:
+- Landing creates `artifacts/af/<req-id>/` plus an empty `af-run-manifest.json`, or imports `analysis-result.json`.
+- `/af/:reqId/analyze` renders the imported analysis through the existing `AnalysisResult` component and toggles `analysis_reviewed`. `boundaries_approved` / `runtime_contracts_approved` / `stub_ready_for_followup` remain reviewer-visible chips but their toggles ship with the design/build PRs.
+- Other stage routes are placeholders pointing back at `/legacy` until their PR lands.
+
+When adding a stage workbench, do not bypass approval gates derived from the manifest, do not invent new artifact files outside the write whitelist in `packages/web/server/artifactRootStore.ts`, and do not persist stage state to `localStorage` — `localStorage` is reserved for the recent-artifact-roots cache only.
+
 ## Required artifact posture
 
 For Agent Factory work, produce or preserve reviewable artifacts rather than only code.

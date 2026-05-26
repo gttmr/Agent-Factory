@@ -51,13 +51,21 @@ Core rules:
 
 ### Workbench flow (packages/web)
 
-`App.tsx` is a single-page wizard backed by React state and local server middleware. There is no router; analyzer and ADK runtime actions call the Vite middleware under `packages/web/server`. The long-term product direction is skill-led: repo-local AF skills produce artifacts under `artifacts/af/<req-id>/`, and the workbench visualizes, reviews, and supports guided partial edits of those artifacts.
+The workbench is mid-migration from a single SPA wizard to a router-driven, artifact-root-first model. `App.tsx` mounts `AppRouter` (`src/routes/router.tsx`) inside `BrowserRouter` + `QueryClientProvider`. New routes are skill-scoped and read/write the local file system via Vite middleware under `packages/web/server`:
 
-Current steps are defined in `packages/web/src/workbench/useWorkbenchState.ts`:
+- `/` Landing — choose or create an artifact root (`POST /api/af`, import `analysis-result.json`).
+- `/af/:reqId/analyze` — af-analyze-requirement workbench. Reads `analysis-result.json` and toggles `analysis_reviewed` on `af-run-manifest.json`.
+- `/af/:reqId/design`, `/af/:reqId/build`, `/af/:reqId/verify` — placeholders pending PR3/PR4.
+- `/catalog` — Reuse Hub placeholder pending PR5.
+- `/legacy` — the prior single-page wizard, preserved until PR6.
+
+State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog, and approval gates are fetched/mutated through `packages/web/src/state/*` hooks (`useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useRecentRoots`). `manifest.approvals.*` is the single source of truth for gate UI; do not rebuild gate state from derived candidate status.
+
+The legacy wizard, still reachable at `/legacy`, is defined in `packages/web/src/routes/LegacyWizard.tsx`. Its steps come from `packages/web/src/workbench/useWorkbenchState.ts`:
 
 `intake → analysis → modules → graph → a2aContracts → catalog → saved → export`
 
-State flows through `useWorkbenchState`: `RequirementIntakeInput` or imported skill artifact → live/reviewed `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation.
+State in the legacy wizard flows through `useWorkbenchState`: `RequirementIntakeInput` or imported skill artifact → live/reviewed `AnalysisResult` (normalized requirement + evidence + module candidates + A2A contracts + runtime contracts + Graph IR) → user-edited `ModuleCandidate[]`, `RuntimeContract[]`, and `A2AContract[]` → catalog changes → review-gated `scaffoldPlan` and ADK runtime handoff. The user can mark missing-information items as accepted as part of review context, but source generation is gated by approved module status, required runtime-contract approval, and scaffold-plan validation. Treat the legacy wizard as a fallback authoring path — new stage UI should land under `src/routes/*` and read from `artifacts/af/<req-id>/`, not from `useWorkbenchState`.
 
 `AnalysisResult.runtimeContracts` is the review artifact for callback and runtime support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback responsibilities, and async resume behavior. The `Runtime 계약` wizard step surfaces these contracts before Remote A2A/catalog/export.
 

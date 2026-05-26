@@ -1,0 +1,278 @@
+/* Router-shell styles. Kept in a separate file so the legacy styles.css stays
+   untouched. New components add classes prefixed with `af-`. */
+
+.af-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--surface, #f6f7fb);
+}
+
+.af-topbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+.af-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.af-brand-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  line-height: 1.1;
+}
+
+.af-brand-link .eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-brand-link strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.af-root-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.af-root-switcher-label {
+  white-space: nowrap;
+}
+
+.af-root-switcher select {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: #fafafa;
+}
+
+.af-stage-nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.af-stage-link {
+  padding: 6px 12px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.75);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.af-stage-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.af-stage-link-active {
+  background: #1f2937;
+  color: #fff;
+  border-color: #1f2937;
+}
+
+.af-stage-link-aux {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-stage-link[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.af-gate-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.af-gate-placeholder {
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+}
+
+.af-approval-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: #fafafa;
+}
+
+.af-approval-chip-on {
+  background: #e6f6ec;
+  border-color: #2f9c6a;
+  color: #1c6a48;
+}
+
+.af-approval-chip-off {
+  background: #fafafa;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.af-approval-chip-pending {
+  opacity: 0.55;
+}
+
+.af-approval-chip-glyph {
+  font-size: 0.75rem;
+}
+
+.af-workspace {
+  flex: 1 1 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.af-landing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.af-landing-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .af-landing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.af-landing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.af-landing-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.af-import-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.af-landing-message {
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 0.85rem;
+}
+
+.af-landing-error {
+  color: #b42318;
+  font-size: 0.85rem;
+}
+
+.af-recent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.af-recent-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.af-recent-list li:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.af-recent-list a {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-decoration: none;
+  color: #2858a5;
+}
+
+.af-recent-time {
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+  margin-left: auto;
+}
+
+.af-recent-remove {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 0 4px;
+}
+
+.af-root-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.af-root-table th,
+.af-root-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  text-align: left;
+}
+
+.af-root-table code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.af-stage-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.af-action-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.af-gate-summary {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.af-gate-summary li {
+  margin-bottom: 4px;
+}
