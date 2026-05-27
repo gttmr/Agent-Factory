@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
 import { useRunVerify, VERIFY_COMMANDS, type VerifyRunResult } from "../state/useVerify";
+import type { ProcessStreamEvent } from "../state/useStreamingProcess";
+
+interface StreamLogEntry {
+  id: number;
+  text: string;
+}
 
 export default function VerifyWorkbench() {
   const params = useParams<{ reqId: string }>();
@@ -28,6 +34,9 @@ export default function VerifyWorkbench() {
   const [deltaDirty, setDeltaDirty] = useState(false);
   const [lastRun, setLastRun] = useState<VerifyRunResult | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [verifyStreamLog, setVerifyStreamLog] = useState<StreamLogEntry[]>([]);
+  const verifyStreamLogRef = useRef<HTMLPreElement | null>(null);
+  const verifyStreamSeq = useRef(0);
 
   useEffect(() => {
     if (!reportDirty && reportArtifact.data) setReportDraft(reportArtifact.data.content);
@@ -35,6 +44,10 @@ export default function VerifyWorkbench() {
   useEffect(() => {
     if (!deltaDirty && deltaArtifact.data) setDeltaDraft(deltaArtifact.data.content);
   }, [deltaArtifact.data, deltaDirty]);
+  useEffect(() => {
+    const log = verifyStreamLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [verifyStreamLog]);
 
   const manifest = manifestData?.manifest;
 
@@ -49,7 +62,12 @@ export default function VerifyWorkbench() {
 
   function handleRun(commandKey: string) {
     setActionMessage(null);
-    runVerify.mutate(commandKey, {
+    setVerifyStreamLog([]);
+    runVerify.mutate({
+      commandKey,
+      streamProgress: true,
+      onEvent: appendVerifyStreamEvent
+    }, {
       onSuccess: (result) => {
         setLastRun(result);
         setActionMessage(
@@ -61,6 +79,19 @@ export default function VerifyWorkbench() {
       onError: (error) => setActionMessage(error instanceof Error ? error.message : "실행 실패")
     });
   }
+
+  function appendVerifyStreamEvent(event: ProcessStreamEvent) {
+    const text = formatProcessStreamLogLine(event);
+    if (!text) return;
+    verifyStreamSeq.current += 1;
+    setVerifyStreamLog((entries) => [
+      ...entries.slice(-199),
+      { id: verifyStreamSeq.current, text }
+    ]);
+  }
+
+  const runningCommand =
+    typeof runVerify.variables === "string" ? runVerify.variables : runVerify.variables?.commandKey;
 
   return (
     <div className="af-stage-workspace">
@@ -100,11 +131,22 @@ export default function VerifyWorkbench() {
                 disabled={runVerify.isPending}
                 onClick={() => handleRun(command.key)}
               >
-                {runVerify.isPending && runVerify.variables === command.key ? "실행 중…" : "실행"}
+                {runVerify.isPending && runningCommand === command.key ? "실행 중…" : "실행"}
               </Button>
             </article>
           ))}
         </div>
+        {verifyStreamLog.length > 0 ? (
+          <div className="af-stream-log-panel">
+            <div className="af-stream-log-header">
+              <strong>실시간 로그</strong>
+              <span>{runVerify.isPending ? "실행 중" : "마지막 실행"}</span>
+            </div>
+            <pre ref={verifyStreamLogRef} className="af-stream-log">
+              {verifyStreamLog.map((entry) => entry.text).join("")}
+            </pre>
+          </div>
+        ) : null}
         {lastRun ? (
           <div className="af-verify-result">
             <p>
@@ -208,4 +250,29 @@ export default function VerifyWorkbench() {
       </Panel>
     </div>
   );
+}
+
+function formatProcessStreamLogLine(event: ProcessStreamEvent): string {
+  const data = event.data;
+  if (event.event === "stdout" || event.event === "stderr") {
+    return `[${event.event}] ${withTrailingNewline(valueToString(data.chunk))}`;
+  }
+  if (event.event === "start") {
+    return `[start] ${valueToString(data.command ?? data.command_key ?? "process")}\n`;
+  }
+  if (event.event === "done") {
+    return `[done] exit ${valueToString(data.exit_code ?? 0)}\n`;
+  }
+  if (event.event === "error") {
+    return `[error] ${valueToString(data.error ?? data.message ?? "실패")}\n`;
+  }
+  return `[${event.event}] ${JSON.stringify(data)}\n`;
+}
+
+function valueToString(value: unknown): string {
+  return typeof value === "string" ? value : String(value);
+}
+
+function withTrailingNewline(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
 }

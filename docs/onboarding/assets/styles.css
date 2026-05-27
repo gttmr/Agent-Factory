@@ -201,6 +201,35 @@ section.block strong { color: var(--text); }
 .callout.good { border-color: #25563f; background: #112a20; }
 .callout.good .icon { color: var(--good); }
 
+.screenshot-grid {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.doc-figure {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.doc-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--code-bg);
+}
+
+.doc-figure figcaption {
+  padding: 10px 14px 12px;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+}
+
 .kv-table, .ref-table {
   width: 100%;
   border-collapse: collapse;

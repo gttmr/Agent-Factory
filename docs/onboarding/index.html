@@ -13,12 +13,9 @@
     <main class="main">
       <div class="page-eyebrow">START · 0/9</div>
       <h1 class="page-title">Agent Factory 온보딩 가이드</h1>
-      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
-        <strong>⚠️ Surface 단어 부분 stale</strong> — 9개 챕터의 화면 묘사(특히 2장 “워크벤치 한 바퀴”, 6장 “Module Review Board”, 8장 “검증과 ADK Runtime Handoff”)는 PR1~PR6 마이그레이션 전의 single-page wizard UI 기준이다. 분류·Graph IR·Remote A2A·Runtime 계약·미싱 정보 게이트의 결정 기준 자체는 그대로 유효하지만, 현재 워크벤치는 router-driven 5-route 모델(<code>/</code>, <code>/af/:reqId/{analyze,design,build,verify}</code>, <code>/catalog</code>)이며 “Module Review”·“ADK Runtime Handoff 화면”·“Smoke 일괄 실행 매크로”는 더 이상 존재하지 않는다. 챕터별 본문/스크린샷 재작성은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다. 현재 surface 사실관계는 <code>docs/workbench/agent-factory-harness.md</code>의 “Workbench surface” 절을 참고한다.
-      </div>
       <p class="page-lede">
         ADK, A2A, MCP, EAI 같은 용어가 처음이라도 이 워크벤치로 어떻게 요구사항을
-        분석하고 4단계 DLC 산출물로 검토한 뒤 ADK Runtime Handoff까지 가는지 단계별로
+        분석하고 Stage Runner 기반 DLC 산출물로 검토한 뒤 Build/Verify까지 가는지 단계별로
         따라갈 수 있도록 만든 가이드다. 9개의 문서를 순서대로 읽으면 된다.
       </p>
 
@@ -37,12 +34,11 @@
       <section class="block">
         <h2>현재 운영 모델</h2>
         <div class="graph-mock">raw requirement
-  → af-analyze-requirement
-  → af-design-boundaries
-  → approved scaffold-plan + ADK Runtime Handoff
-  → af-build-runtime-stub
-  → af-verify-feedback</div>
-        <p>워크벤치는 이 흐름의 산출물을 읽고 검토 상태를 시각화한다. 특히 <code>analysis-result.json</code>은 분석/설계 artifact 본문이고, <code>af-run-manifest.json</code>은 DLC 단계·승인·검증 상태를 연결하는 가벼운 manifest다.</p>
+  → Analyze Stage Runner / af-analyze-requirement
+  → Design Stage Runner / af-design-boundaries
+  → BuildWorkbench: scaffold-plan + runtime-stub
+  → VerifyWorkbench: validation evidence + catalog delta</div>
+        <p>워크벤치는 이 흐름의 산출물을 artifact root에서 직접 읽고 쓴다. 특히 <code>analysis-result.json</code>은 분석/설계 artifact 본문이고, <code>af-run-manifest.json</code>은 approval gate, stage status, optional Stage Runner 실행 요약을 연결하는 가벼운 manifest다.</p>
         <div class="callout info">
           <div class="icon">i</div>
           <div class="body">
@@ -62,7 +58,7 @@
           <div class="card">
             <div class="card-eyebrow">2장</div>
             <h4><a href="02-workbench-tour.html">워크벤치 한 바퀴</a></h4>
-            <p>요구사항 접수 → 분석 결과 → 모듈 검토 → Graph IR → Runtime/Remote 계약 → 카탈로그 → 저장 → ADK 소스 생성 흐름을 본다.</p>
+            <p>Landing → Analyze Skill Runner → Design Skill Runner → Build → Verify → Reuse Hub 흐름을 본다.</p>
           </div>
           <div class="card">
             <div class="card-eyebrow">3장</div>
@@ -81,8 +77,8 @@
           </div>
           <div class="card">
             <div class="card-eyebrow">6장</div>
-            <h4><a href="06-review-board.html">Module Review Board</a></h4>
-            <p>승인/보류/반려/<code>needs_info</code> 판단, Resolution Draft, 2계층 missing-info 게이트.</p>
+            <h4><a href="06-review-board.html">Design Review</a></h4>
+            <p>DesignWorkbench 모듈 패널의 승인/보류/반려/<code>needs_info</code> 판단, Resolution Draft, 2계층 missing-info 게이트.</p>
           </div>
           <div class="card">
             <div class="card-eyebrow">7장</div>
@@ -91,8 +87,8 @@
           </div>
           <div class="card">
             <div class="card-eyebrow">8장</div>
-            <h4><a href="08-validation-handoff.html">검증과 ADK Runtime Handoff</a></h4>
-            <p>manifest 승인, scaffold-plan, source generation gate, smoke 일괄 실행, 검증 명령.</p>
+            <h4><a href="08-validation-handoff.html">Build와 Verify</a></h4>
+            <p>manifest 승인, scaffold-plan, runtime-stub source generation gate, 검증 명령과 evidence 기록.</p>
           </div>
           <div class="card">
             <div class="card-eyebrow">9장</div>
@@ -123,7 +119,7 @@
             <div class="step-num">C</div>
             <div class="step-body">
               <h4>리뷰와 산출에 들어가면 6 → 7 → 8장</h4>
-              <p>승인 게이트, 런타임 계약, 핸드오프까지 가서 끝낸다.</p>
+            <p>승인 게이트, 런타임 계약, Build/Verify까지 가서 끝낸다.</p>
             </div>
           </div>
           <div class="step">
@@ -142,7 +138,7 @@
           <div class="icon">!</div>
           <div class="body">
             <p><strong>Raw requirement는 직접 코드 생성으로 이어지지 않는다.</strong></p>
-            <p>Agent Factory는 “요구사항 → 자동 코드 생성” 도구가 아니다. <em>요구사항을 검토 가능한 산출물로 바꾼 다음</em>, 승인된 후보·Runtime 계약·Graph IR·manifest 승인 상태가 맞을 때만 ADK Runtime Handoff(소스 번들 + smoke 검증)로 흘려보낸다. 이 가이드 전체가 이 원칙을 지키기 위한 화면과 결정들을 다룬다.</p>
+            <p>Agent Factory는 “요구사항 → 자동 코드 생성” 도구가 아니다. <em>요구사항을 검토 가능한 산출물로 바꾼 다음</em>, 승인된 후보·Runtime 계약·Graph IR·manifest 승인 상태가 맞을 때만 BuildWorkbench가 TODO-only runtime stub을 만든다. 이 가이드 전체가 이 원칙을 지키기 위한 화면과 결정들을 다룬다.</p>
           </div>
         </div>
         <div class="callout info">

@@ -3,6 +3,7 @@ import type { ContainerRect } from "./layout";
 
 interface ContainerOverlayProps {
   rects: ContainerRect[];
+  highlightedIds?: Set<string>;
 }
 
 const transformSelector = (s: ReactFlowState): [number, number, number] => s.transform;
@@ -23,7 +24,7 @@ const KIND_GLYPH: Record<string, string> = {
   remote_boundary: "⇨"
 };
 
-export function ContainerOverlay({ rects }: ContainerOverlayProps) {
+export function ContainerOverlay({ rects, highlightedIds }: ContainerOverlayProps) {
   const [tx, ty, zoom] = useStore(transformSelector);
   return (
     <div
@@ -41,7 +42,9 @@ export function ContainerOverlay({ rects }: ContainerOverlayProps) {
         return (
           <div
             key={container.id}
-            className={`graph-container-overlay kind-${kind}`}
+            className={`graph-container-overlay kind-${kind} ${
+              highlightedIds?.has(container.id) ? "is-highlighted" : ""
+            }`}
             style={{ left: x, top: y, width, height }}
           >
             <div className="graph-container-overlay-head">

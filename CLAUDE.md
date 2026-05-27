@@ -8,7 +8,7 @@ This is the Agent Factory workbench — a local-first, skill-led tool that turns
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
-For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, export, or review-board work.
+For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, Stage Runner, or review-board work.
 
 Before source-code edits, check whether the change affects active `docs/` Markdown. Taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, and operating policy changes must update the relevant docs in the same change set. Leave `docs/archive/**` untouched unless the task explicitly asks for archival or migration work.
 
@@ -31,13 +31,13 @@ node scripts/validate-artifacts.mjs                       # smoke-checks templat
 node scripts/validate-artifacts.mjs path/to/artifacts     # check exported artifacts
 ```
 
-The validator enforces taxonomy, subtype presence, Remote A2A contract completeness, and the scaffold guard that raw requirements cannot generate code. After any TypeScript, React, analyzer, or export change, run `npm run build` in `packages/web` — work is not complete without that observable verification.
+The validator enforces taxonomy, subtype presence, Remote A2A contract completeness, Stage Runner manifest metadata, and the scaffold guard that raw requirements cannot generate code. After any TypeScript, React, analyzer, Stage Runner, or handoff change, run `npm run build` in `packages/web` — work is not complete without that observable verification.
 
 ## Architecture
 
 ### Agent Factory harness
 
-`docs/workbench/agent-factory-harness.md` is the project-specific operating harness for this repository. Apply it before non-trivial analysis, taxonomy, scaffold, export, or review-board work.
+`docs/workbench/agent-factory-harness.md` is the project-specific operating harness for this repository. Apply it before non-trivial analysis, taxonomy, scaffold, Stage Runner, handoff, or review-board work.
 
 Core rules:
 
@@ -66,7 +66,7 @@ State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog
 
 `localStorage` is reserved for two read-only caches: `agent-factory:recent-artifact-roots` and `agent-factory:author-{name,role}` for the comment composer. No stage state is persisted to `localStorage` — the artifact root is the canonical store.
 
-`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. Runtime contract review UI is still pending a follow-up PR; for now the `runtime_contracts_approved` toggle is manual and DesignWorkbench surfaces the contract list read-only.
+`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. DesignWorkbench exposes a Runtime contract tab with readiness details and keeps `runtime_contracts_approved` as a reviewer-driven manifest gate; Stage Runner output never toggles it automatically.
 
 ### Analyzer pipeline
 
@@ -131,7 +131,7 @@ npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 Manual/browser testing must stay on the fixed Agent Factory port `5173`. Before starting or restarting, check `lsof -iTCP:5173 -sTCP:LISTEN`; stop a stale Agent Factory/Vite process if it owns the port, but report an unrelated owner as a blocker. Do not let Vite auto-increment to `5174` or another fallback port. Verify with `curl -I http://127.0.0.1:5173/` and report `http://127.0.0.1:5173/` as the testing URL.
 
-Then in MCP: `new_page` → `evaluate_script` to drive route navigation / button clicks → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. Smoke seeding pattern: `POST /api/af { requirement_id: "req-001" }` then `PUT /api/af/req-001/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
+Then in MCP or Playwright: drive route navigation / button clicks and save screenshots to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, force a fresh navigation. Smoke seeding pattern: `POST /api/af { requirement_id: "req-docs-smoke" }` then `PUT /api/af/req-docs-smoke/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the temporary artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
 
 ## Editing Rules (from AGENTS.md)
 

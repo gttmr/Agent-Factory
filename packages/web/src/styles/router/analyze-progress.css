@@ -1,6 +1,27 @@
 
 /* ===== Analyze rerun progress ===== */
 
+.af-analyze-intake {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
+  align-items: end;
+}
+
+.af-analyze-intake textarea {
+  min-height: 150px;
+}
+
+.af-analyze-intake-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.af-analyze-intake-controls .ui-button {
+  width: 100%;
+  white-space: nowrap;
+}
+
 .af-analyze-progress {
   margin-top: 10px;
 }
@@ -56,4 +77,19 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.7rem;
   text-align: right;
+}
+
+@media (max-width: 760px) {
+  .af-analyze-intake {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .af-analyze-event {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+
+  .af-analyze-event-meta {
+    grid-column: 2;
+    text-align: left;
+  }
 }

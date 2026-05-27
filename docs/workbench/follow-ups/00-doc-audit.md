@@ -1,16 +1,20 @@
-# 00 — Doc audit (router-shell migration 후 잔존 stale 참조)
+# 00 — Doc audit (router-shell migration 후 문서 불일치 감사)
+
+상태: 해결됨. brief 00 commit(`a3ed7df`)과 brief 07 onboarding refresh에서 현재 active 문서를 Stage Runner / route shell 기준으로 갱신했다.
+
+아래 목록은 당시 확인한 감사 스냅샷이다. 새 작업의 현재 진입점으로 쓰지 말고 [`STATUS.md`](./STATUS.md)와 [`INDEX.md`](./INDEX.md)의 최신 브리프 상태를 먼저 본다.
 
 ## 왜 필요한가
 
-PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으로 전면 전환했지만, 문서 일부가 여전히 9-step wizard / `useWorkbenchState` / `AdkRuntimeWorkbench` / `예시 불러오기` 등 사라진 surface 를 전제로 작성돼 있다. 새 onboarding 사용자가 docs 만 보고 워크벤치를 켜면 화면과 설명이 어긋나서 신뢰가 깎인다.
+PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으로 전면 전환했지만, 당시 문서 일부가 9-step flow / `useWorkbenchState` / `AdkRuntimeWorkbench` / `예시 불러오기` 등 사라진 surface 를 전제로 작성돼 있었다. 새 onboarding 사용자가 docs 만 보고 워크벤치를 켜면 화면과 설명이 어긋나서 신뢰가 깎이는 상태였다.
 
 이 브리프는 코드 변경 없이 **문서만 정리**하는 단발성 작업이다.
 
-## 현재 상태 — 의심 지점 (코드 검증 끝낸 항목)
+## 원래 의심 지점 (코드 검증 끝낸 항목)
 
 코드 grep 결과를 기준으로 명시. 실제 작업 시 한 번 더 검증한다.
 
-### 확인된 stale 위치
+### 확인된 불일치 위치
 
 - `docs/onboarding/02-workbench-tour.html`
   - L52: "Codex CLI가 raw requirement를 정규화한다… 화면 상단의 핵심 계약 5개" — 현재 `AnalysisResult` 컴포넌트의 metric panel 은 동일하지만 진입점이 wizard intake → analysis 가 아니라 Landing import → `/af/:id/analyze`.
@@ -19,7 +23,7 @@ PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으�
 - `docs/onboarding/09-glossary.html`
   - L97-98: "Codex CLI… `/api/analyze-requirement` SSE endpoint를 통해 호출되고" — 엔드포인트는 남아있지만 워크벤치 UI 에서 호출하지 않는다. 용어 정의로는 유지하되 "현재 워크벤치 UI 에서는 직접 호출하지 않으며 af-analyze-requirement skill 이 호출한다" 한 줄 추가 필요.
   - 다른 항목들도 `예시 불러오기`, `Module Review` UI, `SavedAnalysisRecord` 같은 wizard 전용 단어가 정의되어 있으면 갱신 또는 deprecate 표기.
-- `docs/onboarding/index.html` 및 03~08 챕터 — wizard 시나리오 기반 가능성 높음. 페이지 별로 한 번씩 brain check.
+- `docs/onboarding/index.html` 및 03~08 챕터 — 9-step flow 기반 가능성 높음. 페이지 별로 한 번씩 brain check.
 - `docs/workbench/validation.md`
   - L38: "schemas/analysis-draft.schema.json은 live Codex CLI의 내부 반환 계약" — 사실이지만, "워크벤치 UI 는 이 endpoint 를 호출하지 않는다 — 검증은 import 시 `validateAnalysisResult` 가 담당" 같은 정합화 필요.
 - `docs/workbench/review-board.md`, `docs/workbench/process-flow.md`, `docs/workbench/taxonomy.md`, `docs/workbench/analysis-guide.md`, `docs/workbench/workflow-decision-guide.md`

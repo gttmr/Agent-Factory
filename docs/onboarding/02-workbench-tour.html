@@ -13,149 +13,133 @@
     <main class="main">
       <div class="page-eyebrow">화면 투어 · 2/9</div>
       <h1 class="page-title">2. 워크벤치 한 바퀴</h1>
-      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
-        <strong>⚠️ Stale (PR6 이전 wizard UI 기준)</strong> — 이 챕터는 PR1~PR6 마이그레이션 전의 단일 페이지 wizard surface(intake → analysis → modules → graph → contracts → catalog → saved → export)를 묘사한다. 현재 워크벤치는 router-driven 5-route 모델(<code>/</code> Landing → <code>/af/:reqId/{analyze,design,build,verify}</code> → <code>/catalog</code> Reuse Hub)이다. 본문 재작성과 새 스크린샷은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다. 현재 UI 사실관계는 <code>docs/workbench/agent-factory-harness.md</code>의 “Workbench surface” 절을 참고한다.
-      </div>
       <p class="page-lede">
-        Agent Factory 워크벤치는 단일 페이지 wizard다. 좌측 rail에는 항상 보이는 단계와
-        산출물 상태에 따라 열리는 조건부 단계가 있다. 각 단계는 “무엇을 결정하는 화면인지”가
-        분명히 다르다. 이 장은 각 단계가 어떤 입력을 받고 어떤 산출물을 만드는지 한 번에 본다.
+        현재 Agent Factory 워크벤치는 Landing과 Analyze/Design/Build/Verify, Reuse Hub로 나뉜
+        5-route review console이다. Landing에서 artifact root를 고르고, Reuse Hub는 별도
+        <code>/catalog</code> route에서 연다. Analyze와 Design의 첫 화면에는 Stage Runner가 있고, 스킬 실행 결과는
+        diff/preview 후 사용자가 적용해야 canonical artifact가 바뀐다.
       </p>
 
       <section class="block">
-        <h2>워크벤치 단계 한눈에</h2>
-        <div class="graph-mock">intake → analysis → modules → graph → [runtimeContracts] → [a2aContracts] → catalog → saved → export
-  ↓        ↓          ↓        ↓            ↓                  ↓             ↓        ↓        ↓
- 입력    이해 확인   판단/승인  흐름검증     Runtime 계약        Remote A2A     재사용   저장    ADK 소스 생성</div>
-        <p>좌측 rail은 의미 단위로 4개 그룹이다:</p>
-        <ul>
-          <li><strong>입력</strong> — intake, analysis</li>
-          <li><strong>검토</strong> — modules, graph, runtimeContracts, a2aContracts</li>
-          <li><strong>자산화</strong> — catalog, saved</li>
-          <li><strong>생성</strong> — export (ADK Runtime Handoff)</li>
-        </ul>
-        <p><code>runtimeContracts</code>는 Runtime 계약 후보나 catalog-bound 후보가 있을 때 열리고, <code>a2aContracts</code>는 Remote A2A 후보나 A2A 계약이 있을 때 열린다. 조건이 없으면 rail에 나타나지 않는다.</p>
+        <h2>현재 route 흐름</h2>
+        <div class="graph-mock">/ Landing
+  -> /af/:reqId/analyze  Analyze Stage Runner + AnalysisResult review
+  -> /af/:reqId/design   Design Stage Runner + module/Graph/Runtime review
+  -> /af/:reqId/build    scaffold-plan + runtime-stub handoff
+  -> /af/:reqId/verify   validation commands + reports
+  -> /catalog            Reuse Hub</div>
+        <p>모든 route는 <code>artifacts/af/&lt;req-id&gt;/</code>를 단일 저장소로 사용한다. 브라우저 localStorage는 최근 root와 코멘트 작성자 캐시에만 쓰고, 분석 결과나 단계 상태를 저장하지 않는다.</p>
       </section>
 
       <section class="block">
-        <h2>각 단계의 책임</h2>
-
+        <h2>화면별 책임</h2>
         <div class="step-rail">
           <div class="step">
             <div class="step-num">1</div>
             <div class="step-body">
-              <h4>intake — 요구사항 입력</h4>
-              <p>raw requirement 텍스트와 requester context를 넣는다. 워크벤치는 여기서 코드를 만들지 않는다. 오른쪽 <em>파일 입력</em> 패널에서는 <code>analysis-result.json</code>과 <code>af-run-manifest.json</code>을 browser file import로 불러올 수 있다.</p>
+              <h4>Landing — root 선택</h4>
+              <p>새 <code>requirement_id</code>를 만들거나 최근 root를 연다. 외부 <code>af-analyze-requirement</code>가 만든 <code>analysis-result.json</code> import도 여기서 시작할 수 있다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
             <div class="step-body">
-              <h4>analysis — 이해 확인</h4>
-              <p>Codex CLI가 raw requirement를 정규화한다. 화면 상단의 핵심 계약 5개(<code>목표</code>, <code>도메인</code>, <code>입력</code>, <code>출력</code>, <code>시스템</code>)가 맞는지 본다. 가정/누락 정보/모순/위험 신호는 보조 drawer에 둔다. <strong>이 화면은 보고서가 아니라 “모듈 검토로 넘어가도 되는가”를 보는 게이트다.</strong></p>
+              <h4>Analyze — 요구사항 분석 실행과 이해 확인</h4>
+              <p>상단 <strong>Analyze Skill Runner</strong>가 raw requirement, domain, model, seed catalog를 서버 Stage Runner로 보낸다. 결과는 먼저 <code>runs/analyze/&lt;run-id&gt;/proposed-artifacts/analysis-result.json</code>에 저장되고, 사용자가 <em>제안 적용</em>을 누른 뒤에만 canonical <code>analysis-result.json</code>이 바뀐다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">3</div>
             <div class="step-body">
-              <h4>modules — Module Review Board</h4>
-              <p>각 ModuleCandidate를 <code>approved</code>/<code>deferred</code>/<code>rejected</code>/<code>needs_info</code>로 판단한다. <em>신규 모듈</em>과 <em>카탈로그 계약</em> 두 탭으로 나뉜다. <code>needs_info</code>는 “해결 초안 생성” → <em>Resolution Draft 검토</em> → <em>반영 적용</em> → <em>승인</em> 순서로 푼다 (<a href="06-review-board.html">6장</a>).</p>
+              <h4>Design — 경계 설계와 검토</h4>
+              <p><code>analysis_reviewed=true</code>가 되면 <strong>Design Skill Runner</strong>를 실행할 수 있다. 이 runner는 모듈 상태, candidate-level missing information, Graph IR, Runtime 계약, A2A 계약 변경을 patch로 제안한다. 성공해도 <code>boundaries_approved</code>나 <code>runtime_contracts_approved</code>는 자동으로 켜지지 않는다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">4</div>
             <div class="step-body">
-              <h4>graph — Process Flow 검증</h4>
-              <p>승인된 모듈로 Graph IR을 본다. 고립된 node, 누락된 join, route_condition이 없는 route edge 같은 구조 오류를 잡는다. Module Review에서 저장하면 deterministic하게 재생성된다.</p>
+              <h4>Build — Runtime Handoff 준비</h4>
+              <p>승인된 analysis artifact와 seed catalog로 <code>scaffold-plan.json</code>을 만들고, <code>runtime-stub/</code> source bundle을 생성한다. raw requirement는 source generation 입력이 될 수 없다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">5</div>
             <div class="step-body">
-              <h4>runtimeContracts — Runtime 계약 검토</h4>
-              <p>MCP, EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약을 검토한다. 필수 계약은 <code>contract_status: approved</code>가 되기 전까지 scaffold/source generation blocker다.</p>
+              <h4>Verify — 검증 evidence 기록</h4>
+              <p>고정 allow-list 검증 명령을 실행하고 <code>manifest.validation.last_result</code>, <code>validation-report.md</code>, <code>catalog-delta.yaml</code>을 갱신한다. 실제 <code>adk web</code>이나 chat smoke는 워크벤치 밖 별도 터미널에서 수행한다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">6</div>
             <div class="step-body">
-              <h4>a2aContracts — Remote A2A 계약 검토</h4>
-              <p><code>remote_a2a</code> 후보가 있으면 Agent Card, 인터페이스, message/task/artifact 계약, auth, timeout, retry, fallback, audit, data policy를 검토한다. 없으면 rail에서 숨겨진다.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">7</div>
-            <div class="step-body">
-              <h4>catalog — 재사용 결정</h4>
-              <p>기존 catalog의 agent/workflow/adapter/remote_a2a 계약 중 어떤 것을 재사용할지, 어떤 후보를 새로 등록할지 정한다. 이 단계가 “신규 vs 재사용”을 가르는 곳이다.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">8</div>
-            <div class="step-body">
-              <h4>saved — 저장된 분석</h4>
-              <p>현재 분석을 <code>SavedAnalysisRecord</code>로 저장하거나 이전 record를 불러온다. 여기서 현재 검토 상태의 <code>analysis-result.json</code>과 연결된 <code>af-run-manifest.json</code>을 내보낼 수 있다.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">9</div>
-            <div class="step-body">
-              <h4>export — ADK Runtime Handoff</h4>
-              <p>승인된 산출물로 <code>scaffold-plan.json</code>을 만들고 ADK source bundle을 생성한다. Manifest 승인, Runtime 계약 승인, Graph IR coverage가 맞지 않으면 source generation이 차단된다 (<a href="08-validation-handoff.html">8장</a>).</p>
+              <h4>Reuse Hub — catalog 연결과 등록 제안</h4>
+              <p><code>/catalog</code>에서 reusable Agent/Workflow/Adapter/Remote A2A 계약을 검색한다. 현재 root 후보에 pin하거나, 새 등록 제안을 root의 <code>catalog-delta.yaml</code>에 append한다. <code>catalog/*.yaml</code>은 UI가 직접 수정하지 않는다.</p>
             </div>
           </div>
         </div>
       </section>
 
       <section class="block">
-        <h2>화면 골격 (WorkbenchShell)</h2>
-        <div class="graph-mock">┌──────────────────────────────────────────────────────────────┐
-│  Agent Factory                  분석 상태 요약 (metric pills) │  ← 상단
-├──────────┬───────────────────────────────────────┬────────────┤
-│ 입력      │                                        │            │
-│  intake  │                                        │  Context   │
-│  analysis│         현재 단계의 주 작업면            │  (단계에   │
-│ 검토      │         (Module Review / Graph 등)     │   따라     │
-│  modules │                                        │   다름)    │
-│  graph   │                                        │            │
-│  runtime │                                        │            │
-│  a2a     │                                        │            │
-│ 자산화    │                                        │            │
-│  catalog │                                        │            │
-│  saved   │                                        │            │
-│ 생성      │                                        │            │
-│  export  │                                        │            │
-└──────────┴───────────────────────────────────────┴────────────┘
-   좌측: 워크플로우 rail        가운데: 작업면            우측: context</div>
+        <h2>Stage Runner가 남기는 evidence</h2>
+        <p>Analyze와 Design 실행은 같은 run folder 계약을 사용한다.</p>
+        <pre>artifacts/af/&lt;req-id&gt;/runs/&lt;stage&gt;/&lt;run-id&gt;/
+  request.json
+  events.jsonl
+  result-summary.json
+  diff-summary.json
+  proposed-artifacts/
+    analysis-result.json
+    boundary-design.md
+  diagnostics.md</pre>
+        <ul>
+          <li><code>manifest.stage_runs</code>는 최근 실행 요약이다. approval source of truth가 아니다.</li>
+          <li><code>manifest.approvals.*</code>가 계속 gate UI의 단일 기준이다.</li>
+          <li>validation 실패나 ETag conflict가 있으면 canonical artifact에 적용할 수 없다.</li>
+          <li>실패 run도 diagnostics와 함께 남아 원인 분석이 가능하다.</li>
+        </ul>
       </section>
 
       <section class="block">
-        <h2>색·글리프 한 줄</h2>
-        <p>워크벤치는 카테고리를 항상 색과 글리프로 즉시 구분한다. 가이드 안에서도 같은 매핑을 쓴다.</p>
-        <table class="ref-table">
-          <thead>
-            <tr><th>카테고리</th><th>색</th><th>글리프</th><th>의미</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><span class="cat-badge agent"><span class="glyph">◆</span> agent</span></td><td>보라</td><td>◆</td><td>reasoning 책임</td></tr>
-            <tr><td><span class="cat-badge workflow"><span class="glyph">▶</span> workflow</span></td><td>주황</td><td>▶</td><td>control flow / orchestration</td></tr>
-            <tr><td><span class="cat-badge adapter"><span class="glyph">⚙</span> adapter</span></td><td>청록</td><td>⚙</td><td>callable capability</td></tr>
-            <tr><td><span class="cat-badge remote"><span class="glyph">⇨</span> remote_a2a</span></td><td>빨강</td><td>⇨</td><td>원격 protocol boundary</td></tr>
-          </tbody>
-        </table>
-        <p>빨강은 Remote A2A 외에는 쓰지 않는다. 위험 신호(<code>risk_signals</code>)는 별도 핑크 배경 체계이며 자동 반려 조건이 아니다.</p>
+        <h2>스크린샷으로 보는 현재 화면</h2>
+        <div class="screenshot-grid">
+          <figure class="doc-figure">
+            <img src="assets/onboarding-landing.png" alt="Agent Factory Landing 화면" />
+            <figcaption>Landing은 artifact root를 만들거나 최근 root를 여는 진입점이다.</figcaption>
+          </figure>
+          <figure class="doc-figure">
+            <img src="assets/onboarding-analyze.png" alt="Analyze Skill Runner 화면" />
+            <figcaption>Analyze route의 첫 Panel은 Skill Runner다. raw requirement 실행 결과는 proposed artifact로 먼저 저장된다.</figcaption>
+          </figure>
+          <figure class="doc-figure">
+            <img src="assets/onboarding-design.png" alt="Design Skill Runner와 검토 화면" />
+            <figcaption>Design route는 Skill Runner, module review, Graph IR, Runtime 계약 검토를 한 화면에서 이어준다.</figcaption>
+          </figure>
+          <figure class="doc-figure">
+            <img src="assets/onboarding-build.png" alt="Build Workbench 화면" />
+            <figcaption>Build route는 승인된 artifact에서 scaffold-plan과 TODO-only runtime stub을 만든다.</figcaption>
+          </figure>
+          <figure class="doc-figure">
+            <img src="assets/onboarding-verify.png" alt="Verify Workbench 화면" />
+            <figcaption>Verify route는 고정 allow-list 검증 명령과 report/catalog-delta evidence를 다룬다.</figcaption>
+          </figure>
+          <figure class="doc-figure">
+            <img src="assets/onboarding-catalog.png" alt="Reuse Hub 화면" />
+            <figcaption>Reuse Hub는 catalog 원본을 직접 고치지 않고 root별 pin 또는 delta 제안만 남긴다.</figcaption>
+          </figure>
+        </div>
       </section>
 
       <section class="block">
         <h2>처음 실행해보는 추천 순서</h2>
         <ol>
-          <li><code>cd packages/web &amp;&amp; npm install &amp;&amp; npm run dev -- --host 0.0.0.0 --port 5173 --strictPort</code> 후 <code>http://127.0.0.1:5173/</code>에서 워크벤치를 연다.</li>
-          <li>intake 단계에서 <strong>예시 불러오기</strong>를 누른다.</li>
-          <li><strong>요구사항 분석</strong>으로 analysis를 본다 — 핵심 계약 5개가 맞는지 확인한다.</li>
-          <li>modules 단계에서 후보 목록을 본다. <code>needs_info</code>가 있으면 6장 절차를 따른다.</li>
-          <li>graph 단계에서 fan-out/join/loop/human input이 보이는지 확인한다.</li>
-          <li>Runtime 계약과 Remote A2A 계약 단계가 나타나면 모두 승인 상태인지 확인한다.</li>
-          <li>모두 <code>approved</code>면 export에서 ADK Runtime Handoff와 smoke macro를 실행한다.</li>
+          <li><code>cd packages/web &amp;&amp; npm run dev -- --host 0.0.0.0 --port 5173 --strictPort</code> 후 <code>http://127.0.0.1:5173/</code>에서 워크벤치를 연다.</li>
+          <li>Landing에서 새 root를 만들고 Analyze route로 이동한다.</li>
+          <li>Analyze Skill Runner에 raw requirement를 넣어 실행한다.</li>
+          <li>run detail의 diff/preview를 확인하고 proposed <code>analysis-result.json</code>을 적용한다.</li>
+          <li>요구사항 수준 missing information을 수용한 뒤 <code>analysis_reviewed</code>를 수동 토글한다.</li>
+          <li>Design Skill Runner를 실행하고 proposed patch를 diff/preview 후 적용한다.</li>
+          <li>모듈 상태, Graph IR validation, Runtime 계약 readiness를 검토하고 approval gate를 사람이 직접 토글한다.</li>
+          <li>Build에서 scaffold-plan과 runtime stub을 만들고, Verify에서 검증 evidence를 남긴다.</li>
         </ol>
         <div class="callout info">
           <div class="icon">i</div>

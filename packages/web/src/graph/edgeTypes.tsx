@@ -140,7 +140,10 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
 
   const label = spec.showLabel && graphEdge ? buildLabel(graphEdge, spec.labelPrefix) : "";
   const isSelected = data?.selected;
+  const isHighlighted = Boolean(data?.highlightCount);
+  const hasComment = Boolean(data?.commentCount);
   const selectedStrokeWidth = Math.max(spec.strokeWidth + 3, spec.strokeWidth * 1.8);
+  const highlightStroke = data?.highlightColor ?? "var(--cat-workflow-line, #2f8a68)";
 
   return (
     <>
@@ -148,20 +151,23 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
         id={id}
         path={edgePath}
         style={{
-          stroke: spec.stroke,
-          strokeWidth: isSelected ? selectedStrokeWidth : spec.strokeWidth,
+          stroke: isHighlighted ? highlightStroke : spec.stroke,
+          strokeWidth: isSelected || isHighlighted ? selectedStrokeWidth : spec.strokeWidth,
           strokeDasharray: spec.strokeDasharray,
-          opacity: isSelected ? 1 : 0.92,
+          opacity: isSelected || isHighlighted ? 1 : 0.92,
           strokeLinecap: "round",
           strokeLinejoin: "round",
-          filter: isSelected ? "drop-shadow(0 0 3px rgba(30, 122, 77, 0.35))" : undefined,
+          filter: isSelected || isHighlighted ? "drop-shadow(0 0 3px rgba(30, 122, 77, 0.35))" : undefined,
           transition: "stroke-width 120ms ease, opacity 120ms ease, filter 120ms ease"
         }}
       />
-      {label ? (
+      {label || hasComment || isHighlighted ? (
         <EdgeLabelRenderer>
           <div
-            className={`graph-edge-label ${spec.className}-label ${isSelected ? "is-selected" : ""}`}
+            className={`graph-edge-label ${spec.className}-label ${isSelected ? "is-selected" : ""} ${
+              isHighlighted ? "is-highlighted" : ""
+            }`}
+            title={data?.commentTooltip}
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
             }}
@@ -170,7 +176,8 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
               if (data && id) data.onSelect(id);
             }}
           >
-            {label}
+            {label || "edge"}
+            {hasComment ? <span className="graph-edge-comment-pin">{data?.commentCount}</span> : null}
           </div>
         </EdgeLabelRenderer>
       ) : null}

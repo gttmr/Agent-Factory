@@ -12,11 +12,11 @@
 4. 후보 모듈을 `agent`, `workflow`, `adapter`, `remote_a2a` 중 하나로 분류한다.
 5. 선택한 category에 맞는 subtype을 채운다.
 6. [Workflow decision guide](./workflow-decision-guide.md)에 따라 process flow를 그린다.
-7. 개발 리더가 Module Review Board에서 후보별 책임, 계약, Graph 연결을 검토한다.
-8. `needs_info` 후보는 Resolution Draft를 생성하고 object schema, patch preview, smoke 계약을 검토한 뒤 `반영 적용`한다.
+7. 개발 리더가 DesignWorkbench의 모듈 검토 패널에서 후보별 책임, 계약, Graph 연결을 검토한다.
+8. `needs_info` 후보는 Design Stage Runner 또는 외부 `af-design-boundaries` producer가 제안한 Resolution Draft/patch를 diff로 확인한 뒤 canonical artifact에 적용한다.
 9. 개발 리더가 각 후보를 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
 10. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
-11. 승인된 후보만 `scaffold-plan`으로 묶고 `af-build-runtime-stub` 또는 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 chat smoke 준비 상태를 확인한다.
+11. 승인된 후보만 `scaffold-plan`으로 묶고 `af-build-runtime-stub` 또는 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 structural smoke 준비 상태를 확인한다.
 12. `af-verify-feedback`로 검증 결과와 catalog delta 제안을 남긴다.
 
 ## 분석 결과 화면
@@ -33,7 +33,7 @@ Import 연결 방식은 browser file import다. Workbench가 로컬 `artifacts/a
 Import된 artifact는 live analyzer 응답과 같은 client-side normalization을 거쳐 `AnalysisResult`, `ModuleCandidate[]`, Runtime 계약, A2A 계약, Graph IR 상태로 hydrate된다.
 Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마지막 검증 결과를 상태 요약으로 보여준다. `requirement_id`가 현재 분석 artifact와 다르면 연결하지 않는다.
 누락 정보나 모순이 남아 있으면 `분석 결과` 단계로, 그렇지 않으면 `모듈 검토` 단계로 이동해 reviewer가 검토를 계속한다.
-검토 후 `저장된 분석` 화면의 `analysis-result.json 내보내기`와 `af-run-manifest.json 내보내기`를 사용하면 현재 Workbench 상태의 reviewed artifact와 연결된 DLC manifest를 browser download로 받을 수 있다.
+검토 후 canonical artifact는 `artifacts/af/<req-id>/`에 그대로 남는다. Stage Runner 결과는 `runs/<stage>/<run-id>/`에 보존되고, 적용된 artifact와 manifest는 같은 root에서 파일로 확인한다.
 
 ## 산출물 의미
 
@@ -41,7 +41,7 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 - `normalized-requirement.json`: 요구사항을 구조화한 split convenience artifact다.
 - `analysis-summary.md`: 분류 근거, 위험, 누락 정보, 가정을 사람이 빠르게 검토할 수 있게 요약한 문서다.
 - `module-candidates.json`: 검토 대상 모듈 후보.
-- `resolution_draft`: 정보 필요 후보를 승인 가능한 artifact로 바꾸기 위한 후보별 LLM 초안. 자동 적용되지 않고 Module Review에서 검토 후 반영한다.
+- `resolution_draft`: 정보 필요 후보를 승인 가능한 artifact로 바꾸기 위한 후보별 LLM 초안. 자동 적용되지 않고 Design Stage Runner diff 또는 모듈 검토 패널에서 검토 후 반영한다.
 - `process-flow.json`: 후보 모듈 사이의 local 또는 Remote A2A 흐름.
 - `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보 요약. 실제 등록/제외 결정은 Catalog review에서 한다.
 - `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
@@ -61,7 +61,7 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 - ADK component는 category가 아니다. 필요하면 module candidate의 ADK hint로 남긴다.
 - 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
 - Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK Runtime Handoff는 승인된 후보와 `scaffold-plan`만 사용하며, 생성물은 실제 runtime 설정과 비즈니스 로직을 TODO 경계로 남긴다.
-- LLM이 만든 Resolution Draft는 승인 근거가 아니라 검토 초안이다. object schema와 smoke 계약은 개발 리더가 Module Review에서 확인하고 `반영 적용`해야 scaffold/chat smoke 입력으로 쓰인다.
+- LLM이 만든 Resolution Draft는 승인 근거가 아니라 검토 초안이다. object schema와 smoke 계약은 개발 리더가 DesignWorkbench에서 확인하고 명시적으로 적용해야 scaffold 입력으로 쓰인다.
 
 ## Live analyzer 실행 계약
 

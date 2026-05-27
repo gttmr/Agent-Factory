@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>8. 검증과 ADK Runtime Handoff — Agent Factory 온보딩</title>
+  <title>8. Build와 Verify — Agent Factory 온보딩</title>
   <link rel="stylesheet" href="assets/styles.css" />
   <link rel="icon" href="data:," />
 </head>
@@ -11,148 +11,70 @@
   <div class="layout">
     <nav class="sidebar" aria-label="목차"></nav>
     <main class="main">
-      <div class="page-eyebrow">검증과 핸드오프 · 8/9</div>
-      <h1 class="page-title">8. 검증과 ADK Runtime Handoff</h1>
-      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
-        <strong>⚠️ Stale (PR6 이전 wizard UI 기준)</strong> — 이 챕터의 “ADK Runtime Handoff 화면 + Smoke 일괄 실행 macro + chat-smoke + <code>adk web</code> 임베드 + <code>SavedAnalysisRecord</code>/<code>activeStep</code> landing 분기”는 PR6 마이그레이션 이전 surface다. 현재 워크벤치는 두 단계로 나뉘어 있다:
-        <ul>
-          <li>BuildWorkbench(<code>/af/:reqId/build</code>) — scaffold-plan 도출 + <code>POST /api/af/:id/runtime-stub/build</code>로 <code>scripts/generate-adk-source.mjs</code> spawn, <code>implementation-handoff.md</code> inline 편집.</li>
-          <li>VerifyWorkbench(<code>/af/:reqId/verify</code>) — 고정 allow-list 세 명령(<code>validate-artifacts.mjs &lt;root&gt;</code>, <code>npm run build --prefix packages/web</code>, <code>npm run test:analyzer --prefix packages/web</code>)만 실행하고 결과를 <code>manifest.validation.last_result</code>에 기록.</li>
-        </ul>
-        <code>adk web</code> 임베드 / <code>/run</code> chat smoke / Smoke 일괄 실행 macro는 워크벤치 UI에서 제거됐고, 같은 검증이 필요하면 별도 터미널에서 실행한다. <code>SavedAnalysisRecord</code>는 <code>templates/saved-analysis-fixtures/</code>의 validator regression fixture로만 남는다. 본문 재작성과 새 스크린샷은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다.
-      </div>
+      <div class="page-eyebrow">핸드오프와 검증 · 8/9</div>
+      <h1 class="page-title">8. Build와 Verify</h1>
       <p class="page-lede">
-        승인된 산출물이 모이면 워크벤치는 <code>scaffold-plan.json</code>을 만들고 ADK source
-        bundle을 핸드오프한다. 이 단계는 “배포”가 아니라 <em>검토 게이트 + source-bundle handoff +
-        smoke 검증</em>이다. 이 장은 검증 규칙, scaffold-plan, smoke 일괄 실행 macro, stub
-        runtime 배너, 검증 명령을 본다.
+        승인된 산출물이 모이면 BuildWorkbench는 <code>scaffold-plan.json</code>을 만들고
+        TODO-only <code>runtime-stub/</code> source bundle을 생성한다. VerifyWorkbench는 고정된
+        검증 명령을 실행하고 evidence를 남긴다. 이 단계는 배포가 아니라 review-gated
+        source-bundle handoff다.
       </p>
 
       <section class="block">
-        <h2>ADK Runtime Handoff는 무엇이고 무엇이 아닌가</h2>
+        <h2>BuildWorkbench의 책임</h2>
         <table class="ref-table">
-          <thead><tr><th style="width:50%">맞는 것</th><th>아닌 것</th></tr></thead>
+          <thead><tr><th style="width:220px">작업</th><th>의미</th></tr></thead>
           <tbody>
-            <tr>
-              <td>승인된 workbench artifact만 입력으로 받는 review-gated source-bundle handoff</td>
-              <td>raw requirement에서 자동 코드 생성</td>
-            </tr>
-            <tr>
-              <td>generated source의 구조 검증 (compileall, pytest 같은 smoke)</td>
-              <td>production 배포</td>
-            </tr>
-            <tr>
-              <td>local에서 <code>adk web</code> 시작하고 chat smoke를 실행하는 개발 검증</td>
-              <td>운영 인증/배포 UI</td>
-            </tr>
-            <tr>
-              <td>runtime wiring/configuration을 TODO 경계로 남긴 source bundle</td>
-              <td>private endpoint/credential/실제 비즈니스 로직 포함</td>
-            </tr>
+            <tr><td><code>scaffold-plan.json</code> 생성</td><td>승인된 <code>AnalysisResult</code>, module candidate, Runtime 계약, Graph IR, catalog decision만 입력으로 삼는다.</td></tr>
+            <tr><td><code>runtime-stub/</code> 생성</td><td><code>scripts/generate-adk-source.mjs</code>를 artifact root 기준으로 실행해 TODO/runtime wiring source bundle을 만든다.</td></tr>
+            <tr><td><code>implementation-handoff.md</code></td><td>후속 구현자가 실제 wiring과 business logic을 채울 때 볼 handoff notes를 inline 편집한다.</td></tr>
+            <tr><td><code>stub_ready_for_followup</code></td><td>stub directory가 비어 있지 않고 reviewer가 결과를 확인한 뒤에만 토글하는 manifest gate다.</td></tr>
           </tbody>
         </table>
-      </section>
-
-      <section class="block">
-        <h2>scaffold-plan validation 규칙</h2>
-        <ul>
-          <li><code>source</code>는 반드시 <code>approved_workbench_artifact</code>여야 한다.</li>
-          <li><code>approved</code> 후보만 포함된다.</li>
-          <li>raw requirement는 직접 코드 생성 입력이 될 수 없다.</li>
-          <li><code>af-run-manifest.json</code>이 있으면 <code>analysis_reviewed</code>, <code>boundaries_approved</code>, <code>runtime_contracts_approved</code>가 모두 true여야 하고 design stage가 complete여야 한다.</li>
-          <li>catalog-bound 항목(Agent/Workflow/Adapter/Remote A2A)은 runtime contract로 해석하되, 실제 runtime wiring은 reviewed TODO boundary로 남긴다.</li>
-          <li><code>runtime_mock</code>이 있으면 generated source의 deterministic stub output으로 포함될 수 있다 (test double, synthetic 데이터만).</li>
-          <li>필수 <code>runtime_contracts</code>가 <code>approved</code>가 아니거나 <code>needs_info</code> 정책을 남기면 source generation blocker.</li>
-          <li>모든 scaffold module은 승인된 ModuleCandidate에서 와야 하며 Graph IR node로 덮여야 한다.</li>
-          <li>runnable business logic은 out of scope.</li>
-        </ul>
         <div class="callout warn">
           <div class="icon">!</div>
           <div class="body">
-            <p><code>scaffoldPlan.validation.can_generate_source</code>가 false거나 Graph IR에 errors가 있으면 ADK Runtime Handoff 화면 상단에 empty-state 패널이 뜨고 <em>모듈 검토로 이동</em> 버튼이 나온다. 다시 6장 흐름으로 돌아간다.</p>
+            <p>raw requirement는 source generation 입력이 아니다. BuildWorkbench는 승인된 scaffold-plan만 넘긴다.</p>
           </div>
         </div>
       </section>
 
       <section class="block">
-        <h2>CLI source generation gate</h2>
-        <p><code>scripts/generate-adk-source.mjs</code>는 UI에서 만든 계획을 그대로 믿지 않고 artifact를 다시 대조한다.</p>
-        <table class="ref-table">
-          <thead><tr><th>검사</th><th>차단되는 경우</th></tr></thead>
-          <tbody>
-            <tr><td>Manifest approval</td><td><code>analysis_reviewed</code>, <code>boundaries_approved</code>, <code>runtime_contracts_approved</code> 중 하나라도 false</td></tr>
-            <tr><td>Design stage</td><td><code>stages.design.status</code>가 <code>complete</code>가 아님</td></tr>
-            <tr><td>Runtime contracts</td><td><code>scaffold-plan.runtime_contracts[].contract_status</code>가 <code>approved</code>가 아님</td></tr>
-            <tr><td>Module source</td><td><code>scaffold-plan.modules[]</code> id가 승인된 module candidate가 아니거나 candidate-level missing이 남음</td></tr>
-            <tr><td>Graph IR coverage</td><td>scaffold module이 Graph IR node에 존재하지 않음</td></tr>
-          </tbody>
-        </table>
-        <p>generated <code>agent.py</code>의 skeleton edge도 <code>scaffold-plan.modules</code> 배열 순서가 아니라 검토된 Graph IR edge를 따라 만든다.</p>
-      </section>
-
-      <section class="block">
-        <h2>Smoke 일괄 실행 macro</h2>
-        <p>ADK Runtime Handoff 화면에는 <strong>Smoke 일괄 실행</strong> macro 버튼이 있다. 다음 단계를 순서대로 실행하고 단계별 pill로 pass/fail을 보여준다. 실패 시 후속 단계가 차단된다.</p>
-        <div class="graph-mock">┌──────────┐   ┌──────────┐   ┌────────────┐   ┌───────────┐   ┌────────────┐
-│ generate │──►│ install  │──►│ start-web  │──►│ check-web │──►│ chat-smoke │
-└──────────┘   └──────────┘   └────────────┘   └───────────┘   └────────────┘
-   ✓ ok        ⏳ running       ⏸ pending         ⏸ pending         ⏸ pending</div>
-        <table class="ref-table">
-          <thead><tr><th>단계</th><th>하는 일</th></tr></thead>
-          <tbody>
-            <tr><td><code>generate</code></td><td>generated output 디렉터리에 <code>scaffold-plan.json</code>과 ADK source bundle 작성.</td></tr>
-            <tr><td><code>install</code></td><td>local <code>.venv</code> 생성, <code>requirements.txt</code> 기준으로 ADK dependency 설치.</td></tr>
-            <tr><td><code>start-web</code></td><td><code>adk web</code> 시작.</td></tr>
-            <tr><td><code>check-web</code></td><td>실행 중인 ADK Web에 대한 health 체크 + 선택된 app URL을 iframe으로 워크벤치에 임베드.</td></tr>
-            <tr><td><code>chat-smoke</code></td><td>ADK API server의 session 생성 endpoint와 <code>/run</code> endpoint를 호출해 같은 app에 chat smoke 실행.</td></tr>
-          </tbody>
-        </table>
-        <div class="callout info">
-          <div class="icon">i</div>
-          <div class="body">
-            <p>단계별 버튼도 계속 사용 가능하다 (디버그 용도). <code>chat-smoke</code>와 일괄 실행은 <strong>승인된 후보의 <code>smoke_spec.ready</code>와 <code>sample_user_message</code>가 있어야</strong> 활성화된다. 없으면 Module Review로 돌아간다 (6장 참조).</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="block">
-        <h2>Stub runtime 배너</h2>
-        <p>다음 중 하나라도 해당하면 임베드 패널 상단에 노란 배너가 표시된다.</p>
+        <h2>Build gate</h2>
         <ul>
-          <li><code>runtimeMode === "stub"</code></li>
-          <li>chat-smoke 응답 event에 <code>"stubbed_runtime_contract"</code> 표식이 있음</li>
-          <li>Catalog mock-ready 항목의 <code>runtime_mock</code> 출력</li>
+          <li><code>analysis_reviewed</code>가 true여야 한다.</li>
+          <li><code>boundaries_approved</code>와 <code>runtime_contracts_approved</code>가 true여야 한다.</li>
+          <li>candidate-level <code>needs_info</code>와 <code>missing_information</code>이 남아 있으면 차단된다.</li>
+          <li>Graph IR validation error가 있거나 approved module이 Graph node로 덮이지 않으면 차단된다.</li>
+          <li>필수 Runtime 계약의 <code>contract_status</code>가 <code>approved</code>가 아니면 차단된다.</li>
         </ul>
-        <div class="callout warn">
-          <div class="icon">!</div>
-          <div class="body">
-            <p>배너 문구: <em>“스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다.”</em></p>
-            <p>이 배너는 stub 출력과 실제 비즈니스 로직을 절대 혼동하지 못하게 만든다. 절대 제거하지 않는다.</p>
-          </div>
-        </div>
+        <p>차단되면 BuildWorkbench는 blocker를 보여주고 Design route로 돌아가서 Stage Runner proposal을 적용하거나 사람이 검토를 마치도록 안내한다.</p>
       </section>
 
       <section class="block">
-        <h2>SavedAnalysisRecord와 landing step</h2>
-        <p>분석을 저장하면 다음 필드가 남는다.</p>
-        <table class="kv-table">
-          <tbody>
-            <tr><th><code>catalogEntries</code></th><td>저장 시점의 active catalog snapshot (<code>provenance !== "session_deleted"</code>). 시드 catalog의 silent drift 방지.</td></tr>
-            <tr><th><code>activeStep</code></th><td>저장 시점의 wizard step. 마이그레이션 안전망.</td></tr>
-            <tr><th><code>scaffoldReady</code></th><td><code>can_generate_source && Graph IR errors.length === 0</code>.</td></tr>
-            <tr><th>후보별 review state</th><td><code>resolution_draft</code>, <code>resolution_applied_at</code>, <code>schema_review_state</code>, <code>smoke_spec</code>.</td></tr>
-          </tbody>
-        </table>
-        <p>다음에 불러올 때 <strong>landing step</strong>은 다음 규칙으로 결정된다:</p>
+        <h2>VerifyWorkbench의 책임</h2>
+        <p>VerifyWorkbench는 임의 shell을 실행하지 않는다. 현재 allow-list는 세 명령으로 고정되어 있다.</p>
+        <pre>node scripts/validate-artifacts.mjs &lt;artifact-root&gt;
+npm run build --prefix packages/web
+npm run test:analyzer --prefix packages/web</pre>
+        <ul>
+          <li>stdout/stderr와 exit code는 <code>manifest.validation.last_result</code>에 기록된다.</li>
+          <li><code>validation-report.md</code>는 reviewer가 남기는 검증 요약이다.</li>
+          <li><code>catalog-delta.yaml</code>은 catalog 등록/수정 제안이다. <code>catalog/*.yaml</code>은 UI가 직접 수정하지 않는다.</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h2>워크벤치 밖에서 하는 smoke</h2>
+        <p>PR6 이후 워크벤치 UI 안에는 <code>adk web</code> iframe, ADK API <code>/run</code> chat smoke, <strong>Smoke 일괄 실행</strong> macro가 없다. 생성된 source bundle에 대해 실제 ADK Web 또는 chat smoke가 필요하면 별도 터미널에서 실행한다.</p>
         <table class="ref-table">
-          <thead><tr><th>조건</th><th>landing step</th></tr></thead>
+          <thead><tr><th>검증</th><th>위치</th></tr></thead>
           <tbody>
-            <tr><td><code>scaffoldReady === true</code></td><td><code>export</code></td></tr>
-            <tr><td>모든 후보가 <code>needs_info</code>가 아니지만 <code>can_generate_source</code> false</td><td><code>modules</code></td></tr>
-            <tr><td>그 외</td><td><code>analysis</code></td></tr>
+            <tr><td><code>compileall</code>, <code>pytest</code></td><td>생성된 <code>runtime-stub/</code> 또는 별도 export 디렉터리</td></tr>
+            <tr><td><code>adk web</code></td><td>워크벤치 밖 터미널</td></tr>
+            <tr><td>chat smoke</td><td>별도 ADK runtime/API against generated stub</td></tr>
           </tbody>
         </table>
-        <p>Catalog는 시드가 아니라 record snapshot으로 교체된다. backfill은 구버전 record에 안전한 기본값만 채우고 candidate status를 절대 자동 승격하지 않는다.</p>
       </section>
 
       <section class="block">
@@ -161,36 +83,29 @@
 node scripts/validate-artifacts.mjs templates/regression-scenarios
 node scripts/validate-artifacts.mjs templates/saved-analysis-fixtures
 node scripts/validate-artifacts.mjs catalog/contracts
-node scripts/validate-artifacts.mjs templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json
-node scripts/generate-adk-source.mjs templates /tmp/af-generate-smoke
-node scripts/generate-adk-source.test.mjs /tmp/af-generate-smoke
-python3 -m compileall /tmp/af-generate-smoke/req_001_adk /tmp/af-generate-smoke/tests
-python3 -m pytest -q /tmp/af-generate-smoke/tests
 cd packages/web &amp;&amp; npm run test:analyzer
 cd packages/web &amp;&amp; npm run build</pre>
         <table class="ref-table">
           <thead><tr><th>변경 종류</th><th>실행해야 할 검증</th></tr></thead>
           <tbody>
-            <tr><td>문서만</td><td>구조와 링크 검증 우선. build 불필요.</td></tr>
+            <tr><td>문서만</td><td>링크와 stale 표현 grep. UI screenshot을 갱신했다면 정적 HTML을 브라우저로 확인한다.</td></tr>
             <tr><td>TypeScript / React / analyzer / schema / validator logic</td><td><code>cd packages/web &amp;&amp; npm run test:analyzer</code>와 <code>cd packages/web &amp;&amp; npm run build</code></td></tr>
-            <tr><td>scaffold-plan 또는 ADK source generator</td><td>위에 추가로 <code>node scripts/generate-adk-source.mjs ...</code>, <code>node scripts/generate-adk-source.test.mjs ...</code>, <code>python3 -m compileall ...</code>, <code>python3 -m pytest -q ...</code> smoke</td></tr>
-            <tr><td>UI 시각 변경</td><td><code>npm run dev -- --host 0.0.0.0 --port 5173 --strictPort</code> 후 browser smoke 또는 chrome-devtools MCP로 screenshot 확인 (포트 5173 고정)</td></tr>
+            <tr><td>scaffold-plan 또는 runtime-stub generator</td><td>artifact validation에 더해 생성된 stub의 compile/test smoke</td></tr>
+            <tr><td>UI 시각 변경</td><td>고정 포트 <code>5173</code> dev server와 큰 viewport screenshot</td></tr>
           </tbody>
         </table>
       </section>
 
       <section class="block">
-        <h2>“Done”의 의미</h2>
-        <p>Agent Factory 작업은 다음을 모두 만족할 때만 done이다.</p>
+        <h2>Done의 의미</h2>
         <ul>
           <li>raw requirement가 scaffold input으로 쓰이지 않는다.</li>
           <li>module 분류가 활성 taxonomy를 따른다.</li>
           <li>category에 맞는 subtype 필드가 존재한다.</li>
           <li>Remote A2A는 high-friction이고 contract-backed다.</li>
-          <li>Runtime 계약과 manifest 승인 상태가 source generation 전에 맞춰져 있다.</li>
+          <li>Runtime 계약과 manifest approval 상태가 source generation 전에 맞춰져 있다.</li>
           <li>schema, validator, analyzer types, UI label이 enum 변화에 맞춰 정렬되어 있다.</li>
           <li>review artifact와 deferred fixture가 검증을 통과한다.</li>
-          <li>UI 시각 변경이 있으면 screenshot으로 확인되었다.</li>
           <li>private banking 데이터/credential/endpoint/deployment script/organization-specific runtime 코드가 추가되지 않았다.</li>
         </ul>
       </section>
@@ -199,39 +114,37 @@ cd packages/web &amp;&amp; npm run build</pre>
         <h2>퀴즈</h2>
 
         <div class="quiz" data-correct="block">
-          <div class="quiz-question">Q1. 후보 2개가 <code>needs_info</code>인 상태에서 export로 가서 ADK Runtime Handoff를 눌렀다. 어떻게 될까?</div>
+          <div class="quiz-question">Q1. 후보 2개가 <code>needs_info</code>인 상태에서 Build route에서 runtime stub 생성을 누르면?</div>
           <div class="quiz-options">
             <button data-value="generate">그래도 generate된다 — needs_info는 무시된다</button>
-            <button data-value="block">scaffold-plan blocker로 차단되고 “모듈 검토로 이동” 패널이 뜬다</button>
+            <button data-value="block">scaffold-plan blocker로 차단되고 Design route에서 해결하라는 안내가 나온다</button>
             <button data-value="approve">자동으로 approved로 승격된다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: 차단.</strong> candidate-level missing은 hard gate다. 모듈 검토에서 Resolution Draft → 반영 적용 → 승인을 거쳐야 한다.</p>
+            <p><strong>정답: 차단.</strong> candidate-level missing은 hard gate다. Design Stage Runner proposal을 적용하거나 사람이 모듈 검토를 끝내야 한다.</p>
           </div>
         </div>
 
-        <div class="quiz" data-correct="stub">
-          <div class="quiz-question">Q2. chat-smoke 응답에 <code>"stubbed_runtime_contract"</code> 표식이 있다. UI에는 무엇이 나타나야 할까?</div>
+        <div class="quiz" data-correct="outside">
+          <div class="quiz-question">Q2. 생성된 stub으로 <code>adk web</code>과 chat smoke를 돌리고 싶다. 현재 워크벤치 UI 안에서 바로 실행하나?</div>
           <div class="quiz-options">
-            <button data-value="nothing">아무 표시 없음</button>
-            <button data-value="green">초록색 “정상 동작 중” 배너</button>
-            <button data-value="stub">노란색 stub-runtime 배너: “스텁 런타임 — graph 구조만 검증합니다.”</button>
+            <button data-value="inside">예 — 워크벤치 안에서 한 번에 실행한다</button>
+            <button data-value="outside">아니오 — 별도 터미널에서 generated stub을 대상으로 실행한다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: 노란 stub 배너.</strong> stub 출력과 실제 비즈니스 로직을 절대 혼동하지 못하게 만드는 안전장치다. 절대 제거하지 않는다.</p>
+            <p><strong>정답: 별도 터미널.</strong> 현재 UI는 Build/Verify evidence 경계까지만 제공한다.</p>
           </div>
         </div>
 
-        <div class="quiz" data-correct="export">
-          <div class="quiz-question">Q3. saved record를 다시 열었더니 <code>scaffoldReady === true</code>다. 어디로 landing할까?</div>
+        <div class="quiz" data-correct="delta">
+          <div class="quiz-question">Q3. 검증 중 catalog에 새 reusable adapter를 등록해야 한다는 사실을 발견했다. Verify route는 무엇을 남기나?</div>
           <div class="quiz-options">
-            <button data-value="intake">intake</button>
-            <button data-value="modules">modules</button>
-            <button data-value="export">export</button>
-            <button data-value="analysis">analysis</button>
+            <button data-value="catalog">즉시 <code>catalog/adapters.yaml</code>을 수정한다</button>
+            <button data-value="delta"><code>catalog-delta.yaml</code>에 proposal을 남긴다</button>
+            <button data-value="ignore">검증 보고서에 쓰지 않는다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: export.</strong> <code>scaffoldReady</code>가 true면 바로 ADK Runtime Handoff 화면으로 들어간다.</p>
+            <p><strong>정답: catalog-delta.</strong> 실제 catalog YAML 반영은 별도 reviewer merge 작업이다.</p>
           </div>
         </div>
       </section>

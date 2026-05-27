@@ -29,13 +29,29 @@
   flex-direction: column;
 }
 
+.af-design-sidebar {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+
 .af-design-canvas-pane {
   min-height: 480px;
   overflow: hidden;
+  min-width: 0;
+}
+
+.af-design-canvas-loading {
+  min-height: 480px;
+  display: grid;
+  place-items: center;
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 700;
 }
 
 .af-design-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
@@ -185,3 +201,66 @@
   color: rgba(0, 0, 0, 0.4);
 }
 
+.af-path-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-path-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.68);
+}
+
+.af-path-panel select,
+.af-path-panel input {
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 4px;
+  font: inherit;
+  background: #fff;
+}
+
+.af-path-candidates {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.af-path-candidate {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.02);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.af-path-candidate:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.af-path-candidate-active {
+  border-color: rgba(31, 41, 55, 0.36);
+  background: rgba(31, 41, 55, 0.07);
+}
+
+.af-path-candidate span {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.af-path-candidate small {
+  color: rgba(0, 0, 0, 0.48);
+}

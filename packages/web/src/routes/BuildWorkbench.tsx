@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
@@ -17,6 +17,12 @@ import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
 import type { CatalogEntry } from "../catalog/types";
 import { loadSeedCatalog } from "../catalog/seed";
+import type { ProcessStreamEvent } from "../state/useStreamingProcess";
+
+interface StreamLogEntry {
+  id: number;
+  text: string;
+}
 
 export default function BuildWorkbench() {
   const params = useParams<{ reqId: string }>();
@@ -41,6 +47,9 @@ export default function BuildWorkbench() {
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [handoffDraft, setHandoffDraft] = useState<string>("");
   const [handoffDirty, setHandoffDirty] = useState(false);
+  const [buildStreamLog, setBuildStreamLog] = useState<StreamLogEntry[]>([]);
+  const buildStreamLogRef = useRef<HTMLPreElement | null>(null);
+  const buildStreamSeq = useRef(0);
 
   const manifest = manifestData?.manifest;
   const manifestEtag = manifestData?.etag ?? null;
@@ -67,6 +76,10 @@ export default function BuildWorkbench() {
   useEffect(() => {
     if (!handoffDirty && handoffArtifact.data) setHandoffDraft(handoffArtifact.data.content);
   }, [handoffArtifact.data, handoffDirty]);
+  useEffect(() => {
+    const log = buildStreamLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [buildStreamLog]);
 
   const filePreview = useQuery<string>({
     queryKey: ["af", reqId, "runtime-stub", "files", previewPath] as const,
@@ -101,7 +114,12 @@ export default function BuildWorkbench() {
   }
 
   function handleBuildStub() {
-    buildStub.mutate(undefined, {
+    setActionMessage(null);
+    setBuildStreamLog([]);
+    buildStub.mutate({
+      streamProgress: true,
+      onEvent: appendBuildStreamEvent
+    }, {
       onSuccess: (result) =>
         setActionMessage(
           result.ok
@@ -110,6 +128,16 @@ export default function BuildWorkbench() {
         ),
       onError: (error) => setActionMessage(error instanceof Error ? error.message : "runtime-stub 생성 실패")
     });
+  }
+
+  function appendBuildStreamEvent(event: ProcessStreamEvent) {
+    const text = formatProcessStreamLogLine(event);
+    if (!text) return;
+    buildStreamSeq.current += 1;
+    setBuildStreamLog((entries) => [
+      ...entries.slice(-199),
+      { id: buildStreamSeq.current, text }
+    ]);
   }
 
   function handleToggleStubReady() {
@@ -272,6 +300,17 @@ export default function BuildWorkbench() {
             </div>
           </div>
         )}
+        {buildStreamLog.length > 0 ? (
+          <div className="af-stream-log-panel">
+            <div className="af-stream-log-header">
+              <strong>실시간 로그</strong>
+              <span>{buildStub.isPending ? "실행 중" : "마지막 실행"}</span>
+            </div>
+            <pre ref={buildStreamLogRef} className="af-stream-log">
+              {buildStreamLog.map((entry) => entry.text).join("")}
+            </pre>
+          </div>
+        ) : null}
         {buildStub.data?.stdout ? (
           <details className="af-blocker-list">
             <summary>generate-adk-source stdout</summary>
@@ -352,4 +391,29 @@ export default function BuildWorkbench() {
       ) : null}
     </div>
   );
+}
+
+function formatProcessStreamLogLine(event: ProcessStreamEvent): string {
+  const data = event.data;
+  if (event.event === "stdout" || event.event === "stderr") {
+    return `[${event.event}] ${withTrailingNewline(valueToString(data.chunk))}`;
+  }
+  if (event.event === "start") {
+    return `[start] ${valueToString(data.command ?? data.command_key ?? "process")}\n`;
+  }
+  if (event.event === "done") {
+    return `[done] exit ${valueToString(data.exit_code ?? 0)}\n`;
+  }
+  if (event.event === "error") {
+    return `[error] ${valueToString(data.error ?? data.message ?? "실패")}\n`;
+  }
+  return `[${event.event}] ${JSON.stringify(data)}\n`;
+}
+
+function valueToString(value: unknown): string {
+  return typeof value === "string" ? value : String(value);
+}
+
+function withTrailingNewline(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
 }

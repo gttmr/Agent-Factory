@@ -30,7 +30,7 @@
 
           <div class="glossary-entry">
             <h4>ADK Runtime Handoff</h4>
-            <p>승인된 workbench artifact와 manifest approval만 입력으로 받아 ADK source bundle을 만들고 smoke 검증을 실행하는 review-gated 단계. <em>배포가 아니다.</em></p>
+            <p>승인된 workbench artifact와 manifest approval만 입력으로 받아 TODO-only runtime stub source bundle을 만드는 review-gated handoff. <em>배포가 아니다.</em></p>
           </div>
 
           <div class="glossary-entry">
@@ -65,7 +65,17 @@
 
           <div class="glossary-entry">
             <h4>AnalysisResult</h4>
-            <p>워크벤치가 raw requirement를 정규화해 만든 canonical combined artifact. normalized requirement, evidence, module candidates, A2A contracts, runtime contracts, Graph IR을 포함한다. Browser import/export 파일명은 보통 <code>analysis-result.json</code>이다.</p>
+            <p>워크벤치가 raw requirement를 정규화해 만든 canonical combined artifact. normalized requirement, evidence, module candidates, A2A contracts, runtime contracts, Graph IR을 포함한다. 파일명은 보통 <code>analysis-result.json</code>이며 Stage Runner proposal이 적용된 뒤 canonical artifact가 된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Analyze Skill Runner</h4>
+            <p><code>/af/:reqId/analyze</code>의 첫 패널. raw requirement, domain, model, seed catalog를 서버 Stage Runner에 보내고 proposed <code>analysis-result.json</code>을 만든다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>BuildWorkbench</h4>
+            <p><code>/af/:reqId/build</code> route. 승인된 artifact에서 <code>scaffold-plan.json</code>을 만들고 <code>runtime-stub/</code> source bundle을 생성한다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -95,7 +105,12 @@
 
           <div class="glossary-entry">
             <h4>Codex CLI</h4>
-            <p>분석 단계의 live analyzer를 실행하는 CLI. <code>packages/web/server/codexAnalyzer.ts</code>의 <code>/api/analyze-requirement</code> SSE endpoint를 통해 호출되고, compact draft artifact를 반환한다. PR6 마이그레이션 이후 워크벤치 UI는 이 endpoint를 직접 호출하지 않으며, 대신 <code>af-analyze-requirement</code> skill(또는 동일 schema를 emit하는 외부 producer)이 호출하고 결과 <code>analysis-result.json</code>을 Landing이나 단계별 import 버튼으로 적재한다.</p>
+            <p>분석/설계 Stage Runner가 내부에서 실행할 수 있는 CLI. <code>/api/analyze-requirement</code> SSE endpoint는 direct/internal analyzer primitive로 남아 있지만, 기본 UI 경로는 <code>/api/af/:reqId/stages/analyze/run</code>이다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Design Skill Runner</h4>
+            <p><code>/af/:reqId/design</code>의 첫 패널. <code>analysis_reviewed=true</code>인 canonical analysis를 기준으로 module boundary, Graph IR, Runtime 계약, A2A 계약 변경을 proposed artifact로 만든다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -209,6 +224,16 @@
           </div>
 
           <div class="glossary-entry">
+            <h4>proposed-artifacts</h4>
+            <p>Stage Runner run folder 안의 적용 전 산출물 디렉터리. reviewer가 diff/preview를 확인하고 apply해야 canonical artifact로 반영된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>diff-summary.json</h4>
+            <p>Stage Runner run의 proposed artifact가 canonical artifact와 어떻게 다른지 요약한 evidence 파일. validation 상태와 apply 가능 여부 판단에 쓰인다.</p>
+          </div>
+
+          <div class="glossary-entry">
             <h4>remote_a2a (module_category)</h4>
             <p>독립 owner를 가진 원격 에이전트와의 protocol boundary. high-friction. <code>risk_level: high</code>와 owner/agent_card/auth/task_lifecycle/timeout/retry/fallback/audit 필수.</p>
           </div>
@@ -244,8 +269,13 @@
           </div>
 
           <div class="glossary-entry">
+            <h4>run artifact</h4>
+            <p>Stage Runner 한 번의 실행을 설명하는 파일 묶음. <code>request.json</code>, <code>events.jsonl</code>, <code>result-summary.json</code>, <code>diff-summary.json</code>, <code>proposed-artifacts/</code>, 실패 시 <code>diagnostics.md</code>를 포함한다.</p>
+          </div>
+
+          <div class="glossary-entry">
             <h4>runtimeContracts</h4>
-            <p><code>AnalysisResult.runtimeContracts</code>. MCP/EAI/Legacy adapter contract, Context Manager, Callback Broker, ADK callback, async resume의 review artifact. 필수 계약은 <code>contract_status: approved</code>가 되어야 scaffold/source generation을 통과한다.</p>
+            <p><code>AnalysisResult.runtimeContracts</code>. MCP/EAI/Legacy adapter contract, Context Manager, Callback Broker, ADK callback, async resume의 review artifact. 현재 DesignWorkbench의 Runtime 계약 탭에서 readiness를 검토하고, 필수 계약은 <code>contract_status: approved</code>가 되어야 scaffold/source generation을 통과한다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -261,6 +291,16 @@
           <div class="glossary-entry">
             <h4>scaffold-plan</h4>
             <p><code>scaffold-plan.json</code>. 승인된 workbench artifact만 입력으로 받는 ADK Runtime Handoff의 검토 게이트 계약. manifest approval, 승인된 module candidate, approved runtime contract, Graph IR coverage와 함께 source generation gate가 된다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Stage Runner</h4>
+            <p>Analyze/Design 화면에서 서버에 skill 실행을 요청하는 공통 실행 모델. run evidence를 <code>runs/&lt;stage&gt;/&lt;run-id&gt;/</code>에 남기고 canonical artifact는 diff/preview 후 apply할 때만 바꾼다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>stage_runs</h4>
+            <p><code>af-run-manifest.json</code>의 optional 실행 요약 필드. 최근 run id, status, output path를 담지만 approval gate를 대체하지 않는다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -310,7 +350,17 @@
 
           <div class="glossary-entry">
             <h4>stub runtime</h4>
-            <p>generated ADK app이 실제 모델/어댑터/은행 시스템 호출 없이 graph 구조만 검증하는 모드. 노란 stub 배너 필수.</p>
+            <p>generated runtime stub이 실제 모델/어댑터/은행 시스템 호출 없이 graph 구조와 wiring 경계만 검증하는 모드. 실제 business logic이 아니다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>Reuse Hub</h4>
+            <p><code>/catalog</code> route. reusable Agent/Workflow/Adapter/Remote A2A catalog를 검색하고 현재 root 후보에 pin하거나 <code>catalog-delta.yaml</code> proposal을 남긴다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>VerifyWorkbench</h4>
+            <p><code>/af/:reqId/verify</code> route. allow-list 검증 명령을 실행하고 <code>manifest.validation.last_result</code>, <code>validation-report.md</code>, <code>catalog-delta.yaml</code> evidence를 다룬다.</p>
           </div>
 
           <div class="glossary-entry">

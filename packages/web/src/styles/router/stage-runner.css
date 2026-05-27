@@ -5,6 +5,19 @@
   gap: 16px;
 }
 
+.af-stage-runner .ui-section-action {
+  flex: 0 0 auto;
+}
+
+.af-stage-runner .af-action-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.af-stage-runner .af-action-row .ui-button {
+  white-space: nowrap;
+}
+
 .af-runner-status-row {
   display: flex;
   flex-wrap: wrap;
@@ -267,6 +280,14 @@
 }
 
 @media (max-width: 760px) {
+  .af-stage-runner .ui-section-header {
+    display: grid;
+  }
+
+  .af-stage-runner .af-action-row {
+    justify-content: flex-start;
+  }
+
   .af-runner-controls,
   .af-runner-metrics,
   .af-runner-events li {

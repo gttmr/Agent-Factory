@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AfApiError } from "./apiClient";
+import { streamServerEvents, type ProcessStreamEvent } from "./useStreamingProcess";
 
 export interface VerifyCommandInfo {
   key: string;
@@ -34,11 +35,30 @@ export interface VerifyRunResult {
   command_key: string;
 }
 
+export interface RunVerifyOptions {
+  commandKey: string;
+  streamProgress?: boolean;
+  onEvent?: (event: ProcessStreamEvent) => void;
+}
+
 export function useRunVerify(reqId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (commandKey: string): Promise<VerifyRunResult> => {
+    mutationFn: async (input: string | RunVerifyOptions): Promise<VerifyRunResult> => {
       if (!reqId) throw new Error("requirement_id 가 없습니다.");
+      const options: RunVerifyOptions = typeof input === "string" ? { commandKey: input } : input;
+      const commandKey = options.commandKey;
+      if (options.streamProgress) {
+        return await streamServerEvents<VerifyRunResult>(
+          `/api/af/${encodeURIComponent(reqId)}/verify/run`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ command: commandKey, streamProgress: true })
+          },
+          options.onEvent
+        );
+      }
       const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/verify/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

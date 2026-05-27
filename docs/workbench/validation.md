@@ -60,6 +60,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 - Catalog 항목에 `runtime_mock`이 있으면 ADK Runtime Handoff는 해당 synthetic payload를 generated source의 deterministic stub output으로 포함할 수 있다.
 - `runtime_mock`은 local smoke용 test double이며 synthetic data만 허용한다. private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 담지 않는다.
 - `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
+- `a2aContracts`는 Remote A2A 후보의 reviewed handoff다. DesignWorkbench의 `Remote A2A` 탭에서 모든 Remote A2A 후보가 매칭 계약을 갖고 `contract_status: approved`이며 readiness issue가 없어야 `runtime_contracts_approved` 게이트를 새로 켤 수 있다.
 - runnable business logic은 out of scope다.
 - `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성하며 TODO runtime wiring handoff로만 취급한다.
 
@@ -75,7 +76,7 @@ PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` 
 분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
 
 - **Requirement-level (`evidence.missing_information`) — soft gate.** `/af/:reqId/analyze` (AnalyzeWorkbench)에서 항목별 "수용" 토글이 제공된다. 토글은 컴포넌트 내부 `acceptedMissing` state를 갱신하며 reviewer attestation으로만 사용하고 scaffold-plan 생성은 차단하지 않는다. `analysis_reviewed` 게이트는 모든 항목이 수용된 뒤에야 활성화된다.
-- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. PR6 이후 워크벤치 안에는 더 이상 `해결 초안 생성` / `반영 적용` 인스펙터가 없다. Resolution Draft 적용은 `af-design-boundaries` skill(또는 동일 형태를 emit하는 외부 producer)이 `missing_information_resolution`, `resolved_missing_information`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 채워 `analysis-result.json`에 다시 PUT하는 식으로 처리한다.
+- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Resolution Draft 적용은 Design Stage Runner(`af-design-boundaries`) 또는 동일 형태를 emit하는 외부 producer가 먼저 `runs/design/<run-id>/proposed-artifacts/`에 제안하고, reviewer가 diff/preview 후 apply할 때 canonical `analysis-result.json`에 반영한다.
 - **Resolved review state.** 채워진 후보 record는 기존 누락 항목을 `resolved_missing_information`에 보존하고 `missing_information`을 비운다. 카탈로그 계약 후보도 동일 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
 - **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인 후보가 남아 있으면 `scaffoldPlan.collectBlockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." blocker와 동일 개수의 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" warning을 emit한다. BuildWorkbench는 이 blocker가 남아 있으면 `runtime-stub/build` POST를 차단한다.
 

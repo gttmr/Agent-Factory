@@ -20,6 +20,7 @@ import { layoutGraphIR } from "../graph/layout";
 import { nodeTypes } from "../graph/nodeTypes";
 import { ValidationBanner } from "../graph/validationBanner";
 import { GraphInspector } from "./GraphInspector";
+import type { CommentRecord, HighlightRecord } from "../state/useCollaboration";
 
 interface GraphCanvasProps {
   graphIR: GraphIR;
@@ -31,6 +32,8 @@ interface GraphCanvasProps {
   selection?: Selection;
   onSelectionChange?: (selection: Selection) => void;
   hideInspector?: boolean;
+  comments?: CommentRecord[];
+  highlights?: HighlightRecord[];
 }
 
 export interface Selection {
@@ -47,7 +50,9 @@ export function GraphCanvas({
   continueLabel,
   selection: selectionProp,
   onSelectionChange,
-  hideInspector = false
+  hideInspector = false,
+  comments = [],
+  highlights = []
 }: GraphCanvasProps) {
   const [internalSelection, setInternalSelection] = useState<Selection>({ nodeId: null, edgeId: null });
   const isControlled = selectionProp !== undefined;
@@ -64,6 +69,42 @@ export function GraphCanvas({
   const layout = useMemo(
     () => layoutGraphIR(graphIR, selection, handleSelect),
     [graphIR, selection.nodeId, selection.edgeId]
+  );
+  const collaborationMarks = useMemo(
+    () => buildCollaborationMarks(graphIR, comments, highlights),
+    [graphIR, comments, highlights]
+  );
+
+  const markedNodes = useMemo(
+    () =>
+      layout.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          commentCount: collaborationMarks.nodeCommentCounts.get(node.id) ?? 0,
+          commentTooltip: collaborationMarks.nodeCommentTooltips.get(node.id),
+          highlightCount: collaborationMarks.nodeHighlightCounts.get(node.id) ?? 0
+        }
+      })),
+    [layout.nodes, collaborationMarks]
+  );
+  const markedEdges = useMemo(
+    () =>
+      layout.edges.map((edge) => ({
+        ...edge,
+        zIndex:
+          (collaborationMarks.edgeHighlightCounts.get(edge.id) ?? 0) > 0
+            ? Math.max(edge.zIndex ?? 1, 18)
+            : edge.zIndex,
+        data: {
+          ...edge.data,
+          commentCount: collaborationMarks.edgeCommentCounts.get(edge.id) ?? 0,
+          commentTooltip: collaborationMarks.edgeCommentTooltips.get(edge.id),
+          highlightCount: collaborationMarks.edgeHighlightCounts.get(edge.id) ?? 0,
+          highlightColor: collaborationMarks.edgeHighlightColors.get(edge.id)
+        }
+      })),
+    [layout.edges, collaborationMarks]
   );
 
   const nodeById = useMemo(() => new Map((graphIR.nodes ?? []).map((n) => [n.id, n])), [graphIR]);
@@ -112,8 +153,8 @@ export function GraphCanvas({
         <div className="graph-canvas-stage">
           <ReactFlowProvider>
             <ReactFlow
-              nodes={layout.nodes}
-              edges={layout.edges}
+              nodes={markedNodes}
+              edges={markedEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               fitView
@@ -128,7 +169,7 @@ export function GraphCanvas({
               <Background gap={18} size={1} />
               <MiniMap pannable zoomable />
               <Controls showInteractive={false} />
-              <ContainerOverlay rects={layout.containerRects} />
+              <ContainerOverlay rects={layout.containerRects} highlightedIds={collaborationMarks.containerHighlightIds} />
             </ReactFlow>
           </ReactFlowProvider>
         </div>
@@ -157,4 +198,105 @@ export function GraphCanvas({
       )}
     </div>
   );
+}
+
+interface CollaborationMarks {
+  nodeCommentCounts: Map<string, number>;
+  edgeCommentCounts: Map<string, number>;
+  nodeCommentTooltips: Map<string, string>;
+  edgeCommentTooltips: Map<string, string>;
+  nodeHighlightCounts: Map<string, number>;
+  edgeHighlightCounts: Map<string, number>;
+  edgeHighlightColors: Map<string, string>;
+  containerHighlightIds: Set<string>;
+}
+
+const HIGHLIGHT_COLORS: Record<HighlightRecord["color_token"], string> = {
+  agent: "var(--cat-agent-line, #2c6ec0)",
+  workflow: "var(--cat-workflow-line, #2f8a68)",
+  adapter: "var(--cat-adapter-line, #8a6a2f)",
+  remote: "var(--cat-remote-line, #c0432c)",
+  neutral: "var(--line-strong, #64736b)"
+};
+
+function buildCollaborationMarks(
+  graphIR: GraphIR,
+  comments: CommentRecord[],
+  highlights: HighlightRecord[]
+): CollaborationMarks {
+  const marks: CollaborationMarks = {
+    nodeCommentCounts: new Map(),
+    edgeCommentCounts: new Map(),
+    nodeCommentTooltips: new Map(),
+    edgeCommentTooltips: new Map(),
+    nodeHighlightCounts: new Map(),
+    edgeHighlightCounts: new Map(),
+    edgeHighlightColors: new Map(),
+    containerHighlightIds: new Set()
+  };
+  const edgeIdByPair = new Map((graphIR.edges ?? []).map((edge) => [`${edge.from}->${edge.to}`, edge.id]));
+
+  const inc = (map: Map<string, number>, id: string | undefined) => {
+    if (!id) return;
+    map.set(id, (map.get(id) ?? 0) + 1);
+  };
+  const addComment = (countMap: Map<string, number>, tooltipMap: Map<string, string>, id: string | undefined, comment: CommentRecord) => {
+    if (!id) return;
+    inc(countMap, id);
+    const summary = summarizeComment(comment);
+    tooltipMap.set(id, tooltipMap.has(id) ? `${tooltipMap.get(id)}\n${summary}` : summary);
+  };
+  const pathEdgeIds = (nodePath: string[] | undefined) => {
+    const result: string[] = [];
+    if (!nodePath) return result;
+    for (let index = 0; index < nodePath.length - 1; index += 1) {
+      const edgeId = edgeIdByPair.get(`${nodePath[index]}->${nodePath[index + 1]}`);
+      if (edgeId) result.push(edgeId);
+    }
+    return result;
+  };
+
+  for (const comment of comments) {
+    const anchor = comment.anchor;
+    if (anchor.kind === "node") addComment(marks.nodeCommentCounts, marks.nodeCommentTooltips, anchor.node_id, comment);
+    if (anchor.kind === "edge") addComment(marks.edgeCommentCounts, marks.edgeCommentTooltips, anchor.edge_id, comment);
+    if (anchor.kind === "path") {
+      for (const nodeId of anchor.node_path ?? []) {
+        addComment(marks.nodeCommentCounts, marks.nodeCommentTooltips, nodeId, comment);
+      }
+      for (const edgeId of pathEdgeIds(anchor.node_path)) {
+        addComment(marks.edgeCommentCounts, marks.edgeCommentTooltips, edgeId, comment);
+      }
+    }
+  }
+
+  for (const highlight of highlights) {
+    const color = HIGHLIGHT_COLORS[highlight.color_token] ?? HIGHLIGHT_COLORS.neutral;
+    const markEdge = (edgeId: string | undefined) => {
+      if (!edgeId) return;
+      inc(marks.edgeHighlightCounts, edgeId);
+      marks.edgeHighlightColors.set(edgeId, color);
+    };
+    if (highlight.kind === "path") {
+      for (const nodeId of highlight.target.node_path ?? []) inc(marks.nodeHighlightCounts, nodeId);
+      for (const edgeId of pathEdgeIds(highlight.target.node_path)) markEdge(edgeId);
+    }
+    if (highlight.kind === "node_group") {
+      for (const nodeId of highlight.target.node_ids ?? []) inc(marks.nodeHighlightCounts, nodeId);
+    }
+    if (highlight.kind === "edge_group") {
+      for (const edgeId of highlight.target.edge_ids ?? []) markEdge(edgeId);
+    }
+    if (highlight.kind === "container_focus" && highlight.target.container_id) {
+      marks.containerHighlightIds.add(highlight.target.container_id);
+    }
+  }
+
+  return marks;
+}
+
+function summarizeComment(comment: CommentRecord): string {
+  const body = comment.body_md.replace(/\s+/g, " ").trim();
+  const snippet = body.length > 96 ? `${body.slice(0, 96)}...` : body;
+  return `${comment.author} · ${new Date(comment.created_at).toLocaleString()}: ${snippet}`;
 }

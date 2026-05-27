@@ -18,9 +18,9 @@ const TOC = [
   {
     group: "검토와 핸드오프",
     items: [
-      { id: "06", title: "6. Module Review Board", href: "06-review-board.html" },
+      { id: "06", title: "6. Design Review", href: "06-review-board.html" },
       { id: "07", title: "7. Runtime 계약", href: "07-runtime-contracts.html" },
-      { id: "08", title: "8. 검증과 ADK Runtime Handoff", href: "08-validation-handoff.html" },
+      { id: "08", title: "8. Build와 Verify", href: "08-validation-handoff.html" },
     ],
   },
   {

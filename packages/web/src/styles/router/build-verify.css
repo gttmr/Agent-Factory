@@ -93,6 +93,42 @@
   white-space: pre;
 }
 
+.af-stream-log-panel {
+  margin-top: 12px;
+  border: 1px solid rgba(31, 41, 55, 0.12);
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.02);
+}
+
+.af-stream-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.1);
+  font-size: 0.82rem;
+}
+
+.af-stream-log-header span {
+  color: rgba(0, 0, 0, 0.52);
+  font-size: 0.74rem;
+}
+
+.af-stream-log {
+  margin: 0;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.045);
+  color: rgba(17, 24, 39, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .af-markdown-editor {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

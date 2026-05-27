@@ -23,6 +23,18 @@ function reviewChip(status: string | undefined) {
   return <span className={cls}>{status}</span>;
 }
 
+function CollaborationBadges({ data }: { data: GraphNodeData }) {
+  const commentCount = data.commentCount ?? 0;
+  const highlightCount = data.highlightCount ?? 0;
+  if (!commentCount && !highlightCount) return null;
+  return (
+    <span className="graph-node-collab" title={data.commentTooltip ?? `comments ${commentCount}, highlights ${highlightCount}`}>
+      {commentCount ? <span className="graph-node-comment-pin">{commentCount}</span> : null}
+      {highlightCount ? <span className="graph-node-highlight-pin">{highlightCount}</span> : null}
+    </span>
+  );
+}
+
 function HandleStrip() {
   return (
     <>
@@ -38,10 +50,13 @@ function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" |
   const sub = graphNode.execution_kind ?? null;
   return (
     <div
-      className={`graph-node graph-node-card cat-${cat ?? "agent"} ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-card cat-${cat ?? "agent"} ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <div className="graph-node-head">
         {cat ? <CategoryBadge category={cat} /> : null}
         {sub ? <SubtypeBadge value={sub} /> : null}
@@ -59,10 +74,13 @@ function FunctionToolNode({ data, kind }: NodeProps<GraphNodeData> & { kind: "fu
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-square graph-node-${kind} ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-square graph-node-${kind} ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <span className="graph-node-eyebrow">{kind}</span>
       <strong className="graph-node-label graph-node-mono">{graphNode.label}</strong>
     </div>
@@ -73,10 +91,13 @@ function HumanInputNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-card graph-node-human ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-card graph-node-human ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <span className="graph-node-eyebrow">human ⏸︎</span>
       <strong className="graph-node-label">{graphNode.label}</strong>
       {graphNode.execution_kind ? (
@@ -90,10 +111,13 @@ function RouterNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-router ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-router ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <div className="graph-node-router-inner">
         <span className="graph-node-eyebrow">router</span>
         <strong>{graphNode.label}</strong>
@@ -106,10 +130,13 @@ function JoinNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-join ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-join ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <span className="graph-node-join-dot" aria-hidden />
       <span className="graph-node-join-label">{graphNode.label}</span>
     </div>
@@ -120,10 +147,13 @@ function LoopControlNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-loop ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-loop ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <span className="graph-node-loop-glyph">↻</span>
       <strong className="graph-node-label">{graphNode.label}</strong>
     </div>
@@ -134,10 +164,13 @@ function PillNode({ data, kind }: NodeProps<GraphNodeData> & { kind: "input" | "
   const { graphNode, selected, onSelect } = data;
   return (
     <div
-      className={`graph-node graph-node-pill graph-node-${kind} ${selected ? "is-selected" : ""}`}
+      className={`graph-node graph-node-pill graph-node-${kind} ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
       onClick={() => onSelect(graphNode.id)}
     >
       <HandleStrip />
+      <CollaborationBadges data={data} />
       <span className="graph-node-eyebrow">{kind}</span>
       <strong className="graph-node-label">{graphNode.label}</strong>
     </div>

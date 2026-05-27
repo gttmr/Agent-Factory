@@ -1,17 +1,19 @@
 # 07 — `docs/onboarding/*.html` 새 흐름으로 재작성
 
+상태: 완료. Stage Runner 구현 이후 정적 온보딩 본문과 스크린샷을 현재 route 모델로 갱신했다.
+
 ## 왜 필요한가
 
-`docs/onboarding/` 의 HTML 가이드는 9-step wizard 시나리오 (intake → analysis → modules → … → export) 를 가정하고 있다. PR6 후 워크벤치는 5-route 모델 (`/`, `/af/:id/{analyze,design,build,verify}`, `/catalog`) 이므로 onboarding 사용자가 docs 만 보고 화면을 못 따라간다.
+`docs/onboarding/` 의 HTML 가이드는 원래 9-step flow(intake → analysis → modules → ... → export) 를 가정했다. PR6 후 워크벤치는 5-route 모델 (`/`, `/af/:id/{analyze,design,build,verify}`, `/catalog`) 이고, brief 09 후 Analyze/Design은 Stage Runner 패널을 먼저 보여준다.
 
-`00-doc-audit.md` 에서 stale 부분 목록을 확인했다. 이 브리프는 그 중 onboarding HTML 만 별도로 묶어 처리한다 (스크린샷 + 캡션이 무거워서 분리할 가치가 있다).
+`00-doc-audit.md` 에서 화면과 문서가 어긋난 위치를 확인했다. 이 브리프는 그 중 onboarding HTML 만 별도로 묶어 처리한다 (스크린샷 + 캡션이 무거워서 분리할 가치가 있다).
 
 ## 현재 상태
 
-`docs/onboarding/`:
+갱신 대상:
 - `index.html`
 - `01-concepts.html`
-- `02-workbench-tour.html` (가장 stale — wizard step 별 설명)
+- `02-workbench-tour.html` (가장 큰 작업 — route별 화면 투어)
 - `03-taxonomy.html`
 - `04-workflow-decision.html`
 - `05-process-flow.html`
@@ -21,20 +23,20 @@
 - `09-glossary.html` (Codex CLI 항목 등)
 - `assets/` (스크린샷, css 추정)
 
-확인된 명시적 stale:
-- `02-workbench-tour.html` L52 (Codex CLI raw requirement 정규화) — surface 위치 갱신.
-- `02-workbench-tour.html` L150 (intake 단계 예시 불러오기) — `/af/:id/analyze` 의 "분석 결과 import" 로 변경.
-- `09-glossary.html` L97-98 (Codex CLI) — "현재 워크벤치 UI 에서는 직접 호출하지 않으며 af-analyze-requirement skill 이 호출한다" 추가.
-- 03~08 챕터는 schema/taxonomy/contract 자체 설명이므로 페이지별로 wizard 단어만 grep + 갱신.
+확인된 화면 불일치는 현재 작업에서 Stage Runner 기준으로 정리했다.
 
-## 작업 정의 (Done means)
+- `02-workbench-tour.html` — Landing, Analyze Skill Runner, Design Skill Runner, Build, Verify, Reuse Hub 흐름으로 재작성.
+- `09-glossary.html` — Codex CLI, Stage Runner, `stage_runs`, proposed artifacts, BuildWorkbench, VerifyWorkbench, Reuse Hub 용어 추가.
+- 03~08 챕터는 schema/taxonomy/contract 자체 설명은 보존하고 route/surface 표현만 갱신.
 
-1. `02-workbench-tour.html` 를 새 5-route 흐름으로 다시 쓴다.
+## 작업 결과
+
+1. `02-workbench-tour.html` 를 새 5-route 흐름으로 다시 썼다.
    - Landing → artifact root 생성 → analysis-result.json import → /af/:id/analyze → ...
-   - 스크린샷: `/tmp/af-screens/pr2-...`, `/tmp/af-screens/pr3-...`, `/tmp/af-screens/pr4-...`, `/tmp/af-screens/pr5-...`, `/tmp/af-screens/pr6-...` 가 이미 있으나 onboarding 용으로는 다시 정리하여 `docs/onboarding/assets/` 아래 png 로 저장.
-2. `09-glossary.html` 의 용어를 새 surface 와 정합 — `wizard step`, `useWorkbenchState`, `AdkRuntimeWorkbench`, `예시 불러오기` 같은 삭제된 단어는 deprecated 표기 또는 제거.
-3. 03~08 챕터의 본문에서 surface 표현이 어긋난 부분만 보정. 스키마 본문은 그대로.
-4. `index.html` 의 챕터 목차에 빠진 새 화면 (Reuse Hub, collaboration layer) 이 있으면 추가.
+   - 스크린샷은 `/tmp/af-screens/onboarding-*.png` 에 캡처하고 `docs/onboarding/assets/onboarding-*.png` 로 복사했다.
+2. `09-glossary.html` 의 용어를 새 surface 와 정합했다. 삭제된 surface 용어는 fixture/history로만 남기고 현재 UI 기본 경로와 섞지 않는다.
+3. 03~08 챕터의 본문에서 surface 표현이 어긋난 부분만 보정했다. 스키마 본문은 유지했다.
+4. `index.html` 과 navigation title을 Stage Runner / Build / Verify 흐름에 맞췄다.
 
 ## 파일 / 디렉터리
 
@@ -44,25 +46,24 @@
   - `docs/onboarding/09-glossary.html`
   - 03~08: grep 결과에 따라 부분 수정
 - 신규 (스크린샷)
-  - `docs/onboarding/assets/landing.png`
-  - `docs/onboarding/assets/analyze.png`
-  - `docs/onboarding/assets/design.png`
-  - `docs/onboarding/assets/build.png`
-  - `docs/onboarding/assets/verify.png`
-  - `docs/onboarding/assets/reuse-hub.png`
+  - `docs/onboarding/assets/onboarding-landing.png`
+  - `docs/onboarding/assets/onboarding-analyze.png`
+  - `docs/onboarding/assets/onboarding-design.png`
+  - `docs/onboarding/assets/onboarding-build.png`
+  - `docs/onboarding/assets/onboarding-verify.png`
+  - `docs/onboarding/assets/onboarding-catalog.png`
 
-## 작업 절차
+## 적용 절차 기록
 
-1. `cd packages/web && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort &` 로 dev server 띄움.
-2. scenario-a 또는 d 를 req-001 로 import (시연 시 보기 좋은 모듈 분포).
-3. chrome-devtools MCP 로 각 화면을 캡처해 `docs/onboarding/assets/` 에 저장.
-4. HTML 본문 갱신 — `<figure>` 캡션과 step 번호를 5-route 기반으로 재작성.
-5. dev server 정지, smoke artifact root 삭제, 캡쳐 화일 git add.
+1. 고정 포트 `5173`에서 이미 떠 있는 dev server를 `curl -I http://127.0.0.1:5173/` 로 확인했다.
+2. 기존 `artifacts/af/req-001`, `artifacts/af/req-002` root를 화면 샘플로 사용했다.
+3. Chrome DevTools MCP gate가 열려 있지 않아 WSL headless Chrome으로 큰 viewport screenshot을 캡처했다.
+4. HTML 본문 갱신 — `<figure>` 캡션과 step 번호를 5-route 기반으로 재작성했다.
 
 ## 검증
 
 - 브라우저로 `docs/onboarding/index.html` 열어 클릭 흐름 확인. (서버 불필요, 정적 HTML)
-- 본 브리프 작업 후 `00-doc-audit.md` 의 onboarding 항목이 모두 해소됐는지 다시 grep.
+- 본 브리프 작업 후 active onboarding 문서가 Stage Runner/route 모델을 기준으로 설명되는지 다시 grep.
 
 ## Out of scope
 

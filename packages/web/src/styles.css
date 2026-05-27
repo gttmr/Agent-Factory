@@ -171,6 +171,17 @@ dt {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .ui-button-primary {
@@ -948,6 +959,10 @@ td {
   color: var(--cat-remote);
   background: var(--surface);
 }
+.graph-container-overlay.is-highlighted {
+  border-width: 2px;
+  box-shadow: 0 0 0 3px rgba(47, 138, 104, 0.18);
+}
 
 /* Graph node cards. Tokens come from --cat-*. */
 .graph-node {
@@ -962,11 +977,49 @@ td {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
+  position: relative;
 }
 
 .graph-node.is-selected {
   outline: 2px solid var(--accent-strong, #1e7a4d);
   outline-offset: 2px;
+}
+
+.graph-node.has-highlight {
+  box-shadow: inset 0 0 0 2px rgba(47, 138, 104, 0.26), 0 0 0 2px rgba(47, 138, 104, 0.12);
+}
+
+.graph-node-collab {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: inline-flex;
+  gap: 3px;
+  z-index: 2;
+}
+
+.graph-node-comment-pin,
+.graph-node-highlight-pin,
+.graph-edge-comment-pin {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+}
+
+.graph-node-comment-pin,
+.graph-edge-comment-pin {
+  background: var(--accent-strong, #1e7a4d);
+}
+
+.graph-node-highlight-pin {
+  background: var(--cat-workflow-line, #2f8a68);
 }
 
 .graph-node-card.cat-agent { border-color: var(--cat-agent-line); }
@@ -1134,6 +1187,16 @@ td {
 .graph-edge-label.is-selected {
   border-color: var(--accent-strong, #1e7a4d);
   color: #1a202c;
+}
+.graph-edge-label.is-highlighted {
+  border-color: var(--cat-workflow-line, #2f8a68);
+  box-shadow: 0 0 0 2px rgba(47, 138, 104, 0.14);
+}
+.graph-edge-comment-pin {
+  margin-left: 6px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 0.62rem;
 }
 .graph-edge-route-label  { color: var(--accent-strong, #1e7a4d); }
 .graph-edge-control-label { color: var(--red, #c0432c); }
