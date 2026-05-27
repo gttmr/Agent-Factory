@@ -13,6 +13,14 @@
     <main class="main">
       <div class="page-eyebrow">검증과 핸드오프 · 8/9</div>
       <h1 class="page-title">8. 검증과 ADK Runtime Handoff</h1>
+      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
+        <strong>⚠️ Stale (PR6 이전 wizard UI 기준)</strong> — 이 챕터의 “ADK Runtime Handoff 화면 + Smoke 일괄 실행 macro + chat-smoke + <code>adk web</code> 임베드 + <code>SavedAnalysisRecord</code>/<code>activeStep</code> landing 분기”는 PR6 마이그레이션 이전 surface다. 현재 워크벤치는 두 단계로 나뉘어 있다:
+        <ul>
+          <li>BuildWorkbench(<code>/af/:reqId/build</code>) — scaffold-plan 도출 + <code>POST /api/af/:id/runtime-stub/build</code>로 <code>scripts/generate-adk-source.mjs</code> spawn, <code>implementation-handoff.md</code> inline 편집.</li>
+          <li>VerifyWorkbench(<code>/af/:reqId/verify</code>) — 고정 allow-list 세 명령(<code>validate-artifacts.mjs &lt;root&gt;</code>, <code>npm run build --prefix packages/web</code>, <code>npm run test:analyzer --prefix packages/web</code>)만 실행하고 결과를 <code>manifest.validation.last_result</code>에 기록.</li>
+        </ul>
+        <code>adk web</code> 임베드 / <code>/run</code> chat smoke / Smoke 일괄 실행 macro는 워크벤치 UI에서 제거됐고, 같은 검증이 필요하면 별도 터미널에서 실행한다. <code>SavedAnalysisRecord</code>는 <code>templates/saved-analysis-fixtures/</code>의 validator regression fixture로만 남는다. 본문 재작성과 새 스크린샷은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다.
+      </div>
       <p class="page-lede">
         승인된 산출물이 모이면 워크벤치는 <code>scaffold-plan.json</code>을 만들고 ADK source
         bundle을 핸드오프한다. 이 단계는 “배포”가 아니라 <em>검토 게이트 + source-bundle handoff +

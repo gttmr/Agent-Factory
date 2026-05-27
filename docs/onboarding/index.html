@@ -13,6 +13,9 @@
     <main class="main">
       <div class="page-eyebrow">START · 0/9</div>
       <h1 class="page-title">Agent Factory 온보딩 가이드</h1>
+      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
+        <strong>⚠️ Surface 단어 부분 stale</strong> — 9개 챕터의 화면 묘사(특히 2장 “워크벤치 한 바퀴”, 6장 “Module Review Board”, 8장 “검증과 ADK Runtime Handoff”)는 PR1~PR6 마이그레이션 전의 single-page wizard UI 기준이다. 분류·Graph IR·Remote A2A·Runtime 계약·미싱 정보 게이트의 결정 기준 자체는 그대로 유효하지만, 현재 워크벤치는 router-driven 5-route 모델(<code>/</code>, <code>/af/:reqId/{analyze,design,build,verify}</code>, <code>/catalog</code>)이며 “Module Review”·“ADK Runtime Handoff 화면”·“Smoke 일괄 실행 매크로”는 더 이상 존재하지 않는다. 챕터별 본문/스크린샷 재작성은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다. 현재 surface 사실관계는 <code>docs/workbench/agent-factory-harness.md</code>의 “Workbench surface” 절을 참고한다.
+      </div>
       <p class="page-lede">
         ADK, A2A, MCP, EAI 같은 용어가 처음이라도 이 워크벤치로 어떻게 요구사항을
         분석하고 4단계 DLC 산출물로 검토한 뒤 ADK Runtime Handoff까지 가는지 단계별로

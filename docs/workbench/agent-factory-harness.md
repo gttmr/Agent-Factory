@@ -101,13 +101,12 @@ A scaffold plan should make boundaries explicit before code exists. Generated so
 
 Triage of missing information after analysis follows a two-layer rule.
 
-- Requirement-level `evidence.missing_information` is a soft gate. AnalysisResult exposes a per-row "수용" toggle that writes to `acceptedMissing`. This is reviewer attestation only and does not block scaffold-plan generation. The accepted set is preserved in `SavedAnalysisRecord` and surfaced in the ADK Runtime Handoff header as a "요구사항 누락 수용 N건" chip.
-- Candidate-level `ModuleCandidate.missing_information` and unresolved `status === "needs_info"` are hard gates. A candidate cannot transition to `approved` until its Resolution Draft has been reviewed and applied.
-- Module Review generates the Resolution Draft per candidate through the LLM endpoint. The draft is not applied automatically; the reviewer inspects the missing-item answers, expandable input/output object schemas, patch preview, and smoke contract before pressing `반영 적용`.
-- `반영 적용` copies the current `missing_information` array into `resolved_missing_information`, clears `missing_information`, stores the reviewer note in `missing_information_resolution`, records `resolution_applied_at`, marks `schema_review_state: applied`, and stores `smoke_spec`. The reviewer then uses `검토 승인` or the status select to set `approved`.
-- `buildScaffoldPlan` surfaces unresolved candidates as an actionable blocker ("정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.") and appends "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" to warnings.
+- Requirement-level `evidence.missing_information` is a soft gate. `/af/:reqId/analyze` (AnalyzeWorkbench) exposes a per-row "수용" toggle stored in the component's in-memory `acceptedMissing` state. This is reviewer attestation only and does not block scaffold-plan generation; the `analysis_reviewed` approval becomes enable-able once every item is accepted.
+- Candidate-level `ModuleCandidate.missing_information` and unresolved `status === "needs_info"` are hard gates. A candidate cannot transition to `approved` until its Resolution Draft has been applied. After the PR6 migration the workbench no longer ships an in-UI `해결 초안 생성` / `반영 적용` inspector — Resolution Draft application is performed by the `af-design-boundaries` skill (or an equivalent external producer) that fills in `missing_information_resolution`, `resolved_missing_information`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec` on the candidate and re-PUTs `analysis-result.json`.
+- Applied state copies the current `missing_information` array into `resolved_missing_information`, clears `missing_information`, stores the reviewer note in `missing_information_resolution`, records `resolution_applied_at`, marks `schema_review_state: applied`, and stores `smoke_spec`. Candidate `status` is then set to `approved` so DesignWorkbench can flip `boundaries_approved`.
+- `buildScaffoldPlan` (called from BuildWorkbench) surfaces unresolved candidates as an actionable blocker ("정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.") and appends "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" to warnings.
 
-The ADK Runtime Handoff screen renders an empty-state panel with a `모듈 검토로 이동` deep link whenever `can_generate_source` is false or Graph IR errors are present.
+BuildWorkbench refuses to spawn `scripts/generate-adk-source.mjs` while these blockers remain — the operator must update the analysis artifact (typically by re-running the skill) before retrying.
 
 ### Artifact root persistence
 
@@ -115,9 +114,9 @@ There is no in-browser save record any more. The artifact root directory `artifa
 
 Saved-analysis fixtures under `templates/saved-analysis-fixtures/` are now only consumed by `scripts/validate-artifacts.mjs` regression smoke. They should still mirror the canonical `analysis-result.json` shape.
 
-### Graph IR regeneration from Module Review
+### Graph IR regeneration from module review
 
-Module Review regeneration preserves reviewed edge metadata from the previous Graph IR when it can map edge endpoints back to active module candidates. If the previous graph contains only partial edges, regeneration must not leave active module candidates isolated. The workbench adds fallback `event_output` edges in module review order for candidates that lack incoming or outgoing connections, while `rejected` candidates remain excluded.
+When the module review surface (currently the DesignWorkbench module tab plus any upstream `af-design-boundaries` run) regenerates Graph IR, it preserves reviewed edge metadata from the previous Graph IR whenever edge endpoints can be mapped back to active module candidates. If the previous graph contains only partial edges, regeneration must not leave active module candidates isolated. The workbench adds fallback `event_output` edges in module review order for candidates that lack incoming or outgoing connections, while `rejected` candidates remain excluded.
 
 Graph IR validation treats any module-bound node without at least one incoming edge and one outgoing edge as an error. A graph that merely renders disconnected nodes is not scaffold-ready.
 
@@ -130,13 +129,9 @@ Catalog entries remain runtime contracts. For local smoke, a seed contract may i
 
 The registry must use synthetic data only. Do not add private banking endpoints, credentials, deployment scripts, or real customer data.
 
-### Smoke 일괄 실행 매크로 and stub banner
+### Smoke macro / chat smoke (removed in PR6)
 
-The Runtime Handoff screen ships a `Smoke 일괄 실행` macro that runs `generate → install → start-web → check-web → chat-smoke` sequentially, surfacing per-step pass/fail pills and halting on the first failure. Individual buttons stay available for debugging.
-
-Chat smoke requires an approved module `smoke_spec` from Module Review. If source generation is ready but no smoke contract is ready, source/install/web actions remain available, while `chat-smoke` and the smoke macro stay disabled and link back to Module Review.
-
-When `runtimeMode === "stub"` or any returned event carries `"stubbed_runtime_contract"`, the embed panel shows a yellow stub-runtime banner so reviewers do not mistake stub output for real business logic.
+The pre-PR6 Runtime Handoff screen used to ship a `Smoke 일괄 실행` macro (`generate → install → start-web → check-web → chat-smoke`) plus an in-iframe `adk web` embedding and a `/run` chat smoke. PR6 split the surface into BuildWorkbench (`/af/:reqId/build`) and VerifyWorkbench (`/af/:reqId/verify`); the in-UI macro, `adk web` iframe, and chat smoke are no longer present. BuildWorkbench only generates the runtime stub, and VerifyWorkbench only runs the fixed `validate-artifacts.mjs` / `npm run build` / `npm run test:analyzer` allow-list. Any `adk web` smoke or chat smoke is performed in a separate terminal against the generated stub directory.
 
 ## Workbench surface
 
