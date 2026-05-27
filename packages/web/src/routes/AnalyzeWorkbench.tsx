@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnalysisResult } from "../components/AnalysisResult";
-import { Button, EmptyState, Panel, SectionHeader, SelectField } from "../ui/primitives";
+import { StageRunnerPanel } from "../components/StageRunnerPanel";
+import { Button, EmptyState, Field, Panel, SectionHeader, TextareaField } from "../ui/primitives";
 import { useAnalysisArtifact, useSaveAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useApprovalGate } from "../state/useApprovalGate";
@@ -9,9 +10,10 @@ import { useRecentRoots } from "../state/useRecentRoots";
 import { putArtifactJson } from "../state/apiClient";
 import { parseAnalysisResultArtifact } from "../analyzer/analysisArtifactImport";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAnalyze, type AnalyzeCatalogEntry } from "../state/useAnalyze";
+import type { AnalyzeCatalogEntry } from "../state/useAnalyze";
 import { useCatalog, type CatalogHubEntry } from "../state/useCatalog";
-import { codexAnalyzerModels, type CodexAnalyzerModel } from "../analyzer/types";
+import { resolveAnalyzeRawText } from "../analyzer/analyzeInput";
+import { canToggleAnalysisReviewed as canToggleAnalysisReviewedGate } from "../analyzer/analysisReviewGate";
 
 export default function AnalyzeWorkbench() {
   const params = useParams<{ reqId: string }>();
@@ -31,7 +33,8 @@ export default function AnalyzeWorkbench() {
   const [acceptedMissing, setAcceptedMissing] = useState<string[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<CodexAnalyzerModel>(codexAnalyzerModels[0]);
+  const [requirementText, setRequirementText] = useState("");
+  const [domainDraft, setDomainDraft] = useState("공통");
 
   const manifest = manifestData?.manifest;
   const manifestEtag = manifestData?.etag ?? null;
@@ -39,21 +42,24 @@ export default function AnalyzeWorkbench() {
   const analysisEtag = analysisData?.etag ?? null;
 
   const { data: catalogIndex } = useCatalog();
-  const analyze = useAnalyze(reqId);
   const rawText = analysis?.normalizedRequirement?.raw_text?.trim() ?? "";
-  const domain = analysis?.normalizedRequirement?.domain ?? "general";
-  const canRerun = Boolean(reqId) && rawText.length > 0 && analyze.status !== "running";
-  const rerunBusy = analyze.status === "running";
-
-  const allCandidatesResolved = useMemo(() => {
-    if (!analysis) return false;
-    if (!Array.isArray(analysis.moduleCandidates) || analysis.moduleCandidates.length === 0) return false;
-    return analysis.moduleCandidates.every((candidate) => candidate.status !== "needs_info");
-  }, [analysis]);
+  const domain = analysis?.normalizedRequirement?.domain ?? "공통";
+  const analyzeRawText = resolveAnalyzeRawText(requirementText, rawText);
+  const analyzeDomain = domainDraft.trim() || domain;
+  const catalog = flattenCatalogForAnalyzer(catalogIndex);
+  const catalogCounts = {
+    agent: catalog.filter((entry) => entry.module_category === "agent").length,
+    workflow: catalog.filter((entry) => entry.module_category === "workflow").length,
+    adapter: catalog.filter((entry) => entry.module_category === "adapter").length,
+    remote_a2a: catalog.filter((entry) => entry.module_category === "remote_a2a").length
+  };
 
   const missingInfo = analysis?.evidence?.missing_information ?? [];
-  const allMissingHandled = missingInfo.every((item) => acceptedMissing.includes(item));
-  const canToggleAnalysisReviewed = Boolean(analysis) && allCandidatesResolved && allMissingHandled;
+  const canToggleAnalysisReviewed = canToggleAnalysisReviewedGate({
+    hasAnalysis: Boolean(analysis),
+    missingInfo,
+    acceptedMissing
+  });
 
   function toggleAcceptedMissing(item: string) {
     setAcceptedMissing((prev) =>
@@ -72,6 +78,8 @@ export default function AnalyzeWorkbench() {
       const text = await file.text();
       const parsed = parseAnalysisResultArtifact(text, file.name);
       await putArtifactJson(reqId, "analysis-result.json", parsed.analysis, analysisEtag);
+      setRequirementText(parsed.input.rawText);
+      setDomainDraft(parsed.input.domain || "공통");
       setActionMessage(`Imported ${file.name}`);
       await queryClient.invalidateQueries({ queryKey: ["af", reqId, "analysis-result"] });
     } catch (error) {
@@ -79,22 +87,8 @@ export default function AnalyzeWorkbench() {
     }
   }
 
-  function handleRerun() {
-    if (!reqId) return;
-    if (!rawText) {
-      setActionMessage(
-        "원문 요구사항(normalizedRequirement.raw_text)이 비어 있어 재분석할 수 없습니다. 먼저 raw_text 가 포함된 analysis-result.json 을 import 하세요."
-      );
-      return;
-    }
-    setActionMessage(null);
-    setImportError(null);
-    const catalog = flattenCatalogForAnalyzer(catalogIndex);
-    void analyze.start({ rawText, domain, model: selectedModel, catalog });
-  }
-
-  function handleAbortRerun() {
-    analyze.abort();
+  function handleRerunFromResult() {
+    setActionMessage("상단 Skill Runner 패널에서 요구사항을 확인한 뒤 실행하세요.");
   }
 
   function handleToggleAnalysisReviewed() {
@@ -131,92 +125,94 @@ export default function AnalyzeWorkbench() {
 
   return (
     <div className="af-stage-workspace">
-      <Panel>
-        <SectionHeader
-          eyebrow={`af-analyze-requirement · ${reqId}`}
-          title="요구사항 분석 검토"
-          description="artifact root에 저장된 analysis-result.json을 검토하고 analysis_reviewed gate를 토글합니다."
-          action={
-            <div className="af-action-row">
-              <label className="ui-button ui-button-secondary af-import-button">
-                분석 결과 import…
-                <input type="file" accept="application/json,.json" onChange={handleImport} hidden />
-              </label>
-            </div>
-          }
-        />
-        {manifestLoading ? <p className="af-landing-message">manifest 불러오는 중…</p> : null}
-        {manifestError ? (
-          <p className="af-landing-error">manifest 조회 실패: {(manifestError as Error).message}</p>
-        ) : null}
-        {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
-        {importError ? <p className="af-landing-error">Import 실패: {importError}</p> : null}
-        {saveMutation.isError ? (
-          <p className="af-landing-error">저장 실패: {(saveMutation.error as Error).message}</p>
-        ) : null}
-      </Panel>
+      {manifestLoading || manifestError || actionMessage || importError || saveMutation.isError ? (
+        <Panel>
+          {manifestLoading ? <p className="af-landing-message">manifest 불러오는 중…</p> : null}
+          {manifestError ? (
+            <p className="af-landing-error">manifest 조회 실패: {(manifestError as Error).message}</p>
+          ) : null}
+          {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
+          {importError ? <p className="af-landing-error">Import 실패: {importError}</p> : null}
+          {saveMutation.isError ? (
+            <p className="af-landing-error">저장 실패: {(saveMutation.error as Error).message}</p>
+          ) : null}
+        </Panel>
+      ) : null}
 
-      <Panel tone="muted">
-        <SectionHeader
-          title="Codex CLI 재분석"
-          description={
-            rawText
-              ? "현재 root 의 raw_text 와 seed catalog 를 Codex CLI 로 다시 보내 analysis-result.json 을 새 결과로 덮어씁니다. 진행 상황은 아래 progress 영역에 SSE 로 흐릅니다."
-              : "원문 요구사항(normalizedRequirement.raw_text) 이 비어 있어 재분석할 수 없습니다. raw_text 가 포함된 분석 결과를 먼저 import 하세요."
-          }
-          action={
-            <div className="af-action-row">
-              <SelectField
-                label="모델"
-                value={selectedModel}
-                onChange={(event) => setSelectedModel(event.target.value as CodexAnalyzerModel)}
-                disabled={rerunBusy}
-              >
-                {codexAnalyzerModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </SelectField>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={handleRerun}
-                disabled={!canRerun}
-              >
-                {rerunBusy ? "분석 중…" : "Codex CLI 로 재분석"}
-              </Button>
-              {rerunBusy ? (
-                <Button type="button" variant="ghost" onClick={handleAbortRerun}>
-                  중단
+      <StageRunnerPanel
+        reqId={reqId}
+        stage="analyze"
+        skillName="af-analyze-requirement"
+        title="Analyze Skill Runner"
+        description="요구사항 텍스트와 seed catalog 를 서버 Stage Runner 로 보내고, 결과는 run 폴더의 proposed artifact 로 먼저 저장합니다. canonical analysis-result.json 은 제안 적용 후에만 바뀝니다."
+        headerAction={
+          <div className="af-action-row">
+            <label className="ui-button ui-button-secondary af-import-button">
+              분석 결과 import…
+              <input type="file" accept="application/json,.json" onChange={handleImport} hidden />
+            </label>
+          </div>
+        }
+        controls={
+          <div className="af-analyze-intake">
+            <TextareaField
+              label="요구사항 텍스트"
+              value={requirementText}
+              onChange={(event) => setRequirementText(event.target.value)}
+              rows={7}
+              placeholder="예: 고객 문의를 분류하고 담당자가 먼저 읽을 수 있는 요약을 생성하는 Agent가 필요합니다."
+              hint={
+                rawText
+                  ? "비워 두면 현재 analysis-result.json 의 normalizedRequirement.raw_text 로 분석합니다."
+                  : "입력한 텍스트가 Analyze Skill Runner 입력으로 전송됩니다."
+              }
+            />
+            <div className="af-analyze-intake-controls">
+              <Field label="도메인">
+                <input
+                  type="text"
+                  value={domainDraft}
+                  onChange={(event) => setDomainDraft(event.target.value)}
+                  placeholder="공통"
+                />
+              </Field>
+              {rawText ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setRequirementText(rawText);
+                    setDomainDraft(domain);
+                  }}
+                >
+                  현재 raw_text 불러오기
                 </Button>
               ) : null}
             </div>
+          </div>
+        }
+        metrics={[
+          { label: "입력 글자", value: `${analyzeRawText.length}자`, tone: analyzeRawText ? "ok" : "danger" },
+          { label: "현재 후보", value: analysis ? `${analysis.moduleCandidates.length}개` : "없음" },
+          { label: "catalog", value: `${catalog.length}개` },
+          {
+            label: "catalog 구성",
+            value: `A ${catalogCounts.agent} · W ${catalogCounts.workflow} · D ${catalogCounts.adapter} · R ${catalogCounts.remote_a2a}`
           }
-        />
-        {analyze.error ? <p className="af-landing-error">{analyze.error}</p> : null}
-        {analyze.status === "completed" ? (
-          <p className="af-landing-message">analysis-result.json 이 새 결과로 갱신되었습니다.</p>
-        ) : null}
-        {analyze.events.length > 0 ? (
-          <details className="af-analyze-progress" open={analyze.status === "running"}>
-            <summary>
-              progress ({analyze.events.length}건) · 현재 상태: {analyze.status}
-            </summary>
-            <ol className="af-analyze-progress-list">
-              {analyze.events.slice(-20).map((event, index) => (
-                <li key={`${event.phase}-${event.at}-${index}`} className={`af-analyze-event af-analyze-event-${event.phase}`}>
-                  <span className="af-analyze-event-phase">{event.phase}</span>
-                  <span className="af-analyze-event-title">{event.title ?? event.message}</span>
-                  {typeof event.elapsedMs === "number" ? (
-                    <small className="af-analyze-event-meta">{event.elapsedMs}ms</small>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          </details>
-        ) : null}
-      </Panel>
+        ]}
+        disabledReason={
+          analyzeRawText
+            ? null
+            : "요구사항 텍스트가 비어 있습니다. 원문을 입력하거나 raw_text 가 포함된 analysis-result.json 을 import 하세요."
+        }
+        currentArtifactEtag={analysisEtag}
+        runButtonLabel={analysis ? "Analyze 재실행" : "Analyze 실행"}
+        buildRunBody={(model) => ({
+          model,
+          input: { rawText: analyzeRawText, domain: analyzeDomain },
+          catalog
+        })}
+      />
 
       {analysisLoading ? (
         <Panel>
@@ -230,13 +226,13 @@ export default function AnalyzeWorkbench() {
         <Panel>
           <EmptyState
             title="아직 analysis-result.json 이 없습니다"
-            description="상단의 ‘분석 결과 import’를 사용해 외부에서 만든 결과를 올리거나, Legacy 분석기에서 분석을 실행하고 export 한 결과를 import 하세요."
+            description="상단에 요구사항 텍스트를 입력해 Codex CLI 분석을 실행하거나, ‘분석 결과 import’를 사용해 외부에서 만든 결과를 올리세요."
           />
         </Panel>
       ) : (
         <AnalysisResult
           analysis={analysis}
-          onRerun={handleRerun}
+          onRerun={handleRerunFromResult}
           onContinue={handleContinueToDesign}
           acceptedMissing={acceptedMissing}
           onToggleAcceptedMissing={toggleAcceptedMissing}
@@ -249,8 +245,8 @@ export default function AnalyzeWorkbench() {
             title="Gate: analysis_reviewed"
             description={
               canToggleAnalysisReviewed
-                ? "모든 모듈 후보의 needs_info가 해소되고 누락 정보 항목이 ‘수용’ 처리되었습니다. gate를 토글하여 다음 단계로 진행하세요."
-                : "다음 단계로 넘어가려면 모든 모듈 status가 needs_info가 아니어야 하고, 위에서 missing_information 항목을 모두 ‘수용’ 처리해야 합니다."
+                ? "요구사항 수준 누락 정보 항목이 ‘수용’ 처리되었습니다. gate를 토글하여 모듈 검토 단계로 진행하세요."
+                : "다음 단계로 넘어가려면 위에서 요구사항 수준 missing_information 항목을 모두 ‘수용’ 처리해야 합니다."
             }
             action={
               <Button

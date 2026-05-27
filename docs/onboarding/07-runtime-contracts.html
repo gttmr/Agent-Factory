@@ -13,9 +13,6 @@
     <main class="main">
       <div class="page-eyebrow">계약 검토 · 7/9</div>
       <h1 class="page-title">7. Runtime 계약</h1>
-      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
-        <strong>⚠️ Surface 단어 stale</strong> — “워크벤치 wizard의 <code>Runtime 계약</code> 스텝/rail”은 PR6 마이그레이션 전 surface다. 현재 워크벤치는 5-route 모델이며 Runtime 계약 검토 화면은 아직 별도 surface로 부활하지 않았다. 잠정적으로 <code>runtime_contracts_approved</code>는 manifest direct PATCH로만 토글 가능하고, DesignWorkbench는 계약 목록을 read-only로 노출한다. 전용 surface 추가는 <code>docs/workbench/follow-ups/03-runtime-contract-review-surface.md</code> 브리프에서 다룬다. 본문 단어 일괄 갱신은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다.
-      </div>
       <p class="page-lede">
         MCP, EAI/Legacy adapter, Context Manager, Callback Broker, ADK callback, async resume처럼
         “callback과 runtime support 경계”에 해당하는 항목은 top-level <code>module_category</code>를
@@ -68,23 +65,23 @@
       </section>
 
       <section class="block">
-        <h2>검토 화면 — 워크벤치의 “Runtime 계약” 단계</h2>
-        <p>워크벤치 wizard의 <code>Runtime 계약</code> 스텝이 이 artifact를 보여준다. Runtime 계약 후보가 있거나 catalog-bound 후보가 있을 때만 rail에 나타난다. 이 화면이 Remote A2A 검토와 Catalog Review 앞에 있는 이유는, <em>요구사항이 callback/legacy/async resume을 포함한다면 그 경계가 확정된 다음에야 scaffold-plan을 만들 수 있기 때문</em>이다.</p>
+        <h2>검토 화면 — DesignWorkbench의 Runtime 계약 탭</h2>
+        <p>현재 Runtime 계약은 <code>/af/:reqId/design</code>의 <strong>Runtime 계약</strong> 탭에서 검토한다. Design Stage Runner가 계약 보강을 proposed artifact로 제안할 수 있고, reviewer는 diff/preview 후 적용한 다음 readiness issue가 0건인지 확인한다. <code>runtime_contracts_approved</code>는 사람이 토글하는 manifest gate이며 runner 성공만으로 자동 변경되지 않는다.</p>
         <div class="callout info">
           <div class="icon">i</div>
           <div class="body">
-            <p>각 계약은 <code>contract_status</code>를 갖는다. 필수 계약이 <code>approved</code>가 아니면 scaffold-plan validation과 CLI source generation 모두 blocker로 남긴다. 선택 계약이면 warning으로 남길 수 있다.</p>
+            <p>각 계약은 <code>contract_status</code>를 갖는다. 필수 계약이 <code>approved</code>가 아니면 scaffold-plan validation과 source generation 모두 blocker로 남긴다. 선택 계약이면 warning으로 남길 수 있다.</p>
           </div>
         </div>
       </section>
 
       <section class="block">
         <h2>import/backfill 규칙</h2>
-        <p><code>analysis-result.json</code>을 browser import할 때 Runtime 계약은 안전하게 정규화된다. 오래된 artifact에 <code>runtimeContracts</code> 필드가 없으면 catalog 기본 계약을 보강할 수 있지만, 명시적으로 <code>runtimeContracts: []</code>가 있으면 reviewer가 비워 둔 상태로 존중한다.</p>
+        <p><code>analysis-result.json</code>을 browser import하거나 Stage Runner proposal을 적용할 때 Runtime 계약은 안전하게 정규화된다. 오래된 artifact에 <code>runtimeContracts</code> 필드가 없으면 catalog 기본 계약을 보강할 수 있지만, 명시적으로 <code>runtimeContracts: []</code>가 있으면 reviewer가 비워 둔 상태로 존중한다.</p>
         <ul>
           <li>malformed contract는 UI가 깨지지 않도록 기본 operation/policy/support 필드를 채운다.</li>
-          <li>catalog-bound 후보의 기본 계약은 Runtime 계약 화면에서 <em>기본값 생성</em>으로 다시 채울 수 있다.</li>
-          <li>계약 상태를 바꾸면 연결된 <code>af-run-manifest.json</code>의 <code>runtime_contracts_approved</code> 승인 상태도 현재 계약 목록 기준으로 갱신된다.</li>
+          <li>catalog-bound 후보의 기본 계약은 Design Stage Runner나 catalog 기본값 보강 경로로 다시 채울 수 있다.</li>
+          <li>계약을 저장해도 <code>runtime_contracts_approved</code>는 자동 승인되지 않는다. reviewer가 readiness를 확인한 뒤 manifest gate를 직접 토글한다.</li>
         </ul>
       </section>
 

@@ -9,6 +9,15 @@ import {
   REQ_ID_PATTERN
 } from "./artifactRootStore";
 import {
+  applyStageRun,
+  assertSkillRunnerStage,
+  listStageRuns,
+  readStageRunDetail,
+  runStageSkill,
+  type StageRunEvent,
+  type StageRunRequestBody
+} from "./stageRunner";
+import {
   type AfRunManifest,
   type AfRunValidationResult,
   afRunValidationResults
@@ -53,6 +62,7 @@ const VERIFY_COMMANDS: Record<string, { argv: string[]; description: string }> =
 
 export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
+  const stageRunLocks = new Set<string>();
 
   return async function afArtifactsMiddleware(
     req: IncomingMessage,
@@ -88,6 +98,11 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       }
 
       const sub = rest.join("/");
+
+      // /api/af/:id/stages/:stage/{run,cancel,runs...}
+      if (rest[0] === "stages") {
+        return await handleStageRunner(repoRoot, store, stageRunLocks, reqId, rest.slice(1), req, res);
+      }
 
       // /api/af/:id/manifest
       if (sub === "manifest") {
@@ -143,7 +158,7 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
 
       // /api/af/:id/runtime-stub/build  → spawn scripts/generate-adk-source.mjs
       if (sub === "runtime-stub/build") {
-        if (req.method === "POST") return await handleBuildRuntimeStub(repoRoot, store, reqId, res);
+        if (req.method === "POST") return await handleBuildRuntimeStub(repoRoot, store, reqId, req, res);
         sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
         return;
       }
@@ -186,6 +201,115 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       handleError(error, res, next);
     }
   };
+}
+
+async function handleStageRunner(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  locks: Set<string>,
+  reqId: string,
+  rest: string[],
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const [stageRaw, action, runId, subAction] = rest;
+  const stage = assertSkillRunnerStage(stageRaw ?? "");
+
+  if (action === "run") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    if (locks.has(reqId)) {
+      sendJson(res, 409, { error: "이 artifact root 에서 이미 stage run 이 진행 중입니다." });
+      return;
+    }
+    const body = (await readJsonBody(req)) as StageRunRequestBody;
+    locks.add(reqId);
+    try {
+      if (shouldStreamStageRun(req, body)) {
+        await handleStageRunSse(repoRoot, store, reqId, stage, body, res);
+      } else {
+        const summary = await runStageSkill({ repoRoot, store, reqId, stage, body });
+        sendJson(res, summary.status === "failed" ? 422 : 200, summary);
+      }
+    } finally {
+      locks.delete(reqId);
+    }
+    return;
+  }
+
+  if (action === "cancel") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 501, { error: "cancel 은 child-process registry 준비 후 후속 구현합니다." });
+    return;
+  }
+
+  if (action === "runs" && !runId) {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const runs = await listStageRuns({ store, reqId, stage });
+    sendJson(res, 200, runs.slice(0, 20));
+    return;
+  }
+
+  if (action === "runs" && runId && !subAction) {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const detail = await readStageRunDetail({ store, reqId, stage, runId });
+    sendJson(res, 200, detail);
+    return;
+  }
+
+  if (action === "runs" && runId && subAction === "apply") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const result = await applyStageRun({ store, reqId, stage, runId, ifMatch: ifMatchHeader(req.headers["if-match"]) });
+    sendJson(res, 200, result);
+    return;
+  }
+
+  sendJson(res, 404, { error: "알 수 없는 stage runner 경로입니다." });
+}
+
+async function handleStageRunSse(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  reqId: string,
+  stage: "analyze" | "design",
+  body: StageRunRequestBody,
+  res: ServerResponse
+): Promise<void> {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  const writeEvent = (event: StageRunEvent | { phase: string; message: string; summary?: unknown }) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+  const summary = await runStageSkill({
+    repoRoot,
+    store,
+    reqId,
+    stage,
+    body,
+    onEvent: writeEvent
+  });
+  writeEvent({
+    phase: summary.status === "failed" ? "failed" : "completed",
+    message: summary.status === "failed" ? summary.last_error ?? "stage run failed" : "stage run completed",
+    summary
+  });
+  res.end();
 }
 
 async function handleListRoots(store: ArtifactRootStore, res: ServerResponse): Promise<void> {
@@ -456,11 +580,18 @@ async function handleBuildRuntimeStub(
   repoRoot: string,
   store: ArtifactRootStore,
   reqId: string,
+  req: IncomingMessage,
   res: ServerResponse
 ): Promise<void> {
+  const body = await readJsonBody(req).catch(() => ({}));
   const rootDir = store.resolveRootDir(reqId);
   const stubDir = join(rootDir, "runtime-stub");
   const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];
+  const command = `node ${args.join(" ")}`;
+  if (shouldStreamProcess(req, body)) {
+    await handleBuildRuntimeStubSse(repoRoot, stubDir, args, command, res);
+    return;
+  }
   const result = await runProcess(repoRoot, "node", args);
   if (result.code !== 0) {
     sendJson(res, 422, {
@@ -468,7 +599,7 @@ async function handleBuildRuntimeStub(
       exit_code: result.code,
       stdout: result.stdout,
       stderr: result.stderr,
-      command: `node ${args.join(" ")}`
+      command
     });
     return;
   }
@@ -478,8 +609,67 @@ async function handleBuildRuntimeStub(
     files,
     stdout: result.stdout,
     stderr: result.stderr,
-    command: `node ${args.join(" ")}`
+    command
   });
+}
+
+async function handleBuildRuntimeStubSse(
+  repoRoot: string,
+  stubDir: string,
+  args: string[],
+  command: string,
+  res: ServerResponse
+): Promise<void> {
+  beginSse(res);
+  const abortController = new AbortController();
+  const abortOnClose = () => {
+    if (!res.writableEnded) abortController.abort();
+  };
+  res.on("close", abortOnClose);
+  writeSseEvent(res, "start", { command, started_at: new Date().toISOString() });
+  try {
+    let streamedStdout = false;
+    let streamedStderr = false;
+    const result = await runProcess(repoRoot, "node", args, {
+      signal: abortController.signal,
+      onStdout: (chunk) => {
+        streamedStdout = true;
+        writeSseEvent(res, "stdout", { chunk });
+      },
+      onStderr: (chunk) => {
+        streamedStderr = true;
+        writeSseEvent(res, "stderr", { chunk });
+      },
+      onError: (error) => writeSseEvent(res, "error", { error: error.message })
+    });
+    flushBufferedProcessOutput(res, result, streamedStdout, streamedStderr);
+    if (result.code !== 0) {
+      writeSseEvent(res, "error", {
+        error: "runtime-stub 생성 실패",
+        exit_code: result.code,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        command
+      });
+      return;
+    }
+    const files = await collectFiles(stubDir, stubDir);
+    writeSseEvent(res, "done", {
+      ok: true,
+      files,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      command
+    });
+  } catch (error) {
+    writeSseEvent(res, "error", {
+      error: error instanceof Error ? error.message : "runtime-stub 생성 실패",
+      command
+    });
+  } finally {
+    res.off("close", abortOnClose);
+    res.end();
+  }
 }
 
 async function handleVerifyRun(
@@ -503,6 +693,10 @@ async function handleVerifyRun(
   const rootDir = store.resolveRootDir(reqId);
   const argv =
     key === "validate_artifact_root" ? [...command.argv, rootDir] : [...command.argv];
+  if (shouldStreamProcess(req, body)) {
+    await handleVerifyRunSse(repoRoot, store, reqId, key, argv, res);
+    return;
+  }
   const result = await runProcess(repoRoot, argv[0], argv.slice(1));
   const passed = result.code === 0;
 
@@ -527,32 +721,137 @@ async function handleVerifyRun(
   });
 }
 
+async function handleVerifyRunSse(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  reqId: string,
+  key: string,
+  argv: string[],
+  res: ServerResponse
+): Promise<void> {
+  beginSse(res);
+  const command = argv.join(" ");
+  const abortController = new AbortController();
+  const abortOnClose = () => {
+    if (!res.writableEnded) abortController.abort();
+  };
+  res.on("close", abortOnClose);
+  writeSseEvent(res, "start", { command, command_key: key, started_at: new Date().toISOString() });
+  try {
+    let streamedStdout = false;
+    let streamedStderr = false;
+    const result = await runProcess(repoRoot, argv[0], argv.slice(1), {
+      signal: abortController.signal,
+      onStdout: (chunk) => {
+        streamedStdout = true;
+        writeSseEvent(res, "stdout", { chunk });
+      },
+      onStderr: (chunk) => {
+        streamedStderr = true;
+        writeSseEvent(res, "stderr", { chunk });
+      },
+      onError: (error) => writeSseEvent(res, "error", { error: error.message })
+    });
+    flushBufferedProcessOutput(res, result, streamedStdout, streamedStderr);
+    const passed = result.code === 0;
+
+    const { manifest } = await store.readManifest(reqId);
+    const next: AfRunManifest = {
+      ...manifest,
+      validation: {
+        commands: [command],
+        last_result: passed ? "passed" : "failed"
+      }
+    };
+    await store.writeManifest(reqId, next, null);
+
+    const payload = {
+      ok: passed,
+      exit_code: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      command,
+      command_key: key
+    };
+    writeSseEvent(res, passed ? "done" : "error", passed ? payload : { ...payload, error: "verify 실행 실패" });
+  } catch (error) {
+    writeSseEvent(res, "error", {
+      error: error instanceof Error ? error.message : "verify 실행 실패",
+      command,
+      command_key: key
+    });
+  } finally {
+    res.off("close", abortOnClose);
+    res.end();
+  }
+}
+
 interface ProcessResult {
   code: number;
   stdout: string;
   stderr: string;
 }
 
-function runProcess(cwd: string, command: string, args: string[]): Promise<ProcessResult> {
+interface ProcessOptions {
+  signal?: AbortSignal;
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
+  onError?: (error: Error) => void;
+}
+
+function runProcess(cwd: string, command: string, args: string[], options: ProcessOptions = {}): Promise<ProcessResult> {
   return new Promise((resolvePromise) => {
     const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let settled = false;
     let stdout = "";
     let stderr = "";
+    const cleanup = () => {
+      options.signal?.removeEventListener("abort", abortChild);
+    };
+    const finish = (result: ProcessResult) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolvePromise(result);
+    };
+    const abortChild = () => {
+      if (!settled) child.kill("SIGTERM");
+    };
+    if (options.signal?.aborted) {
+      child.kill("SIGTERM");
+    } else {
+      options.signal?.addEventListener("abort", abortChild, { once: true });
+    }
     child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      stdout += text;
       if (stdout.length > 200_000) stdout = stdout.slice(-200_000);
+      options.onStdout?.(text);
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      stderr += text;
       if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
+      options.onStderr?.(text);
     });
     child.on("error", (error) => {
-      resolvePromise({ code: -1, stdout, stderr: `${stderr}\n[spawn-error] ${error.message}` });
+      options.onError?.(error);
+      finish({ code: -1, stdout, stderr: `${stderr}\n[spawn-error] ${error.message}` });
     });
     child.on("close", (code) => {
-      resolvePromise({ code: code ?? -1, stdout, stderr });
+      finish({ code: code ?? -1, stdout, stderr });
     });
   });
+}
+
+function flushBufferedProcessOutput(
+  res: ServerResponse,
+  result: ProcessResult,
+  streamedStdout: boolean,
+  streamedStderr: boolean
+): void {
+  if (!streamedStdout && result.stdout) writeSseEvent(res, "stdout", { chunk: result.stdout });
+  if (!streamedStderr && result.stderr) writeSseEvent(res, "stderr", { chunk: result.stderr });
 }
 
 async function mintRequirementId(store: ArtifactRootStore): Promise<string> {
@@ -578,6 +877,32 @@ function parsePath(req: IncomingMessage): { segments: string[] } | null {
     }
   }
   return { segments };
+}
+
+function shouldStreamStageRun(req: IncomingMessage, body: StageRunRequestBody): boolean {
+  const accept = req.headers.accept;
+  return body.streamProgress === true || (typeof accept === "string" && accept.includes("text/event-stream"));
+}
+
+function shouldStreamProcess(req: IncomingMessage, body: unknown): boolean {
+  const accept = req.headers.accept;
+  return (
+    (isRecord(body) && body.streamProgress === true) ||
+    (typeof accept === "string" && accept.includes("text/event-stream"))
+  );
+}
+
+function beginSse(res: ServerResponse): void {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+}
+
+function writeSseEvent(res: ServerResponse, event: "start" | "stdout" | "stderr" | "done" | "error", data: unknown): void {
+  if (res.destroyed || res.writableEnded) return;
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
 function ifMatchHeader(value: string | string[] | undefined): string | null {

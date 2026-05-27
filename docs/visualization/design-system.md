@@ -4,7 +4,7 @@
 
 ## 디자인 원칙
 
-- **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. 모든 화면(Module Review, Graph IR, Catalog, A2A Contract Review)이 동일 매핑을 사용한다.
+- **카테고리는 색으로 구분한다.** Agent / Workflow / Adapter / Remote A2A 의 분류는 라벨만 보고 식별하지 않고 색·글리프·stripe 로 즉시 구분되어야 한다. Analyze/Design, Graph IR, Runtime 계약, Reuse Hub가 동일 매핑을 사용한다.
 - **특수 흐름은 시각적으로 부각한다.** `process-flow.md`에서 정의한 fan-out/fan-in, loop, human input, branch, Remote A2A boundary는 텍스트 라벨만 두지 말고 노드 형태, edge 스타일, container overlay로 표시한다.
 - **Edge 는 흐름 안에 둔다.** 노드 리스트와 분리된 거대한 edge 테이블 대신, ReactFlow edge와 Graph Inspector의 edge detail로 `edge_kind`, `execution_semantics`, `data_label`, state/artifact/A2A metadata를 확인하게 한다.
 - **Workbench 는 운영 콘솔이다.** 첫 화면은 marketing hero가 아니라 개발리더가 상태, 다음 단계, 작업면, context를 바로 읽는 Ops console이어야 한다.
@@ -12,14 +12,14 @@
 
 ## 화면 골격
 
-`packages/web/src/ui/WorkbenchShell.tsx`가 workbench의 기본 골격이다.
+`packages/web/src/layout/WorkbenchLayout.tsx`와 route별 workbench 화면이 현재 workbench의 기본 골격이다.
 
-- 상단: `Agent Factory` 이름과 분석 상태 요약.
-- 좌측: workflow rail. 단계 그룹은 `입력`, `검토`, `자산화`, `생성` 순서다. `생성`은 승인된 scaffold-plan을 ADK Runtime Handoff로 넘기는 review-gated 영역이다.
-- 중앙: 현재 단계의 주 작업면.
-- 우측: 실제 단계별 context가 있을 때만 표시한다. 현재 공통 상태/검토 게이트 요약 패널은 렌더링하지 않는다. Intake에서는 파일 가져오기, 입력 metric, 분석 trace를 보여준다.
+- 상단: `Agent Factory` 이름, artifact root 전환, approval gate chip, stage navigation.
+- 좌측 rail 대신 route navigation이 `/af/:reqId/analyze`, `/design`, `/build`, `/verify`, `/catalog`로 작업 경계를 나눈다.
+- 중앙: 현재 route의 주 작업면. Analyze와 Design은 첫 Panel에 Skill Runner를 두고, 그 아래에 적용된 artifact 검토 UI를 둔다.
+- 우측: route가 필요로 하는 inspector만 표시한다. 전역 generic context panel은 다시 만들지 않는다.
 
-980px 이하에서는 좌측 rail을 한 줄 가로 스크롤로 압축하고 context는 작업면 아래로 내려간다.
+980px 이하에서는 route navigation과 gate chip이 줄바꿈되어도 본문 작업면을 밀어내지 않도록 간격을 줄이고, inspector는 작업면 아래로 내려간다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
 
 ## 코드 primitives
@@ -41,8 +41,9 @@
 
 상태는 `@tanstack/react-query` 기반이며 화면 별로 hook 이 분리되어 있다 (`packages/web/src/state/*`).
 
-- 각 route 는 `useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots` 중 필요한 hook 만 사용한다.
+- 각 route 는 `useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots`, `useStageRunner` 중 필요한 hook 만 사용한다.
 - `af-run-manifest.json` 의 `approvals.*` 가 모든 게이트 UI 의 source of truth 이다. 후보 status 로부터 다시 계산하지 않는다.
+- `af-run-manifest.json` 의 optional `stage_runs` 는 Stage Runner 실행 요약일 뿐 approval source of truth 가 아니다.
 - `localStorage` 는 최근 root 목록과 코멘트 작성자 이름/역할 캐시에만 사용한다. 단계 상태나 분석 결과는 절대 `localStorage` 에 두지 않는다.
 
 새 기능을 추가할 때는 우선 어느 artifact 가 source of truth 인지 확인하고, 필요한 hook 을 `state/` 에 둔 다음 화면 component 가 그 hook 만 호출하도록 연결한다. analysis-result, scaffold-plan, manifest 의 schema 는 UI refactor 때문에 바꾸지 않는다.
@@ -120,7 +121,7 @@
 
 ## Module Review 탭
 
-Module Review는 같은 테이블을 필터링하는 화면이 아니라 두 작업면을 분리한 review console이다.
+현재 Module Review 책임은 DesignWorkbench의 모듈 검토 패널에 있다. 같은 테이블을 필터링하는 화면이 아니라 두 작업면을 분리한 review console이다.
 
 - `신규 모듈`: 사람이 승인/보류/반려할 후보를 다룬다. 컬럼은 이름, 분류, 세부 유형, 검토 상태, 입력/출력 계약 요약에 둔다.
 - `카탈로그 계약`: 기존 runtime contract를 다룬다. 카탈로그 원본은 read-only로 표시하고, 현재 분석의 입력/출력 override와 Graph 연결만 편집한다.
@@ -128,7 +129,7 @@ Module Review는 같은 테이블을 필터링하는 화면이 아니라 두 작
 위험도, 신뢰도, 재사용 여부는 탭의 메인 컬럼에 두지 않는다.
 필요하면 inspector의 보조 evidence로만 표시한다.
 
-정보 필요 후보의 Inspector는 `Resolution Draft`를 하나의 작업면으로 표시한다.
+정보 필요 후보의 Resolution Draft는 Design Stage Runner가 proposed artifact와 diff summary로 제안할 수 있다.
 LLM 초안은 바로 적용하지 않고, 누락 항목 답변, patch preview, `Smoke 계약`을 같은 위치에서 검토하게 한다.
 `object` 또는 `array<object>` 입력/출력은 textarea가 아니라 Schema Tree로 표시한다.
 
@@ -136,7 +137,7 @@ LLM 초안은 바로 적용하지 않고, 누락 항목 답변, patch preview, `
 - 하위 field는 들여쓰기와 얇은 divider로 표시하고, 타입은 작은 code pill로 보여준다.
 - 필드 추가, required 토글, type select는 Inspector 안에 두며 테이블 컬럼으로 끌어내지 않는다.
 - raw JSON은 주 편집면이 아니라 보조 확인 수단으로만 쓴다.
-- `반영 적용`과 `검토 승인`은 분리한다. 적용 전 승인 버튼은 disabled 상태여야 한다.
+- `제안 적용`과 approval gate 토글은 분리한다. Stage Runner 성공이 `analysis_reviewed`, `boundaries_approved`, `runtime_contracts_approved`를 자동으로 켜면 안 된다.
 
 ## Process Flow 시각화
 
@@ -186,10 +187,10 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 3. 새 색·글리프가 필요하면 `:root` 토큰 + `subtypeGlyph` 매핑을 함께 추가한다.
 4. 새 Graph marker 가 필요하면 Graph IR 의미, node/edge/container 렌더러, CSS 색을 모두 갱신한다.
 5. 화면 단위 자손 선택자(`.foo-table td span`) 는 항상 `>` 직계 자식으로 좁힌다.
-6. 변경 후 chrome-devtools MCP 로 스크린샷을 찍어 색 매핑이 맞는지 시각 확인한다.
+6. 변경 후 Chrome DevTools MCP 또는 Playwright로 스크린샷을 찍어 색 매핑이 맞는지 시각 확인한다.
 
 ## 검증
 
 - `npm run build` (tsc + vite build) 통과
-- Module Review / Graph IR / Catalog / A2A Contract Review에서 카테고리 색이 동일한지 시각 확인
-- `before/after` 스크린샷이 필요할 때는 dev 서버 + chrome-devtools MCP 의 `take_screenshot` 으로 캡처
+- Analyze Stage Runner / Design Stage Runner / Graph IR / Catalog에서 카테고리 색이 동일한지 시각 확인
+- `before/after` 스크린샷이 필요할 때는 dev 서버 + Chrome DevTools MCP 또는 Playwright로 캡처

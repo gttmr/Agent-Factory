@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AfApiError, fetchArtifactJson, putArtifactJson } from "./apiClient";
+import { streamServerEvents, type ProcessStreamEvent } from "./useStreamingProcess";
 import type { ScaffoldPlan } from "../analyzer/types";
 
 export function useScaffoldPlan(reqId: string | undefined) {
@@ -38,6 +39,11 @@ export interface BuildRuntimeStubResult extends RuntimeStubListing {
   command: string;
 }
 
+export interface BuildRuntimeStubOptions {
+  streamProgress?: boolean;
+  onEvent?: (event: ProcessStreamEvent) => void;
+}
+
 export function useRuntimeStub(reqId: string | undefined) {
   return useQuery<RuntimeStubListing>({
     queryKey: ["af", reqId, "runtime-stub"] as const,
@@ -54,8 +60,23 @@ export function useRuntimeStub(reqId: string | undefined) {
 export function useBuildRuntimeStub(reqId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (options?: BuildRuntimeStubOptions) => {
       if (!reqId) throw new Error("requirement_id 가 없습니다.");
+      if (options?.streamProgress) {
+        const result = await streamServerEvents<BuildRuntimeStubResult>(
+          `/api/af/${encodeURIComponent(reqId)}/runtime-stub/build`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ streamProgress: true })
+          },
+          options.onEvent
+        );
+        if (!result.ok) {
+          throw new AfApiError(422, "runtime-stub 생성 실패", result);
+        }
+        return result;
+      }
       const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-stub/build`, {
         method: "POST"
       });

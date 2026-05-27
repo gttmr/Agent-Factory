@@ -1,0 +1,300 @@
+/* ===== Skill runner panel ===== */
+
+.af-stage-runner {
+  display: grid;
+  gap: 16px;
+}
+
+.af-stage-runner .ui-section-action {
+  flex: 0 0 auto;
+}
+
+.af-stage-runner .af-action-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.af-stage-runner .af-action-row .ui-button {
+  white-space: nowrap;
+}
+
+.af-runner-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.af-runner-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.af-runner-status-running {
+  color: var(--blue);
+}
+
+.af-runner-status-completed,
+.af-runner-status-applied {
+  color: var(--accent);
+}
+
+.af-runner-status-failed,
+.af-runner-status-canceled {
+  color: var(--red);
+}
+
+.af-runner-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.af-runner-main,
+.af-runner-controls-extra {
+  display: grid;
+  gap: 12px;
+}
+
+.af-runner-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.af-runner-controls .ui-button {
+  min-width: 150px;
+}
+
+.af-runner-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.af-runner-metric {
+  border-top: 1px solid var(--line);
+  padding: 10px 0 0;
+}
+
+.af-runner-metric dt {
+  margin-bottom: 4px;
+}
+
+.af-runner-metric dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.af-runner-metric-ok dd {
+  color: var(--accent);
+}
+
+.af-runner-metric-warn dd {
+  color: var(--amber);
+}
+
+.af-runner-metric-danger dd,
+.af-runner-readiness-blocked {
+  color: var(--red);
+}
+
+.af-runner-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.af-runner-history,
+.af-runner-detail,
+.af-runner-events {
+  min-width: 0;
+}
+
+.af-runner-history h3,
+.af-runner-detail h3,
+.af-runner-events h3 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+}
+
+.af-runner-history-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.af-runner-history-button span,
+.af-runner-history-button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.af-runner-history-button span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+}
+
+.af-runner-history-button strong {
+  font-size: 0.72rem;
+}
+
+.af-runner-history-button-active {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+}
+
+.af-runner-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.af-runner-detail-header h3 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+
+.af-runner-artifacts {
+  display: grid;
+  gap: 8px;
+}
+
+.af-runner-artifact-row {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.af-runner-artifact-row div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.af-runner-artifact-row strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.af-runner-artifact-row small,
+.af-runner-artifact-row p,
+.af-runner-events small {
+  color: var(--text-muted);
+}
+
+.af-runner-artifact-row p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.af-runner-artifact-row ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--red);
+  font-size: 0.8rem;
+}
+
+.af-runner-preview,
+.af-runner-diagnostics {
+  margin-top: 10px;
+}
+
+.af-runner-preview summary,
+.af-runner-diagnostics summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.af-runner-preview pre,
+.af-runner-diagnostics pre {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8faf8;
+  padding: 10px;
+  color: #1a202c;
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+}
+
+.af-runner-events ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.af-runner-events li {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  font-size: 0.78rem;
+}
+
+.af-runner-events li span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1180px) {
+  .af-runner-grid,
+  .af-runner-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .af-stage-runner .ui-section-header {
+    display: grid;
+  }
+
+  .af-stage-runner .af-action-row {
+    justify-content: flex-start;
+  }
+
+  .af-runner-controls,
+  .af-runner-metrics,
+  .af-runner-events li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .af-runner-controls .ui-button {
+    width: 100%;
+  }
+}

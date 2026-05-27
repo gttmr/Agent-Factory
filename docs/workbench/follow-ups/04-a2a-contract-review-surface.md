@@ -1,5 +1,7 @@
 # 04 — A2A Contract Review surface
 
+상태: 완료. `a2aContracts` 정규화와 GraphInspector의 Remote A2A 계약 안내에 더해, DesignWorkbench의 `Remote A2A` 탭에서 후보별 매칭 계약, 편집 form, readiness issue, runtime gate 연동을 다룬다.
+
 ## 왜 필요한가
 
 Remote A2A 는 high-friction boundary 이고 contract 가 굉장히 길다 (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`, `data_policy` 등). PR6 에서 legacy `A2AContractReview` 가 제거되며 새 셸에서는 이 contract 들을 다룰 UI 가 없다. `a2a-contracts.json` 파일 PUT 만 가능한 상태.
@@ -9,24 +11,28 @@ Remote A2A 는 high-friction boundary 이고 contract 가 굉장히 길다 (`own
 - 스키마: `schemas/a2a-contract.schema.json`, type 은 `packages/web/src/analyzer/types.ts` 의 `A2AContract`.
 - `analysis-result.json.a2aContracts` 또는 별도 파일 `artifacts/af/<id>/a2a-contracts.json` 양쪽에 저장 가능. 서버는 두 경로 모두 PUT 화이트리스트.
 - legacy 컴포넌트 (삭제됨): `components/A2AContractReview.tsx` + `components/a2aContractReview/{A2AContractDetail,A2AContractList,A2AFieldControls,helpers}.tsx`. 디자인 참고로만 git history 에서 확인 가능 (`git show 676b140^:packages/web/src/components/A2AContractReview.tsx`).
-- DesignWorkbench: 현재 사이드바 탭에 "Remote A2A" 탭이 placeholder 로도 없음. 추가 필요.
+- DesignWorkbench: 사이드바에 `Remote A2A` 탭이 추가됐고, remote_a2a 후보별 contract 매칭/issue count 를 보여준다.
+- inspector/editor: Agent Card, message contract, lifecycle, task capability, auth/retry/fallback/audit/data policy 를 편집하고 `analysis-result.json.a2aContracts` 로 저장한다.
+- gate: `a2aContractsGateReady` 가 `runtime_contracts_approved` 토글 조건에 포함된다. 즉 Build 단계 진입은 Runtime 계약과 Remote A2A 계약이 모두 ready 일 때만 열린다.
 
-## 작업 정의 (Done means)
+## 구현 결과
 
-1. DesignWorkbench 사이드바에 "Remote A2A" 탭 추가.
-2. 각 Remote A2A 후보 module + 매칭되는 A2AContract 가 표 형태로 표시.
-3. agent_card / message_contract / task_lifecycle / task_capability / auth / retry / fallback / audit / data_policy 필드 편집 가능.
-4. `runtimeContractReadinessIssues` 와 유사한 `a2aContractReadinessIssues` 함수가 필드 누락 issue 를 표시 (필요 시 신규 생성).
-5. 모든 Remote A2A 후보가 매칭 contract 를 가지고 `contract_status=approved` 인 경우에만 (boundaries_approved 와 함께) Build stage 진행 허용.
+1. DesignWorkbench 사이드바에 `Remote A2A` 탭이 있다.
+2. 각 Remote A2A 후보 module + 매칭되는 A2AContract 가 표 형태로 표시된다.
+3. `agent_card`, `message_contract`, `task_lifecycle`, `task_capability`, `auth`, `retry`, `fallback`, `audit`, `data_policy` 필드 편집이 가능하다.
+4. `a2aContractReadinessIssues` 가 필드 누락 issue 를 표시하고, approved 저장 시 readiness issue 가 있으면 막는다.
+5. 모든 Remote A2A 후보가 매칭 contract 를 가지고 `contract_status=approved` 인 경우에만 `runtime_contracts_approved` gate 를 켤 수 있다.
 
 ## 파일 / 디렉터리
 
 - 신규
   - `packages/web/src/design/A2AContractPanel.tsx`
-  - `packages/web/src/design/a2aContractValidator.ts` — readiness issue 함수 (legacy `analyzer/a2aNormalize.ts` 의 일부 로직 재사용 가능)
+  - `packages/web/src/design/a2aContractValidator.ts`
+  - `packages/web/src/design/a2aContractValidator.test.ts`
+  - `packages/web/src/styles/router/a2a-contract.css`
 - 수정
-  - `packages/web/src/routes/DesignWorkbench.tsx` — 탭 추가. `module_category === "remote_a2a"` 인 후보가 0개일 때 탭 자체를 disable 또는 EmptyState.
-  - `packages/web/src/styles-router.css` — `.af-a2a-*`.
+  - `packages/web/src/routes/DesignWorkbench.tsx` — 탭 추가, A2A contract 저장, runtime gate 조건에 A2A readiness 포함.
+  - `packages/web/src/styles-router.css` — A2A style partial import.
 
 ## 검증
 
@@ -51,4 +57,4 @@ MCP 스모크 (scenario-e 가 필수):
 
 - legacy `A2AContractDetail.tsx` 는 18KB 정도였다. 새 surface 는 필드 form 만 깔끔하게 — 700 줄 이내 권장.
 - A2A field 가 매우 많아 한 화면 표 vs 카드 vs accordion 중 선택해야 한다. UX 측면에서 module candidate 단위로 카드 + 내부 form 권장.
-- `a2aContractReadinessIssues` 가 PR3/4 의 scaffold-plan blocker 에 들어가야 하는지 검토. 현재 `scaffoldPlan.collectBlockers` 는 runtime contract 만 본다. A2A 도 blocker 로 surface 가 필요한지 사용자에게 확인.
+- `scaffoldPlan.collectBlockers` 는 아직 runtime contract blocker 만 직접 수집한다. A2A readiness 는 Build 진입 전 `runtime_contracts_approved` gate 에서 막는 구조다.

@@ -14,12 +14,19 @@ export interface GraphNodeData {
   graphNode: GraphNode;
   selected: boolean;
   onSelect: (id: string) => void;
+  commentCount?: number;
+  commentTooltip?: string;
+  highlightCount?: number;
 }
 
 export interface GraphEdgeData {
   graphEdge: GraphEdge;
   selected: boolean;
   onSelect: (id: string) => void;
+  commentCount?: number;
+  commentTooltip?: string;
+  highlightCount?: number;
+  highlightColor?: string;
 }
 
 export interface ContainerRect {

@@ -1,5 +1,7 @@
 # 06 — Analyze pipeline 결정
 
+상태: 완료 후 brief 09로 흡수. 옵션 B의 `/api/analyze-requirement` SSE 호출 hook은 구현됐고, 현재 기본 UI는 Analyze Skill Runner(`/api/af/:reqId/stages/analyze/run`)가 담당한다. `/api/analyze-requirement`는 direct/internal analyzer primitive로 보존한다.
+
 ## 왜 필요한가
 
 PR6 에서 `/legacy` 가 제거되며 워크벤치 UI 안에서 분석을 직접 실행할 수단이 사라졌다. 현재는 외부 `af-analyze-requirement` skill 이 `analysis-result.json` 을 생성하고 사용자가 import 해야 한다. 이게 의도된 운영 모델인지, 아니면 `/af/:reqId/analyze` 에서 "분석 실행" 버튼 한 번으로 Codex CLI 를 호출하는 게 맞는지 사용자가 결정해야 한다.
@@ -9,16 +11,17 @@ PR2 의 AnalyzeWorkbench 코드에 남아있는 `handleRerun` 함수는 현재 �
 ## 현재 상태
 
 - 서버: `packages/web/server/codexAnalyzer.ts` 가 그대로 `POST /api/analyze-requirement` SSE endpoint 를 제공. validateAnalysisResult 도 동일.
-- 클라이언트 hook: `AnalyzerProvider` / `OpenAICompatibleAnalyzerProvider` / `defaultAnalyzerProvider` 는 PR6 에서 삭제. 즉 호출 측 코드가 사라짐.
-- 사용자 발언: PR6 진입 직전 "레거시는 없어도 된다" (분석을 외부에서 import 하는 모델 수용 시사). 단 명시적으로 "재분석 버튼이 없어도 좋다" 라고는 안 했다.
+- 클라이언트 hook: `packages/web/src/state/useAnalyze.ts` 가 옵션 B 형태로 구현되어 `/api/analyze-requirement` SSE 호출을 지원한다.
+- 현재 기본 UI: `packages/web/src/routes/AnalyzeWorkbench.tsx` 는 `StageRunnerPanel`을 사용해 `/api/af/:reqId/stages/analyze/run`을 호출한다. direct analyze hook은 보존되어 있지만 기본 화면 동선은 brief 09 Stage Runner가 담당한다.
+- 운영 모델: 외부 `af-analyze-requirement` skill import 경로도 유지한다.
 
-## 결정해야 할 것
+## 원래 결정지
 
 A. **외부 import 만 유지.** 현재 상태 그대로. `codexAnalyzer.ts` 및 `/api/analyze-requirement` endpoint 도 삭제 가능.
 B. **재분석 버튼을 워크벤치에 복원.** AnalyzeWorkbench 의 "재분석" 버튼이 실제로 Codex CLI 를 호출하고 결과를 PUT.
 C. **외부 import + skill 트리거.** UI 가 직접 Codex 를 호출하지는 않지만 "af-analyze-requirement skill 실행" 안내 / spawn 만 한다.
 
-`/home/ilmaswsl/.claude/plans/agent-factory-synthetic-hummingbird.md` §1 라우트 표 의 `/af/:reqId/analyze` 행은 "`POST analyze` (Codex CLI 재실행)" 을 명시하므로 원래 계획은 (B) 였다. PR2 도입 시 복잡도 줄이려고 미뤄둔 항목.
+선택은 B로 진행됐고, 이후 brief 09에서 Stage Runner 실행 모델로 흡수됐다. `/api/analyze-requirement`는 삭제하지 않고 direct/internal primitive로 보존한다.
 
 ## 작업 정의 (선택지별 Done means)
 

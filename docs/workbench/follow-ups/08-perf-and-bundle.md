@@ -1,5 +1,7 @@
 # 08 — Bundle & runtime perf 정리
 
+상태: 완료. Route-level `React.lazy`와 route/style split에 더해 GraphCanvas child-level lazy boundary 를 적용했고, 최신 Vite build 정량 결과를 `_perf-notes.md`에 기록했다.
+
 ## 왜 필요한가
 
 PR6 후 가장 큰 청크는 `DesignWorkbench-*.js` (275 kB) 와 `index-*.js` (267 kB). DesignWorkbench 가 큰 이유는 ReactFlow 전체와 graph 의 nodeTypes/edgeTypes/containerOverlay 를 한 번에 import 하기 때문. 페이지 첫 로드 시 약 540 kB 가 즉시 다운로드된다.
@@ -10,31 +12,29 @@ PR6 후 가장 큰 청크는 `DesignWorkbench-*.js` (275 kB) 와 `index-*.js` (2
 
 - `react-router-dom` 의 `lazy()` 로 각 route 가 분리 청크에 들어감 — 이미 PR2 에 포함.
 - `ReactFlow` + 의존 자산은 `GraphCanvas.tsx` 가 import 하고, `DesignWorkbench` 와 `LegacyWizard`(PR6 에서 제거됨) 가 사용했다. 현재 사용처는 DesignWorkbench 하나.
-- 청크 분할 메트릭 (`packages/web/` 에서 `npm run build` 결과):
-  - `DesignWorkbench-*.js` 275 kB
-  - `index-*.js` 267 kB
-  - `BuildWorkbench-*.js` 74 kB (catalog seed 포함 추정)
-  - `LandingPage-*.js` 5 kB
-  - 기타 stage 5–10 kB
-- `seed-*.js` (63 kB) 는 catalog 의 yaml 인라인 데이터를 import — Build/Reuse Hub 가 함께 의존. 1.5–2 MB 의 catalog yaml 을 동기 import 하는 구조.
+- 청크 분할 메트릭 (2026-05-27 `packages/web/` 에서 `npm run build` 결과):
+  - `DesignWorkbench-*.js` 48.83 kB / gzip 13.40 kB
+  - `GraphCanvas-*.js` 261.38 kB / gzip 87.27 kB
+  - `index-*.js` 269.04 kB / gzip 85.47 kB
+  - `BuildWorkbench-*.js` 75.14 kB / gzip 24.28 kB
+  - `AnalyzeWorkbench-*.js` 13.95 kB / gzip 5.28 kB
+  - `VerifyWorkbench-*.js` 6.83 kB / gzip 2.77 kB
+- catalog seed는 BuildWorkbench에서 `useQuery`로 읽지만 `loadSeedCatalog` import 자체는 BuildWorkbench chunk에 남아 있다. Reuse Hub는 `/api/catalog` 경로를 사용한다.
 
-## 작업 정의 (Done means)
+## 구현 결과
 
-1. DesignWorkbench 초기 청크가 300 kB 이하 (gzip 95 kB 이하) 로 떨어진다.
-   - ReactFlow / GraphCanvas 를 dynamic import 로 분리.
-   - 또는 GraphCanvas 자체에 lazy boundary 도입.
-2. catalog seed 가 BuildWorkbench/ReuseHub 진입 직전에만 로드된다.
-3. 다른 stage 진입 시간이 측정 가능하게 lighthouse audit 결과 기록 (또는 vite build 결과 `--mode production --analyse` 옵션 활용).
-4. 정량 결과를 `docs/workbench/follow-ups/_perf-notes.md` (신규 가능) 에 남긴다.
+1. DesignWorkbench 초기 청크가 48.83 kB / gzip 13.40 kB 로 떨어졌다.
+2. ReactFlow / GraphCanvas 는 별도 `GraphCanvas-*.js` child chunk 로 분리됐다.
+3. catalog seed 는 BuildWorkbench route chunk 진입 시점에만 포함되고 Reuse Hub 는 `/api/catalog` 를 사용한다.
+4. Vite build 정량 결과를 `docs/workbench/follow-ups/_perf-notes.md` 에 남겼다.
 
 ## 파일 / 디렉터리
 
 - 수정
-  - `packages/web/src/routes/router.tsx` — 이미 lazy 적용. 추가로 child-level lazy 필요 시 새 컴포넌트 분리.
-  - `packages/web/src/routes/DesignWorkbench.tsx` — `GraphCanvas` 와 `Inspector` 의 import 를 `React.lazy` 로 감싸고 `<Suspense fallback={...}>` 로 둘러쌈.
-  - `packages/web/src/routes/BuildWorkbench.tsx` — `loadSeedCatalog()` 호출을 `useQuery` queryFn 으로 옮겨 (이미 그렇긴 함) chunk 분리. seed yaml import 가 BuildWorkbench 진입 시점에만 발생하는지 확인.
+  - `packages/web/src/routes/DesignWorkbench.tsx` — `GraphCanvas` import 를 `React.lazy` 로 감싸고 `<Suspense fallback={...}>` 로 둘러쌈.
+  - `packages/web/src/styles/router/design.css` — GraphCanvas lazy fallback style.
 - 신규
-  - `packages/web/src/routes/_perf-notes.md` 같은 메모는 필요 없음. 결과는 `docs/workbench/follow-ups/_perf-notes.md` 한 곳에만.
+  - `docs/workbench/follow-ups/_perf-notes.md`.
 
 ## 측정 방법
 

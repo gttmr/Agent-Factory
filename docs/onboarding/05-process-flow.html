@@ -13,9 +13,6 @@
     <main class="main">
       <div class="page-eyebrow">Graph IR · 5/9</div>
       <h1 class="page-title">5. Process Flow와 Graph IR</h1>
-      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
-        <strong>⚠️ Surface 단어 stale</strong> — “Module Review” 단어는 PR6 마이그레이션 전 wizard step 이름이다. 현재 동일 책임은 DesignWorkbench(<code>/af/:reqId/design</code>)의 모듈 검토 패널에 있다. Graph IR 규칙·재생성 규칙·고립 노드 차단 정책 자체는 그대로 유효하다. 본문 단어 일괄 갱신은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다.
-      </div>
       <p class="page-lede">
         Process Flow는 <code>AnalysisResult.processFlow</code>에 저장되는 ADK 2.0 Graph IR
         artifact다. 필드 이름은 마이그레이션을 위해 <code>processFlow</code>를 유지하지만 내부
@@ -169,7 +166,7 @@ input ──► router ────┤                 ├──► join ──�
         <div class="callout warn">
           <div class="icon">!</div>
           <div class="body">
-            <p>Module Review에서 저장하면 Graph IR이 deterministic하게 재생성된다. analyzer 재실행이 아니라 현재 module candidates와 입력/출력 연결 기준으로 다시 만든다. 후보가 빠진 edge는 모듈 검토 순서대로 fallback edge를 보강한다. 그래도 incoming/outgoing이 없는 module-bound node가 남으면 validation error다. CLI source generator도 scaffold module이 Graph IR node로 덮이지 않으면 차단한다.</p>
+            <p>DesignWorkbench의 모듈 패널에서 저장하거나 Design Stage Runner 제안을 적용하면 Graph IR이 deterministic하게 재생성된다. analyzer 재실행이 아니라 현재 module candidates와 입력/출력 연결 기준으로 다시 만든다. 후보가 빠진 edge는 모듈 검토 순서대로 fallback edge를 보강한다. 그래도 incoming/outgoing이 없는 module-bound node가 남으면 validation error다. CLI source generator도 scaffold module이 Graph IR node로 덮이지 않으면 차단한다.</p>
           </div>
         </div>
       </section>
@@ -204,13 +201,13 @@ input ──► router ────┤                 ├──► join ──�
         <h2>퀴즈</h2>
 
         <div class="quiz" data-correct="invalid-isolated">
-          <div class="quiz-question">Q1. Module Review에서 후보 5개를 모두 <code>approved</code>로 두고 graph 단계로 갔다. 그런데 후보 중 하나가 어떤 edge에도 연결되지 않은 채 노드만 화면에 떠 있다. 이 그래프는?</div>
+          <div class="quiz-question">Q1. DesignWorkbench에서 후보 5개를 모두 <code>approved</code>로 두고 Graph IR을 봤다. 그런데 후보 중 하나가 어떤 edge에도 연결되지 않은 채 노드만 화면에 떠 있다. 이 그래프는?</div>
           <div class="quiz-options">
             <button data-value="ok-isolated">OK — 노드가 보이니까 충분하다</button>
             <button data-value="invalid-isolated">Validation error — module-bound node는 incoming/outgoing edge가 각각 ≥ 1이어야 한다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답:</strong> Validation error. 고립된 모듈 노드는 scaffold source가 될 수 없다. Module Review로 돌아가서 입력/출력을 연결하거나 후보를 reject한다.</p>
+            <p><strong>정답:</strong> Validation error. 고립된 모듈 노드는 scaffold source가 될 수 없다. DesignWorkbench의 모듈 패널로 돌아가서 입력/출력을 연결하거나 후보를 reject한다.</p>
           </div>
         </div>
 

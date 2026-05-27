@@ -9,4 +9,6 @@
 @import "./styles/router/catalog.css";
 @import "./styles/router/modal-drawer.css";
 @import "./styles/router/runtime-contract.css";
+@import "./styles/router/a2a-contract.css";
 @import "./styles/router/analyze-progress.css";
+@import "./styles/router/stage-runner.css";

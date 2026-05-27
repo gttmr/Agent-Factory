@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
-import { GraphCanvas, type Selection } from "../components/GraphCanvas";
+import type { Selection } from "../components/GraphCanvas";
+import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
 import type { AnalysisResult, ModuleCandidate, RuntimeContract } from "../analyzer/types";
+import {
+  A2AContractInspector,
+  A2AContractSidebar,
+  buildA2AReviewRows
+} from "../design/A2AContractPanel";
 import { CommentThread } from "../design/CommentThread";
+import { PathTracePanel } from "../design/PathTracePanel";
 import {
   RuntimeContractInspector,
   RuntimeContractSidebar,
   runtimeContractsGateReady
 } from "../design/RuntimeContractPanel";
+import { a2aContractsGateReady } from "../design/a2aContractValidator";
 import { useAnalysisArtifact, useSaveAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useApprovalGate } from "../state/useApprovalGate";
 import { useArtifactRoot } from "../state/useArtifactRoot";
@@ -17,7 +25,9 @@ import { useAuthor } from "../state/useAuthor";
 import {
   useComments,
   useCreateComment,
+  useCreateHighlight,
   useDeleteComment,
+  useHighlights,
   useUpdateComment,
   type CommentAnchor,
   type CommentStage
@@ -29,9 +39,16 @@ const SIDEBAR_TABS = [
   { id: "modules", label: "모듈" },
   { id: "graph", label: "Graph IR" },
   { id: "runtime", label: "Runtime 계약" },
+  { id: "a2a", label: "Remote A2A" },
+  { id: "path", label: "경로" },
   { id: "comments", label: "Comments" }
 ] as const;
 type SidebarTab = (typeof SIDEBAR_TABS)[number]["id"];
+
+const GraphCanvas = lazy(async () => {
+  const module = await import("../components/GraphCanvas");
+  return { default: module.GraphCanvas };
+});
 
 export default function DesignWorkbench() {
   const params = useParams<{ reqId: string }>();
@@ -49,13 +66,16 @@ export default function DesignWorkbench() {
   const { name: authorName, role: authorRole, setName: setAuthorName, setRole: setAuthorRole } = useAuthor();
 
   const { data: commentsFile } = useComments(reqId);
+  const { data: highlightsFile } = useHighlights(reqId);
   const createComment = useCreateComment(reqId);
+  const createHighlight = useCreateHighlight(reqId);
   const updateComment = useUpdateComment(reqId);
   const deleteComment = useDeleteComment(reqId);
 
   const [activeTab, setActiveTab] = useState<SidebarTab>("modules");
   const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [selectedA2AModuleId, setSelectedA2AModuleId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const manifest = manifestData?.manifest;
@@ -64,11 +84,20 @@ export default function DesignWorkbench() {
   const analysisEtag = analysisData?.etag ?? null;
   const { graphIR, errorCount, warningCount } = useGraphIR(analysis);
   const comments = commentsFile?.comments ?? [];
+  const highlights = highlightsFile?.highlights ?? [];
 
   const runtimeContracts = analysis?.runtimeContracts ?? [];
+  const a2aContracts = analysis?.a2aContracts ?? [];
   const selectedContract =
     runtimeContracts.find((contract) => contract.contract_id === selectedContractId) ?? null;
   const runtimeContractsReady = runtimeContractsGateReady(analysis);
+  const a2aContractsReady = a2aContractsGateReady(analysis);
+  const a2aRows = useMemo(
+    () => (analysis ? buildA2AReviewRows(analysis.moduleCandidates, a2aContracts) : []),
+    [analysis, a2aContracts]
+  );
+  const selectedA2ARow =
+    a2aRows.find((row) => row.candidate.id === selectedA2AModuleId) ?? a2aRows[0] ?? null;
 
   const allCandidatesApproved = useMemo(() => {
     if (!analysis?.moduleCandidates?.length) return false;
@@ -77,7 +106,8 @@ export default function DesignWorkbench() {
 
   const boundariesGateEnabled =
     Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
-  const runtimeGateEnabled = Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady;
+  const runtimeGateEnabled =
+    Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady && a2aContractsReady;
 
   const anchor = useMemo<CommentAnchor | null>(() => {
     if (selection.nodeId) return { kind: "node", node_id: selection.nodeId };
@@ -146,6 +176,25 @@ export default function DesignWorkbench() {
     );
   }
 
+  function handleSaveA2AContract(next: AnalysisResult["a2aContracts"][number]) {
+    if (!analysis) return;
+    const replaced = a2aContracts.some((contract) => contract.contract_id === next.contract_id);
+    const nextAnalysis: AnalysisResult = {
+      ...analysis,
+      a2aContracts: replaced
+        ? a2aContracts.map((contract) => (contract.contract_id === next.contract_id ? next : contract))
+        : [...a2aContracts, next]
+    };
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => setActionMessage(`${next.contract_id} 저장 완료`),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "A2A contract 저장 실패")
+      }
+    );
+  }
+
   function handleCreateComment(input: { stage: CommentStage; anchor: CommentAnchor; body_md: string }) {
     if (!authorName.trim()) return;
     createComment.mutate(
@@ -165,25 +214,60 @@ export default function DesignWorkbench() {
 
   return (
     <div className="af-design-shell">
-      <Panel>
-        <SectionHeader
-          eyebrow={`af-design-boundaries · ${reqId}`}
-          title="경계 설계 검토"
-          description="Graph IR 을 함께 보면서 모듈/Runtime/Remote A2A 계약과 협업 코멘트를 검토합니다. boundaries_approved 게이트는 모든 모듈이 approved 이고 Graph IR 오류가 없을 때만 활성화됩니다."
-          action={
-            <div className="af-action-row">
-              <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/analyze`}>
-                Analyze 로
-              </Link>
-              <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/build`}>
-                Build 로
-              </Link>
-            </div>
+      <StageRunnerPanel
+        reqId={reqId}
+        stage="design"
+        skillName="af-design-boundaries"
+        title="Design Skill Runner"
+        description="reviewed analysis-result.json 을 기준으로 모듈 경계, Graph IR, Runtime 계약, A2A 계약 변경 제안을 생성합니다. 성공한 run 도 approval gate 를 자동으로 켜지 않습니다."
+        headerAction={
+          <div className="af-action-row">
+            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/analyze`}>
+              Analyze 로
+            </Link>
+            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/build`}>
+              Build 로
+            </Link>
+          </div>
+        }
+        metrics={[
+          {
+            label: "analysis_reviewed",
+            value: manifest?.approvals.analysis_reviewed ? "true" : "false",
+            tone: manifest?.approvals.analysis_reviewed ? "ok" : "danger"
+          },
+          {
+            label: "module status",
+            value: analysis
+              ? `approved ${analysis.moduleCandidates.filter((c) => c.status === "approved").length} / ${analysis.moduleCandidates.length}`
+              : "없음",
+            tone: allCandidatesApproved ? "ok" : "warn"
+          },
+          { label: "Graph IR", value: `nodes ${graphIR?.nodes?.length ?? 0} · errors ${errorCount}`, tone: errorCount ? "danger" : "ok" },
+          {
+            label: "Runtime/A2A",
+            value: `runtime ${runtimeContracts.length} · A2A ${a2aContracts.length}`,
+            tone: runtimeContractsReady && a2aContractsReady ? "ok" : "warn"
           }
-        />
-        {manifestLoading || analysisLoading ? <p className="af-landing-message">데이터 불러오는 중…</p> : null}
-        {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
-      </Panel>
+        ]}
+        disabledReason={
+          !analysis
+            ? "analysis-result.json 이 없어 Design runner 를 실행할 수 없습니다."
+            : !manifest?.approvals.analysis_reviewed
+              ? "analysis_reviewed=true 상태에서만 Design runner 를 실행할 수 있습니다."
+              : null
+        }
+        currentArtifactEtag={analysisEtag}
+        runButtonLabel="Design 실행"
+        buildRunBody={(model) => ({ model })}
+      />
+
+      {manifestLoading || analysisLoading || actionMessage ? (
+        <Panel>
+          {manifestLoading || analysisLoading ? <p className="af-landing-message">데이터 불러오는 중…</p> : null}
+          {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
+        </Panel>
+      ) : null}
 
       {!analysis ? (
         <Panel>
@@ -211,6 +295,9 @@ export default function DesignWorkbench() {
                   {tab.label}
                   {tab.id === "comments" && comments.length > 0 ? (
                     <span className="af-design-tab-count">{comments.length}</span>
+                  ) : null}
+                  {tab.id === "path" && highlights.length > 0 ? (
+                    <span className="af-design-tab-count">{highlights.length}</span>
                   ) : null}
                 </button>
               ))}
@@ -248,6 +335,14 @@ export default function DesignWorkbench() {
                   onSelect={(contractId) => setSelectedContractId(contractId)}
                 />
               ) : null}
+              {activeTab === "a2a" ? (
+                <A2AContractSidebar
+                  candidates={analysis.moduleCandidates}
+                  contracts={a2aContracts}
+                  selectedModuleId={selectedA2ARow?.candidate.id ?? null}
+                  onSelect={(moduleId) => setSelectedA2AModuleId(moduleId)}
+                />
+              ) : null}
               {activeTab === "comments" ? (
                 <CommentThread
                   reqId={reqId}
@@ -264,19 +359,38 @@ export default function DesignWorkbench() {
                   emptyHint="Graph IR 또는 모듈 탭에서 노드/엣지를 먼저 선택하세요."
                 />
               ) : null}
+              {activeTab === "path" ? (
+                <PathTracePanel
+                  graphIR={graphIR}
+                  author={authorName}
+                  saving={createHighlight.isPending}
+                  onSelectNode={(id) => setSelection({ nodeId: id, edgeId: null })}
+                  onCreateHighlight={(input) =>
+                    createHighlight.mutate(input, {
+                      onSuccess: () => setActionMessage("path highlight 저장 완료"),
+                      onError: (error) =>
+                        setActionMessage(error instanceof Error ? error.message : "highlight 저장 실패")
+                    })
+                  }
+                />
+              ) : null}
             </div>
           </aside>
 
           <section className="af-design-canvas-pane" aria-label="Graph IR">
             {graphIR ? (
-              <GraphCanvas
-                graphIR={graphIR}
-                moduleCandidates={analysis.moduleCandidates}
-                a2aContracts={analysis.a2aContracts ?? []}
-                selection={selection}
-                onSelectionChange={setSelection}
-                hideInspector
-              />
+              <Suspense fallback={<div className="af-design-canvas-loading">Graph IR 불러오는 중...</div>}>
+                <GraphCanvas
+                  graphIR={graphIR}
+                  moduleCandidates={analysis.moduleCandidates}
+                  a2aContracts={analysis.a2aContracts ?? []}
+                  selection={selection}
+                  onSelectionChange={setSelection}
+                  comments={comments}
+                  highlights={highlights}
+                  hideInspector
+                />
+              </Suspense>
             ) : (
               <EmptyState title="Graph IR 가 없습니다" description="processFlow 가 분석 결과에 포함되어 있지 않습니다." />
             )}
@@ -289,6 +403,15 @@ export default function DesignWorkbench() {
                 contract={selectedContract}
                 saving={saveAnalysisMutation.isPending}
                 onSave={handleSaveRuntimeContract}
+                onCancel={() => setActionMessage(null)}
+              />
+            ) : activeTab === "a2a" ? (
+              <A2AContractInspector
+                key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
+                candidate={selectedA2ARow?.candidate ?? null}
+                contract={selectedA2ARow?.contract ?? null}
+                saving={saveAnalysisMutation.isPending}
+                onSave={handleSaveA2AContract}
                 onCancel={() => setActionMessage(null)}
               />
             ) : (
@@ -351,18 +474,18 @@ export default function DesignWorkbench() {
               {analysis?.moduleCandidates.length ?? 0}
             </li>
             <li>Graph IR errors: {errorCount} · warnings: {warningCount}</li>
-            <li>코멘트: {comments.length}건</li>
+            <li>코멘트: {comments.length}건 · highlights: {highlights.length}건</li>
           </ul>
           <SectionHeader
             title="Gate: runtime_contracts_approved"
             description={
-              runtimeContracts.length === 0
-                ? "Runtime 계약 후보가 없습니다. 토글만 누르면 통과로 처리됩니다."
+              runtimeContracts.length === 0 && a2aRows.length === 0
+                ? "Runtime/A2A 계약 후보가 없습니다. 토글만 누르면 통과로 처리됩니다."
                 : !manifest.approvals.boundaries_approved
                   ? "boundaries_approved 가 먼저 활성화되어야 합니다."
-                  : runtimeContractsReady
-                    ? "모든 필수 Runtime 계약이 approved 입니다. 토글을 눌러 design 단계를 마무리하세요."
-                    : "Runtime 계약 탭에서 readiness issue 가 남은 계약을 approved 로 만들어 주세요."
+                  : runtimeContractsReady && a2aContractsReady
+                    ? "모든 필수 Runtime/A2A 계약이 approved 입니다. 토글을 눌러 design 단계를 마무리하세요."
+                    : "Runtime 계약 또는 Remote A2A 탭에서 readiness issue 가 남은 계약을 approved 로 만들어 주세요."
             }
             action={
               <Button
@@ -378,7 +501,7 @@ export default function DesignWorkbench() {
                   ? "갱신 중…"
                   : manifest.approvals.runtime_contracts_approved
                     ? "계약 승인 취소"
-                    : "Runtime 계약 승인"}
+                    : "Runtime/A2A 계약 승인"}
               </Button>
             }
           />
@@ -389,11 +512,16 @@ export default function DesignWorkbench() {
               {runtimeContracts.filter((contract) => contract.contract_status === "rejected").length}
             </li>
             <li>
+              Remote A2A 후보 {a2aRows.length}개 — approved{" "}
+              {a2aRows.filter((row) => row.contract?.contract_status === "approved").length} · missing{" "}
+              {a2aRows.filter((row) => !row.contract).length}
+            </li>
+            <li>
               계약 readiness:{" "}
-              {runtimeContracts.length === 0
+              {runtimeContracts.length === 0 && a2aRows.length === 0
                 ? "—"
-                : runtimeContractsReady
-                  ? "모든 비-rejected 계약 OK"
+                : runtimeContractsReady && a2aContractsReady
+                  ? "모든 Runtime/A2A 계약 OK"
                   : "남은 issue 있음"}
             </li>
           </ul>
@@ -401,7 +529,7 @@ export default function DesignWorkbench() {
             <Button
               type="button"
               variant="ghost"
-              disabled={!manifest.approvals.boundaries_approved}
+              disabled={!manifest.approvals.boundaries_approved || !manifest.approvals.runtime_contracts_approved}
               onClick={() => navigate(`/af/${reqId}/build`)}
             >
               Build 워크벤치로 이동

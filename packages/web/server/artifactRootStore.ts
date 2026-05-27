@@ -33,16 +33,24 @@ export interface ArtifactRootSummary {
 }
 
 export class ArtifactValidationError extends Error {
-  constructor(public statusCode: number, message: string) {
+  statusCode: number;
+
+  constructor(statusCode: number, message: string) {
     super(message);
     this.name = "ArtifactValidationError";
+    this.statusCode = statusCode;
   }
 }
 
 export class ArtifactConflictError extends Error {
-  constructor(public expectedEtag: string, public actualEtag: string) {
+  expectedEtag: string;
+  actualEtag: string;
+
+  constructor(expectedEtag: string, actualEtag: string) {
     super(`ETag 불일치: 다른 곳에서 수정되었습니다.`);
     this.name = "ArtifactConflictError";
+    this.expectedEtag = expectedEtag;
+    this.actualEtag = actualEtag;
   }
 }
 

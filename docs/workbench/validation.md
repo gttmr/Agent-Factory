@@ -4,9 +4,9 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
 Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰고 `af-run-manifest.json`으로 단계를 연결한다.
 Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)를 통해 artifact root 디렉터리를 직접 읽고 쓰며, `manifest.approvals.*`를 게이트 UI의 단일 진실로 사용한다.
-초기 분석 결과는 Landing 또는 단계별 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. 적재된 파일은 PUT 시점에 `validateAnalysisResult`로 검증된다.
-현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)를 tolerant하게 읽는다.
-`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
+초기 분석 결과는 Analyze Stage Runner 또는 Landing/단계 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. Stage Runner 결과는 먼저 `runs/<stage>/<run-id>/proposed-artifacts/`에 저장되고, 사용자가 diff/preview 후 적용할 때 canonical artifact가 갱신된다.
+현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)와 optional `stage_runs`를 tolerant하게 읽는다.
+`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
 
 ## module-candidates.json
 
@@ -37,7 +37,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 
 `schemas/analysis-draft.schema.json`은 live Codex CLI의 내부 반환 계약이다.
 이 schema는 저장/export artifact가 아니며, CLI 출력량을 줄이기 위한 compact transport shape다.
-현재 워크벤치 UI는 이 endpoint(`/api/analyze-requirement` SSE)를 직접 호출하지 않는다. 분석은 `af-analyze-requirement` skill(또는 동일 schema를 emit하는 외부 producer)이 수행하고, 결과 `analysis-result.json`을 Landing/단계 import 버튼으로 적재한다. PUT 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다.
+워크벤치 UI의 기본 Analyze 경로는 Stage Runner API(`/api/af/:reqId/stages/analyze/run`)다. Stage Runner가 내부적으로 Codex CLI 또는 skill 실행을 수행하고 proposed `analysis-result.json`을 만든 뒤, apply 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다. `/api/analyze-requirement` SSE compact-draft endpoint는 direct analyzer primitive로 유지되며, 외부 `af-analyze-requirement` producer가 만든 결과를 Landing/단계 import 버튼으로 적재하는 경로도 유지한다.
 
 - Draft는 `normalizedRequirement`, `evidence`, `moduleCandidates`, `processFlow`의 결정 정보를 담는다.
 - Catalog reuse 후보는 반복되는 inputs/outputs/runtime metadata 대신 `catalog_entry_id`와 필요한 override만 담을 수 있다.
@@ -60,6 +60,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 - Catalog 항목에 `runtime_mock`이 있으면 ADK Runtime Handoff는 해당 synthetic payload를 generated source의 deterministic stub output으로 포함할 수 있다.
 - `runtime_mock`은 local smoke용 test double이며 synthetic data만 허용한다. private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 담지 않는다.
 - `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
+- `a2aContracts`는 Remote A2A 후보의 reviewed handoff다. DesignWorkbench의 `Remote A2A` 탭에서 모든 Remote A2A 후보가 매칭 계약을 갖고 `contract_status: approved`이며 readiness issue가 없어야 `runtime_contracts_approved` 게이트를 새로 켤 수 있다.
 - runnable business logic은 out of scope다.
 - `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성하며 TODO runtime wiring handoff로만 취급한다.
 
@@ -75,7 +76,7 @@ PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` 
 분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
 
 - **Requirement-level (`evidence.missing_information`) — soft gate.** `/af/:reqId/analyze` (AnalyzeWorkbench)에서 항목별 "수용" 토글이 제공된다. 토글은 컴포넌트 내부 `acceptedMissing` state를 갱신하며 reviewer attestation으로만 사용하고 scaffold-plan 생성은 차단하지 않는다. `analysis_reviewed` 게이트는 모든 항목이 수용된 뒤에야 활성화된다.
-- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. PR6 이후 워크벤치 안에는 더 이상 `해결 초안 생성` / `반영 적용` 인스펙터가 없다. Resolution Draft 적용은 `af-design-boundaries` skill(또는 동일 형태를 emit하는 외부 producer)이 `missing_information_resolution`, `resolved_missing_information`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 채워 `analysis-result.json`에 다시 PUT하는 식으로 처리한다.
+- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Resolution Draft 적용은 Design Stage Runner(`af-design-boundaries`) 또는 동일 형태를 emit하는 외부 producer가 먼저 `runs/design/<run-id>/proposed-artifacts/`에 제안하고, reviewer가 diff/preview 후 apply할 때 canonical `analysis-result.json`에 반영한다.
 - **Resolved review state.** 채워진 후보 record는 기존 누락 항목을 `resolved_missing_information`에 보존하고 `missing_information`을 비운다. 카탈로그 계약 후보도 동일 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
 - **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인 후보가 남아 있으면 `scaffoldPlan.collectBlockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." blocker와 동일 개수의 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" warning을 emit한다. BuildWorkbench는 이 blocker가 남아 있으면 `runtime-stub/build` POST를 차단한다.
 
@@ -84,6 +85,7 @@ PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` 
 PR6 마이그레이션 이후 워크벤치는 in-browser save record(`SavedAnalysisRecord`)를 운용하지 않는다. `artifacts/af/<req-id>/`가 단일 저장소이며 다음 파일을 보관한다.
 
 - `af-run-manifest.json` — stage status, approval gate, 마지막 validation 결과.
+- `runs/<stage>/<run-id>/` — Stage Runner request, event stream, result summary, diff summary, proposed artifacts, diagnostics.
 - `analysis-result.json` 및 분할 산출물(`commonization-notes.json`, `boundary-design.md`, `a2a-contracts.json`).
 - `scaffold-plan.json`, `runtime-stub/`, `implementation-handoff.md`.
 - `validation-report.md`, `catalog-delta.yaml`.

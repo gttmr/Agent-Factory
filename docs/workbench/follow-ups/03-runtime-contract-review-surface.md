@@ -1,5 +1,7 @@
 # 03 — Runtime Contract Review surface
 
+상태: 완료 (`69edb6c feat: brief 03 — Runtime contract review surface in DesignWorkbench`). 현재 구현은 `packages/web/src/design/RuntimeContractPanel.tsx`, `DesignWorkbench`의 `Runtime 계약` 탭, `runtime_contracts_approved` gate 토글로 유지된다.
+
 ## 왜 필요한가
 
 `af-run-manifest.json.approvals.runtime_contracts_approved` 게이트는 PR2 시점부터 manifest 스키마에 있지만, **router 셸에는 이 게이트를 토글할 UI 가 없다.** PR3 의 DesignWorkbench 에서 boundaries_approved 만 다루고 runtime 계약은 manifest 직접 PATCH 또는 외부 도구로 처리해야 한다.

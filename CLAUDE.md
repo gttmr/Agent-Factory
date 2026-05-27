@@ -8,7 +8,7 @@ This is the Agent Factory workbench — a local-first, skill-led tool that turns
 
 `AGENTS.md` is the model-facing source of truth for working rules and overrides anything inferred from code structure alone. Read it before non-trivial edits.
 
-For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, export, or review-board work.
+For Agent Factory-specific harness rules, also read `docs/workbench/agent-factory-harness.md` before analysis, taxonomy, scaffold, Stage Runner, or review-board work.
 
 Before source-code edits, check whether the change affects active `docs/` Markdown. Taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, and operating policy changes must update the relevant docs in the same change set. Leave `docs/archive/**` untouched unless the task explicitly asks for archival or migration work.
 
@@ -31,13 +31,13 @@ node scripts/validate-artifacts.mjs                       # smoke-checks templat
 node scripts/validate-artifacts.mjs path/to/artifacts     # check exported artifacts
 ```
 
-The validator enforces taxonomy, subtype presence, Remote A2A contract completeness, and the scaffold guard that raw requirements cannot generate code. After any TypeScript, React, analyzer, or export change, run `npm run build` in `packages/web` — work is not complete without that observable verification.
+The validator enforces taxonomy, subtype presence, Remote A2A contract completeness, Stage Runner manifest metadata, and the scaffold guard that raw requirements cannot generate code. After any TypeScript, React, analyzer, Stage Runner, or handoff change, run `npm run build` in `packages/web` — work is not complete without that observable verification.
 
 ## Architecture
 
 ### Agent Factory harness
 
-`docs/workbench/agent-factory-harness.md` is the project-specific operating harness for this repository. Apply it before non-trivial analysis, taxonomy, scaffold, export, or review-board work.
+`docs/workbench/agent-factory-harness.md` is the project-specific operating harness for this repository. Apply it before non-trivial analysis, taxonomy, scaffold, Stage Runner, handoff, or review-board work.
 
 Core rules:
 
@@ -54,23 +54,23 @@ Core rules:
 The workbench is a router-driven, artifact-root-first React app. `App.tsx` mounts `AppRouter` (`src/routes/router.tsx`) inside `BrowserRouter` + `QueryClientProvider`. All routes are skill-scoped and read/write the local file system via Vite middleware under `packages/web/server`:
 
 - `/` Landing — list / create artifact roots (`POST /api/af`), import an `analysis-result.json` produced by the `af-analyze-requirement` skill.
-- `/af/:reqId/analyze` — review the imported analysis through `AnalysisResult`, mark `missing_information` as accepted, toggle `analysis_reviewed` on `af-run-manifest.json`.
-- `/af/:reqId/design` — 3-pane Graph IR review with node/edge-anchored comments under `collaboration/comments.json`. Toggles `boundaries_approved` when every module candidate is `status === "approved"` and Graph IR validation errors are zero.
+- `/af/:reqId/analyze` — run `af-analyze-requirement` through the Stage Runner panel or import an existing `analysis-result.json`, review the resulting `AnalysisResult`, mark `missing_information` as accepted, toggle `analysis_reviewed` on `af-run-manifest.json`.
+- `/af/:reqId/design` — run `af-design-boundaries` through the Stage Runner panel, then use the 3-pane Graph IR review with node/edge-anchored comments under `collaboration/comments.json`. Toggles `boundaries_approved` when every module candidate is `status === "approved"` and Graph IR validation errors are zero.
 - `/af/:reqId/build` — derive `scaffold-plan.json` client-side from the analysis + seed catalog, spawn `scripts/generate-adk-source.mjs` to populate `runtime-stub/`, edit `implementation-handoff.md`, and toggle `stub_ready_for_followup`.
 - `/af/:reqId/verify` — run an allow-list of three commands (`validate-artifacts.mjs`, `npm run build`, `npm run test:analyzer`), edit `validation-report.md` and `catalog-delta.yaml`.
 - `/catalog` — Reuse Hub: search Agent/Workflow/Adapter/Remote A2A catalog cards, pin one to a candidate in the active root (`PUT analysis-result.json`), or propose a new entry by appending to `catalog-delta.yaml`. `catalog/*.yaml` is never edited from the UI.
 
-There is no in-browser analyzer or fallback. Analysis must be produced by running the `.agents/skills/af-analyze-requirement` skill (or any compatible producer) and imported into the workbench via Landing or the per-stage import button.
+Analyze and Design use the common Stage Runner API under `/api/af/:reqId/stages/:stage/*`. Runs write evidence under `artifacts/af/<req-id>/runs/<stage>/<run-id>/`, save proposed artifacts first, and require explicit diff/preview apply before canonical artifacts change. `manifest.stage_runs` is optional execution metadata; approval gates remain `manifest.approvals.*`.
 
 State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog, collaboration, scaffold-plan, and runtime-stub data are fetched/mutated through `packages/web/src/state/*` hooks (`useArtifactRoot`, `useAnalysisArtifact`, `useApprovalGate`, `useCollaboration`, `useCatalog`, `useScaffoldPlan`, `useTextArtifact`, `useVerify`, `useRecentRoots`). `manifest.approvals.*` is the single source of truth for gate UI; the server mirrors approval state onto `stages.<stage>.status` so external tooling (`scripts/generate-adk-source.mjs`) reads a consistent stage progression. Do not rebuild gate state from derived candidate status.
 
 `localStorage` is reserved for two read-only caches: `agent-factory:recent-artifact-roots` and `agent-factory:author-{name,role}` for the comment composer. No stage state is persisted to `localStorage` — the artifact root is the canonical store.
 
-`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. Runtime contract review UI is still pending a follow-up PR; for now the `runtime_contracts_approved` toggle is manual and DesignWorkbench surfaces the contract list read-only.
+`AnalysisResult.runtimeContracts` carries the review artifact for callback/runtime-support boundaries: MCP/EAI/Legacy adapter contracts, Context Manager, Callback Broker, ADK callback, and async resume. DesignWorkbench exposes a Runtime contract tab with readiness details and keeps `runtime_contracts_approved` as a reviewer-driven manifest gate; Stage Runner output never toggles it automatically.
 
 ### Analyzer pipeline
 
-`packages/web/server/codexAnalyzer.ts` still exposes the SSE `/api/analyze-requirement` endpoint that shells out to the Codex CLI. The router-shell does not call it directly — the af-analyze-requirement skill (or any external producer) is expected to drive analysis and produce a canonical `analysis-result.json`. The workbench validates that file via `validateAnalysisResult` (re-exported from `server/validators.ts`) on PUT.
+`packages/web/server/stageRunner.ts` is the Analyze/Design execution contract. It creates sortable run ids, writes `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, and optional `diagnostics.md`, then updates optional `manifest.stage_runs`. The legacy `/api/analyze-requirement` analyzer endpoint remains available as an internal/direct analysis primitive, but Stage Runner apply is the path that preserves diff-before-canonical behavior.
 
 ### Taxonomy contract (load-bearing)
 
@@ -131,7 +131,7 @@ npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 Manual/browser testing must stay on the fixed Agent Factory port `5173`. Before starting or restarting, check `lsof -iTCP:5173 -sTCP:LISTEN`; stop a stale Agent Factory/Vite process if it owns the port, but report an unrelated owner as a blocker. Do not let Vite auto-increment to `5174` or another fallback port. Verify with `curl -I http://127.0.0.1:5173/` and report `http://127.0.0.1:5173/` as the testing URL.
 
-Then in MCP: `new_page` → `evaluate_script` to drive route navigation / button clicks → `take_screenshot` to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, use `navigate_page` with `ignoreCache: true`. Smoke seeding pattern: `POST /api/af { requirement_id: "req-001" }` then `PUT /api/af/req-001/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
+Then in MCP or Playwright: drive route navigation / button clicks and save screenshots to a known path under `/tmp/af-screens/`. If a CSS edit doesn't appear after reload, force a fresh navigation. Smoke seeding pattern: `POST /api/af { requirement_id: "req-docs-smoke" }` then `PUT /api/af/req-docs-smoke/analysis-result.json` with a fixture from `templates/regression-scenarios/scenario-a-simple-local-specialist/`. After the smoke, delete the temporary artifact root under `artifacts/af/<id>/` so it doesn't pollute the repo.
 
 ## Editing Rules (from AGENTS.md)
 
