@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnalysisResult } from "../components/AnalysisResult";
-import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { Button, EmptyState, Panel, SectionHeader, SelectField } from "../ui/primitives";
 import { useAnalysisArtifact, useSaveAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useApprovalGate } from "../state/useApprovalGate";
@@ -9,6 +9,9 @@ import { useRecentRoots } from "../state/useRecentRoots";
 import { putArtifactJson } from "../state/apiClient";
 import { parseAnalysisResultArtifact } from "../analyzer/analysisArtifactImport";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAnalyze, type AnalyzeCatalogEntry } from "../state/useAnalyze";
+import { useCatalog, type CatalogHubEntry } from "../state/useCatalog";
+import { codexAnalyzerModels, type CodexAnalyzerModel } from "../analyzer/types";
 
 export default function AnalyzeWorkbench() {
   const params = useParams<{ reqId: string }>();
@@ -28,11 +31,19 @@ export default function AnalyzeWorkbench() {
   const [acceptedMissing, setAcceptedMissing] = useState<string[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<CodexAnalyzerModel>(codexAnalyzerModels[0]);
 
   const manifest = manifestData?.manifest;
   const manifestEtag = manifestData?.etag ?? null;
   const analysis = analysisData?.data ?? null;
   const analysisEtag = analysisData?.etag ?? null;
+
+  const { data: catalogIndex } = useCatalog();
+  const analyze = useAnalyze(reqId);
+  const rawText = analysis?.normalizedRequirement?.raw_text?.trim() ?? "";
+  const domain = analysis?.normalizedRequirement?.domain ?? "general";
+  const canRerun = Boolean(reqId) && rawText.length > 0 && analyze.status !== "running";
+  const rerunBusy = analyze.status === "running";
 
   const allCandidatesResolved = useMemo(() => {
     if (!analysis) return false;
@@ -69,7 +80,21 @@ export default function AnalyzeWorkbench() {
   }
 
   function handleRerun() {
-    setActionMessage("이 워크벤치는 결과 import 만 지원합니다. 분석 자체는 .agents/skills/af-analyze-requirement 스킬에서 실행하고 analysis-result.json 을 import 하세요.");
+    if (!reqId) return;
+    if (!rawText) {
+      setActionMessage(
+        "원문 요구사항(normalizedRequirement.raw_text)이 비어 있어 재분석할 수 없습니다. 먼저 raw_text 가 포함된 analysis-result.json 을 import 하세요."
+      );
+      return;
+    }
+    setActionMessage(null);
+    setImportError(null);
+    const catalog = flattenCatalogForAnalyzer(catalogIndex);
+    void analyze.start({ rawText, domain, model: selectedModel, catalog });
+  }
+
+  function handleAbortRerun() {
+    analyze.abort();
   }
 
   function handleToggleAnalysisReviewed() {
@@ -128,6 +153,68 @@ export default function AnalyzeWorkbench() {
         {importError ? <p className="af-landing-error">Import 실패: {importError}</p> : null}
         {saveMutation.isError ? (
           <p className="af-landing-error">저장 실패: {(saveMutation.error as Error).message}</p>
+        ) : null}
+      </Panel>
+
+      <Panel tone="muted">
+        <SectionHeader
+          title="Codex CLI 재분석"
+          description={
+            rawText
+              ? "현재 root 의 raw_text 와 seed catalog 를 Codex CLI 로 다시 보내 analysis-result.json 을 새 결과로 덮어씁니다. 진행 상황은 아래 progress 영역에 SSE 로 흐릅니다."
+              : "원문 요구사항(normalizedRequirement.raw_text) 이 비어 있어 재분석할 수 없습니다. raw_text 가 포함된 분석 결과를 먼저 import 하세요."
+          }
+          action={
+            <div className="af-action-row">
+              <SelectField
+                label="모델"
+                value={selectedModel}
+                onChange={(event) => setSelectedModel(event.target.value as CodexAnalyzerModel)}
+                disabled={rerunBusy}
+              >
+                {codexAnalyzerModels.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </SelectField>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleRerun}
+                disabled={!canRerun}
+              >
+                {rerunBusy ? "분석 중…" : "Codex CLI 로 재분석"}
+              </Button>
+              {rerunBusy ? (
+                <Button type="button" variant="ghost" onClick={handleAbortRerun}>
+                  중단
+                </Button>
+              ) : null}
+            </div>
+          }
+        />
+        {analyze.error ? <p className="af-landing-error">{analyze.error}</p> : null}
+        {analyze.status === "completed" ? (
+          <p className="af-landing-message">analysis-result.json 이 새 결과로 갱신되었습니다.</p>
+        ) : null}
+        {analyze.events.length > 0 ? (
+          <details className="af-analyze-progress" open={analyze.status === "running"}>
+            <summary>
+              progress ({analyze.events.length}건) · 현재 상태: {analyze.status}
+            </summary>
+            <ol className="af-analyze-progress-list">
+              {analyze.events.slice(-20).map((event, index) => (
+                <li key={`${event.phase}-${event.at}-${index}`} className={`af-analyze-event af-analyze-event-${event.phase}`}>
+                  <span className="af-analyze-event-phase">{event.phase}</span>
+                  <span className="af-analyze-event-title">{event.title ?? event.message}</span>
+                  {typeof event.elapsedMs === "number" ? (
+                    <small className="af-analyze-event-meta">{event.elapsedMs}ms</small>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </details>
         ) : null}
       </Panel>
 
@@ -192,4 +279,29 @@ export default function AnalyzeWorkbench() {
       ) : null}
     </div>
   );
+}
+
+function flattenCatalogForAnalyzer(
+  index: { agents: CatalogHubEntry[]; workflows: CatalogHubEntry[]; adapters: CatalogHubEntry[]; remoteA2A: CatalogHubEntry[] } | undefined
+): AnalyzeCatalogEntry[] {
+  if (!index) return [];
+  const groups: Array<[AnalyzeCatalogEntry["module_category"], CatalogHubEntry[]]> = [
+    ["agent", index.agents],
+    ["workflow", index.workflows],
+    ["adapter", index.adapters],
+    ["remote_a2a", index.remoteA2A]
+  ];
+  const result: AnalyzeCatalogEntry[] = [];
+  for (const [moduleCategory, entries] of groups) {
+    for (const entry of entries) {
+      result.push({
+        ...entry,
+        id: entry.id,
+        name: entry.name,
+        module_category: moduleCategory,
+        subtype: entry.subtype ?? null
+      });
+    }
+  }
+  return result;
 }

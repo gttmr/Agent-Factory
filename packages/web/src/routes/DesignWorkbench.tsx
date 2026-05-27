@@ -3,9 +3,14 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
 import { GraphCanvas, type Selection } from "../components/GraphCanvas";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
-import type { ModuleCandidate } from "../analyzer/types";
+import type { AnalysisResult, ModuleCandidate, RuntimeContract } from "../analyzer/types";
 import { CommentThread } from "../design/CommentThread";
-import { useAnalysisArtifact } from "../state/useAnalysisArtifact";
+import {
+  RuntimeContractInspector,
+  RuntimeContractSidebar,
+  runtimeContractsGateReady
+} from "../design/RuntimeContractPanel";
+import { useAnalysisArtifact, useSaveAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useApprovalGate } from "../state/useApprovalGate";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useAuthor } from "../state/useAuthor";
@@ -23,6 +28,7 @@ import { useRecentRoots } from "../state/useRecentRoots";
 const SIDEBAR_TABS = [
   { id: "modules", label: "모듈" },
   { id: "graph", label: "Graph IR" },
+  { id: "runtime", label: "Runtime 계약" },
   { id: "comments", label: "Comments" }
 ] as const;
 type SidebarTab = (typeof SIDEBAR_TABS)[number]["id"];
@@ -39,6 +45,7 @@ export default function DesignWorkbench() {
   const { data: manifestData, isLoading: manifestLoading } = useArtifactRoot(reqId);
   const { data: analysisData, isLoading: analysisLoading } = useAnalysisArtifact(reqId);
   const approvalMutation = useApprovalGate(reqId);
+  const saveAnalysisMutation = useSaveAnalysisArtifact(reqId);
   const { name: authorName, role: authorRole, setName: setAuthorName, setRole: setAuthorRole } = useAuthor();
 
   const { data: commentsFile } = useComments(reqId);
@@ -48,13 +55,20 @@ export default function DesignWorkbench() {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>("modules");
   const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const manifest = manifestData?.manifest;
   const manifestEtag = manifestData?.etag ?? null;
   const analysis = analysisData?.data ?? null;
+  const analysisEtag = analysisData?.etag ?? null;
   const { graphIR, errorCount, warningCount } = useGraphIR(analysis);
   const comments = commentsFile?.comments ?? [];
+
+  const runtimeContracts = analysis?.runtimeContracts ?? [];
+  const selectedContract =
+    runtimeContracts.find((contract) => contract.contract_id === selectedContractId) ?? null;
+  const runtimeContractsReady = runtimeContractsGateReady(analysis);
 
   const allCandidatesApproved = useMemo(() => {
     if (!analysis?.moduleCandidates?.length) return false;
@@ -63,6 +77,7 @@ export default function DesignWorkbench() {
 
   const boundariesGateEnabled =
     Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
+  const runtimeGateEnabled = Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady;
 
   const anchor = useMemo<CommentAnchor | null>(() => {
     if (selection.nodeId) return { kind: "node", node_id: selection.nodeId };
@@ -93,6 +108,40 @@ export default function DesignWorkbench() {
         onSuccess: () => setActionMessage("boundaries_approved 갱신 완료"),
         onError: (error) =>
           setActionMessage(error instanceof Error ? error.message : "approval gate 갱신 실패")
+      }
+    );
+  }
+
+  function handleToggleRuntimeContractsApproved() {
+    if (!manifest) return;
+    approvalMutation.mutate(
+      {
+        gate: "runtime_contracts_approved",
+        value: !manifest.approvals.runtime_contracts_approved,
+        etag: manifestEtag
+      },
+      {
+        onSuccess: () => setActionMessage("runtime_contracts_approved 갱신 완료"),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "approval gate 갱신 실패")
+      }
+    );
+  }
+
+  function handleSaveRuntimeContract(next: RuntimeContract) {
+    if (!analysis) return;
+    const nextAnalysis: AnalysisResult = {
+      ...analysis,
+      runtimeContracts: runtimeContracts.map((contract) =>
+        contract.contract_id === next.contract_id ? next : contract
+      )
+    };
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => setActionMessage(`${next.contract_id} 저장 완료`),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "runtime contract 저장 실패")
       }
     );
   }
@@ -192,6 +241,13 @@ export default function DesignWorkbench() {
                   onSelectEdge={(id) => setSelection({ nodeId: null, edgeId: id })}
                 />
               ) : null}
+              {activeTab === "runtime" ? (
+                <RuntimeContractSidebar
+                  contracts={runtimeContracts}
+                  selectedContractId={selectedContractId}
+                  onSelect={(contractId) => setSelectedContractId(contractId)}
+                />
+              ) : null}
               {activeTab === "comments" ? (
                 <CommentThread
                   reqId={reqId}
@@ -227,20 +283,32 @@ export default function DesignWorkbench() {
           </section>
 
           <aside className="af-design-inspector" aria-label="선택 검토 패널">
-            <SelectionHeader selection={selection} graphIR={graphIR} />
-            <CommentThread
-              reqId={reqId}
-              comments={comments}
-              anchor={anchor}
-              authorName={authorName}
-              authorRole={authorRole}
-              isMutating={createComment.isPending}
-              onAuthorNameChange={setAuthorName}
-              onAuthorRoleChange={setAuthorRole}
-              onCreate={handleCreateComment}
-              onUpdate={(id, body) => updateComment.mutate({ id, body })}
-              onDelete={(id) => deleteComment.mutate(id)}
-            />
+            {activeTab === "runtime" ? (
+              <RuntimeContractInspector
+                key={selectedContract?.contract_id ?? "none"}
+                contract={selectedContract}
+                saving={saveAnalysisMutation.isPending}
+                onSave={handleSaveRuntimeContract}
+                onCancel={() => setActionMessage(null)}
+              />
+            ) : (
+              <>
+                <SelectionHeader selection={selection} graphIR={graphIR} />
+                <CommentThread
+                  reqId={reqId}
+                  comments={comments}
+                  anchor={anchor}
+                  authorName={authorName}
+                  authorRole={authorRole}
+                  isMutating={createComment.isPending}
+                  onAuthorNameChange={setAuthorName}
+                  onAuthorRoleChange={setAuthorRole}
+                  onCreate={handleCreateComment}
+                  onUpdate={(id, body) => updateComment.mutate({ id, body })}
+                  onDelete={(id) => deleteComment.mutate(id)}
+                />
+              </>
+            )}
           </aside>
         </div>
       )}
@@ -284,6 +352,50 @@ export default function DesignWorkbench() {
             </li>
             <li>Graph IR errors: {errorCount} · warnings: {warningCount}</li>
             <li>코멘트: {comments.length}건</li>
+          </ul>
+          <SectionHeader
+            title="Gate: runtime_contracts_approved"
+            description={
+              runtimeContracts.length === 0
+                ? "Runtime 계약 후보가 없습니다. 토글만 누르면 통과로 처리됩니다."
+                : !manifest.approvals.boundaries_approved
+                  ? "boundaries_approved 가 먼저 활성화되어야 합니다."
+                  : runtimeContractsReady
+                    ? "모든 필수 Runtime 계약이 approved 입니다. 토글을 눌러 design 단계를 마무리하세요."
+                    : "Runtime 계약 탭에서 readiness issue 가 남은 계약을 approved 로 만들어 주세요."
+            }
+            action={
+              <Button
+                variant={manifest.approvals.runtime_contracts_approved ? "secondary" : "primary"}
+                type="button"
+                onClick={handleToggleRuntimeContractsApproved}
+                disabled={
+                  approvalMutation.isPending ||
+                  (!manifest.approvals.runtime_contracts_approved && !runtimeGateEnabled)
+                }
+              >
+                {approvalMutation.isPending
+                  ? "갱신 중…"
+                  : manifest.approvals.runtime_contracts_approved
+                    ? "계약 승인 취소"
+                    : "Runtime 계약 승인"}
+              </Button>
+            }
+          />
+          <ul className="af-gate-summary">
+            <li>
+              Runtime 계약 {runtimeContracts.length}개 — approved{" "}
+              {runtimeContracts.filter((contract) => contract.contract_status === "approved").length} · rejected{" "}
+              {runtimeContracts.filter((contract) => contract.contract_status === "rejected").length}
+            </li>
+            <li>
+              계약 readiness:{" "}
+              {runtimeContracts.length === 0
+                ? "—"
+                : runtimeContractsReady
+                  ? "모든 비-rejected 계약 OK"
+                  : "남은 issue 있음"}
+            </li>
           </ul>
           <div className="af-action-row">
             <Button

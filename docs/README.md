@@ -14,9 +14,9 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 4. [Process Flow](./workbench/process-flow.md)
    분석 결과를 어떤 node와 edge로 그릴지 설명한다.
 5. [Review Board](./workbench/review-board.md)
-   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하고 Resolution Draft를 검토/반영하는 기준이다. UI review의 기준 화면이며, 승인되지 않은 후보가 Runtime Handoff로 넘어가지 않게 하는 사람 검토 게이트를 정의한다.
+   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다. PR6 이후 워크벤치 UI에는 별도 “Module Review Board” 화면 대신 DesignWorkbench(`/af/:reqId/design`)의 모듈 검토 패널과 외부 producer(`af-design-boundaries` skill)가 Resolution Draft 적용을 분담하지만, 후보 승인 정책 자체와 hard/soft 게이트 의미는 이 문서가 기준이다.
 6. [Validation](./workbench/validation.md)
-   review artifact, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다. ADK Runtime Handoff가 배포가 아니라 승인 artifact 기반 source-bundle handoff와 smoke 검증 게이트라는 점은 이 문서의 `Scaffold-plan and ADK Runtime Handoff` 절을 기준으로 한다.
+   review artifact, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다. ADK Runtime Handoff(현 BuildWorkbench + VerifyWorkbench)가 배포가 아니라 승인 artifact 기반 source-bundle handoff와 검증 게이트라는 점은 이 문서의 `Scaffold-plan and ADK Runtime Handoff` 절을 기준으로 한다.
 7. [Agent Factory Harness](./workbench/agent-factory-harness.md)
    Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, docs 최신화, 검증 기준을 정의한다.
 

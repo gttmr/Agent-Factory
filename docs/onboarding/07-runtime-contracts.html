@@ -13,6 +13,9 @@
     <main class="main">
       <div class="page-eyebrow">계약 검토 · 7/9</div>
       <h1 class="page-title">7. Runtime 계약</h1>
+      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
+        <strong>⚠️ Surface 단어 stale</strong> — “워크벤치 wizard의 <code>Runtime 계약</code> 스텝/rail”은 PR6 마이그레이션 전 surface다. 현재 워크벤치는 5-route 모델이며 Runtime 계약 검토 화면은 아직 별도 surface로 부활하지 않았다. 잠정적으로 <code>runtime_contracts_approved</code>는 manifest direct PATCH로만 토글 가능하고, DesignWorkbench는 계약 목록을 read-only로 노출한다. 전용 surface 추가는 <code>docs/workbench/follow-ups/03-runtime-contract-review-surface.md</code> 브리프에서 다룬다. 본문 단어 일괄 갱신은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다.
+      </div>
       <p class="page-lede">
         MCP, EAI/Legacy adapter, Context Manager, Callback Broker, ADK callback, async resume처럼
         “callback과 runtime support 경계”에 해당하는 항목은 top-level <code>module_category</code>를

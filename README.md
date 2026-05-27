@@ -19,17 +19,17 @@ The intended first user is a development leader who needs to turn an ambiguous b
 
 1. Use `af-analyze-requirement` to produce schema-first analysis artifacts under `artifacts/af/<req-id>/`.
 2. Use `af-design-boundaries` to review candidate modules, runtime contracts, Graph IR, Remote A2A, and reuse decisions.
-3. Use the workbench to import `artifacts/af/<req-id>/analysis-result.json` plus `af-run-manifest.json`, visualize artifacts and DLC status, perform guided partial edits, and export reviewed artifacts where helpful.
+3. Use the workbench (`packages/web`) to open the `artifacts/af/<req-id>/` root from Landing or a recent-root pick. The workbench reads and writes the root through `/api/af/*` and `/api/af-collab/*`, mirroring `analysis-result.json`, `af-run-manifest.json`, scaffold plan, runtime stub, validation report, collaboration comments, and catalog delta directly to disk.
 4. Use `af-build-runtime-stub` only after approved artifacts exist; generated source remains TODO/runtime wiring handoff.
 5. Use `af-verify-feedback` to record command evidence and propose catalog deltas without silently editing runtime catalogs.
 
-ADK Runtime Handoff is therefore a review gate and source-bundle handoff, not a deployment step. Its generated files keep runtime wiring, private configuration, and business logic as explicit TODO boundaries while allowing structural smoke checks such as dependency install, compile, pytest, ADK Web launch, and chat smoke.
+ADK Runtime Handoff is therefore a review gate and source-bundle handoff, not a deployment step. Its generated files keep runtime wiring, private configuration, and business logic as explicit TODO boundaries while allowing structural smoke checks. After the PR6 migration the workbench surface is split into BuildWorkbench (`/af/:reqId/build`) and VerifyWorkbench (`/af/:reqId/verify`); the previous in-UI `adk web` embed, `/run` chat smoke, and Smoke 일괄 실행 macro were removed and equivalent dependency-install / compileall / pytest / ADK Web smoke is performed from a separate terminal against the generated `runtime-stub/`.
 
 ## Workbench Flow
 
 1. `af-analyze-requirement`: normalize the raw requirement, evidence, module candidates, and first Graph IR into schema artifacts.
 2. `af-design-boundaries`: resolve candidate-level `needs_info`, approve boundaries, review runtime contracts, and confirm catalog reuse decisions.
-3. Workbench review: import `analysis-result.json` and `af-run-manifest.json` from the intake context panel, visualize artifacts and DLC status, apply guided partial edits, and export reviewed artifacts without bypassing schema and review gates.
+3. Workbench review: open the artifact root from Landing (or recent-root pick) and walk `/af/:reqId/analyze` → `/af/:reqId/design` → `/af/:reqId/build` → `/af/:reqId/verify`. The workbench reads/writes the root in place, mirrors approval state into `manifest.approvals.*` and `stages.*.status`, and never bypasses schema and review gates.
 4. `af-build-runtime-stub`: generate TODO-only runtime stubs from approved scaffold-plan data.
 5. `af-verify-feedback`: validate artifacts/stubs and write verification evidence plus catalog delta proposals.
 

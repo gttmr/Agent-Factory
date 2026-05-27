@@ -13,6 +13,9 @@
     <main class="main">
       <div class="page-eyebrow">화면 투어 · 2/9</div>
       <h1 class="page-title">2. 워크벤치 한 바퀴</h1>
+      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
+        <strong>⚠️ Stale (PR6 이전 wizard UI 기준)</strong> — 이 챕터는 PR1~PR6 마이그레이션 전의 단일 페이지 wizard surface(intake → analysis → modules → graph → contracts → catalog → saved → export)를 묘사한다. 현재 워크벤치는 router-driven 5-route 모델(<code>/</code> Landing → <code>/af/:reqId/{analyze,design,build,verify}</code> → <code>/catalog</code> Reuse Hub)이다. 본문 재작성과 새 스크린샷은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다. 현재 UI 사실관계는 <code>docs/workbench/agent-factory-harness.md</code>의 “Workbench surface” 절을 참고한다.
+      </div>
       <p class="page-lede">
         Agent Factory 워크벤치는 단일 페이지 wizard다. 좌측 rail에는 항상 보이는 단계와
         산출물 상태에 따라 열리는 조건부 단계가 있다. 각 단계는 “무엇을 결정하는 화면인지”가

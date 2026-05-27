@@ -13,6 +13,15 @@
     <main class="main">
       <div class="page-eyebrow">검토 게이트 · 6/9</div>
       <h1 class="page-title">6. Module Review Board</h1>
+      <div class="callout callout-warning" role="note" style="border:1px solid #efc785;background:#fbecd5;padding:12px 16px;border-radius:8px;margin:12px 0;">
+        <strong>⚠️ Stale (PR6 이전 wizard UI 기준)</strong> — 이 챕터는 PR1~PR6 마이그레이션 전의 “Module Review Board” wizard step + Inspector(“해결 초안 생성 → 반영 적용 → 검토 승인” 버튼 흐름)를 묘사한다. PR6 이후 워크벤치는 같은 UI를 제공하지 않는다:
+        <ul>
+          <li>모듈 상태(승인/보류/거절/추가정보) 결정은 DesignWorkbench(<code>/af/:reqId/design</code>) 모듈 패널에서 한다.</li>
+          <li>Resolution Draft 생성·적용·smoke 계약 작성은 <code>af-design-boundaries</code> skill(또는 외부 producer)이 <code>analysis-result.json</code>에 직접 채워 PUT한다.</li>
+          <li>candidate-level missing-information hard gate, requirement-level soft gate, scaffold-plan blocker 메시지(“정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.”)는 그대로 유효하다.</li>
+        </ul>
+        본문 단어와 스크린샷 재작성은 <code>docs/workbench/follow-ups/07-onboarding-html-refresh.md</code> 브리프에서 다룬다. 현재 운영 정책은 <code>docs/workbench/agent-factory-harness.md</code>의 “Missing-information two-layer gate” 절을 참고한다.
+      </div>
       <p class="page-lede">
         Module Review Board는 개발 리더가 분석 결과를 승인 가능한 설계 artifact로 바꾸는
         결정 표면이다. 이 화면의 결정이 Process Flow / Catalog Review / ADK Runtime Handoff의

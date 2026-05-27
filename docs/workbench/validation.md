@@ -3,8 +3,8 @@
 Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전에 검증해야 한다.
 검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
 Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰고 `af-run-manifest.json`으로 단계를 연결한다.
-Workbench는 `analysis-result.json`과 `af-run-manifest.json`을 browser file import로 읽어 현재 검토 상태와 DLC lifecycle 상태를 표시한다.
-Manifest import는 `artifact_root`나 `outputs[]` 경로의 파일을 자동으로 따라가지 않는다. 경로에 있는 다른 artifact가 필요하면 사용자가 별도 파일로 제공해야 한다.
+Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)를 통해 artifact root 디렉터리를 직접 읽고 쓰며, `manifest.approvals.*`를 게이트 UI의 단일 진실로 사용한다.
+초기 분석 결과는 Landing 또는 단계별 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. 적재된 파일은 PUT 시점에 `validateAnalysisResult`로 검증된다.
 현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)를 tolerant하게 읽는다.
 `scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
 
@@ -13,7 +13,7 @@ Manifest import는 `artifact_root`나 `outputs[]` 경로의 파일을 자동으�
 - `module_category`는 `agent`, `workflow`, `adapter`, `remote_a2a` 중 하나다.
 - `workflow_kind`는 `orchestration`, `graph`, `dynamic`, `unknown` 중 하나다.
 - `agent`는 `agent_kind`, `adapter`는 `adapter_kind`, `remote_a2a`는 `remote_contract_kind`를 포함한다.
-- `catalog_entry_id`가 있으면 이 후보는 catalog-bound runtime contract에서 온 항목이다. Module Review는 원본 catalog entry를 직접 수정하지 않고 현재 분석 artifact의 입력/출력 override와 Graph 연결만 저장한다.
+- `catalog_entry_id`가 있으면 이 후보는 catalog-bound runtime contract에서 온 항목이다. DesignWorkbench(`/af/:reqId/design`)의 모듈 검토 패널은 원본 catalog entry를 직접 수정하지 않고 현재 분석 artifact의 입력/출력 override와 Graph 연결만 저장한다.
 - `status`는 `approved`, `deferred`, `rejected`, `needs_info` 중 하나다.
 - `missing_information`은 후보별로 승인 전 필요한 정보를 담는 문자열 배열이다.
 - `legacy_recommended_type`은 migration metadata로만 사용한다.
@@ -31,12 +31,13 @@ Manifest import는 `artifact_root`나 `outputs[]` 경로의 파일을 자동으�
 - module-bound node는 incoming edge와 outgoing edge를 각각 최소 1개 가져야 한다. 화면에 노드가 렌더링되더라도 고립 후보는 scaffold source가 될 수 없다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
-- Module Review 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
+- DesignWorkbench의 모듈 검토 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
 
 ## Live analyzer draft schema
 
 `schemas/analysis-draft.schema.json`은 live Codex CLI의 내부 반환 계약이다.
 이 schema는 저장/export artifact가 아니며, CLI 출력량을 줄이기 위한 compact transport shape다.
+현재 워크벤치 UI는 이 endpoint(`/api/analyze-requirement` SSE)를 직접 호출하지 않는다. 분석은 `af-analyze-requirement` skill(또는 동일 schema를 emit하는 외부 producer)이 수행하고, 결과 `analysis-result.json`을 Landing/단계 import 버튼으로 적재한다. PUT 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다.
 
 - Draft는 `normalizedRequirement`, `evidence`, `moduleCandidates`, `processFlow`의 결정 정보를 담는다.
 - Catalog reuse 후보는 반복되는 inputs/outputs/runtime metadata 대신 `catalog_entry_id`와 필요한 override만 담을 수 있다.
@@ -62,53 +63,42 @@ Manifest import는 `artifact_root`나 `outputs[]` 경로의 파일을 자동으�
 - runnable business logic은 out of scope다.
 - `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성하며 TODO runtime wiring handoff로만 취급한다.
 
-ADK Runtime Handoff 화면은 생성된 source bundle을 대상으로 다음 개발용 smoke를 제공한다.
+현재 ADK Runtime Handoff는 두 단계로 나뉘어 있다.
 
-- generated output directory에 `scaffold-plan.json`과 ADK source bundle을 쓴다.
-- local `.venv`를 만들고 `requirements.txt` 기준으로 ADK dependency를 설치할 수 있다.
-- `compileall`과 `pytest`로 generated source의 구조 검증을 실행한다.
-- `adk web`을 시작하고 선택된 app URL을 workbench 안에 iframe으로 임베딩한다.
-- ADK API server의 session 생성 endpoint와 `/run` endpoint를 호출해 같은 app에 대한 채팅 smoke를 실행한다.
+- `/af/:reqId/build` (BuildWorkbench)는 분석 + seed catalog를 입력으로 client-side에서 `scaffold-plan.json`을 도출해 artifact root에 PUT하고, `POST /api/af/:id/runtime-stub/build`로 `scripts/generate-adk-source.mjs`를 spawn해 `runtime-stub/`을 채운다. 생성된 파일 목록과 텍스트 미리보기(< 500KB)를 노출하고 `implementation-handoff.md`를 inline 편집한다.
+- `/af/:reqId/verify` (VerifyWorkbench)는 고정 allow-list(`validate-artifacts.mjs <root>`, `npm run build --prefix packages/web`, `npm run test:analyzer --prefix packages/web`) 세 명령만 child_process로 실행하고 stdout/stderr를 캡처해 `manifest.validation.{commands,last_result}`에 기록한다. `validation-report.md`와 `catalog-delta.yaml`을 inline 편집한다.
 
-이 임베딩/채팅 smoke는 개발 검증용이다. ADK Web은 공식 문서상 production deployment용 UI가 아니며, 배포 UI나 운영 인증 흐름으로 간주하지 않는다.
+PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` chat smoke / `Smoke 일괄 실행` 매크로는 현재 워크벤치에서 제거됐다. 생성된 source bundle에 대한 실제 `compileall`/`pytest`/`adk web` 검증은 별도 터미널에서 수행한다(검증 명령 절 참고).
 
 ## Missing-information 2계층 게이트
 
 분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
 
-- **Requirement-level (`evidence.missing_information`) — soft gate.** AnalysisResult 화면에서 항목별 "수용" 토글이 제공된다. 토글은 `acceptedMissing` 배열을 갱신하며 reviewer attestation으로만 사용한다. scaffold-plan 생성은 차단하지 않는다. 저장 record와 ADK Runtime Handoff 화면(`요구사항 누락 수용 N건` chip)으로 흐름이 보존된다.
-- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Module Review 인스펙터에서 후보별 `해결 초안 생성`을 실행하고 object schema와 smoke 계약을 검토한 뒤 `반영 적용`해야 한다.
-- **Resolved review state.** `반영 적용`은 기존 누락 항목을 `resolved_missing_information`에 보존하고, `missing_information`을 비우며, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 현재 분석 artifact에 저장한다. 카탈로그 계약 후보도 같은 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
-- **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인데 Resolution Draft가 아직 적용되지 않은 후보가 있으면 `scaffold-plan.validation.blockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." 메시지를 emit한다. unresolved 후보 개수는 `validation.warnings`에 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요"로 누적된다.
+- **Requirement-level (`evidence.missing_information`) — soft gate.** `/af/:reqId/analyze` (AnalyzeWorkbench)에서 항목별 "수용" 토글이 제공된다. 토글은 컴포넌트 내부 `acceptedMissing` state를 갱신하며 reviewer attestation으로만 사용하고 scaffold-plan 생성은 차단하지 않는다. `analysis_reviewed` 게이트는 모든 항목이 수용된 뒤에야 활성화된다.
+- **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. PR6 이후 워크벤치 안에는 더 이상 `해결 초안 생성` / `반영 적용` 인스펙터가 없다. Resolution Draft 적용은 `af-design-boundaries` skill(또는 동일 형태를 emit하는 외부 producer)이 `missing_information_resolution`, `resolved_missing_information`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`을 채워 `analysis-result.json`에 다시 PUT하는 식으로 처리한다.
+- **Resolved review state.** 채워진 후보 record는 기존 누락 항목을 `resolved_missing_information`에 보존하고 `missing_information`을 비운다. 카탈로그 계약 후보도 동일 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
+- **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인 후보가 남아 있으면 `scaffoldPlan.collectBlockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." blocker와 동일 개수의 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" warning을 emit한다. BuildWorkbench는 이 blocker가 남아 있으면 `runtime-stub/build` POST를 차단한다.
 
-ADK Runtime Handoff 화면은 `scaffoldPlan.validation.can_generate_source` 또는 Graph IR error로 준비되지 않은 경우 상단에 empty-state 패널과 "모듈 검토로 이동" 버튼을 노출한다. 이는 사유 안내와 한 번에 모듈 검토로 돌아가는 deep link 역할을 한다.
+## Artifact root 저장소
 
-## 저장된 분석 record와 landing step
+PR6 마이그레이션 이후 워크벤치는 in-browser save record(`SavedAnalysisRecord`)를 운용하지 않는다. `artifacts/af/<req-id>/`가 단일 저장소이며 다음 파일을 보관한다.
 
-`SavedAnalysisRecord`는 다음 필드를 포함한다.
+- `af-run-manifest.json` — stage status, approval gate, 마지막 validation 결과.
+- `analysis-result.json` 및 분할 산출물(`commonization-notes.json`, `boundary-design.md`, `a2a-contracts.json`).
+- `scaffold-plan.json`, `runtime-stub/`, `implementation-handoff.md`.
+- `validation-report.md`, `catalog-delta.yaml`.
+- `collaboration/{comments,highlights}.json`.
 
-- `catalogEntries`: 저장 시점 세션의 활성 catalog entry snapshot(`provenance !== "session_deleted"`). 시드 catalog 진화에 따른 silent drift를 차단한다.
-- `activeStep`: 저장 시점 wizard step. 마이그레이션 안전망 역할.
-- `scaffoldReady`: 저장 시점 `buildScaffoldPlan(...).validation.can_generate_source && processFlow.validation.errors.length === 0`.
-- 후보별 review state: `resolution_draft`, `resolution_applied_at`, `schema_review_state`, `smoke_spec`은 현재 분석 안의 검토 산출물이다. backfill은 빈 상태로만 채우며 candidate status를 자동 승격하지 않는다.
-- 저장본의 Graph IR에 구버전 node id나 일부 누락 edge가 남아 있으면 load/backfill 단계에서 module candidate 순서를 기준으로 connectivity를 repair한다. 이는 저장 데이터를 승인으로 승격하는 작업이 아니라, 이미 존재하는 후보와 edge metadata를 일관된 Graph IR shape로 복구하는 마이그레이션이다.
+워크벤치는 위 경로를 `/api/af/*`, `/api/af-collab/*`로 직접 읽고 쓴다. `localStorage`는 최근 artifact root 캐시(`agent-factory:recent-artifact-roots`)와 댓글 composer 작성자 식별(`agent-factory:author-{name,role}`)만 보관한다.
 
-`loadSavedAnalysis`는 다음 규칙으로 landing step을 선택한다.
+### Saved-analysis fixture
 
-- `scaffoldReady === true` → `export`로 진입.
-- 모든 후보가 `needs_info`가 아니지만 `can_generate_source`가 false → `modules`.
-- 그 외 → `analysis`.
+`templates/saved-analysis-fixtures/`는 더 이상 UI 주입용이 아니다. 현재는 `scripts/validate-artifacts.mjs`가 `SavedAnalysisRecord` shape를 regression smoke로 검증하기 위한 fixture로만 쓴다.
 
-Catalog는 시드가 아니라 record snapshot으로 교체된다. backfill은 구버전 record에 안전한 기본값을 채우며 candidate status는 절대 자동 승격하지 않는다.
+- `catalog-needs-info.json`: 요구사항 수준 누락은 reviewer attestation으로 수용 가능하지만, 후보 수준 `ModuleCandidate.missing_information`은 승인과 source generation을 막는지 검증한다.
+- `catalog-scaffold-ready.json`: 승인된 catalog-bound 후보가 `scaffoldReady=true`로 저장돼 source 생성 게이트를 통과하는지 검증한다.
 
-### 저장 분석 fixture
-
-`templates/saved-analysis-fixtures/`는 localStorage 주입용 `SavedAnalysisRecord` fixture를 보관한다.
-
-- `catalog-needs-info.json`: 요구사항 수준 누락은 `acceptedMissing`으로 수용할 수 있지만 후보 수준 `ModuleCandidate.missing_information`은 승인과 source generation을 막는지 검증한다.
-- `catalog-scaffold-ready.json`: 승인된 catalog-bound 후보가 `scaffoldReady=true`로 저장되고 ADK Runtime Handoff 화면에 바로 진입할 수 있는지 검증한다.
-
-fixture는 `moduleCandidates`를 top-level record와 `analysis.moduleCandidates` 양쪽에 같은 id/order로 저장해야 한다. 저장된 record loader는 top-level `moduleCandidates`를 화면의 검토 상태로 사용하므로 둘이 다르면 visual smoke가 실제 저장 흐름과 달라진다.
+fixture는 `moduleCandidates`를 top-level record와 `analysis.moduleCandidates` 양쪽에 같은 id/order로 저장해야 한다. validator는 두 위치를 함께 검증한다.
 
 ## Catalog contract registry
 
@@ -118,12 +108,6 @@ fixture는 `moduleCandidates`를 top-level record와 `analysis.moduleCandidates`
 - `catalog/contracts/a2a/*.json`: `runtime_binding: remote_a2a` 또는 Remote A2A 검토에 쓰는 A2A contract 본문이다. Agent Card, interface, message/task/artifact contract, auth, timeout, retry, fallback, audit, data policy와 synthetic task examples를 포함한다.
 
 MCP/A2A fixture data는 synthetic sample만 사용한다. private endpoint, credential, deployment script, 실제 고객/은행 데이터는 catalog contract registry에 넣지 않는다.
-
-## Smoke 일괄 실행 매크로
-
-ADK Runtime Handoff 화면은 `generate → install → start-web → check-web → chat-smoke` 순서를 자동으로 실행하는 "Smoke 일괄 실행" 매크로를 제공한다. 각 단계의 진행 상태(`pending/running/ok/fail`)를 step list pill로 노출하고 실패 시 후속 단계를 차단한다. 단계별 버튼도 계속 사용 가능하며 디버그 용도다. `chat-smoke`와 일괄 실행은 승인된 후보의 `smoke_spec.ready`와 `sample_user_message`가 있어야 활성화된다.
-
-runtime mode가 `stub`이거나 chat-smoke 응답 이벤트에 `"stubbed_runtime_contract"` 표식이 포함되면 임베드 패널 상단에 노란 stub 배너가 표시된다: "스텁 런타임 — graph 구조만 검증합니다. 실제 모델/어댑터 호출은 발생하지 않습니다." Catalog mock-ready 항목의 `runtime_mock` 출력도 이 stub runtime 범주에 속한다. 즉 로컬 ADK run에서 완성된 입출력 shape를 확인할 수 있지만, 실제 모델/어댑터/은행 시스템 호출이나 운영 비즈니스 로직은 발생하지 않는다.
 
 ## 검증 명령
 
