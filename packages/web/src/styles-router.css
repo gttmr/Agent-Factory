@@ -1086,3 +1086,184 @@
 .af-drawer-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* ===== Runtime contract panel ===== */
+
+.af-runtime-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.af-runtime-item {
+  display: block;
+}
+
+.af-runtime-item-button {
+  width: 100%;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.af-runtime-item-button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.af-runtime-item-active > .af-runtime-item-button {
+  border-color: var(--accent, #0c6b58);
+  background: #f5fbf7;
+}
+
+.af-runtime-item-header {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.af-runtime-kind {
+  color: rgba(0, 0, 0, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}
+
+.af-runtime-item-meta {
+  color: rgba(0, 0, 0, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}
+
+.af-runtime-status {
+  display: inline-block;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.af-runtime-status-approved {
+  background: var(--cat-adapter-soft, #d9ecdf);
+  color: var(--cat-adapter, #0c6b58);
+}
+
+.af-runtime-status-needs_info {
+  background: #fbecd5;
+  color: #b35900;
+}
+
+.af-runtime-status-draft {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.af-runtime-status-rejected {
+  background: var(--cat-remote-soft, #fde2dd);
+  color: var(--cat-remote, #b42318);
+}
+
+.af-runtime-readiness {
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-runtime-readiness-ready {
+  color: var(--cat-adapter, #0c6b58);
+}
+
+.af-runtime-readiness-pending {
+  color: #b35900;
+}
+
+.af-runtime-readiness-skipped {
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+}
+
+.af-runtime-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.af-runtime-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.af-runtime-meta div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px;
+}
+
+.af-runtime-meta dt {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.af-runtime-meta dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.af-runtime-policies {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-runtime-policies legend {
+  padding: 0 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-runtime-required ul,
+.af-runtime-readiness-block ul,
+.af-runtime-todos ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.af-runtime-readiness-block .af-runtime-readiness-ready {
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.af-runtime-warning {
+  font-size: 0.8rem;
+  color: var(--cat-remote, #b42318);
+  background: var(--cat-remote-soft, #fde2dd);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.af-runtime-todos summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.7);
+}
