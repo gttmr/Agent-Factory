@@ -21,6 +21,20 @@ const manifest = parseAfRunManifest(
     validation: {
       commands: ["node scripts/validate-artifacts.mjs artifacts/af/req-001"],
       last_result: "failed"
+    },
+    stage_runs: {
+      analyze: {
+        latest_run_id: "20260527T130000Z-analyze-a1b2c3",
+        status: "completed",
+        started_at: "2026-05-27T13:00:00.000Z",
+        finished_at: "2026-05-27T13:02:00.000Z",
+        skill_name: "af-analyze-requirement",
+        model: "gpt-5.5",
+        output_artifacts: [
+          "runs/analyze/20260527T130000Z-analyze-a1b2c3/proposed-artifacts/analysis-result.json"
+        ],
+        last_error: null
+      }
     }
   }),
   "af-run-manifest.json"
@@ -32,6 +46,9 @@ assert.equal(manifest.stages.analyze.status, "complete");
 assert.equal(manifest.stages.design.outputs[0], "boundary-design.md");
 assert.equal(manifest.approvals.analysis_reviewed, true);
 assert.equal(manifest.validation.last_result, "failed");
+assert.equal(manifest.stage_runs?.analyze?.latest_run_id, "20260527T130000Z-analyze-a1b2c3");
+assert.equal(manifest.stage_runs?.analyze?.status, "completed");
+assert.equal(manifest.stage_runs?.design, undefined);
 
 const summary = summarizeAfRunManifest(manifest);
 assert.equal(summary.stageLabel, "설계");
@@ -45,6 +62,7 @@ assert.equal(summary.validationStatusLabel, "실패");
 const serialized = serializeAfRunManifest(manifest);
 assert.ok(serialized.endsWith("\n"));
 assert.equal(JSON.parse(serialized).requirement_id, "req-001");
+assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-analyze-requirement");
 
 assert.throws(() => parseAfRunManifest("[]", "bad.json"), /object/);
 assert.throws(() => parseAfRunManifest(JSON.stringify({ requirement_id: "" }), "bad.json"), /requirement_id/);

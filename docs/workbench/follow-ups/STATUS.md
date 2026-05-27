@@ -32,6 +32,7 @@ git log --oneline origin/codex/runtime-contract-review..HEAD
 브리프 진행 중 사용자가 명시한 운영 정책. 다음 세션에서 다시 묻지 않는다.
 
 - **brief 06 — Analyze pipeline**: 옵션 B 채택. 워크벤치 안의 “Codex CLI 재분석” 흐름을 유지한다. 외부 `af-analyze-requirement` skill 도 그대로 import 경로로 살아있다. `/api/analyze-requirement` SSE endpoint 와 `packages/web/server/codexAnalyzer.ts` 는 보존.
+- **brief 09 — Skill Runner Workbench 상위 브리프**: Analyze + Design 을 1차 범위로 한다. 웹 화면은 공통 Stage Runner API와 SSE로 서버 실행을 요청하고, 서버는 stage별 prompt + `SKILL.md` 기반 `codex exec` 계열 실행을 담당한다. 스킬 결과는 `runs/<stage>/<run-id>/`에 먼저 저장하고 diff/preview 후 사용자가 적용한다. approval gate는 스킬이 자동 토글하지 않는다. 같은 `reqId`는 root 단위 lock으로 동시 실행을 막는다. `manifest.stage_runs`는 optional 요약 필드로만 추가한다. 실제 Codex smoke 실패는 API/UI/fake runner 결과와 host-verified 환경 원인을 분리 보고한다.
 - **commit 정책**: 한 브리프 = 한 commit. push 는 사용자 명시 없이 금지. (memory: `feedback_commit_per_pr.md`)
 
 ## 완료한 브리프
@@ -81,6 +82,7 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 | 번호 | 파일 | 우선도 | 한 줄 요약 | 시작 전 추가로 봐야 할 것 |
 |---|---|---|---|---|
+| 09 | `09-skill-runner-workbench.md` | 최상 | Skill Runner 상위 브리프: Analyze + Design 화면에서 서버 실행, SSE, run evidence, diff/apply, gate 분리 모델을 구현 | `packages/web/src/routes/{AnalyzeWorkbench,DesignWorkbench}.tsx`, `packages/web/server/afArtifactsApi.ts`, `packages/web/src/state/useAnalyze.ts`, `.agents/skills/af-analyze-requirement/SKILL.md`, `.agents/skills/af-design-boundaries/SKILL.md` |
 | 01 | `01-canvas-collaboration-overlay.md` | 중 | Graph IR canvas 위에 코멘트 핀 / highlight overlay 렌더링 (현재는 persistence/CRUD 만 있음) | `packages/web/src/components/GraphCanvas.tsx`, `packages/web/src/design/CommentThread.tsx`, `useCollaboration` 훅 |
 | 02 | `02-path-trace-panel.md` | 낮음 (01 이후) | 두 노드 선택 → DAG BFS → 경로 highlight 저장 | brief 01 결과 |
 | 04 | `04-a2a-contract-review-surface.md` | 중 | Remote A2A contract 편집 화면 (PR6 에서 제거된 surface 재구성). brief 03 의 패턴 그대로 적용하면 빠르다 | brief 03 의 `RuntimeContractPanel.tsx` 패턴, `packages/web/src/analyzer/a2aNormalize.ts`, `packages/web/src/analyzer/types.ts` 의 `A2AContract` |
@@ -90,17 +92,19 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 추천 진행 순서:
 
-1. **04** (A2A contract review surface) — brief 03 패턴 그대로 재사용 가능, 가장 효율적
-2. **07** (Onboarding HTML refresh) — brief 00 에서 배너만 달고 본문은 미뤘으니 한 번에 정리
-3. **01** → **02** (canvas overlay → path trace) — 의존 관계
-4. **05** (SSE streaming) — brief 06 의 hook 패턴 일반화
-5. **08** (perf & bundle) — 마지막
+1. **09** (Skill Runner Workbench 상위 브리프) — 기존 05/06을 일반화하고 Analyze + Design부터 스킬과 화면을 강하게 연결
+2. **04** (A2A contract review surface) — 09의 Design runner patch 제안과 연결 가능. brief 03 패턴 그대로 재사용 가능
+3. **07** (Onboarding HTML refresh) — Skill Runner 흐름이 자리 잡은 뒤 새 화면 기준으로 갱신
+4. **01** → **02** (canvas overlay → path trace) — 의존 관계
+5. **05** (SSE streaming) — 09의 Stage Runner SSE 설계 이후 `verify/run`, `runtime-stub/build`까지 확장
+6. **08** (perf & bundle) — 마지막
 
 ## 남은 잔무 (브리프 외)
 
 브리프 작업 도중 발견됐지만 별도 브리프로 분리하기엔 작은 것들. 해당 브리프 작업 시 같이 정리.
 
 - **brief 00 vs brief 06 정합화**: brief 00 에서 `docs/onboarding/09-glossary.html` 의 “Codex CLI” 항목과 `docs/workbench/validation.md` Live analyzer draft schema 절에 “워크벤치 UI 는 이 endpoint 를 직접 호출하지 않는다” 라고 적었다. brief 06 으로 워크벤치가 다시 호출하게 됐으므로 두 문서를 “외부 skill 과 워크벤치 재분석 두 경로 모두 가능” 으로 갱신해야 한다. brief 07 작업 시 함께 처리 권장.
+- **brief 09 onboarding 정합화**: active workbench docs는 Stage Runner API/run evidence 모델에 맞춰 갱신했다. onboarding HTML은 brief 07에서 새 화면 스크린샷과 함께 별도 갱신한다.
 - **brief 03 의 Runtime 계약 UI 가 빈 contract 배열일 때**: 시나리오 fixture 가 비어 있으면 사이드바에 안내 문구만 노출되고 토글은 “비어있음 → 통과” 로 enable 된다 (`runtimeContractsGateReady` 가 빈 배열에 true 반환). brief 04 의 A2A surface 와 일관성 맞출 때 정책 재확인.
 - **`docs/superpowers/plans/2026-05-09-analysis-result-review-brief-implementation.md`**: archive 성격 plan 문서에 “existing React wizard” 단어 잔존. brief 00 범위에서 제외했음. plan archive 일괄 정리 작업이 생기면 함께 처리.
 

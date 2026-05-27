@@ -153,6 +153,8 @@ const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rej
 const afRunStages = new Set(["analyze", "design", "build", "verify"]);
 const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
 const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
+const afStageRunStatuses = new Set(["running", "completed", "failed", "applied", "canceled"]);
+const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design)-[a-f0-9]{6}$/;
 
 // Required string fields on an A2AContract (top-level scalar string fields).
 // Nested object fields are validated separately.
@@ -508,6 +510,10 @@ function validateAfRunManifest(dir = root) {
       errors.push(`${label}.validation.last_result must be one of ${Array.from(afRunValidationResults).join(", ")}.`);
     }
   }
+
+  if (manifest.stage_runs !== undefined) {
+    validateAfStageRuns(manifest.stage_runs, `${label}.stage_runs`);
+  }
 }
 
 function validateAfRunStage(stage, label) {
@@ -531,6 +537,52 @@ function validateAfRunStage(stage, label) {
       errors.push(`${label}.outputs[${index}] must use POSIX-style / separators.`);
     }
   });
+}
+
+function validateAfStageRuns(stageRuns, label) {
+  if (!stageRuns || typeof stageRuns !== "object" || Array.isArray(stageRuns)) {
+    errors.push(`${label} must be an object when present.`);
+    return;
+  }
+  for (const [stage, entry] of Object.entries(stageRuns)) {
+    const entryLabel = `${label}.${stage}`;
+    if (!afRunStages.has(stage)) {
+      errors.push(`${entryLabel} uses an unknown stage key.`);
+      continue;
+    }
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      errors.push(`${entryLabel} must be an object.`);
+      continue;
+    }
+    if (!afStageRunIdPattern.test(entry.latest_run_id) || !entry.latest_run_id.includes(`-${stage}-`)) {
+      errors.push(`${entryLabel}.latest_run_id must be a sortable stage run id.`);
+    }
+    if (!afStageRunStatuses.has(entry.status)) {
+      errors.push(`${entryLabel}.status must be one of ${Array.from(afStageRunStatuses).join(", ")}.`);
+    }
+    requireNonEmptyString(entry.started_at, `${entryLabel}.started_at`);
+    if (entry.finished_at !== null && entry.finished_at !== undefined && typeof entry.finished_at !== "string") {
+      errors.push(`${entryLabel}.finished_at must be a string or null.`);
+    }
+    requireNonEmptyString(entry.skill_name, `${entryLabel}.skill_name`);
+    requireNonEmptyString(entry.model, `${entryLabel}.model`);
+    if (!Array.isArray(entry.output_artifacts)) {
+      errors.push(`${entryLabel}.output_artifacts must be an array.`);
+    } else {
+      entry.output_artifacts.forEach((artifactPath, index) => {
+        if (typeof artifactPath !== "string" || !artifactPath.trim()) {
+          errors.push(`${entryLabel}.output_artifacts[${index}] must be a non-empty string.`);
+          return;
+        }
+        if (artifactPath.includes("\\") || artifactPath.includes("..")) {
+          errors.push(`${entryLabel}.output_artifacts[${index}] must be a safe POSIX-style relative path.`);
+        }
+      });
+    }
+    if (entry.last_error !== null && entry.last_error !== undefined && typeof entry.last_error !== "string") {
+      errors.push(`${entryLabel}.last_error must be a string or null.`);
+    }
+  }
 }
 
 function requireNonEmptyString(value, label) {

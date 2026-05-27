@@ -4,9 +4,9 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
 Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰고 `af-run-manifest.json`으로 단계를 연결한다.
 Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)를 통해 artifact root 디렉터리를 직접 읽고 쓰며, `manifest.approvals.*`를 게이트 UI의 단일 진실로 사용한다.
-초기 분석 결과는 Landing 또는 단계별 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. 적재된 파일은 PUT 시점에 `validateAnalysisResult`로 검증된다.
-현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)를 tolerant하게 읽는다.
-`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
+초기 분석 결과는 Analyze Stage Runner 또는 Landing/단계 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. Stage Runner 결과는 먼저 `runs/<stage>/<run-id>/proposed-artifacts/`에 저장되고, 사용자가 diff/preview 후 적용할 때 canonical artifact가 갱신된다.
+현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)와 optional `stage_runs`를 tolerant하게 읽는다.
+`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
 
 ## module-candidates.json
 
@@ -37,7 +37,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 
 `schemas/analysis-draft.schema.json`은 live Codex CLI의 내부 반환 계약이다.
 이 schema는 저장/export artifact가 아니며, CLI 출력량을 줄이기 위한 compact transport shape다.
-현재 워크벤치 UI는 이 endpoint(`/api/analyze-requirement` SSE)를 직접 호출하지 않는다. 분석은 `af-analyze-requirement` skill(또는 동일 schema를 emit하는 외부 producer)이 수행하고, 결과 `analysis-result.json`을 Landing/단계 import 버튼으로 적재한다. PUT 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다.
+워크벤치 UI의 기본 Analyze 경로는 Stage Runner API(`/api/af/:reqId/stages/analyze/run`)다. Stage Runner가 내부적으로 Codex CLI 또는 skill 실행을 수행하고 proposed `analysis-result.json`을 만든 뒤, apply 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다. `/api/analyze-requirement` SSE compact-draft endpoint는 direct analyzer primitive로 유지되며, 외부 `af-analyze-requirement` producer가 만든 결과를 Landing/단계 import 버튼으로 적재하는 경로도 유지한다.
 
 - Draft는 `normalizedRequirement`, `evidence`, `moduleCandidates`, `processFlow`의 결정 정보를 담는다.
 - Catalog reuse 후보는 반복되는 inputs/outputs/runtime metadata 대신 `catalog_entry_id`와 필요한 override만 담을 수 있다.
@@ -84,6 +84,7 @@ PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` 
 PR6 마이그레이션 이후 워크벤치는 in-browser save record(`SavedAnalysisRecord`)를 운용하지 않는다. `artifacts/af/<req-id>/`가 단일 저장소이며 다음 파일을 보관한다.
 
 - `af-run-manifest.json` — stage status, approval gate, 마지막 validation 결과.
+- `runs/<stage>/<run-id>/` — Stage Runner request, event stream, result summary, diff summary, proposed artifacts, diagnostics.
 - `analysis-result.json` 및 분할 산출물(`commonization-notes.json`, `boundary-design.md`, `a2a-contracts.json`).
 - `scaffold-plan.json`, `runtime-stub/`, `implementation-handoff.md`.
 - `validation-report.md`, `catalog-delta.yaml`.

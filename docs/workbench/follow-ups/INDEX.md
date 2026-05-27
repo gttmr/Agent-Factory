@@ -22,6 +22,9 @@
 | 06 | `06-analyze-pipeline.md` | `/af/:reqId/analyze` 에서 분석을 직접 실행할지, skill 만으로 둘지 결정 | 높음 — 운영 정책 결정 필요 |
 | 07 | `07-onboarding-html-refresh.md` | `docs/onboarding/*.html` 의 wizard 시나리오 → router shell 로 재작성 | 중 |
 | 08 | `08-perf-and-bundle.md` | DesignWorkbench / GraphCanvas 청크 분할, lazy import 정교화, lighthouse 측정 | 낮음 |
+| 09 | `09-skill-runner-workbench.md` | 화면에서 서버 Skill Runner로 Analyze/Design 스킬 실행, run evidence, diff/apply, gate 분리 모델 설계 | 최상 — 새 시점 stage 1 |
+
+`09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프다. 기존 05의 SSE 방향과 06의 Analyze 실행 결정을 일반화하고, 1차 구현 범위를 Analyze + Design 화면의 강한 스킬 연동으로 제한한다. 새 세션에서 스킬/화면 연동 작업을 시작한다면 `STATUS.md` 다음으로 09를 먼저 읽는다.
 
 ## 공통 작업 자세
 
@@ -33,7 +36,7 @@
 ## 마이그레이션 후 변경된 사실 (브리프 작성 시 가정)
 
 - 라우트: `/`, `/af/:reqId/{analyze,design,build,verify}`, `/catalog` 5개. `/legacy` 는 제거됨.
-- 서버 미들웨어: `/api/analyze-requirement` (Codex CLI SSE, **현재 UI 에서 호출하지 않음**), `/api/af`, `/api/af-collab`, `/api/catalog`.
+- 서버 미들웨어: `/api/analyze-requirement` (Codex CLI SSE, Analyze 화면에서 호출 가능), `/api/af`, `/api/af-collab`, `/api/catalog`.
 - 삭제된 컴포넌트: `RequirementIntake`, `AnalysisTracePanel`, `SavedAnalyses`, `CatalogManager`, `ModuleReview`(+ Inspector), `RuntimeContractReview`, `A2AContractReview`(+ subdir), `AdkRuntimeWorkbench`, `WorkbenchShell`, `ui/review.tsx`.
 - 삭제된 analyzer 파일: `exampleRequirement.ts`, `providers.ts`, `savedAnalyses.ts`, `adkSource.ts`, `adkGraph.ts`.
 - 삭제된 서버 미들웨어 파일: `adkRuntime.ts`, `moduleResolution.ts`.

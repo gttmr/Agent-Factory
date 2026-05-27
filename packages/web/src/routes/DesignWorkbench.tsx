@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
 import { GraphCanvas, type Selection } from "../components/GraphCanvas";
+import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
 import type { AnalysisResult, ModuleCandidate, RuntimeContract } from "../analyzer/types";
 import { CommentThread } from "../design/CommentThread";
@@ -66,6 +67,7 @@ export default function DesignWorkbench() {
   const comments = commentsFile?.comments ?? [];
 
   const runtimeContracts = analysis?.runtimeContracts ?? [];
+  const a2aContracts = analysis?.a2aContracts ?? [];
   const selectedContract =
     runtimeContracts.find((contract) => contract.contract_id === selectedContractId) ?? null;
   const runtimeContractsReady = runtimeContractsGateReady(analysis);
@@ -165,25 +167,60 @@ export default function DesignWorkbench() {
 
   return (
     <div className="af-design-shell">
-      <Panel>
-        <SectionHeader
-          eyebrow={`af-design-boundaries · ${reqId}`}
-          title="경계 설계 검토"
-          description="Graph IR 을 함께 보면서 모듈/Runtime/Remote A2A 계약과 협업 코멘트를 검토합니다. boundaries_approved 게이트는 모든 모듈이 approved 이고 Graph IR 오류가 없을 때만 활성화됩니다."
-          action={
-            <div className="af-action-row">
-              <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/analyze`}>
-                Analyze 로
-              </Link>
-              <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/build`}>
-                Build 로
-              </Link>
-            </div>
+      <StageRunnerPanel
+        reqId={reqId}
+        stage="design"
+        skillName="af-design-boundaries"
+        title="Design Skill Runner"
+        description="reviewed analysis-result.json 을 기준으로 모듈 경계, Graph IR, Runtime 계약, A2A 계약 변경 제안을 생성합니다. 성공한 run 도 approval gate 를 자동으로 켜지 않습니다."
+        headerAction={
+          <div className="af-action-row">
+            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/analyze`}>
+              Analyze 로
+            </Link>
+            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/build`}>
+              Build 로
+            </Link>
+          </div>
+        }
+        metrics={[
+          {
+            label: "analysis_reviewed",
+            value: manifest?.approvals.analysis_reviewed ? "true" : "false",
+            tone: manifest?.approvals.analysis_reviewed ? "ok" : "danger"
+          },
+          {
+            label: "module status",
+            value: analysis
+              ? `approved ${analysis.moduleCandidates.filter((c) => c.status === "approved").length} / ${analysis.moduleCandidates.length}`
+              : "없음",
+            tone: allCandidatesApproved ? "ok" : "warn"
+          },
+          { label: "Graph IR", value: `nodes ${graphIR?.nodes?.length ?? 0} · errors ${errorCount}`, tone: errorCount ? "danger" : "ok" },
+          {
+            label: "Runtime/A2A",
+            value: `runtime ${runtimeContracts.length} · A2A ${a2aContracts.length}`,
+            tone: runtimeContractsReady ? "ok" : "warn"
           }
-        />
-        {manifestLoading || analysisLoading ? <p className="af-landing-message">데이터 불러오는 중…</p> : null}
-        {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
-      </Panel>
+        ]}
+        disabledReason={
+          !analysis
+            ? "analysis-result.json 이 없어 Design runner 를 실행할 수 없습니다."
+            : !manifest?.approvals.analysis_reviewed
+              ? "analysis_reviewed=true 상태에서만 Design runner 를 실행할 수 있습니다."
+              : null
+        }
+        currentArtifactEtag={analysisEtag}
+        runButtonLabel="Design 실행"
+        buildRunBody={(model) => ({ model })}
+      />
+
+      {manifestLoading || analysisLoading || actionMessage ? (
+        <Panel>
+          {manifestLoading || analysisLoading ? <p className="af-landing-message">데이터 불러오는 중…</p> : null}
+          {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
+        </Panel>
+      ) : null}
 
       {!analysis ? (
         <Panel>

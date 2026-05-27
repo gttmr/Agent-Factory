@@ -9,6 +9,15 @@ import {
   REQ_ID_PATTERN
 } from "./artifactRootStore";
 import {
+  applyStageRun,
+  assertSkillRunnerStage,
+  listStageRuns,
+  readStageRunDetail,
+  runStageSkill,
+  type StageRunEvent,
+  type StageRunRequestBody
+} from "./stageRunner";
+import {
   type AfRunManifest,
   type AfRunValidationResult,
   afRunValidationResults
@@ -53,6 +62,7 @@ const VERIFY_COMMANDS: Record<string, { argv: string[]; description: string }> =
 
 export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
+  const stageRunLocks = new Set<string>();
 
   return async function afArtifactsMiddleware(
     req: IncomingMessage,
@@ -88,6 +98,11 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       }
 
       const sub = rest.join("/");
+
+      // /api/af/:id/stages/:stage/{run,cancel,runs...}
+      if (rest[0] === "stages") {
+        return await handleStageRunner(repoRoot, store, stageRunLocks, reqId, rest.slice(1), req, res);
+      }
 
       // /api/af/:id/manifest
       if (sub === "manifest") {
@@ -186,6 +201,115 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       handleError(error, res, next);
     }
   };
+}
+
+async function handleStageRunner(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  locks: Set<string>,
+  reqId: string,
+  rest: string[],
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const [stageRaw, action, runId, subAction] = rest;
+  const stage = assertSkillRunnerStage(stageRaw ?? "");
+
+  if (action === "run") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    if (locks.has(reqId)) {
+      sendJson(res, 409, { error: "이 artifact root 에서 이미 stage run 이 진행 중입니다." });
+      return;
+    }
+    const body = (await readJsonBody(req)) as StageRunRequestBody;
+    locks.add(reqId);
+    try {
+      if (shouldStreamStageRun(req, body)) {
+        await handleStageRunSse(repoRoot, store, reqId, stage, body, res);
+      } else {
+        const summary = await runStageSkill({ repoRoot, store, reqId, stage, body });
+        sendJson(res, summary.status === "failed" ? 422 : 200, summary);
+      }
+    } finally {
+      locks.delete(reqId);
+    }
+    return;
+  }
+
+  if (action === "cancel") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 501, { error: "cancel 은 child-process registry 준비 후 후속 구현합니다." });
+    return;
+  }
+
+  if (action === "runs" && !runId) {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const runs = await listStageRuns({ store, reqId, stage });
+    sendJson(res, 200, runs.slice(0, 20));
+    return;
+  }
+
+  if (action === "runs" && runId && !subAction) {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const detail = await readStageRunDetail({ store, reqId, stage, runId });
+    sendJson(res, 200, detail);
+    return;
+  }
+
+  if (action === "runs" && runId && subAction === "apply") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const result = await applyStageRun({ store, reqId, stage, runId, ifMatch: ifMatchHeader(req.headers["if-match"]) });
+    sendJson(res, 200, result);
+    return;
+  }
+
+  sendJson(res, 404, { error: "알 수 없는 stage runner 경로입니다." });
+}
+
+async function handleStageRunSse(
+  repoRoot: string,
+  store: ArtifactRootStore,
+  reqId: string,
+  stage: "analyze" | "design",
+  body: StageRunRequestBody,
+  res: ServerResponse
+): Promise<void> {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  const writeEvent = (event: StageRunEvent | { phase: string; message: string; summary?: unknown }) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+  const summary = await runStageSkill({
+    repoRoot,
+    store,
+    reqId,
+    stage,
+    body,
+    onEvent: writeEvent
+  });
+  writeEvent({
+    phase: summary.status === "failed" ? "failed" : "completed",
+    message: summary.status === "failed" ? summary.last_error ?? "stage run failed" : "stage run completed",
+    summary
+  });
+  res.end();
 }
 
 async function handleListRoots(store: ArtifactRootStore, res: ServerResponse): Promise<void> {
@@ -578,6 +702,11 @@ function parsePath(req: IncomingMessage): { segments: string[] } | null {
     }
   }
   return { segments };
+}
+
+function shouldStreamStageRun(req: IncomingMessage, body: StageRunRequestBody): boolean {
+  const accept = req.headers.accept;
+  return body.streamProgress === true || (typeof accept === "string" && accept.includes("text/event-stream"));
 }
 
 function ifMatchHeader(value: string | string[] | undefined): string | null {

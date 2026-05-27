@@ -1,14 +1,27 @@
 export const afRunStageIds = ["analyze", "design", "build", "verify"] as const;
 export const afRunStageStatuses = ["pending", "complete", "blocked"] as const;
 export const afRunValidationResults = ["not_run", "passed", "failed"] as const;
+export const afStageRunStatuses = ["running", "completed", "failed", "applied", "canceled"] as const;
 
 export type AfRunStageId = (typeof afRunStageIds)[number];
 export type AfRunStageStatus = (typeof afRunStageStatuses)[number];
 export type AfRunValidationResult = (typeof afRunValidationResults)[number];
+export type AfStageRunStatus = (typeof afStageRunStatuses)[number];
 
 export interface AfRunStage {
   status: AfRunStageStatus;
   outputs: string[];
+}
+
+export interface AfStageRunManifestEntry {
+  latest_run_id: string;
+  status: AfStageRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  skill_name: string;
+  model: string;
+  output_artifacts: string[];
+  last_error: string | null;
 }
 
 export interface AfRunManifest {
@@ -26,6 +39,7 @@ export interface AfRunManifest {
     commands: string[];
     last_result: AfRunValidationResult;
   };
+  stage_runs?: Partial<Record<AfRunStageId, AfStageRunManifestEntry>>;
 }
 
 export interface AfRunManifestSummary {
@@ -78,7 +92,8 @@ export function parseAfRunManifest(source: string, fileName = "af-run-manifest.j
     current_stage: currentStage,
     stages: normalizeStages(parsed.stages),
     approvals: normalizeApprovals(parsed.approvals),
-    validation: normalizeValidation(parsed.validation)
+    validation: normalizeValidation(parsed.validation),
+    stage_runs: normalizeStageRuns(parsed.stage_runs)
   };
 }
 
@@ -139,6 +154,38 @@ function normalizeValidation(value: unknown): AfRunManifest["validation"] {
   };
 }
 
+function normalizeStageRuns(value: unknown): AfRunManifest["stage_runs"] | undefined {
+  if (!isRecord(value)) return undefined;
+  const result: Partial<Record<AfRunStageId, AfStageRunManifestEntry>> = {};
+  for (const stage of afRunStageIds) {
+    const entry = normalizeStageRunEntry(value[stage]);
+    if (entry) result[stage] = entry;
+  }
+  return Object.keys(result).length ? result : undefined;
+}
+
+function normalizeStageRunEntry(value: unknown): AfStageRunManifestEntry | null {
+  if (!isRecord(value)) return null;
+  const latestRunId = optionalString(value.latest_run_id);
+  const status = normalizeStageRunStatus(value.status);
+  const startedAt = optionalString(value.started_at);
+  const skillName = optionalString(value.skill_name);
+  const model = optionalString(value.model);
+  if (!latestRunId || !startedAt || !skillName || !model) return null;
+  return {
+    latest_run_id: latestRunId,
+    status,
+    started_at: startedAt,
+    finished_at: typeof value.finished_at === "string" ? value.finished_at : null,
+    skill_name: skillName,
+    model,
+    output_artifacts: Array.isArray(value.output_artifacts)
+      ? value.output_artifacts.filter((item): item is string => typeof item === "string")
+      : [],
+    last_error: typeof value.last_error === "string" ? value.last_error : null
+  };
+}
+
 function normalizeStageId(value: unknown): AfRunStageId {
   return typeof value === "string" && afRunStageIds.includes(value as AfRunStageId)
     ? (value as AfRunStageId)
@@ -155,6 +202,12 @@ function normalizeValidationResult(value: unknown): AfRunValidationResult {
   return typeof value === "string" && afRunValidationResults.includes(value as AfRunValidationResult)
     ? (value as AfRunValidationResult)
     : "not_run";
+}
+
+function normalizeStageRunStatus(value: unknown): AfStageRunStatus {
+  return typeof value === "string" && afStageRunStatuses.includes(value as AfStageRunStatus)
+    ? (value as AfStageRunStatus)
+    : "running";
 }
 
 function parseJsonObject(source: string, fileName: string): Record<string, unknown> {
