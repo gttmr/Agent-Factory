@@ -1267,3 +1267,62 @@
   font-size: 0.8rem;
   color: rgba(0, 0, 0, 0.7);
 }
+
+/* ===== Analyze rerun progress ===== */
+
+.af-analyze-progress {
+  margin-top: 10px;
+}
+
+.af-analyze-progress summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.7);
+  margin-bottom: 6px;
+}
+
+.af-analyze-progress-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.af-analyze-event {
+  display: grid;
+  grid-template-columns: 110px 1fr 60px;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.02);
+  font-size: 0.8rem;
+}
+
+.af-analyze-event-phase {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.af-analyze-event-completed {
+  background: var(--cat-adapter-soft, #d9ecdf);
+}
+
+.af-analyze-event-failed,
+.af-analyze-event-timeout {
+  background: var(--cat-remote-soft, #fde2dd);
+}
+
+.af-analyze-event-meta {
+  color: rgba(0, 0, 0, 0.45);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  text-align: right;
+}
