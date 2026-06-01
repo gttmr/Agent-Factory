@@ -212,3 +212,11 @@
 .ui-empty-state strong {
   color: var(--text-strong);
 }
+
+/* ---- responsive ---- */
+@media (max-width: 640px) {
+  .panel,
+  .ui-panel {
+    padding: var(--space-2xl);
+  }
+}

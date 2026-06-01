@@ -1,0 +1,351 @@
+/* =====================================================================
+   Feature: Analysis result review (components/AnalysisResult.tsx) —
+   brief hero + metrics, input/output contract list, evidence drawer,
+   value chips, JSON preview, and the missing-information triage rows.
+   @layer features. Consumes tokens; review/code surfaces keep their
+   dedicated literals.
+   ===================================================================== */
+
+@keyframes trace-clock-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.78); }
+}
+
+/* ---- brief hero ---- */
+.analysis-brief {
+  display: grid;
+  gap: 22px;
+}
+
+.analysis-brief-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-5xl);
+}
+
+.analysis-brief-hero h2 {
+  margin-bottom: var(--space-sm);
+}
+
+.analysis-brief-copy {
+  max-width: 720px;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: var(--lh-normal);
+}
+
+.analysis-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.analysis-brief-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.analysis-brief-metric {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-xl) var(--space-2xl);
+  border-right: 1px solid var(--line);
+}
+
+.analysis-brief-metric:last-child {
+  border-right: 0;
+}
+
+.analysis-brief-metric span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  text-transform: uppercase;
+}
+
+.analysis-brief-metric strong {
+  font-size: var(--fs-xl);
+}
+
+/* ---- input/output contract list ---- */
+.contract-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  overflow: hidden;
+  background: var(--line);
+  gap: 1px;
+}
+
+.contract-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.25fr) minmax(0, 1fr);
+  gap: var(--space-2xl);
+  align-items: center;
+  background: var(--surface);
+  padding: var(--space-xl) var(--space-2xl);
+}
+
+.contract-label {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.contract-label strong {
+  font-size: var(--fs-md);
+}
+
+.contract-label span {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.contract-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.value-chip,
+.value-overflow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  padding: 5px 10px;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-heavy);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.value-chip.muted {
+  color: var(--text-muted);
+  font-weight: var(--fw-bold);
+}
+
+.value-overflow {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+/* ---- evidence drawer ---- */
+.evidence-drawer {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.evidence-detail {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.evidence-detail summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  min-height: 48px;
+  padding: 0 var(--space-xl);
+  cursor: pointer;
+  font-weight: var(--fw-heavy);
+}
+
+.evidence-detail summary::marker {
+  color: var(--accent);
+}
+
+.evidence-detail summary strong {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.evidence-summary-main {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.evidence-summary-main small {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-detail-body {
+  border-top: 1px solid var(--line);
+  padding: var(--space-xl);
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: var(--space-3xl);
+}
+
+/* ---- JSON preview (shared dark code surface) ---- */
+.json-preview {
+  max-height: 520px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: #101513;
+  color: #e8efe9;
+  padding: var(--space-2xl);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  white-space: pre-wrap;
+}
+
+.json-preview.compact {
+  min-height: 0;
+  max-height: 520px;
+}
+
+.review-muted {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+
+/* ---- legacy flat edge list (pre-ReactFlow; superseded by .graph-edge-*).
+   Retained pending confirmation it has no remaining consumer. ---- */
+.edge {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) minmax(160px, 1.5fr);
+  gap: var(--space-md);
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: var(--space-md);
+}
+
+.edge strong {
+  border-radius: var(--radius-pill);
+  background: #e3f1ec;
+  color: var(--accent-strong);
+  padding: 6px 9px;
+  font-size: var(--fs-xs);
+}
+
+.edge.remote strong {
+  background: #fff1f0;
+  color: var(--red);
+}
+
+.edge em {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+/* ---- missing-information triage ---- */
+.missing-info-list {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.missing-info-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-md);
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--surface);
+}
+.missing-info-row.is-accepted {
+  background: var(--surface-muted);
+  border-color: var(--line-strong);
+}
+.missing-info-row > label {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: #1f2933;
+}
+.missing-info-row.is-accepted > label > span {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.missing-info-row > label > input[type="checkbox"] {
+  margin-top: var(--space-3xs);
+}
+.missing-info-status {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  padding: var(--space-3xs) var(--space-md);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  background: var(--surface);
+}
+.missing-info-row.is-accepted > .missing-info-status {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: rgba(12, 107, 88, 0.08);
+}
+
+/* ---- responsive ---- */
+@media (max-width: 980px) {
+  .analysis-brief-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-brief-actions {
+    justify-content: flex-start;
+  }
+
+  .contract-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .edge {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .analysis-brief-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-brief-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-brief-metric {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .analysis-brief-metric:last-child {
+    border-bottom: 0;
+  }
+}

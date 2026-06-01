@@ -196,3 +196,9 @@
   font-size: 0.75rem;
   white-space: pre;
 }
+
+/* Smoke 일괄 실행 매크로 step label (BuildWorkbench) */
+.smoke-macro-step-label {
+  font-size: var(--fs-sm);
+  color: #1f2933;
+}
