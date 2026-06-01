@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Factory Mock Lab Spec",
+  "type": "object",
+  "required": ["mock_id", "server_name", "protocol", "tools", "guardrails"],
+  "properties": {
+    "mock_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{3,80}$"
+    },
+    "server_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol": {
+      "type": "string",
+      "enum": ["mcp_stdio"]
+    },
+    "description": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "prefill_from_catalog": { "type": "boolean" },
+        "catalog_entry_name": { "type": ["string", "null"] },
+        "catalog_file": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "inputSchema", "outputSchema", "successResponse"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{2,80}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "type": "object"
+          },
+          "outputSchema": {
+            "type": "object"
+          },
+          "successResponse": {
+            "type": "object"
+          },
+          "errorScenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "errorCode", "message"],
+              "properties": {
+                "name": { "type": "string" },
+                "when": { "type": "object" },
+                "errorCode": { "type": "string" },
+                "message": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "riskSignals": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "auditRequired": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "synthetic_only",
+        "no_private_data",
+        "no_private_endpoint",
+        "no_credentials",
+        "no_production_business_logic"
+      ],
+      "properties": {
+        "synthetic_only": { "const": true },
+        "no_private_data": { "const": true },
+        "no_private_endpoint": { "const": true },
+        "no_credentials": { "const": true },
+        "no_production_business_logic": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
