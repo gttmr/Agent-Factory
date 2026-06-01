@@ -54,7 +54,7 @@
 
 | 카테고리 | 메인 | soft | line | 의미 |
 | --- | --- | --- | --- | --- |
-| `agent` | `--cat-agent` (#5b46c2 보라) | `--cat-agent-soft` | `--cat-agent-line` | reasoning 책임 |
+| `agent` | `--cat-agent` (#a21caf 자홍) | `--cat-agent-soft` | `--cat-agent-line` | reasoning 책임 |
 | `workflow` | `--cat-workflow` (#b35900 주황) | `--cat-workflow-soft` | `--cat-workflow-line` | control flow / orchestration |
 | `adapter` | `--cat-adapter` (#0c6b58 청록) | `--cat-adapter-soft` | `--cat-adapter-line` | callable capability |
 | `remote_a2a` | `--cat-remote` (#b42318 빨강) | `--cat-remote-soft` | `--cat-remote-line` | 원격 protocol boundary |
@@ -62,6 +62,10 @@
 | `output` | `--cat-output` (#0e7c5f 녹색) | `--cat-output-soft` | `--cat-output-line` | 흐름 출력 |
 
 빨강은 Remote A2A 외에는 쓰지 않는다. 위험도(`risk-high`)는 별도 색 체계(연한 핑크 배경)를 사용한다.
+
+chrome 팔레트(버튼·링크·표면·테두리·타이포)는 mock-lab 디자인 시스템에서 이식했다. 핵심 토큰은 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·페이지 배경 #fafaf9, 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 본문 #37352f·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), radius `--radius-button`(8px)·`--radius-card`(12px)·`--radius-pill`(9999px), 폰트 `Inter, -apple-system, …`. 타이포는 h1 28 / h2 16 / 버튼 14·500 / 필드 라벨 13 / eyebrow·meta 12(px). 버튼은 height 40·padding 0 14, primary는 `--accent` 채움이 hover 시 `--accent-strong`로 어두워질 뿐 들리지 않는다. 입력은 min-height 44, focus 시 `--accent` 테두리.
+
+`agent` 카테고리 색은 기존 보라(#5b46c2)가 새 chrome primary 보라(#5645d4)와 거의 겹쳐, 배지를 버튼·링크와 구분하기 위해 자홍(#a21caf)으로 옮겼다. 나머지 카테고리 색은 그대로다.
 
 ## 글리프 매핑
 
