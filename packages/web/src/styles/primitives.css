@@ -1,0 +1,214 @@
+/* =====================================================================
+   Primitives layer — the shared structural building blocks behind
+   ui/primitives.tsx (Panel, SectionHeader, Button, Field, MetricPill,
+   EmptyState) plus legacy structural classes still used across screens
+   (.panel, .stack, .actions, .tag, .eyebrow, .section-heading).
+
+   New screens should compose these instead of restyling raw elements.
+   Consumes tokens only. @layer primitives.
+   ===================================================================== */
+
+/* ---- surfaces ---- */
+/* .panel is the legacy alias of .ui-panel; kept identical so both markup
+   styles resolve the same. Prefer <Panel> / .ui-panel in new code. */
+.panel,
+.ui-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  padding: var(--space-4xl);
+}
+
+.ui-panel-muted {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* ---- section headers ---- */
+.ui-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2xl);
+  align-items: flex-start;
+  margin-bottom: var(--space-3xl);
+}
+
+.ui-section-header h2,
+.section-heading h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+  letter-spacing: 0;
+}
+
+.ui-section-description {
+  max-width: 720px;
+  margin: var(--space-sm) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+}
+
+.section-heading {
+  display: grid;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-3xl);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+/* ---- fields ---- */
+.ui-field {
+  display: grid;
+  gap: 7px;
+}
+
+.ui-field small {
+  color: var(--text-muted);
+  line-height: var(--lh-normal);
+}
+
+.file-input {
+  padding: var(--space-sm);
+}
+
+.validation {
+  margin: 0;
+  color: var(--red);
+  font-weight: var(--fw-bold);
+}
+
+/* ---- buttons (link/anchor variant of the <button> reset) ---- */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
+  padding: 0 var(--space-xl);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.ui-button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.ui-button-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.ui-button-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* ---- pills / chips ---- */
+.metric-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  padding: 7px 10px;
+}
+
+.metric-pill span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  text-transform: uppercase;
+}
+
+.metric-pill strong {
+  font-size: var(--fs-md);
+}
+
+.tag {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  padding: 7px 10px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.tag.risk {
+  border-color: #edcf8f;
+  background: #fff8e8;
+  color: var(--amber);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-2xl) 0;
+}
+
+.tag-row.compact {
+  margin: 0;
+}
+
+/* ---- layout primitives ---- */
+.stack {
+  display: grid;
+  gap: var(--space-3xl);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.actions.align-end {
+  justify-content: flex-end;
+  margin-top: var(--space-3xl);
+}
+
+.actions.compact {
+  gap: var(--space-sm);
+}
+
+/* ---- empty states ---- */
+.empty-state,
+.empty-state p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  line-height: var(--lh-normal);
+}
+
+.ui-empty-state {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-lg) 0 var(--space-3xs);
+}
+
+.ui-empty-state strong {
+  color: var(--text-strong);
+}

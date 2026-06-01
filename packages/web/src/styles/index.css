@@ -24,6 +24,7 @@
 
 @import "./tokens.css" layer(tokens);
 @import "./base.css" layer(base);
+@import "./primitives.css" layer(primitives);
 
 /* --- not yet migrated into layers (unlayered) --- */
 @import "../styles.css";
