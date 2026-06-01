@@ -234,9 +234,9 @@
   background: var(--surface);
   color: var(--text-muted);
 }
-.graph-node-review.approved { background: #e8f6ee; border-color: #a9d6bc; color: #17633b; }
-.graph-node-review.needs    { background: #fff8e8; border-color: #edcf8f; color: var(--amber, #c08a2c); }
-.graph-node-review.rejected { background: #fff1f0; border-color: #f0aaa4; color: var(--red, #c0432c); }
+.graph-node-review.approved { background: var(--success-soft); border-color: var(--success-line); color: var(--success-text); }
+.graph-node-review.needs    { background: var(--warning-soft); border-color: var(--warning-line); color: var(--warning-text); }
+.graph-node-review.rejected { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-text); }
 .graph-node-review.deferred { background: var(--surface-muted, #f0f1ec); }
 
 .graph-node-square {
@@ -446,19 +446,19 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: var(--space-md) var(--space-lg);
-  background: #e8f6ee;
-  color: #17633b;
+  background: var(--success-soft);
+  color: var(--success-text);
   font-size: var(--fs-sm);
 }
 .graph-validation-banner.has-errors {
-  background: #fff1f0;
-  border-color: #f0aaa4;
-  color: var(--red, #c0432c);
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
 }
 .graph-validation-banner.has-warnings {
-  background: #fff8e8;
-  border-color: #edcf8f;
-  color: var(--amber, #c08a2c);
+  background: var(--warning-soft);
+  border-color: var(--warning-line);
+  color: var(--warning-text);
 }
 .graph-validation-banner-block {
   display: grid;

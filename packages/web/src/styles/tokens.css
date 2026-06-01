@@ -30,11 +30,18 @@
   --red: #e03131;
   --blue: #2858a5;
   --success: #1aae39;
-  /* success state surfaces (approval chips, OK states) */
+  /* status state surfaces — chips, banners, review badges.
+     soft = background, line = border, text = label. */
   --success-faint: #f5fbf7;
   --success-soft: #e6f6ec;
   --success-line: #2f9c6a;
   --success-text: #1c6a48;
+  --warning-soft: #fff8e8;
+  --warning-line: #edcf8f;
+  --warning-text: var(--amber);
+  --danger-soft: #fff1f0;
+  --danger-line: #f0aaa4;
+  --danger-text: var(--red);
 
   /* ---- status tint surfaces (ported from mock-lab) ---- */
   --tint-peach: #ffe8d4;

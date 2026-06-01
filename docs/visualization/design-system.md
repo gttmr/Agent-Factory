@@ -98,7 +98,9 @@ src/styles/
 
 빨강(`--cat-remote`)은 Remote A2A 외에는 쓰지 않는다. 에러/위험 빨강이 필요하면 `--red` 를 쓴다.
 
-**색 — chrome (mock-lab 이식).** 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·`--page-bg`(#fafaf9), 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 텍스트 `--text`(본문 #37352f)·`--text-strong`(제목·값·dark active fill #1a1a1a)·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), 강조 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), `--amber`·`--red`·`--blue`·`--success`, status tint 6종(`--tint-*`). 승인/OK 상태는 `--success-faint`·`--success-soft`·`--success-line`·`--success-text` 를 쓴다.
+**색 — chrome (mock-lab 이식).** 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·`--page-bg`(#fafaf9), 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 텍스트 `--text`(본문 #37352f)·`--text-strong`(제목·값·dark active fill #1a1a1a)·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), 강조 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), `--amber`·`--red`·`--blue`·`--success`, status tint 6종(`--tint-*`).
+
+**색 — 상태(status state).** 칩·배너·리뷰 배지의 success/warning/danger는 `--{success,warning,danger}-{soft,line,text}` 한 벌로 통일한다(`soft`=배경, `line`=테두리, `text`=라벨; `--success-faint`는 더 옅은 OK 배경). 승인 칩(`.af-approval-chip-on`), Graph 노드 리뷰(`.graph-node-review.approved/needs/rejected`), Graph 검증 배너, `.tag.risk`가 모두 이 토큰을 참조하므로 상태색은 `tokens.css` 한 곳에서 바뀐다.
 
 **타이포.** font-size 는 8단계 스케일로 통일했다(이전 24종 rem/px 혼용을 정리): `--fs-2xs 11 / --fs-xs 12 / --fs-sm 13 / --fs-md 14 / --fs-lg 16 / --fs-xl 18 / --fs-2xl 20 / --fs-3xl 28`(px). line-height `--lh-tight 1.3 / --lh-normal 1.5`. weight `--fw-medium 500 / --fw-semibold 600 / --fw-bold 700 / --fw-heavy 800`. 폰트 `--font-sans`(Inter …) / `--font-mono`. 새 텍스트는 rem 리터럴 대신 이 토큰을 쓴다.
 

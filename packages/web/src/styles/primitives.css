@@ -154,9 +154,9 @@
 }
 
 .tag.risk {
-  border-color: #edcf8f;
-  background: #fff8e8;
-  color: var(--amber);
+  border-color: var(--warning-line);
+  background: var(--warning-soft);
+  color: var(--warning-text);
 }
 
 .tag-row {
