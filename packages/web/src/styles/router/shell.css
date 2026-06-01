@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--surface, #f6f7fb);
+  background: var(--surface, var(--surface-muted));
 }
 
 .af-topbar {
@@ -10,8 +10,8 @@
   flex-direction: column;
   gap: 8px;
   padding: 16px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .af-topbar-brand {
@@ -29,14 +29,14 @@
 }
 
 .af-brand-link .eyebrow {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
 }
 
 .af-brand-link strong {
-  font-size: 1.1rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
 }
 
@@ -44,8 +44,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }
 
 .af-root-switcher-label {
@@ -56,8 +56,8 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  background: #fafafa;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-muted);
 }
 
 .af-stage-nav {
@@ -70,26 +70,26 @@
   padding: 6px 12px;
   border-radius: 4px;
   text-decoration: none;
-  font-size: 0.9rem;
-  color: rgba(0, 0, 0, 0.75);
+  font-size: var(--fs-md);
+  color: var(--text);
   background: transparent;
   border: 1px solid transparent;
 }
 
 .af-stage-link:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--surface-muted);
 }
 
 .af-stage-link-active {
-  background: #1f2937;
-  color: #fff;
-  border-color: #1f2937;
+  background: var(--text-strong);
+  color: var(--surface);
+  border-color: var(--text-strong);
 }
 
 .af-stage-link-aux {
   margin-left: auto;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 
 .af-stage-link[aria-disabled="true"] {
@@ -101,11 +101,11 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 
 .af-gate-placeholder {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-subtle);
   font-style: italic;
 }
 
@@ -115,19 +115,19 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  background: #fafafa;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-muted);
 }
 
 .af-approval-chip-on {
-  background: #e6f6ec;
-  border-color: #2f9c6a;
-  color: #1c6a48;
+  background: var(--success-soft);
+  border-color: var(--success-line);
+  color: var(--success-text);
 }
 
 .af-approval-chip-off {
-  background: #fafafa;
-  color: rgba(0, 0, 0, 0.6);
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .af-approval-chip-pending {
@@ -135,7 +135,7 @@
 }
 
 .af-approval-chip-glyph {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 
 .af-workspace {
@@ -184,13 +184,13 @@
 }
 
 .af-landing-message {
-  color: rgba(0, 0, 0, 0.7);
-  font-size: 0.85rem;
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
 
 .af-landing-error {
-  color: #b42318;
-  font-size: 0.85rem;
+  color: var(--red);
+  font-size: var(--fs-sm);
 }
 
 .af-recent-list {
@@ -211,18 +211,18 @@
 }
 
 .af-recent-list li:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--surface-muted);
 }
 
 .af-recent-list a {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-decoration: none;
-  color: #2858a5;
+  color: var(--blue);
 }
 
 .af-recent-time {
-  font-size: 0.75rem;
-  color: rgba(0, 0, 0, 0.5);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-left: auto;
 }
 
@@ -230,20 +230,20 @@
   background: transparent;
   border: 0;
   cursor: pointer;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-subtle);
   padding: 0 4px;
 }
 
 .af-root-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .af-root-table th,
 .af-root-table td {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--line);
   text-align: left;
 }
 
@@ -266,8 +266,8 @@
 .af-gate-summary {
   margin: 8px 0 0;
   padding-left: 18px;
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }
 
 .af-gate-summary li {

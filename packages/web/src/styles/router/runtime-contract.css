@@ -17,8 +17,8 @@
 .af-runtime-item-button {
   width: 100%;
   text-align: left;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px;
   cursor: pointer;
@@ -28,12 +28,12 @@
 }
 
 .af-runtime-item-button:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--surface-muted);
 }
 
 .af-runtime-item-active > .af-runtime-item-button {
-  border-color: var(--accent, #0c6b58);
-  background: #f5fbf7;
+  border-color: var(--accent, var(--cat-adapter));
+  background: var(--success-faint);
 }
 
 .af-runtime-item-header {
@@ -43,64 +43,64 @@
 }
 
 .af-runtime-kind {
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
 }
 
 .af-runtime-item-meta {
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
 }
 
 .af-runtime-status {
   display: inline-block;
-  font-size: 0.65rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(0, 0, 0, 0.7);
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .af-runtime-status-approved {
-  background: var(--cat-adapter-soft, #d9ecdf);
-  color: var(--cat-adapter, #0c6b58);
+  background: var(--cat-adapter-soft, var(--cat-adapter-soft));
+  color: var(--cat-adapter, var(--cat-adapter));
 }
 
 .af-runtime-status-needs_info {
-  background: #fbecd5;
-  color: #b35900;
+  background: var(--cat-workflow-soft);
+  color: var(--cat-workflow);
 }
 
 .af-runtime-status-draft {
-  background: rgba(0, 0, 0, 0.05);
-  color: rgba(0, 0, 0, 0.6);
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .af-runtime-status-rejected {
-  background: var(--cat-remote-soft, #fde2dd);
+  background: var(--cat-remote-soft, var(--cat-remote-soft));
   color: var(--cat-remote, #b42318);
 }
 
 .af-runtime-readiness {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.02em;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
 }
 
 .af-runtime-readiness-ready {
-  color: var(--cat-adapter, #0c6b58);
+  color: var(--cat-adapter, var(--cat-adapter));
 }
 
 .af-runtime-readiness-pending {
-  color: #b35900;
+  color: var(--cat-workflow);
 }
 
 .af-runtime-readiness-skipped {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-subtle);
   font-style: italic;
 }
 
@@ -115,7 +115,7 @@
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runtime-meta div {
@@ -126,7 +126,7 @@
 
 .af-runtime-meta dt {
   margin: 0;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -136,7 +136,7 @@
 }
 
 .af-runtime-policies {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
   display: flex;
@@ -146,10 +146,10 @@
 
 .af-runtime-policies legend {
   padding: 0 4px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
 }
 
 .af-runtime-required ul,
@@ -157,25 +157,25 @@
 .af-runtime-todos ul {
   margin: 6px 0 0;
   padding-left: 18px;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }
 
 .af-runtime-readiness-block .af-runtime-readiness-ready {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   margin: 6px 0 0;
 }
 
 .af-runtime-warning {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--cat-remote, #b42318);
-  background: var(--cat-remote-soft, #fde2dd);
+  background: var(--cat-remote-soft, var(--cat-remote-soft));
   padding: 8px 10px;
   border-radius: 6px;
 }
 
 .af-runtime-todos summary {
   cursor: pointer;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }

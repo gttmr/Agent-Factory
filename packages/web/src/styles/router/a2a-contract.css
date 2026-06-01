@@ -3,26 +3,26 @@
 .af-a2a-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
 }
 
 .af-a2a-table th,
 .af-a2a-table td {
   padding: 7px 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--line);
   vertical-align: top;
   text-align: left;
 }
 
 .af-a2a-table th {
-  color: rgba(0, 0, 0, 0.55);
-  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .af-a2a-row-active td {
-  background: #f5fbf7;
+  background: var(--success-faint);
 }
 
 .af-a2a-row-button {
@@ -39,30 +39,30 @@
 }
 
 .af-a2a-row-button strong {
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   line-height: 1.25;
 }
 
 .af-a2a-row-button small,
 .af-a2a-table td small {
   display: block;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.68rem;
+  font-size: var(--fs-2xs);
   margin-top: 2px;
 }
 
 .af-a2a-readiness {
-  font-size: 0.7rem;
-  color: rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
 }
 
 .af-a2a-readiness-ready {
-  color: var(--cat-adapter, #0c6b58);
+  color: var(--cat-adapter, var(--cat-adapter));
 }
 
 .af-a2a-readiness-pending {
-  color: #b35900;
+  color: var(--cat-workflow);
 }
 
 .af-a2a-inspector {
@@ -76,7 +76,7 @@
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-a2a-meta div {
@@ -87,7 +87,7 @@
 
 .af-a2a-meta dt {
   margin: 0;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -97,7 +97,7 @@
 }
 
 .af-a2a-section {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 12px;
   display: flex;
@@ -108,10 +108,10 @@
 .af-a2a-section h4,
 .af-a2a-readiness-block h4 {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--text-muted);
 }
 
 .af-a2a-checks {
@@ -125,8 +125,8 @@
 
 .af-a2a-checks legend {
   width: 100%;
-  font-size: 0.72rem;
-  color: rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
   margin-bottom: 4px;
 }
 
@@ -136,10 +136,10 @@
   align-items: center;
   gap: 5px;
   padding: 4px 7px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.02);
-  font-size: 0.74rem;
+  background: var(--surface-muted);
+  font-size: var(--fs-xs);
 }
 
 .af-a2a-repeat {
@@ -153,7 +153,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 
 .af-a2a-grid {
@@ -170,25 +170,25 @@
 }
 
 .af-a2a-transition-editor span {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-subtle);
 }
 
 .af-a2a-readiness-block ul {
   margin: 6px 0 0;
   padding-left: 18px;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.7);
+  font-size: var(--fs-sm);
+  color: var(--text);
 }
 
 .af-a2a-readiness-block .af-a2a-readiness-ready {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   margin: 6px 0 0;
 }
 
 .af-a2a-warning {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--cat-remote, #b42318);
-  background: var(--cat-remote-soft, #fde2dd);
+  background: var(--cat-remote-soft, var(--cat-remote-soft));
   padding: 8px 10px;
   border-radius: 6px;
 }

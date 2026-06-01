@@ -3,7 +3,7 @@
 
 .af-blocker-list {
   margin-top: 8px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-blocker-list summary {
@@ -17,12 +17,12 @@
 }
 
 .af-blocker-list pre {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--surface-muted);
   padding: 8px;
   border-radius: 4px;
   overflow: auto;
   max-height: 320px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-build-stub-grid {
@@ -61,43 +61,43 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-build-file-button:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--surface-muted);
 }
 
 .af-build-file-button-active {
-  background: rgba(31, 41, 55, 0.08);
-  border-color: rgba(31, 41, 55, 0.32);
+  background: var(--surface-muted);
+  border-color: var(--line-strong);
 }
 
 .af-build-file-button code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 
 .af-build-file-button small {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 0.7rem;
+  color: var(--text-subtle);
+  font-size: var(--fs-2xs);
 }
 
 .af-build-file-preview pre {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--surface-muted);
   padding: 8px;
   border-radius: 4px;
   overflow: auto;
   max-height: 480px;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   white-space: pre;
 }
 
 .af-stream-log-panel {
   margin-top: 12px;
-  border: 1px solid rgba(31, 41, 55, 0.12);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  background: rgba(17, 24, 39, 0.02);
+  background: var(--surface-muted);
 }
 
 .af-stream-log-header {
@@ -106,13 +106,13 @@
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(31, 41, 55, 0.1);
-  font-size: 0.82rem;
+  border-bottom: 1px solid var(--line-strong);
+  font-size: var(--fs-sm);
 }
 
 .af-stream-log-header span {
-  color: rgba(0, 0, 0, 0.52);
-  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }
 
 .af-stream-log {
@@ -120,10 +120,10 @@
   padding: 10px;
   max-height: 260px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.045);
-  color: rgba(17, 24, 39, 0.92);
+  background: var(--surface-muted);
+  color: var(--text-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
@@ -132,15 +132,15 @@
 .af-markdown-editor {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
   resize: vertical;
 }
 
 .af-yaml-editor {
-  background: #fafbff;
+  background: var(--surface-muted);
 }
 
 .af-verify-grid {
@@ -151,10 +151,10 @@
 }
 
 .af-verify-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-muted);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -169,30 +169,36 @@
 
 .af-verify-card code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
-  color: rgba(0, 0, 0, 0.55);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
 }
 
 .af-verify-card p {
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.65);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
   margin: 0;
 }
 
 .af-verify-result {
   margin-top: 12px;
   padding: 8px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--surface-muted);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-verify-result pre {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--surface-muted);
   padding: 8px;
   border-radius: 4px;
   overflow: auto;
   max-height: 320px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   white-space: pre;
+}
+
+/* Smoke 일괄 실행 매크로 step label (BuildWorkbench) */
+.smoke-macro-step-label {
+  font-size: var(--fs-sm);
+  color: var(--text-strong);
 }

@@ -22,12 +22,45 @@
 980px 이하에서는 route navigation과 gate chip이 줄바꿈되어도 본문 작업면을 밀어내지 않도록 간격을 줄이고, inspector는 작업면 아래로 내려간다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
 
+## 스타일시트 구조와 캐스케이드 레이어
+
+CSS 는 `packages/web/src/styles/` 아래에 역할별로 분리되어 있고, `main.tsx` 는 단일 진입점 `styles/index.css` 만 import 한다.
+
+```
+src/styles/
+  index.css      ← 진입점. @layer 순서 선언 + 각 partial 을 layer() 로 import
+  tokens.css     ← 디자인 토큰(:root). 색·타이포·간격·radius·z·motion 의 단일 편집 지점
+  base.css       ← element reset/기본값(button, input, table …). 토큰만 사용
+  primitives.css ← .ui-* + 레거시 구조 클래스(.panel/.stack/.actions/.tag/.eyebrow …)
+  category.css   ← 카테고리 비주얼 SSoT(배지·stripe·affinity·domain map). CategoryBadge.tsx 의 짝
+  features/      ← 화면별 블록(analysis-brief.css, graph.css)
+  router/        ← route shell + per-route 스타일(shell, design, catalog …)
+```
+
+`index.css` 가 선언하는 캐스케이드 레이어 순서(낮음 → 높음):
+
+```css
+@layer tokens, base, primitives, components, features, router, utilities;
+```
+
+레이어는 specificity 보다 우선한다. 같은 요소를 가리키는 규칙이 충돌하면 **항상 더 늦은 레이어가 이긴다.** 새 화면은 specificity 싸움 없이 올바른 레이어에 규칙을 넣기만 하면 된다.
+
+- `tokens` — `:root` 커스텀 프로퍼티만.
+- `base` — bare element. 항상 가장 약하다.
+- `primitives` — `.ui-*` 와 공용 구조 클래스(`primitives.css`).
+- `components` — 화면을 가로지르는 위젯(카테고리 배지 등, `category.css`).
+- `features` — 특정 컴포넌트 전용 블록(`features/*.css`).
+- `router` — route shell + per-route(`router/*.css`). utilities 를 빼면 가장 강하다.
+- `utilities` — 단일 목적 override 예약 슬롯(현재 비어 있음).
+
+새 partial 은 `index.css` 에 `@import "./x.css" layer(<레이어>);` 한 줄로 추가한다. Vite 가 빌드 시 각 import 를 해당 `@layer {}` 블록으로 인라인한다.
+
 ## 코드 primitives
 
-공통 UI primitive는 `packages/web/src/ui/primitives.tsx`에 둔다.
+공통 UI primitive는 `packages/web/src/ui/primitives.tsx`(마크업)와 `packages/web/src/styles/primitives.css`(스타일)에 둔다.
 새 화면은 가능한 한 이 primitive를 먼저 사용한다.
 
-- `Panel`: 실제 작업 surface 또는 inspector block에만 사용한다.
+- `Panel`: 실제 작업 surface 또는 inspector block에만 사용한다. `.panel` 은 `.ui-panel` 의 레거시 alias 로 같은 규칙을 공유한다 — 새 코드는 `<Panel>` / `.ui-panel` 을 쓴다.
 - `SectionHeader`: eyebrow, 제목, 설명, 보조 action을 같은 구조로 배치한다.
 - `Button`: `primary`, `secondary`, `ghost` variant만 쓴다.
 - `Field`, `SelectField`, `TextareaField`, `FileField`: label과 control 간격을 통일한다.
@@ -48,9 +81,11 @@
 
 새 기능을 추가할 때는 우선 어느 artifact 가 source of truth 인지 확인하고, 필요한 hook 을 `state/` 에 둔 다음 화면 component 가 그 hook 만 호출하도록 연결한다. analysis-result, scaffold-plan, manifest 의 schema 는 UI refactor 때문에 바꾸지 않는다.
 
-## 색 토큰
+## 디자인 토큰 (tokens.css)
 
-`packages/web/src/styles.css` 의 `:root` 에 카테고리 토큰이 정의되어 있다. 새 카테고리 색을 추가하려면 항상 다음 4종을 함께 추가한다.
+모든 토큰은 `packages/web/src/styles/tokens.css` 의 `:root` 에 있다. 색·폰트·타이포·간격·radius·z·motion 을 여기서만 편집한다. base/primitives/components/features/router 는 리터럴을 직접 쓰지 않고 이 토큰을 참조한다.
+
+**색 — 카테고리.** 새 카테고리를 추가하려면 항상 base/soft/line 3종을 함께 추가하고, `category.css` 에 glyph + `.category-badge.cat-<name>` + `.row-stripe.cat-<name>` 규칙을 더한다.
 
 | 카테고리 | 메인 | soft | line | 의미 |
 | --- | --- | --- | --- | --- |
@@ -61,11 +96,21 @@
 | `input` | `--cat-input` (#2858a5 파랑) | `--cat-input-soft` | `--cat-input-line` | 흐름 입력 |
 | `output` | `--cat-output` (#0e7c5f 녹색) | `--cat-output-soft` | `--cat-output-line` | 흐름 출력 |
 
-빨강은 Remote A2A 외에는 쓰지 않는다. 위험도(`risk-high`)는 별도 색 체계(연한 핑크 배경)를 사용한다.
+빨강(`--cat-remote`)은 Remote A2A 외에는 쓰지 않는다. 에러/위험 빨강이 필요하면 `--red` 를 쓴다.
 
-chrome 팔레트(버튼·링크·표면·테두리·타이포)는 mock-lab 디자인 시스템에서 이식했다. 핵심 토큰은 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·페이지 배경 #fafaf9, 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 본문 #37352f·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), radius `--radius-button`(8px)·`--radius-card`(12px)·`--radius-pill`(9999px), 폰트 `Inter, -apple-system, …`. 타이포는 h1 28 / h2 16 / 버튼 14·500 / 필드 라벨 13 / eyebrow·meta 12(px). 버튼은 height 40·padding 0 14, primary는 `--accent` 채움이 hover 시 `--accent-strong`로 어두워질 뿐 들리지 않는다. 입력은 min-height 44, focus 시 `--accent` 테두리.
+**색 — chrome (mock-lab 이식).** 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·`--page-bg`(#fafaf9), 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 텍스트 `--text`(본문 #37352f)·`--text-strong`(제목·값·dark active fill #1a1a1a)·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), 강조 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), `--amber`·`--red`·`--blue`·`--success`, status tint 6종(`--tint-*`).
 
-`agent` 카테고리 색은 기존 보라(#5b46c2)가 새 chrome primary 보라(#5645d4)와 거의 겹쳐, 배지를 버튼·링크와 구분하기 위해 자홍(#a21caf)으로 옮겼다. 나머지 카테고리 색은 그대로다.
+**색 — 상태(status state).** 칩·배너·리뷰 배지의 success/warning/danger는 `--{success,warning,danger}-{soft,line,text}` 한 벌로 통일한다(`soft`=배경, `line`=테두리, `text`=라벨; `--success-faint`는 더 옅은 OK 배경). 승인 칩(`.af-approval-chip-on`), Graph 노드 리뷰(`.graph-node-review.approved/needs/rejected`), Graph 검증 배너, `.tag.risk`가 모두 이 토큰을 참조하므로 상태색은 `tokens.css` 한 곳에서 바뀐다.
+
+**타이포.** font-size 는 8단계 스케일로 통일했다(이전 24종 rem/px 혼용을 정리): `--fs-2xs 11 / --fs-xs 12 / --fs-sm 13 / --fs-md 14 / --fs-lg 16 / --fs-xl 18 / --fs-2xl 20 / --fs-3xl 28`(px). line-height `--lh-tight 1.3 / --lh-normal 1.5`. weight `--fw-medium 500 / --fw-semibold 600 / --fw-bold 700 / --fw-heavy 800`. 폰트 `--font-sans`(Inter …) / `--font-mono`. 새 텍스트는 rem 리터럴 대신 이 토큰을 쓴다.
+
+**간격.** `--space-3xs 2 / --space-2xs 4 / --space-xs 6 / --space-sm 8 / --space-md 10 / --space-lg 12 / --space-xl 14 / --space-2xl 16 / --space-3xl 18 / --space-4xl 20 / --space-5xl 24`(px). gap/padding/margin 은 이 스케일을 쓴다(스케일에 없는 5·7px 등 소수 레거시 값은 인라인 유지).
+
+**radius / z / motion.** `--radius-button 8`·`--radius-card 12`·`--radius-pill 9999`(px). `--z-overlay 50`(모달·드로어). `--transition-fast 120ms ease`. 그림자/링은 재사용이 거의 없어 graph 등 사용처에 인라인으로 둔다.
+
+`agent` 카테고리 색은 기존 보라(#5b46c2)가 chrome primary 보라(#5645d4)와 거의 겹쳐, 배지를 버튼·링크와 구분하기 위해 자홍(#a21caf)으로 옮겼다. 나머지 카테고리 색은 그대로다.
+
+`router/*.css`(셸 포함)도 토큰 기반으로 수렴했다. 이전 translucent-black 팔레트(`rgba(0,0,0,*)`)는 역할별로 `--text-*`(텍스트)·`--line`/`--line-strong`(테두리)·`--surface-muted`(옅은 배경)에 매핑했고, 슬레이트 active fill `#1f2937` → `--text-strong`, 링크 `#2858a5` → `--blue`, 에러 `#b42318`(bare) → `--red`, 승인 초록 → `--success-*`, 카테고리 hex → `--cat-*` 로 바꿨다. 남는 raw 값은 의도적 투명 효과뿐이다: 모달 backdrop `rgba(0,0,0,0.3)`, 오버레이 `rgba(255,255,255,*)`, 카테고리 tint 배경 `rgba(<cat>,0.12)`.
 
 ## 글리프 매핑
 
@@ -178,23 +223,26 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 
 ## CSS 함정
 
-**광범위 자손 선택자가 새 컴포넌트를 깨뜨린다.** 기존에 `.domain-map-table td span { display: block; }` 같은 룰이 있어서 새로 추가한 `.category-badge` (span) 가 block 으로 강제되어 안의 글리프와 텍스트가 두 줄로 깨졌다. 테이블/리스트의 마크업 스타일 룰은 항상 직계 자식 선택자(`>`)를 쓴다.
+**광범위 자손 선택자가 새 컴포넌트를 깨뜨린다.** 기존에 `.domain-map-table td span { display: block; }` 같은 룰이 있어서 새로 추가한 `.category-badge` (span) 가 block 으로 강제되어 안의 글리프와 텍스트가 두 줄로 깨졌다. 테이블/리스트의 마크업 스타일 룰은 항상 직계 자식 선택자(`>`)를 쓴다. `@layer` 는 *specificity 충돌*만 해결한다 — descendant 선택자가 안쪽 요소를 잡아버리는 매칭 문제는 레이어로 막지 못하므로 `>` 로 좁히는 규칙은 여전히 유효하다.
 
 **flex / inline-flex 자식이 grid item 일 때.** grid container 안에 inline-flex 자식을 두면 grid track 폭에 따라 안의 텍스트가 wrap 될 수 있다. 카테고리 배지처럼 한 줄로 유지해야 하는 경우는 grid 가 아니라 flex column + align-items:flex-start 를 쓴다.
 
 **HMR 캐시.** 한국어/영어 혼용 컨텐츠를 다루다 보니 CSS 변경이 가끔 hot reload 에 반영되지 않는다. 시각 결과가 코드와 어긋나면 chrome-devtools MCP `navigate_page` 의 `ignoreCache: true` 로 강제 reload 한다.
 
-## 새 화면 추가 시 체크리스트
+## 새 화면 추가 레시피
 
-1. 카테고리·서브타입을 표시한다면 `CategoryBadge` / `SubtypeBadge` 를 import 한다 — 직접 `<span>` 작성 금지.
-2. 카테고리 stripe 가 필요하면 `row-stripe` + `categoryClass()` 를 쓴다.
-3. 새 색·글리프가 필요하면 `:root` 토큰 + `subtypeGlyph` 매핑을 함께 추가한다.
-4. 새 Graph marker 가 필요하면 Graph IR 의미, node/edge/container 렌더러, CSS 색을 모두 갱신한다.
-5. 화면 단위 자손 선택자(`.foo-table td span`) 는 항상 `>` 직계 자식으로 좁힌다.
-6. 변경 후 Chrome DevTools MCP 또는 Playwright로 스크린샷을 찍어 색 매핑이 맞는지 시각 확인한다.
+1. **레이어를 고른다.** 재사용 구조는 `primitives.css`(primitives), 카테고리/배지류는 `category.css`(components), 화면 전용 블록은 `features/<name>.css`(features), route 셸은 `router/<name>.css`(router). `index.css` 에 `@import "./… .css" layer(<레이어>);` 한 줄을 추가한다.
+2. **토큰만 쓴다.** 색·font-size·간격·radius 는 리터럴 대신 `var(--*)`. 스케일에 없는 값이 필요하면 먼저 `tokens.css` 에 추가한다.
+3. 카테고리·서브타입을 표시한다면 `CategoryBadge` / `SubtypeBadge` 를 import 한다 — 직접 `<span>` 작성 금지.
+4. 카테고리 stripe 가 필요하면 `row-stripe` + `categoryClass()` 를 쓴다.
+5. 새 색·글리프가 필요하면 `tokens.css` 토큰(base/soft/line) + `category.css` 규칙 + `subtypeGlyph` 매핑을 함께 추가한다.
+6. 새 Graph marker 가 필요하면 Graph IR 의미(`process-flow.md`), node/edge/container 렌더러, `features/graph.css` 색을 모두 갱신한다.
+7. 화면 단위 자손 선택자(`.foo-table td span`) 는 항상 `>` 직계 자식으로 좁힌다.
+8. 변경 후 Chrome DevTools MCP 또는 Playwright로 스크린샷을 찍어 색 매핑·레이아웃이 맞는지 시각 확인한다.
 
 ## 검증
 
 - `npm run build` (tsc + vite build) 통과
+- 토큰/스케일은 `tokens.css` 한 곳에서만 편집했는지 확인 — 다른 stylesheet 에 색·font-size·간격 리터럴을 새로 넣지 않는다.
 - Analyze Stage Runner / Design Stage Runner / Graph IR / Catalog에서 카테고리 색이 동일한지 시각 확인
 - `before/after` 스크린샷이 필요할 때는 dev 서버 + Chrome DevTools MCP 또는 Playwright로 캡처

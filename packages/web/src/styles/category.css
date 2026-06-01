@@ -1,0 +1,223 @@
+/* =====================================================================
+   Components layer — cross-screen category visuals. This is the CSS half
+   of the category single-source-of-truth; the markup half is
+   components/CategoryBadge.tsx. Module Review, Graph IR, Catalog, A2A
+   review, and Domain Map all render through these classes so colors and
+   glyphs stay in sync.
+
+   To add a category: add --cat-<name>-{base,soft,line} in tokens.css,
+   then a glyph rule + .category-badge.cat-<name> + .row-stripe.cat-<name>
+   here. Consumes tokens only. @layer components.
+   ===================================================================== */
+
+/* ---- glyph chips ---- */
+.cat-glyph {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  line-height: 1;
+}
+
+.subtype-glyph {
+  width: auto;
+  min-width: 18px;
+  padding: 0 var(--space-2xs);
+  font-size: var(--fs-2xs);
+}
+
+.cat-glyph.cat-agent {
+  background: var(--cat-agent-soft);
+  color: var(--cat-agent);
+}
+.cat-glyph.cat-workflow {
+  background: var(--cat-workflow-soft);
+  color: var(--cat-workflow);
+}
+.cat-glyph.cat-adapter {
+  background: var(--cat-adapter-soft);
+  color: var(--cat-adapter);
+}
+.cat-glyph.cat-remote {
+  background: var(--cat-remote-soft);
+  color: var(--cat-remote);
+}
+
+/* ---- category + subtype badges ---- */
+.category-badge,
+.subtype-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2xs) var(--space-md);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  width: fit-content;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.category-badge.cat-agent {
+  background: var(--cat-agent-soft);
+  border-color: var(--cat-agent-line);
+  color: var(--cat-agent);
+}
+.category-badge.cat-workflow {
+  background: var(--cat-workflow-soft);
+  border-color: var(--cat-workflow-line);
+  color: var(--cat-workflow);
+}
+.category-badge.cat-adapter {
+  background: var(--cat-adapter-soft);
+  border-color: var(--cat-adapter-line);
+  color: var(--cat-adapter);
+}
+.category-badge.cat-remote {
+  background: var(--cat-remote-soft);
+  border-color: var(--cat-remote-line);
+  color: var(--cat-remote);
+}
+
+.category-badge .cat-glyph,
+.subtype-badge .cat-glyph {
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+}
+
+.subtype-badge {
+  background: #f3f5f1;
+  border-color: var(--line);
+  color: #26313d;
+}
+
+/* ---- protocol badge ---- */
+.protocol-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2xs) var(--space-md);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  width: fit-content;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: #f8faf6;
+  color: #26313d;
+}
+
+.protocol-badge.protocol-mcp {
+  background: var(--tint-lavender);
+  border-color: #c5b6ec;
+  color: var(--accent);
+}
+
+.protocol-badge .cat-glyph {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* ---- candidate badge row + vertical cell stack ----
+   cell-stack is flex column (not grid) on purpose: a grid track would
+   turn the inline-flex badges into block items and wrap their text. */
+.candidate-cat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.cell-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+/* ---- table category stripe ---- */
+.row-name-cell {
+  position: relative;
+  padding-left: var(--space-3xl) !important;
+}
+
+.row-stripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+}
+
+.row-stripe.cat-agent {
+  background: var(--cat-agent);
+}
+.row-stripe.cat-workflow {
+  background: var(--cat-workflow);
+}
+.row-stripe.cat-adapter {
+  background: var(--cat-adapter);
+}
+.row-stripe.cat-remote {
+  background: var(--cat-remote);
+}
+
+/* ---- Domain × Capability map ----
+   Scope table rules to direct children (td > span) so they never reach
+   into a .category-badge's inner <span>. */
+.domain-map-table {
+  min-width: 1040px;
+}
+
+.domain-map-table td > strong {
+  display: block;
+}
+
+.domain-map-table td > span {
+  display: block;
+  margin-top: var(--space-2xs);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* Affinity intensity uses a dedicated high-contrast palette (not the
+   category tokens) so 낮음/중간/높음 stay visually distinct. */
+.affinity {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: var(--radius-button);
+  padding: var(--space-xs) var(--space-lg);
+  font-weight: var(--fw-heavy);
+  border: 1px solid;
+  font-size: var(--fs-sm);
+}
+
+.affinity.high {
+  background: #c5ecd5;
+  border-color: #74c699;
+  color: #0e562e;
+}
+
+.affinity.medium {
+  background: #fbe6c2;
+  border-color: #d6a55b;
+  color: #7a4500;
+}
+
+.affinity.low {
+  background: #eef0eb;
+  border-color: var(--line);
+  color: var(--text-muted);
+}
+
+.affinity-cell {
+  text-align: center;
+}
+
+.heatmap-score-label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
