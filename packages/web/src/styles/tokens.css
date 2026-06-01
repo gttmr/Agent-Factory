@@ -1,0 +1,117 @@
+/* =====================================================================
+   Design tokens — the single editable source for the web workbench.
+   Every other stylesheet (base / primitives / components / features /
+   router) consumes these custom properties; it must not hard-code
+   colors, font sizes, spacing, or radii. Add or tune the system here.
+
+   Loaded into @layer tokens (lowest priority) from ./index.css.
+   ===================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ---- fonts ---- */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* ---- chrome palette (ported from mock-lab) ---- */
+  --page-bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-muted: #f6f5f4;
+  --line: #e5e3df;
+  --line-strong: #c8c4be;
+  --text: #37352f;          /* body text */
+  --text-strong: #1a1a1a;   /* headings / values */
+  --text-muted: #5d5b54;
+  --text-subtle: #787671;
+  --accent: #5645d4;
+  --accent-strong: #4534b3;
+  --amber: #dd5b00;
+  --red: #e03131;
+  --blue: #2858a5;
+  --success: #1aae39;
+
+  /* ---- status tint surfaces (ported from mock-lab) ---- */
+  --tint-peach: #ffe8d4;
+  --tint-rose: #fde0ec;
+  --tint-mint: #d9f3e1;
+  --tint-lavender: #e6e0f5;
+  --tint-sky: #dcecfa;
+  --tint-yellow: #fef7d6;
+
+  /* ---- category colors — Process Flow, Module Review, Reuse, Domain Map.
+     Always add base + soft + line together for a new category.
+     agent moved off purple (#5b46c2) to magenta to stay distinct from
+     chrome primary. ---- */
+  --cat-agent: #a21caf;
+  --cat-agent-soft: #f7e1fa;
+  --cat-agent-line: #e3b0ec;
+  --cat-workflow: #b35900;
+  --cat-workflow-soft: #fbecd5;
+  --cat-workflow-line: #efc785;
+  --cat-adapter: #0c6b58;
+  --cat-adapter-soft: #d9ecdf;
+  --cat-adapter-line: #a9d6bc;
+  --cat-remote: #b42318;
+  --cat-remote-soft: #fde2dd;
+  --cat-remote-line: #f0aaa4;
+
+  --cat-input: #2858a5;
+  --cat-input-soft: #dee9f7;
+  --cat-input-line: #b3c9e6;
+  --cat-output: #0e7c5f;
+  --cat-output-soft: #d2eee2;
+  --cat-output-line: #98d3b6;
+
+  /* ---- type scale (px). 24 ad-hoc rem/px sizes collapsed to 8 steps. ---- */
+  --fs-2xs: 11px;   /* pins, micro-labels */
+  --fs-xs: 12px;    /* eyebrows, chips, meta */
+  --fs-sm: 13px;    /* dense body, field labels */
+  --fs-md: 14px;    /* body, buttons */
+  --fs-lg: 16px;    /* section titles (h2) */
+  --fs-xl: 18px;    /* large headings */
+  --fs-2xl: 20px;
+  --fs-3xl: 28px;   /* page title (h1) */
+
+  --lh-tight: 1.3;
+  --lh-normal: 1.5;
+
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-heavy: 800;
+
+  /* ---- spacing scale (px). Values preserved from current usage; named
+     so new screens reuse the same rhythm. ---- */
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 6px;
+  --space-sm: 8px;
+  --space-md: 10px;
+  --space-lg: 12px;
+  --space-xl: 14px;
+  --space-2xl: 16px;
+  --space-3xl: 18px;
+  --space-4xl: 20px;
+  --space-5xl: 24px;
+
+  /* ---- radii (ported from mock-lab) ---- */
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+
+  /* ---- motion ---- */
+  --transition-fast: 120ms ease;
+
+  /* ---- z-index. Only overlays/drawers need to escape the content stack;
+     graph-canvas stacking stays local. ---- */
+  --z-overlay: 50;
+
+  /* ---- root presentation ---- */
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--page-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

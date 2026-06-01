@@ -1,0 +1,29 @@
+/* =====================================================================
+   Web workbench stylesheet entry point.
+
+   Cascade layers, declared low → high priority. A rule in a later layer
+   always wins over an earlier layer regardless of selector specificity,
+   so new screens never have to fight existing rules — pick the right
+   layer and the cascade is predictable.
+
+     tokens     — :root custom properties only
+     base       — element resets / defaults
+     primitives — .ui-* and shared structural primitives
+     components — cross-screen widgets (category badges, stripes, affinity)
+     features   — screen-specific blocks (analysis brief, graph canvas, …)
+     router     — route shell + per-route styles
+     utilities  — single-purpose overrides (highest priority)
+
+   Migration note: stylesheets not yet moved into a layer are imported
+   unlayered below. Unlayered rules outrank every layer, which matches
+   their previous "loaded last" precedence, so partial migration stays
+   visually stable.
+   ===================================================================== */
+
+@layer tokens, base, primitives, components, features, router, utilities;
+
+@import "./tokens.css" layer(tokens);
+
+/* --- not yet migrated into layers (unlayered) --- */
+@import "../styles.css";
+@import "../styles-router.css";
