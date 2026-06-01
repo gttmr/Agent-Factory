@@ -225,36 +225,6 @@
   line-height: var(--lh-normal);
 }
 
-/* ---- legacy flat edge list (pre-ReactFlow; superseded by .graph-edge-*).
-   Retained pending confirmation it has no remaining consumer. ---- */
-.edge {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) minmax(160px, 1.5fr);
-  gap: var(--space-md);
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-button);
-  padding: var(--space-md);
-}
-
-.edge strong {
-  border-radius: var(--radius-pill);
-  background: #e3f1ec;
-  color: var(--accent-strong);
-  padding: 6px 9px;
-  font-size: var(--fs-xs);
-}
-
-.edge.remote strong {
-  background: #fff1f0;
-  color: var(--red);
-}
-
-.edge em {
-  color: var(--text-muted);
-  font-style: normal;
-}
-
 /* ---- missing-information triage ---- */
 .missing-info-list {
   display: grid;
@@ -323,10 +293,6 @@
   .contract-row {
     grid-template-columns: 1fr;
     gap: var(--space-md);
-  }
-
-  .edge {
-    grid-template-columns: 1fr;
   }
 }
 
