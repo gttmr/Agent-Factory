@@ -71,6 +71,7 @@ function buildFiles() {
     [`${packageName}/workflow_manifest.json`]: `${JSON.stringify(buildManifest(), null, 2)}\n`,
     "scaffold-plan.json": `${JSON.stringify(scaffoldPlan, null, 2)}\n`,
     "implementation-handoff.md": buildImplementationHandoff(),
+    "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(), null, 2)}\n`,
     "requirements.txt": buildRequirements(),
     "tests/test_workflow_contract.py": buildContractTest(),
     "README.md": buildReadme()
@@ -79,26 +80,32 @@ function buildFiles() {
 
 function buildAgentPy() {
   const functions = modules.map(buildNodeFunction).join("\n\n");
-  const edgeRows = buildGraphWorkflowEdges()
-    .map(([from, to]) => `        (${from}, ${to}),`)
-    .join("\n");
+  const graphEdges = buildGraphWorkflowEdges();
 
   return `from __future__ import annotations
 
+from typing import AsyncGenerator
 from typing import Any
 
-from google.adk import Event, Workflow
+from google.adk.agents import BaseAgent
+from google.adk.agents.invocation_context import InvocationContext
+from google.adk.events import Event
+from google.genai import types
 
 
 COMPONENT_CONTRACTS = ${toPythonLiteral(componentContracts())}
+GRAPH_EDGES = ${toPythonEdgeTupleLiteral(graphEdges)}
+TERMINAL_OUTPUTS = ${toPythonLiteral(terminalOutputIds())}
 
 
 def _event_output(module_id: str, module_name: str, node_input: Any = None):
+    contract = COMPONENT_CONTRACTS[module_id]
     return {
         "module_id": module_id,
         "module_name": module_name,
         "input": node_input,
-        "status": "stubbed_runtime_contract",
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
     }
 
 
@@ -106,19 +113,83 @@ ${functions}
 
 
 def emit_workflow_result(node_input: Any = None):
-    return Event(output={
+    return {
         "node_id": "workflow_result",
-        "terminal_outputs": ${toPythonLiteral(terminalOutputIds())},
+        "terminal_outputs": TERMINAL_OUTPUTS,
         "input": node_input,
-        "status": "stubbed_runtime_contract",
-    })
+        "status": "runtime_mock_smoke",
+    }
 
 
-root_agent = Workflow(
+def _synthetic_module_outputs():
+    return {
+        module_id: {
+            "module_name": contract["catalog_binding"]["name"] if contract.get("catalog_binding") else module_id,
+            "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+            "runtime_mock": contract.get("runtime_mock"),
+            "developer_todos": contract["developer_todos"],
+        }
+        for module_id, contract in COMPONENT_CONTRACTS.items()
+    }
+
+
+def _build_smoke_text(user_text: str = ""):
+    mock_count = sum(1 for contract in COMPONENT_CONTRACTS.values() if contract.get("runtime_mock") is not None)
+    terminal_outputs = ", ".join(TERMINAL_OUTPUTS) if TERMINAL_OUTPUTS else "none"
+    user_note = f" Received message: {user_text[:160]}" if user_text else ""
+    return (
+        "ADK runtime smoke for ${packageName}: "
+        f"{len(COMPONENT_CONTRACTS)} approved modules loaded, "
+        f"{mock_count} synthetic runtime mocks available. "
+        f"Terminal outputs: {terminal_outputs}. "
+        "This response uses reviewed synthetic test doubles only; it is not real business logic."
+        f"{user_note}"
+    )
+
+
+def _latest_user_text(ctx: InvocationContext):
+    try:
+        events = list(getattr(ctx.session, "events", []) or [])
+    except Exception:
+        return ""
+    for event in reversed(events):
+        content = getattr(event, "content", None)
+        if not content or getattr(content, "role", None) != "user":
+            continue
+        parts = getattr(content, "parts", []) or []
+        text = "".join(getattr(part, "text", "") or "" for part in parts)
+        if text.strip():
+            return text.strip()
+    return ""
+
+
+class SyntheticRuntimeSmokeAgent(BaseAgent):
+    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
+        yield Event(
+            invocation_id=ctx.invocation_id,
+            author=self.name,
+            branch=ctx.branch,
+            content=types.Content(
+                role="model",
+                parts=[types.Part(text=_build_smoke_text(_latest_user_text(ctx)))],
+            ),
+            output={
+                "status": "runtime_mock_smoke",
+                "guardrails": {
+                    "raw_requirement_to_code": False,
+                    "generated_business_logic": False,
+                    "private_data_or_endpoints": False,
+                },
+                "graph_edges": GRAPH_EDGES,
+                "terminal_outputs": TERMINAL_OUTPUTS,
+                "module_outputs": _synthetic_module_outputs(),
+            },
+        )
+
+
+root_agent = SyntheticRuntimeSmokeAgent(
     name="${packageName}",
-    edges=[
-${edgeRows}
-    ],
+    description="Synthetic ADK runtime smoke bridge for reviewed Agent Factory handoff artifacts.",
 )
 `;
 }
@@ -132,10 +203,9 @@ function buildNodeFunction(module) {
 def ${nodeFunctionName(module)}(node_input: Any = None):
     contract = COMPONENT_CONTRACTS["${module.id}"]
     output = _event_output("${module.id}", "${escapePythonString(module.name)}", node_input)
-    output["status"] = "todo_implementation_required"
     output["developer_todos"] = contract["developer_todos"]
     output["todo_function"] = "${todoFunctionName(module)}"
-    return Event(output=output)`;
+    return output`;
 }
 
 function buildManifest() {
@@ -174,7 +244,7 @@ function buildManifest() {
 }
 
 function buildRequirements() {
-  return `${["--pre", "google-adk", "pytest"].join("\n")}\n`;
+  return `${["google-adk>=2.0.0", "pytest"].join("\n")}\n`;
 }
 
 function buildContractTest() {
@@ -186,9 +256,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_agent_source_declares_adk_workflow():
     source = (ROOT / "${packageName}" / "agent.py").read_text(encoding="utf-8")
-    assert "from google.adk import Event, Workflow" in source
-    assert "root_agent = Workflow(" in source
+    assert "from google.adk.agents import BaseAgent" in source
+    assert "class SyntheticRuntimeSmokeAgent(BaseAgent)" in source
     assert "TODO_IMPLEMENT_HERE" in source
+    assert "runtime_mock_smoke" in source
 
 
 def test_manifest_uses_scaffold_plan_contract():
@@ -200,6 +271,12 @@ def test_manifest_uses_scaffold_plan_contract():
     assert '"catalog_bound_modules"' in manifest
     assert '"new_code_required"' in manifest
     assert '"runtime_contracts"' in manifest
+
+
+def test_runtime_chat_smoke_contract_is_present():
+    smoke = (ROOT / "runtime-chat-smoke.json").read_text(encoding="utf-8")
+    assert '"appName": "${packageName}"' in smoke
+    assert '"port": 8765' in smoke
 `;
 }
 
@@ -209,11 +286,42 @@ function buildReadme() {
 Generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
 
 \`\`\`bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python -m compileall ${packageName} tests
 python -m pytest -q
 \`\`\`
+
+## ADK runtime chat smoke
+
+This bundle supports local ADK API/Web UI smoke testing with reviewed synthetic test doubles only.
+It does not contain private endpoints, credentials, deployment scripts, or real business logic.
+
+\`\`\`bash
+adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
+curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
+\`\`\`
 `;
+}
+
+function buildRuntimeChatSmoke() {
+  return {
+    host: "127.0.0.1",
+    port: 8765,
+    appName: packageName,
+    userId: "af-reviewer",
+    sessionId: "af-smoke",
+    newMessage: {
+      role: "user",
+      parts: [
+        {
+          text: `Run a synthetic ADK chat smoke for ${normalizedRequirement.title}.`
+        }
+      ]
+    }
+  };
 }
 
 function buildImplementationHandoff() {
@@ -245,7 +353,8 @@ function componentContracts() {
         developer_todos: module.developer_todos,
         inputs: module.inputs,
         outputs: module.outputs,
-        risk_signals: module.risk_signals
+        risk_signals: module.risk_signals,
+        runtime_mock: module.runtime_mock ?? null
       }
     ])
   );
@@ -442,7 +551,7 @@ function buildGraphWorkflowEdges() {
   const outgoing = new Set(rows.map(([from]) => from));
   for (const node of graph.moduleNodes) {
     const fn = nodeFunctionName(graph.moduleById.get(node.module_id));
-    if (!incoming.has(fn)) push('"START"', fn);
+    if (!incoming.has(fn)) push("START", fn);
     if (!outgoing.has(fn)) push(fn, "emit_workflow_result");
   }
 
@@ -458,7 +567,7 @@ function graphEndpoint(nodeId, side, graph) {
   if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
     return nodeFunctionName(graph.moduleById.get(node.module_id));
   }
-  if (side === "from" && node.node_kind === "input") return '"START"';
+  if (side === "from" && node.node_kind === "input") return "START";
   if (side === "to" && node.node_kind === "output") return "emit_workflow_result";
   return null;
 }
@@ -491,6 +600,11 @@ function toPythonLiteral(value) {
     .replace(/\btrue\b/g, "True")
     .replace(/\bfalse\b/g, "False")
     .replace(/\bnull\b/g, "None");
+}
+
+function toPythonEdgeTupleLiteral(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return "[]";
+  return `[\n${rows.map(([from, to]) => `    (${JSON.stringify(from)}, ${JSON.stringify(to)})`).join(",\n")}\n]`;
 }
 
 function escapePythonString(value) {

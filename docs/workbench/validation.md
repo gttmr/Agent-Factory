@@ -66,10 +66,10 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 
 현재 ADK Runtime Handoff는 두 단계로 나뉘어 있다.
 
-- `/af/:reqId/build` (BuildWorkbench)는 분석 + seed catalog를 입력으로 client-side에서 `scaffold-plan.json`을 도출해 artifact root에 PUT하고, `POST /api/af/:id/runtime-stub/build`로 `scripts/generate-adk-source.mjs`를 spawn해 `runtime-stub/`을 채운다. 생성된 파일 목록과 텍스트 미리보기(< 500KB)를 노출하고 `implementation-handoff.md`를 inline 편집한다.
+- `/af/:reqId/build` (BuildWorkbench)는 분석 + seed catalog를 입력으로 client-side에서 `scaffold-plan.json`을 도출해 artifact root에 PUT하고, `POST /api/af/:id/runtime-stub/build`로 `scripts/generate-adk-source.mjs`를 spawn해 `runtime-stub/`을 채운다. 생성된 파일 목록과 텍스트 미리보기(< 500KB)를 노출하고 `implementation-handoff.md`를 inline 편집한다. Runtime stub이 존재하면 같은 화면의 `ADK Chat 연결` 패널에서 `runtime-stub/.venv`에 ADK dependency를 설치하고, 로컬 `adk api_server --with_ui`를 별도 포트(`8765`)로 시작해 ADK session 생성과 `/run` smoke 메시지를 보낼 수 있다.
 - `/af/:reqId/verify` (VerifyWorkbench)는 고정 allow-list(`validate-artifacts.mjs <root>`, `npm run build --prefix packages/web`, `npm run test:analyzer --prefix packages/web`) 세 명령만 child_process로 실행하고 stdout/stderr를 캡처해 `manifest.validation.{commands,last_result}`에 기록한다. `validation-report.md`와 `catalog-delta.yaml`을 inline 편집한다.
 
-PR6 마이그레이션 전에 제공하던 `adk web` 임베딩 / ADK API `/run` chat smoke / `Smoke 일괄 실행` 매크로는 현재 워크벤치에서 제거됐다. 생성된 source bundle에 대한 실제 `compileall`/`pytest`/`adk web` 검증은 별도 터미널에서 수행한다(검증 명령 절 참고).
+PR6 마이그레이션 전에 제공하던 `Smoke 일괄 실행` 매크로와 in-iframe `adk web` 임베딩은 워크벤치에 다시 추가하지 않는다. 현재 chat smoke는 BuildWorkbench의 좁은 runtime-stub bridge로만 제공된다. 이 bridge는 승인된 handoff bundle의 synthetic `runtime_mock` payload와 TODO boundary만 사용하며, private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 포함하지 않는다. VerifyWorkbench allow-list는 그대로 유지된다.
 
 ## Missing-information 2계층 게이트
 
@@ -120,13 +120,14 @@ node scripts/validate-artifacts.mjs templates/saved-analysis-fixtures
 node scripts/validate-artifacts.mjs catalog/contracts
 node scripts/validate-artifacts.mjs artifacts/af/<req-id>
 node scripts/generate-adk-source.mjs artifacts/af/<req-id> artifacts/af/<req-id>/runtime-stub
+cd artifacts/af/<req-id>/runtime-stub && python3 -B -m pytest -q -p no:cacheprovider
 cd packages/web && npm run test:analyzer
 cd packages/web && npm run build
 ```
 
 문서만 변경한 경우에는 build 대신 구조와 링크 검증을 우선한다.
 TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run test:analyzer`와 `cd packages/web && npm run build`를 실행한다.
-scaffold-plan 또는 ADK source generator를 직접 변경한 경우에는 `node scripts/generate-adk-source.mjs ...`와 `python3 -m compileall ...` smoke를 추가한다.
+scaffold-plan 또는 ADK source generator를 직접 변경한 경우에는 `node scripts/generate-adk-source.mjs ...`, `python3 -m compileall ...`, generated stub `pytest` smoke를 추가한다. Runtime chat bridge를 검증할 때는 generated stub directory에서 `adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .`를 실행한 뒤 `runtime-chat-smoke.json`을 `/run`에 전송한다.
 
 ## ADK 공식 문서 확인
 

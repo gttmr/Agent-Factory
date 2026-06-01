@@ -1,0 +1,938 @@
+{
+  "package": "req_loan_precheck_smoke_adk",
+  "requirement": {
+    "id": "req-loan-precheck-smoke",
+    "title": "Synthetic loan precheck graph runtime handoff",
+    "status": "approved"
+  },
+  "guardrails": {
+    "raw_requirement_to_code": false,
+    "generated_business_logic": false,
+    "private_data_or_endpoints": false
+  },
+  "scaffold_plan": {
+    "source": "approved_workbench_artifact",
+    "raw_requirement_to_code": false,
+    "approved_module_count": 7,
+    "excluded_modules": []
+  },
+  "catalog_bound_modules": [
+    {
+      "module_id": "mod-loan-precheck-workflow",
+      "module_name": "loan_application_precheck_mock_workflow",
+      "catalog_id": "seed-workflow-loan_application_precheck_mock_workflow",
+      "catalog_name": "loan_application_precheck_mock_workflow",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-common-document-intake",
+      "module_name": "common_document_intake_mock_workflow",
+      "catalog_id": "seed-workflow-common_document_intake_mock_workflow",
+      "catalog_name": "common_document_intake_mock_workflow",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-customer-account-snapshot",
+      "module_name": "customer_account_snapshot_mock_adapter",
+      "catalog_id": "seed-adapter-customer_account_snapshot_mock_adapter",
+      "catalog_name": "customer_account_snapshot_mock_adapter",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-loan-precheck-rule",
+      "module_name": "loan_precheck_rule_mock_adapter",
+      "catalog_id": "seed-adapter-loan_precheck_rule_mock_adapter",
+      "catalog_name": "loan_precheck_rule_mock_adapter",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-loan-document-review",
+      "module_name": "loan_document_review_mock_agent",
+      "catalog_id": "seed-agent-loan_document_review_mock_agent",
+      "catalog_name": "loan_document_review_mock_agent",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-credit-risk-reasoning",
+      "module_name": "credit_risk_reasoning_mock_agent",
+      "catalog_id": "seed-agent-credit_risk_reasoning_mock_agent",
+      "catalog_name": "credit_risk_reasoning_mock_agent",
+      "component_source": "stub"
+    },
+    {
+      "module_id": "mod-customer-notice-template",
+      "module_name": "customer_notice_template_mock_adapter",
+      "catalog_id": "seed-adapter-customer_notice_template_mock_adapter",
+      "catalog_name": "customer_notice_template_mock_adapter",
+      "component_source": "stub"
+    }
+  ],
+  "new_code_required": [
+    {
+      "module_id": "mod-loan-precheck-workflow",
+      "module_name": "loan_application_precheck_mock_workflow",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ]
+    },
+    {
+      "module_id": "mod-common-document-intake",
+      "module_name": "common_document_intake_mock_workflow",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ]
+    },
+    {
+      "module_id": "mod-customer-account-snapshot",
+      "module_name": "customer_account_snapshot_mock_adapter",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ]
+    },
+    {
+      "module_id": "mod-loan-precheck-rule",
+      "module_name": "loan_precheck_rule_mock_adapter",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ]
+    },
+    {
+      "module_id": "mod-loan-document-review",
+      "module_name": "loan_document_review_mock_agent",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ]
+    },
+    {
+      "module_id": "mod-credit-risk-reasoning",
+      "module_name": "credit_risk_reasoning_mock_agent",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ]
+    },
+    {
+      "module_id": "mod-customer-notice-template",
+      "module_name": "customer_notice_template_mock_adapter",
+      "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ]
+    }
+  ],
+  "runtime_contracts": [],
+  "graph_ir": {
+    "start_nodes": [
+      "mod-loan-precheck-workflow"
+    ],
+    "terminal_outputs": [
+      "precheck_result",
+      "approval_required",
+      "next_actions"
+    ],
+    "node_count": 12,
+    "edge_count": 12,
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "edges": [
+    {
+      "id": "edge-001",
+      "from": "loan_application",
+      "to": "mod-loan-precheck-workflow",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "loan application payload",
+      "schema_ref": "LoanApplication",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-002",
+      "from": "submitted_documents",
+      "to": "mod-loan-precheck-workflow",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "submitted document package",
+      "schema_ref": "SubmittedDocuments",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-003",
+      "from": "mod-loan-precheck-workflow",
+      "to": "mod-common-document-intake",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "fan_out",
+      "data_label": "document package for intake",
+      "schema_ref": "DocumentPackage",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-004",
+      "from": "mod-loan-precheck-workflow",
+      "to": "mod-customer-account-snapshot",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "fan_out",
+      "data_label": "customer identifier for snapshot",
+      "schema_ref": "CustomerIdentifier",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-005",
+      "from": "mod-common-document-intake",
+      "to": "mod-loan-document-review",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "document context and policy basis",
+      "schema_ref": "DocumentContext",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-006",
+      "from": "mod-customer-account-snapshot",
+      "to": "mod-loan-precheck-rule",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "case features for rule registry",
+      "schema_ref": "LoanCaseFeatures",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-007",
+      "from": "mod-loan-document-review",
+      "to": "mod-credit-risk-reasoning",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "document review result",
+      "schema_ref": "DocumentReviewResult",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-008",
+      "from": "mod-loan-precheck-rule",
+      "to": "mod-credit-risk-reasoning",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "rule result",
+      "schema_ref": "RuleResult",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-009",
+      "from": "mod-credit-risk-reasoning",
+      "to": "mod-customer-notice-template",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "supplement request context",
+      "schema_ref": "NoticeTemplateContext",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-010",
+      "from": "mod-customer-notice-template",
+      "to": "precheck_result",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "precheck result with preview template",
+      "schema_ref": "PrecheckResult",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-011",
+      "from": "mod-credit-risk-reasoning",
+      "to": "approval_required",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "manual reviewer required flag",
+      "schema_ref": "ApprovalRequired",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    },
+    {
+      "id": "edge-012",
+      "from": "mod-customer-notice-template",
+      "to": "next_actions",
+      "from_port": null,
+      "to_port": null,
+      "edge_kind": "event_output",
+      "execution_semantics": "normal_transition",
+      "data_label": "reviewer next actions",
+      "schema_ref": "NextActions",
+      "route_condition": null,
+      "state_key": null,
+      "artifact_key": null,
+      "a2a_contract_id": null,
+      "is_remote_boundary_crossing": false
+    }
+  ],
+  "excluded_modules": [],
+  "modules": [
+    {
+      "id": "mod-loan-precheck-workflow",
+      "name": "loan_application_precheck_mock_workflow",
+      "module_category": "workflow",
+      "agent_kind": null,
+      "workflow_kind": "graph",
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "scaffold_output": "orchestration_shell_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-workflow-loan_application_precheck_mock_workflow",
+        "name": "loan_application_precheck_mock_workflow",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ],
+      "inputs": [
+        {
+          "name": "loan_application",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "submitted_documents",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "precheck_result",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "approval_required",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "next_actions",
+          "type": "array<string>",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "input_contract",
+        "output_contract",
+        "eval_placeholders"
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "credit_decision_support",
+        "customer_impact",
+        "external_message",
+        "human_approval_required",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "precheck_result": {
+          "case_id": "LOAN-DEMO-CASE-001",
+          "outcome": "supplement_required_manual_review",
+          "customer_id": "CUST-DEMO-001",
+          "requested_amount": 30000000,
+          "summary": "재직증명서 보완 및 담당자 검토가 필요한 synthetic 사전심사 결과입니다.",
+          "evidence_refs": [
+            "LOAN-DOC-REQ-001",
+            "DSR_SOFT_LIMIT"
+          ]
+        },
+        "approval_required": true,
+        "next_actions": [
+          "request_employment_certificate",
+          "reconcile_income_mismatch",
+          "route_to_manual_reviewer",
+          "preview_customer_notice_only"
+        ]
+      }
+    },
+    {
+      "id": "mod-common-document-intake",
+      "name": "common_document_intake_mock_workflow",
+      "module_category": "workflow",
+      "agent_kind": null,
+      "workflow_kind": "graph",
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "scaffold_output": "orchestration_shell_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-workflow-common_document_intake_mock_workflow",
+        "name": "common_document_intake_mock_workflow",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ],
+      "inputs": [
+        {
+          "name": "document_package",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "domain_context",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "document_context",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "intake_artifacts",
+          "type": "array<object>",
+          "required": true
+        },
+        {
+          "name": "intake_warnings",
+          "type": "array<string>",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "input_contract",
+        "output_contract",
+        "eval_placeholders"
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "document_context": {
+          "document_package_id": "DOC-PKG-DEMO-001",
+          "normalized_document_type": "loan_application_pack",
+          "extracted_fields": {
+            "requested_amount": 30000000,
+            "stated_annual_income": 75000000,
+            "proof_annual_income": 72000000
+          },
+          "policy_basis": [
+            "LOAN-DOC-REQ-001",
+            "LOAN-RISK-DSR-002"
+          ]
+        },
+        "intake_artifacts": [
+          {
+            "artifact_id": "art-ocr-demo-001",
+            "kind": "ocr_text"
+          },
+          {
+            "artifact_id": "art-policy-demo-001",
+            "kind": "policy_citation_pack"
+          }
+        ],
+        "intake_warnings": [
+          "synthetic_document_context"
+        ]
+      }
+    },
+    {
+      "id": "mod-customer-account-snapshot",
+      "name": "customer_account_snapshot_mock_adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "data_query",
+      "remote_contract_kind": null,
+      "scaffold_output": "contract_or_stub_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-adapter-customer_account_snapshot_mock_adapter",
+        "name": "customer_account_snapshot_mock_adapter",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ],
+      "inputs": [
+        {
+          "name": "customer_identifier",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "snapshot_scope",
+          "type": "array<string>",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "customer_snapshot",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "account_summary",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "data_freshness",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "auth_required",
+        "timeout",
+        "retry",
+        "side_effect"
+      ],
+      "risk_signals": [
+        "personal_data",
+        "financial_data",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "customer_snapshot": {
+          "customer_id": "CUST-DEMO-001",
+          "display_name": "김데모",
+          "kyc_status": "verified",
+          "relationship_years": 7,
+          "masking": "synthetic"
+        },
+        "account_summary": {
+          "deposit_balance": 18500000,
+          "monthly_income_estimate": 6000000,
+          "delinquency_count_12m": 0,
+          "existing_loan_balance": 42000000
+        },
+        "data_freshness": {
+          "as_of": "2026-05-01T09:00:00+09:00",
+          "synthetic": true
+        }
+      }
+    },
+    {
+      "id": "mod-loan-precheck-rule",
+      "name": "loan_precheck_rule_mock_adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "rule_registry",
+      "remote_contract_kind": null,
+      "scaffold_output": "contract_or_stub_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-adapter-loan_precheck_rule_mock_adapter",
+        "name": "loan_precheck_rule_mock_adapter",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ],
+      "inputs": [
+        {
+          "name": "rule_set_key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "case_features",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rule_result",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "matched_rules",
+          "type": "array<object>",
+          "required": true
+        },
+        {
+          "name": "required_actions",
+          "type": "array<string>",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "auth_required",
+        "timeout",
+        "retry",
+        "side_effect"
+      ],
+      "risk_signals": [
+        "customer_impact",
+        "credit_decision_support",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "rule_result": {
+          "rule_set_key": "loan_precheck_demo_v1",
+          "outcome": "review_required",
+          "score_band": "B",
+          "hard_stop": false
+        },
+        "matched_rules": [
+          {
+            "rule_id": "DSR_SOFT_LIMIT",
+            "result": "review_required",
+            "reason": "추정 DSR이 soft threshold 근처입니다."
+          },
+          {
+            "rule_id": "DOCUMENT_COMPLETENESS",
+            "result": "supplement_required",
+            "reason": "재직증명서가 누락되었습니다."
+          }
+        ],
+        "required_actions": [
+          "request_employment_certificate",
+          "route_to_manual_reviewer"
+        ]
+      }
+    },
+    {
+      "id": "mod-loan-document-review",
+      "name": "loan_document_review_mock_agent",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "scaffold_output": "agent_shell_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-agent-loan_document_review_mock_agent",
+        "name": "loan_document_review_mock_agent",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ],
+      "inputs": [
+        {
+          "name": "document_context",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "policy_matches",
+          "type": "array<object>",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "document_review_result",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "missing_documents",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "followup_questions",
+          "type": "array<string>",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "input_contract",
+        "output_contract",
+        "eval_placeholders"
+      ],
+      "risk_signals": [
+        "financial_data",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "document_review_result": {
+          "decision": "supplement_required",
+          "checked_items": [
+            "loan_application_form",
+            "income_certificate",
+            "identity_document"
+          ],
+          "mismatches": [
+            {
+              "field": "annual_income",
+              "document_value": 72000000,
+              "application_value": 75000000,
+              "severity": "medium"
+            }
+          ],
+          "confidence": 0.94
+        },
+        "missing_documents": [
+          "employment_certificate"
+        ],
+        "followup_questions": [
+          "재직증명서 최신본을 추가 제출해야 합니다.",
+          "신청서 소득 금액과 소득증빙 금액 차이를 확인해야 합니다."
+        ]
+      }
+    },
+    {
+      "id": "mod-credit-risk-reasoning",
+      "name": "credit_risk_reasoning_mock_agent",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "scaffold_output": "agent_shell_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-agent-credit_risk_reasoning_mock_agent",
+        "name": "credit_risk_reasoning_mock_agent",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
+        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+      ],
+      "inputs": [
+        {
+          "name": "customer_snapshot",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "rule_result",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "document_review_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "risk_reasoning",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "approval_required",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "reviewer_notes",
+          "type": "array<string>",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "input_contract",
+        "output_contract",
+        "eval_placeholders"
+      ],
+      "risk_signals": [
+        "credit_decision_support",
+        "customer_impact",
+        "human_approval_required",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "risk_reasoning": {
+          "summary": "소득 증빙 불일치와 최근 DSR 경고로 담당자 확인이 필요합니다.",
+          "risk_flags": [
+            "income_document_mismatch",
+            "dsr_watch"
+          ],
+          "evidence": [
+            {
+              "rule": "DSR_SOFT_LIMIT",
+              "result": "review_required"
+            },
+            {
+              "rule": "DOCUMENT_COMPLETENESS",
+              "result": "supplement_required"
+            }
+          ],
+          "recommendation": "request_supplement_then_manual_review"
+        },
+        "approval_required": true,
+        "reviewer_notes": [
+          "자동 승인/거절이 아니라 담당자 검토 큐로 전달합니다.",
+          "synthetic demo 데이터이며 실제 신용 판단에 사용할 수 없습니다."
+        ]
+      }
+    },
+    {
+      "id": "mod-customer-notice-template",
+      "name": "customer_notice_template_mock_adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "template",
+      "remote_contract_kind": null,
+      "scaffold_output": "contract_or_stub_only",
+      "no_runnable_business_logic": true,
+      "catalog_binding": {
+        "catalog_id": "seed-adapter-customer_notice_template_mock_adapter",
+        "name": "customer_notice_template_mock_adapter",
+        "component_source": "stub"
+      },
+      "developer_todos": [
+        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
+        "Map reviewed inputs and outputs before replacing the TODO boundary."
+      ],
+      "inputs": [
+        {
+          "name": "template_key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "locale",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "channel",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "template",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "required_variables",
+          "type": "array<string>",
+          "required": true
+        },
+        {
+          "name": "approval_constraints",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "required_review_fields": [
+        "auth_required",
+        "timeout",
+        "retry",
+        "side_effect"
+      ],
+      "risk_signals": [
+        "external_message",
+        "audit_required"
+      ],
+      "runtime_mock": {
+        "template": {
+          "template_key": "loan_supplement_request_demo",
+          "locale": "ko-KR",
+          "channel": "internal_preview",
+          "body": "[데모] 대출 사전심사를 위해 {missing_documents} 보완 제출이 필요합니다. 담당자 검토 후 다음 단계를 안내드립니다."
+        },
+        "required_variables": [
+          "missing_documents",
+          "reviewer_contact"
+        ],
+        "approval_constraints": {
+          "external_send_allowed": false,
+          "requires_human_approval": true,
+          "synthetic": true
+        }
+      }
+    }
+  ]
+}

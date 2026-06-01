@@ -26,6 +26,39 @@ async function writeFakeScripts(root: string): Promise<void> {
     "/* served by the test node shim */\n"
   );
   await writeFile(
+    join(binDir, "python3"),
+    [
+      "#!/bin/sh",
+      "if [ \"$1\" = '-m' ] && [ \"$2\" = 'venv' ]; then",
+      "  venv_dir=\"$3\"",
+      "  mkdir -p \"$venv_dir/bin\"",
+      "  cat > \"$venv_dir/bin/python\" <<'PYEOF'",
+      "#!/bin/sh",
+      "if [ \"$1\" = '-m' ] && [ \"$2\" = 'pip' ] && [ \"$3\" = 'install' ]; then",
+      "  mkdir -p .venv/bin",
+      "  cat > .venv/bin/adk <<'ADEOF'",
+      "#!/bin/sh",
+      "echo 'fake adk server started'",
+      "sleep 30",
+      "ADEOF",
+      "  chmod +x .venv/bin/adk",
+      "  echo 'fake pip installed google-adk'",
+      "  exit 0",
+      "fi",
+      "echo 'unexpected fake venv python args: $@' >&2",
+      "exit 2",
+      "PYEOF",
+      "  chmod +x \"$venv_dir/bin/python\"",
+      "  echo 'fake venv created'",
+      "  exit 0",
+      "fi",
+      "echo 'unexpected fake python3 args: $@' >&2",
+      "exit 2",
+      ""
+    ].join("\n")
+  );
+  await chmod(join(binDir, "python3"), 0o755);
+  await writeFile(
     join(binDir, "node"),
     [
       "#!/bin/sh",
@@ -44,6 +77,9 @@ async function writeFakeScripts(root: string): Promise<void> {
       "    echo 'build stderr line' >&2",
       "    mkdir -p \"$stub_dir\"",
       "    printf '# TODO runtime wiring\\n' > \"$stub_dir/agent.py\"",
+      "    mkdir -p \"$stub_dir/.venv/bin\" \"$stub_dir/req_stream_adk/__pycache__\"",
+      "    printf '# local adk shim\\n' > \"$stub_dir/.venv/bin/adk\"",
+      "    printf 'compiled cache\\n' > \"$stub_dir/req_stream_adk/__pycache__/agent.pyc\"",
       "    exit 0",
       "    ;;",
       `  *) exec "${process.execPath}" "$script" "$@" ;;`,
@@ -170,6 +206,49 @@ async function assertJsonPathsStillWork(request: ReturnType<typeof createRequest
   assert.equal(verify.stderr, "verify stderr line\n");
 }
 
+async function writeFakeRuntimeStub(root: string, reqId: string): Promise<void> {
+  const stubDir = join(root, `artifacts/af/${reqId}/runtime-stub`);
+  await mkdir(join(stubDir, "req_stream_adk"), { recursive: true });
+  await writeFile(
+    join(stubDir, "req_stream_adk/workflow_manifest.json"),
+    `${JSON.stringify({ package: "req_stream_adk" }, null, 2)}\n`
+  );
+  await writeFile(join(stubDir, "requirements.txt"), "google-adk\npytest\n");
+}
+
+async function assertRuntimeChatLifecycle(request: ReturnType<typeof createRequester>, root: string): Promise<void> {
+  await writeFakeRuntimeStub(root, "req-runtime");
+  const before = responseJson<{
+    installed: boolean;
+    port: number;
+    app_name: string;
+    server: { status: string; pid: number | null };
+  }>(await request({ url: "/req-runtime/runtime-chat/status" }));
+  assert.equal(before.installed, false);
+  assert.equal(before.port, 8765);
+  assert.equal(before.app_name, "req_stream_adk");
+  assert.equal(before.server.status, "stopped");
+
+  const install = responseJson<{ ok: boolean; stdout: string; status: { installed: boolean } }>(
+    await request({ url: "/req-runtime/runtime-chat/install", method: "POST" })
+  );
+  assert.equal(install.ok, true);
+  assert.match(install.stdout, /fake pip installed google-adk/);
+  assert.equal(install.status.installed, true);
+
+  const started = responseJson<{ ok: boolean; status: { server: { status: string; pid: number | null } } }>(
+    await request({ url: "/req-runtime/runtime-chat/start", method: "POST" })
+  );
+  assert.equal(started.ok, true);
+  assert.equal(started.status.server.status, "running");
+  assert.ok(started.status.server.pid);
+
+  const stopped = responseJson<{ ok: boolean }>(
+    await request({ url: "/req-runtime/runtime-chat/stop", method: "POST" })
+  );
+  assert.equal(stopped.ok, true);
+}
+
 function parseSse(body: string): SseEntry[] {
   return body
     .trim()
@@ -281,6 +360,9 @@ try {
 
   await createRoot(request, "req-json");
   await assertJsonPathsStillWork(request);
+
+  await createRoot(request, "req-runtime");
+  await assertRuntimeChatLifecycle(request, repoRoot);
 } finally {
   process.env.PATH = originalPath;
   await rm(repoRoot, { recursive: true, force: true });
