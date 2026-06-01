@@ -28,7 +28,7 @@
 
 .af-analyze-progress summary {
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.7);
   margin-bottom: 6px;
 }
@@ -53,12 +53,12 @@
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.02);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-analyze-event-phase {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   color: rgba(0, 0, 0, 0.55);
 }
@@ -75,7 +75,7 @@
 .af-analyze-event-meta {
   color: rgba(0, 0, 0, 0.45);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   text-align: right;
 }
 

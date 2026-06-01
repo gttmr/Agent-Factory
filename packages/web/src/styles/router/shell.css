@@ -29,14 +29,14 @@
 }
 
 .af-brand-link .eyebrow {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(0, 0, 0, 0.55);
 }
 
 .af-brand-link strong {
-  font-size: 1.1rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
 }
 
@@ -44,7 +44,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.7);
 }
 
@@ -70,7 +70,7 @@
   padding: 6px 12px;
   border-radius: 4px;
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: rgba(0, 0, 0, 0.75);
   background: transparent;
   border: 1px solid transparent;
@@ -88,7 +88,7 @@
 
 .af-stage-link-aux {
   margin-left: auto;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.55);
 }
 
@@ -101,7 +101,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 
 .af-gate-placeholder {
@@ -135,7 +135,7 @@
 }
 
 .af-approval-chip-glyph {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 
 .af-workspace {
@@ -185,12 +185,12 @@
 
 .af-landing-message {
   color: rgba(0, 0, 0, 0.7);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-landing-error {
   color: #b42318;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-recent-list {
@@ -221,7 +221,7 @@
 }
 
 .af-recent-time {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: rgba(0, 0, 0, 0.5);
   margin-left: auto;
 }
@@ -237,7 +237,7 @@
 .af-root-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .af-root-table th,
@@ -266,7 +266,7 @@
 .af-gate-summary {
   margin: 8px 0 0;
   padding-left: 18px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.7);
 }
 

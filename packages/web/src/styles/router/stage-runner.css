@@ -24,7 +24,7 @@
   gap: 8px;
   align-items: center;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runner-status {
@@ -35,7 +35,7 @@
   border-radius: 999px;
   padding: 3px 9px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -131,7 +131,7 @@
 .af-runner-detail h3,
 .af-runner-events h3 {
   margin: 0 0 8px;
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
 }
 
 .af-runner-history-button {
@@ -157,11 +157,11 @@
 
 .af-runner-history-button span {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
 }
 
 .af-runner-history-button strong {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
 }
 
 .af-runner-history-button-active {
@@ -202,7 +202,7 @@
 
 .af-runner-artifact-row strong {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runner-artifact-row small,
@@ -213,7 +213,7 @@
 
 .af-runner-artifact-row p {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   line-height: 1.35;
 }
 
@@ -221,7 +221,7 @@
   margin: 0;
   padding-left: 18px;
   color: var(--red);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runner-preview,
@@ -233,7 +233,7 @@
 .af-runner-diagnostics summary {
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runner-preview pre,
@@ -245,7 +245,7 @@
   background: #f8faf8;
   padding: 10px;
   color: #1a1a1a;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   white-space: pre-wrap;
 }
 
@@ -264,7 +264,7 @@
   align-items: baseline;
   border-top: 1px solid var(--line);
   padding-top: 6px;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 
 .af-runner-events li span {

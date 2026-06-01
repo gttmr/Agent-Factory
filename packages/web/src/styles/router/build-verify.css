@@ -3,7 +3,7 @@
 
 .af-blocker-list {
   margin-top: 8px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-blocker-list summary {
@@ -22,7 +22,7 @@
   border-radius: 4px;
   overflow: auto;
   max-height: 320px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-build-stub-grid {
@@ -61,7 +61,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-build-file-button:hover {
@@ -75,12 +75,12 @@
 
 .af-build-file-button code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 
 .af-build-file-button small {
   color: rgba(0, 0, 0, 0.45);
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
 }
 
 .af-build-file-preview pre {
@@ -89,7 +89,7 @@
   border-radius: 4px;
   overflow: auto;
   max-height: 480px;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   white-space: pre;
 }
 
@@ -107,12 +107,12 @@
   gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid rgba(31, 41, 55, 0.1);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 .af-stream-log-header span {
   color: rgba(0, 0, 0, 0.52);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
 }
 
 .af-stream-log {
@@ -123,7 +123,7 @@
   background: rgba(0, 0, 0, 0.045);
   color: rgba(17, 24, 39, 0.92);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
@@ -132,7 +132,7 @@
 .af-markdown-editor {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 8px;
   border: 1px solid rgba(0, 0, 0, 0.16);
   border-radius: 4px;
@@ -169,12 +169,12 @@
 
 .af-verify-card code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   color: rgba(0, 0, 0, 0.55);
 }
 
 .af-verify-card p {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.65);
   margin: 0;
 }
@@ -184,7 +184,7 @@
   padding: 8px;
   background: rgba(0, 0, 0, 0.03);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .af-verify-result pre {
@@ -193,7 +193,7 @@
   border-radius: 4px;
   overflow: auto;
   max-height: 320px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   white-space: pre;
 }
 

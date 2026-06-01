@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-overlay);
 }
 
 .af-modal {
@@ -33,13 +33,13 @@
 .af-modal-header h2,
 .af-drawer-header h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fs-lg);
 }
 
 .af-modal-close {
   background: transparent;
   border: 0;
-  font-size: 1.2rem;
+  font-size: var(--fs-2xl);
   line-height: 1;
   cursor: pointer;
   color: rgba(0, 0, 0, 0.55);
@@ -94,13 +94,13 @@
 
 .af-pin-row code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   color: rgba(0, 0, 0, 0.55);
 }
 
 .af-pin-row small {
   grid-column: 2;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: rgba(0, 0, 0, 0.55);
 }
 
@@ -114,11 +114,11 @@
   border-left: 1px solid rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  z-index: 50;
+  z-index: var(--z-overlay);
 }
 
 .af-drawer-hint {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.55);
   background: rgba(0, 0, 0, 0.04);
   padding: 8px;

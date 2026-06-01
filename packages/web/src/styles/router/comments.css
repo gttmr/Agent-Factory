@@ -10,7 +10,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 
 .af-comment-author-row label {
@@ -25,7 +25,7 @@
   padding: 4px 6px;
   border: 1px solid rgba(0, 0, 0, 0.16);
   border-radius: 4px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-comment-form {
@@ -40,7 +40,7 @@
 .af-comment-form textarea {
   resize: vertical;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   padding: 6px;
   border: 1px solid rgba(0, 0, 0, 0.16);
   border-radius: 4px;
@@ -55,7 +55,7 @@
 
 .af-comment-anchor-tag {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: rgba(0, 0, 0, 0.6);
   background: rgba(0, 0, 0, 0.06);
   padding: 2px 6px;
@@ -63,13 +63,13 @@
 }
 
 .af-comment-anchor-hint {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.55);
   margin: 0;
 }
 
 .af-comment-warn {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: #b35900;
   margin: 0;
 }
@@ -84,7 +84,7 @@
 }
 
 .af-comment-empty {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.45);
 }
 
@@ -107,7 +107,7 @@
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
 }
 
 .af-comment-author {
@@ -116,18 +116,18 @@
 
 .af-comment-role {
   color: rgba(0, 0, 0, 0.55);
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   text-transform: lowercase;
 }
 
 .af-comment-tag {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   color: rgba(0, 0, 0, 0.6);
 }
 
 .af-comment-status {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   border-radius: 999px;
   padding: 1px 6px;
   background: rgba(0, 0, 0, 0.06);
@@ -151,7 +151,7 @@
 .af-comment-body {
   margin: 0;
   white-space: pre-wrap;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 
@@ -162,6 +162,6 @@
 }
 
 .af-comment-footnote {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   color: rgba(0, 0, 0, 0.4);
 }

@@ -29,5 +29,14 @@
 @import "./features/analysis-brief.css" layer(features);
 @import "./features/graph.css" layer(features);
 
-/* --- not yet migrated into layers (unlayered) --- */
-@import "../styles-router.css";
+/* route shell + per-route styles */
+@import "./router/shell.css" layer(router);
+@import "./router/design.css" layer(router);
+@import "./router/comments.css" layer(router);
+@import "./router/build-verify.css" layer(router);
+@import "./router/catalog.css" layer(router);
+@import "./router/modal-drawer.css" layer(router);
+@import "./router/runtime-contract.css" layer(router);
+@import "./router/a2a-contract.css" layer(router);
+@import "./router/analyze-progress.css" layer(router);
+@import "./router/stage-runner.css" layer(router);

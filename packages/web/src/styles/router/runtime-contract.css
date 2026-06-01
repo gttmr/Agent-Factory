@@ -45,18 +45,18 @@
 .af-runtime-kind {
   color: rgba(0, 0, 0, 0.55);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
 }
 
 .af-runtime-item-meta {
   color: rgba(0, 0, 0, 0.55);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
 }
 
 .af-runtime-status {
   display: inline-block;
-  font-size: 0.65rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 1px 6px;
@@ -86,7 +86,7 @@
 }
 
 .af-runtime-readiness {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.02em;
   color: rgba(0, 0, 0, 0.55);
 }
@@ -115,7 +115,7 @@
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 
 .af-runtime-meta div {
@@ -146,7 +146,7 @@
 
 .af-runtime-policies legend {
   padding: 0 4px;
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(0, 0, 0, 0.55);
@@ -157,17 +157,17 @@
 .af-runtime-todos ul {
   margin: 6px 0 0;
   padding-left: 18px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.7);
 }
 
 .af-runtime-readiness-block .af-runtime-readiness-ready {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   margin: 6px 0 0;
 }
 
 .af-runtime-warning {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--cat-remote, #b42318);
   background: var(--cat-remote-soft, #fde2dd);
   padding: 8px 10px;
@@ -176,6 +176,6 @@
 
 .af-runtime-todos summary {
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: rgba(0, 0, 0, 0.7);
 }
