@@ -10,3 +10,5 @@ generated/
 .playwright-cli/
 generated/**/.venv/
 generated/**/.adk/
+artifacts/**/.venv/
+artifacts/**/.adk/

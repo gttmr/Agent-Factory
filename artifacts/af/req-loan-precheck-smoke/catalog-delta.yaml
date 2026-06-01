@@ -1,0 +1,51 @@
+catalog_delta:
+  entries:
+    - name: loan_application_precheck_mock_workflow
+      module_category: workflow
+      subtype: graph
+      status: approved
+      reuse_candidate: true
+      risk_level: high
+      risk_signals: [personal_data, financial_data, credit_decision_support, customer_impact, external_message, human_approval_required, audit_required]
+    - name: common_document_intake_mock_workflow
+      module_category: workflow
+      subtype: graph
+      status: approved
+      reuse_candidate: true
+      risk_level: medium
+      risk_signals: [personal_data, financial_data, audit_required]
+    - name: customer_account_snapshot_mock_adapter
+      module_category: adapter
+      subtype: data_query
+      status: approved
+      reuse_candidate: true
+      risk_level: medium
+      risk_signals: [personal_data, financial_data, audit_required]
+    - name: loan_precheck_rule_mock_adapter
+      module_category: adapter
+      subtype: rule_registry
+      status: approved
+      reuse_candidate: true
+      risk_level: high
+      risk_signals: [customer_impact, credit_decision_support, audit_required]
+    - name: loan_document_review_mock_agent
+      module_category: agent
+      subtype: specialist
+      status: approved
+      reuse_candidate: true
+      risk_level: medium
+      risk_signals: [financial_data, audit_required]
+    - name: credit_risk_reasoning_mock_agent
+      module_category: agent
+      subtype: specialist
+      status: approved
+      reuse_candidate: true
+      risk_level: high
+      risk_signals: [credit_decision_support, customer_impact, human_approval_required, audit_required]
+    - name: customer_notice_template_mock_adapter
+      module_category: adapter
+      subtype: template
+      status: approved
+      reuse_candidate: true
+      risk_level: medium
+      risk_signals: [external_message, audit_required]

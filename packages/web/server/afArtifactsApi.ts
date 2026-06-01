@@ -22,6 +22,7 @@ import {
   type AfRunValidationResult,
   afRunValidationResults
 } from "../src/analyzer/afRunManifest";
+import { RuntimeChatManager } from "./runtimeChat";
 import { validateAnalysisResult } from "./validators";
 
 type MiddlewareNext = (error?: unknown) => void;
@@ -44,6 +45,8 @@ const JSON_ARTIFACT_PATHS = new Set([
 ]);
 
 const YAML_PATHS = new Set(["catalog-delta.yaml"]);
+const RUNTIME_STUB_IGNORED_DIRS = new Set([".adk", ".pytest_cache", ".venv", "__pycache__"]);
+const RUNTIME_STUB_IGNORED_FILE_SUFFIXES = [".pyc", ".pyo"];
 
 const VERIFY_COMMANDS: Record<string, { argv: string[]; description: string }> = {
   validate_artifact_root: {
@@ -63,6 +66,7 @@ const VERIFY_COMMANDS: Record<string, { argv: string[]; description: string }> =
 export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
   const stageRunLocks = new Set<string>();
+  const runtimeChat = new RuntimeChatManager({ repoRoot, store });
 
   return async function afArtifactsMiddleware(
     req: IncomingMessage,
@@ -156,6 +160,11 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
         return;
       }
 
+      // /api/af/:id/runtime-chat/{status,install,start,stop,session,message}
+      if (rest[0] === "runtime-chat") {
+        return await handleRuntimeChat(runtimeChat, reqId, rest.slice(1), req, res);
+      }
+
       // /api/af/:id/runtime-stub/build  → spawn scripts/generate-adk-source.mjs
       if (sub === "runtime-stub/build") {
         if (req.method === "POST") return await handleBuildRuntimeStub(repoRoot, store, reqId, req, res);
@@ -201,6 +210,68 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       handleError(error, res, next);
     }
   };
+}
+
+async function handleRuntimeChat(
+  runtimeChat: RuntimeChatManager,
+  reqId: string,
+  rest: string[],
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const [action] = rest;
+  if (action === "status") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 200, await runtimeChat.status(reqId));
+    return;
+  }
+  if (action === "install") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const result = await runtimeChat.install(reqId);
+    sendJson(res, result.ok ? 200 : 422, result);
+    return;
+  }
+  if (action === "start") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 200, await runtimeChat.start(reqId));
+    return;
+  }
+  if (action === "stop") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 200, await runtimeChat.stop(reqId));
+    return;
+  }
+  if (action === "session") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const body = await readJsonBody(req).catch(() => ({}));
+    sendJson(res, 200, await runtimeChat.createSession(reqId, isRecord(body) ? body : {}));
+    return;
+  }
+  if (action === "message") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    const body = await readJsonBody(req).catch(() => ({}));
+    sendJson(res, 200, await runtimeChat.sendMessage(reqId, isRecord(body) ? body : {}));
+    return;
+  }
+  sendJson(res, 404, { error: "알 수 없는 runtime-chat 경로입니다." });
 }
 
 async function handleStageRunner(
@@ -534,10 +605,13 @@ async function collectFiles(root: string, current: string): Promise<Array<{ path
   for (const entry of entries) {
     const abs = join(current, entry.name);
     if (entry.isDirectory()) {
+      if (RUNTIME_STUB_IGNORED_DIRS.has(entry.name)) continue;
       result.push(...(await collectFiles(root, abs)));
     } else if (entry.isFile()) {
       const fileStat = await stat(abs);
-      result.push({ path: relative(root, abs).split(sep).join("/"), bytes: fileStat.size });
+      const path = relative(root, abs).split(sep).join("/");
+      if (isIgnoredRuntimeStubPath(path)) continue;
+      result.push({ path, bytes: fileStat.size });
     }
   }
   result.sort((a, b) => a.path.localeCompare(b.path));
@@ -552,6 +626,10 @@ async function handleReadRuntimeStubFile(
 ): Promise<void> {
   if (relativeFile.includes("..") || relativeFile.startsWith("/")) {
     sendJson(res, 403, { error: "허용되지 않은 경로입니다." });
+    return;
+  }
+  if (isIgnoredRuntimeStubPath(relativeFile)) {
+    sendJson(res, 403, { error: "runtime-stub 로컬 실행 산출물은 미리보기 대상이 아닙니다." });
     return;
   }
   const rootDir = store.resolveRootDir(reqId);
@@ -574,6 +652,15 @@ async function handleReadRuntimeStubFile(
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.end(content);
+}
+
+function isIgnoredRuntimeStubPath(relativeFile: string): boolean {
+  const normalized = relativeFile.split(sep).join("/");
+  const parts = normalized.split("/");
+  return (
+    parts.some((part) => RUNTIME_STUB_IGNORED_DIRS.has(part)) ||
+    RUNTIME_STUB_IGNORED_FILE_SUFFIXES.some((suffix) => normalized.endsWith(suffix))
+  );
 }
 
 async function handleBuildRuntimeStub(

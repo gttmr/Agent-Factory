@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const outputRoot = process.argv[2];
@@ -11,7 +11,8 @@ if (!outputRoot) {
   throw new Error("Usage: node scripts/generate-adk-source.test.mjs <generated-output-root>");
 }
 
-const manifestPath = join(outputRoot, "req_001_adk", "workflow_manifest.json");
+const packageName = discoverGeneratedPackage(outputRoot);
+const manifestPath = join(outputRoot, packageName, "workflow_manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
 assert.equal(manifest.guardrails.raw_requirement_to_code, false);
@@ -26,12 +27,21 @@ assert.ok(Array.isArray(manifest.edges), "workflow_manifest.json must preserve s
 
 const contractTest = readFileSync(join(outputRoot, "tests", "test_workflow_contract.py"), "utf8");
 assert.match(contractTest, /"graph_ir"/);
-const agentSource = readFileSync(join(outputRoot, "req_001_adk", "agent.py"), "utf8");
-assert.match(agentSource, /\("START", node_mod_001\)/);
-assert.match(agentSource, /\(node_mod_001, node_mod_002\)/);
-assert.match(agentSource, /\(node_mod_002, emit_workflow_result\)/);
+const agentSource = readFileSync(join(outputRoot, packageName, "agent.py"), "utf8");
+assert.match(agentSource, /from google\.adk\.agents import BaseAgent/);
+assert.match(agentSource, /class SyntheticRuntimeSmokeAgent\(BaseAgent\)/);
+assert.match(agentSource, /runtime_mock_smoke/);
+assert.match(agentSource, /GRAPH_EDGES = \[/);
+assert.match(agentSource, /\("START", "node_/);
+assert.doesNotMatch(agentSource, /"\\"START\\""/);
+if (packageName === "req_001_adk") {
+  assert.match(agentSource, /\("START", "node_mod_001"\)/);
+  assert.match(agentSource, /\("node_mod_001", "node_mod_002"\)/);
+  assert.match(agentSource, /\("node_mod_002", "emit_workflow_result"\)/);
+}
 assert.ok(existsSync(join(outputRoot, "scaffold-plan.json")), "generated bundle must carry scaffold-plan.json");
 assert.ok(existsSync(join(outputRoot, "implementation-handoff.md")), "generated bundle must carry implementation-handoff.md");
+assert.ok(existsSync(join(outputRoot, "runtime-chat-smoke.json")), "generated bundle must carry runtime-chat-smoke.json");
 
 if (artifactRoot) {
   const runManifest = JSON.parse(readFileSync(join(artifactRoot, "af-run-manifest.json"), "utf8"));
@@ -42,4 +52,13 @@ if (artifactRoot) {
     runManifest.validation.commands.some((command) => command.includes("python3 -m compileall")),
     "manifest validation commands must include compileall"
   );
+}
+
+function discoverGeneratedPackage(root) {
+  const packages = readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((entry) => existsSync(join(root, entry, "workflow_manifest.json")));
+  assert.equal(packages.length, 1, `expected one generated ADK package, found ${packages.join(", ") || "none"}`);
+  return packages[0];
 }

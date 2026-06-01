@@ -1,0 +1,24 @@
+{
+  "confirmed_reuse_bindings": [
+    "loan_application_precheck_mock_workflow",
+    "common_document_intake_mock_workflow",
+    "customer_account_snapshot_mock_adapter",
+    "loan_precheck_rule_mock_adapter",
+    "loan_document_review_mock_agent",
+    "credit_risk_reasoning_mock_agent",
+    "customer_notice_template_mock_adapter"
+  ],
+  "proposed_shared_agents": [],
+  "proposed_adapter_catalog_entries": [
+    "customer_account_snapshot_mock_adapter",
+    "loan_precheck_rule_mock_adapter",
+    "customer_notice_template_mock_adapter"
+  ],
+  "proposed_workflow_reuse": [
+    "loan_application_precheck_mock_workflow",
+    "common_document_intake_mock_workflow"
+  ],
+  "remote_a2a_contracts": [],
+  "deferred_reuse": [],
+  "rejected_reuse": []
+}

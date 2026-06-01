@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { Button, EmptyState, Field, Panel, SectionHeader } from "../ui/primitives";
 import { useAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useApprovalGate } from "../state/useApprovalGate";
 import { useArtifactRoot } from "../state/useArtifactRoot";
@@ -14,6 +14,14 @@ import {
   fetchRuntimeStubFile
 } from "../state/useScaffoldPlan";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
+import {
+  useCreateRuntimeChatSession,
+  useInstallRuntimeChat,
+  useRuntimeChatStatus,
+  useSendRuntimeChatMessage,
+  useStartRuntimeChat,
+  useStopRuntimeChat
+} from "../state/useRuntimeChat";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
 import type { CatalogEntry } from "../catalog/types";
 import { loadSeedCatalog } from "../catalog/seed";
@@ -21,6 +29,12 @@ import type { ProcessStreamEvent } from "../state/useStreamingProcess";
 
 interface StreamLogEntry {
   id: number;
+  text: string;
+}
+
+interface ChatLogEntry {
+  id: number;
+  role: "user" | "assistant" | "system";
   text: string;
 }
 
@@ -37,6 +51,13 @@ export default function BuildWorkbench() {
   const { data: analysisData } = useAnalysisArtifact(reqId);
   const { data: scaffoldPlan, isLoading: scaffoldLoading } = useScaffoldPlan(reqId);
   const { data: runtimeStub } = useRuntimeStub(reqId);
+  const runtimeChatReqId = reqId && runtimeStub?.exists ? reqId : undefined;
+  const runtimeChatStatus = useRuntimeChatStatus(runtimeChatReqId);
+  const installRuntimeChat = useInstallRuntimeChat(reqId);
+  const startRuntimeChat = useStartRuntimeChat(reqId);
+  const stopRuntimeChat = useStopRuntimeChat(reqId);
+  const createRuntimeSession = useCreateRuntimeChatSession(reqId);
+  const sendRuntimeMessage = useSendRuntimeChatMessage(reqId);
   const saveScaffold = useSaveScaffoldPlan(reqId);
   const buildStub = useBuildRuntimeStub(reqId);
   const approvalMutation = useApprovalGate(reqId);
@@ -48,8 +69,13 @@ export default function BuildWorkbench() {
   const [handoffDraft, setHandoffDraft] = useState<string>("");
   const [handoffDirty, setHandoffDirty] = useState(false);
   const [buildStreamLog, setBuildStreamLog] = useState<StreamLogEntry[]>([]);
+  const [runtimeUserId, setRuntimeUserId] = useState("af-reviewer");
+  const [runtimeSessionId, setRuntimeSessionId] = useState("");
+  const [runtimeMessage, setRuntimeMessage] = useState("대출 사전심사 synthetic demo 결과를 요약해줘.");
+  const [chatLog, setChatLog] = useState<ChatLogEntry[]>([]);
   const buildStreamLogRef = useRef<HTMLPreElement | null>(null);
   const buildStreamSeq = useRef(0);
+  const chatLogSeq = useRef(0);
 
   const manifest = manifestData?.manifest;
   const manifestEtag = manifestData?.etag ?? null;
@@ -169,6 +195,72 @@ export default function BuildWorkbench() {
     );
   }
 
+  function handleInstallRuntimeChat() {
+    setActionMessage(null);
+    installRuntimeChat.mutate(undefined, {
+      onSuccess: (result) =>
+        setActionMessage(result.ok ? "ADK dependency 설치 완료" : "ADK dependency 설치 실패"),
+      onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK dependency 설치 실패")
+    });
+  }
+
+  function handleStartRuntimeChat() {
+    setActionMessage(null);
+    startRuntimeChat.mutate(undefined, {
+      onSuccess: (result) => setActionMessage(`ADK runtime 시작: ${result.status.api_base_url}`),
+      onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK runtime 시작 실패")
+    });
+  }
+
+  function handleStopRuntimeChat() {
+    setActionMessage(null);
+    stopRuntimeChat.mutate(undefined, {
+      onSuccess: () => setActionMessage("ADK runtime 중지 요청 완료"),
+      onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK runtime 중지 실패")
+    });
+  }
+
+  function handleCreateRuntimeSession() {
+    setActionMessage(null);
+    createRuntimeSession.mutate(
+      { user_id: runtimeUserId, session_id: runtimeSessionId || undefined },
+      {
+        onSuccess: (result) => {
+          setRuntimeUserId(result.user_id);
+          setRuntimeSessionId(result.session_id);
+          appendChatLog("system", `session ready: ${result.session_id}`);
+        },
+        onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK session 생성 실패")
+      }
+    );
+  }
+
+  function handleSendRuntimeMessage() {
+    const text = runtimeMessage.trim();
+    if (!text || !runtimeSessionId.trim()) return;
+    appendChatLog("user", text);
+    sendRuntimeMessage.mutate(
+      { user_id: runtimeUserId, session_id: runtimeSessionId, text },
+      {
+        onSuccess: (result) => {
+          appendChatLog(
+            "assistant",
+            result.final_text || `ADK events ${result.events.length}건 수신 (text 응답 없음)`
+          );
+        },
+        onError: (error) => appendChatLog("system", error instanceof Error ? error.message : "ADK message 전송 실패")
+      }
+    );
+  }
+
+  function appendChatLog(role: ChatLogEntry["role"], text: string) {
+    chatLogSeq.current += 1;
+    setChatLog((entries) => [
+      ...entries.slice(-49),
+      { id: chatLogSeq.current, role, text }
+    ]);
+  }
+
   const blockers = scaffoldPlan?.validation?.blockers ?? generatedPlan?.validation?.blockers ?? [];
   const warnings = scaffoldPlan?.validation?.warnings ?? generatedPlan?.validation?.warnings ?? [];
 
@@ -193,6 +285,128 @@ export default function BuildWorkbench() {
             Design 단계에서 게이트를 먼저 통과시키세요.
           </p>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <SectionHeader
+          title="ADK Chat 연결"
+          description="runtime-stub 안에 ADK dependency 를 설치하고, workbench 와 분리된 8765 포트의 ADK API/Web UI 로 실제 chat smoke 를 실행합니다."
+          action={
+            runtimeChatStatus.data ? (
+              <a className="ui-button ui-button-ghost" href={runtimeChatStatus.data.web_url} target="_blank" rel="noreferrer">
+                ADK Web 열기
+              </a>
+            ) : null
+          }
+        />
+        {!stubReady ? (
+          <EmptyState title="runtime-stub 이 필요합니다" description="stub 을 생성한 뒤 ADK dependency 설치와 chat smoke 를 실행할 수 있습니다." />
+        ) : runtimeChatStatus.error ? (
+          <p className="af-landing-error">{(runtimeChatStatus.error as Error).message}</p>
+        ) : (
+          <>
+            <ul className="af-gate-summary">
+              <li>app: {runtimeChatStatus.data?.app_name ?? "확인 중"}</li>
+              <li>ADK dependency: {runtimeChatStatus.data?.installed ? "설치됨" : "미설치"}</li>
+              <li>server: {runtimeChatStatus.data?.server.status ?? "확인 중"}</li>
+              <li>port: {runtimeChatStatus.data?.port ?? 8765}</li>
+            </ul>
+            <div className="af-action-row">
+              <Button
+                type="button"
+                variant="primary"
+                disabled={installRuntimeChat.isPending}
+                onClick={handleInstallRuntimeChat}
+              >
+                {installRuntimeChat.isPending ? "설치 중…" : "ADK dependency 설치"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!runtimeChatStatus.data?.installed || startRuntimeChat.isPending}
+                onClick={handleStartRuntimeChat}
+              >
+                {startRuntimeChat.isPending ? "시작 중…" : "ADK runtime 시작"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={runtimeChatStatus.data?.server.status !== "running" || stopRuntimeChat.isPending}
+                onClick={handleStopRuntimeChat}
+              >
+                {stopRuntimeChat.isPending ? "중지 중…" : "중지"}
+              </Button>
+            </div>
+            {installRuntimeChat.data?.stdout ? (
+              <details className="af-blocker-list">
+                <summary>pip install stdout</summary>
+                <pre>{installRuntimeChat.data.stdout}</pre>
+              </details>
+            ) : null}
+            {runtimeChatStatus.data?.server.stderr_tail ? (
+              <details className="af-blocker-list">
+                <summary>ADK stderr</summary>
+                <pre>{runtimeChatStatus.data.server.stderr_tail}</pre>
+              </details>
+            ) : null}
+            <div className="af-runtime-chat-grid">
+              <div className="af-runtime-chat-controls">
+                <Field label="user_id">
+                  <input value={runtimeUserId} onChange={(event) => setRuntimeUserId(event.target.value)} />
+                </Field>
+                <Field label="session_id">
+                  <input
+                    value={runtimeSessionId}
+                    onChange={(event) => setRuntimeSessionId(event.target.value)}
+                    placeholder="비우면 자동 생성"
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={runtimeChatStatus.data?.server.status !== "running" || createRuntimeSession.isPending}
+                  onClick={handleCreateRuntimeSession}
+                >
+                  {createRuntimeSession.isPending ? "생성 중…" : "session 생성"}
+                </Button>
+              </div>
+              <div className="af-runtime-chat-surface">
+                <div className="af-runtime-chat-log" aria-live="polite">
+                  {chatLog.length === 0 ? (
+                    <p className="af-landing-message">session 을 만든 뒤 smoke 메시지를 전송하세요.</p>
+                  ) : (
+                    chatLog.map((entry) => (
+                      <div key={entry.id} className={`af-chat-message af-chat-message-${entry.role}`}>
+                        <span>{entry.role}</span>
+                        <p>{entry.text}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="af-runtime-chat-compose">
+                  <textarea
+                    value={runtimeMessage}
+                    onChange={(event) => setRuntimeMessage(event.target.value)}
+                    rows={3}
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={
+                      runtimeChatStatus.data?.server.status !== "running" ||
+                      !runtimeSessionId.trim() ||
+                      !runtimeMessage.trim() ||
+                      sendRuntimeMessage.isPending
+                    }
+                    onClick={handleSendRuntimeMessage}
+                  >
+                    {sendRuntimeMessage.isPending ? "전송 중…" : "전송"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </Panel>
 
       <Panel>

@@ -1,0 +1,56 @@
+{
+  "requirement_id": "req-loan-precheck-smoke",
+  "artifact_root": "artifacts/af/req-loan-precheck-smoke",
+  "current_stage": "build",
+  "stages": {
+    "analyze": {
+      "status": "complete",
+      "outputs": [
+        "analysis-result.json",
+        "normalized-requirement.json",
+        "module-candidates.json",
+        "process-flow.json",
+        "analysis-summary.md"
+      ]
+    },
+    "design": {
+      "status": "complete",
+      "outputs": [
+        "boundary-design.md",
+        "commonization-notes.json",
+        "a2a-contracts.json",
+        "scaffold-plan.json"
+      ]
+    },
+    "build": {
+      "status": "complete",
+      "outputs": [
+        "runtime-stub/",
+        "runtime-stub/scaffold-plan.json",
+        "runtime-stub/implementation-handoff.md"
+      ]
+    },
+    "verify": {
+      "status": "complete",
+      "outputs": [
+        "validation-report.md",
+        "catalog-delta.yaml"
+      ]
+    }
+  },
+  "approvals": {
+    "analysis_reviewed": true,
+    "boundaries_approved": true,
+    "runtime_contracts_approved": true,
+    "stub_ready_for_followup": true
+  },
+  "validation": {
+    "commands": [
+      "node scripts/validate-artifacts.mjs artifacts/af/req-loan-precheck-smoke",
+      "node scripts/generate-adk-source.mjs artifacts/af/req-loan-precheck-smoke artifacts/af/req-loan-precheck-smoke/runtime-stub",
+      "python3 -m compileall runtime-stub/req_loan_precheck_smoke_adk runtime-stub/tests",
+      "cd runtime-stub/ && python -m pytest -q"
+    ],
+    "last_result": "passed"
+  }
+}
