@@ -242,9 +242,9 @@
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #f8faf8;
+  background: var(--surface-muted);
   padding: 10px;
-  color: #1a1a1a;
+  color: var(--text-strong);
   font-size: var(--fs-xs);
   white-space: pre-wrap;
 }

@@ -29,7 +29,7 @@
 .af-analyze-progress summary {
   cursor: pointer;
   font-size: var(--fs-sm);
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--text);
   margin-bottom: 6px;
 }
 
@@ -50,9 +50,9 @@
   gap: 8px;
   align-items: baseline;
   padding: 4px 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-muted);
   font-size: var(--fs-sm);
 }
 
@@ -60,20 +60,20 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--fs-2xs);
   text-transform: uppercase;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
 }
 
 .af-analyze-event-completed {
-  background: var(--cat-adapter-soft, #d9ecdf);
+  background: var(--cat-adapter-soft, var(--cat-adapter-soft));
 }
 
 .af-analyze-event-failed,
 .af-analyze-event-timeout {
-  background: var(--cat-remote-soft, #fde2dd);
+  background: var(--cat-remote-soft, var(--cat-remote-soft));
 }
 
 .af-analyze-event-meta {
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-subtle);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--fs-2xs);
   text-align: right;

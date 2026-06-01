@@ -98,7 +98,7 @@ src/styles/
 
 빨강(`--cat-remote`)은 Remote A2A 외에는 쓰지 않는다. 에러/위험 빨강이 필요하면 `--red` 를 쓴다.
 
-**색 — chrome (mock-lab 이식).** 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·`--page-bg`(#fafaf9), 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 텍스트 `--text`(본문 #37352f)·`--text-strong`(제목·값 #1a1a1a)·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), 강조 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), `--amber`·`--red`·`--blue`·`--success`, status tint 6종(`--tint-*`).
+**색 — chrome (mock-lab 이식).** 표면 `--surface`(#ffffff)·`--surface-muted`(#f6f5f4)·`--page-bg`(#fafaf9), 테두리 `--line`(#e5e3df)·`--line-strong`(#c8c4be), 텍스트 `--text`(본문 #37352f)·`--text-strong`(제목·값·dark active fill #1a1a1a)·`--text-muted`(#5d5b54)·`--text-subtle`(#787671), 강조 `--accent` 보라(#5645d4, hover `--accent-strong` #4534b3), `--amber`·`--red`·`--blue`·`--success`, status tint 6종(`--tint-*`). 승인/OK 상태는 `--success-faint`·`--success-soft`·`--success-line`·`--success-text` 를 쓴다.
 
 **타이포.** font-size 는 8단계 스케일로 통일했다(이전 24종 rem/px 혼용을 정리): `--fs-2xs 11 / --fs-xs 12 / --fs-sm 13 / --fs-md 14 / --fs-lg 16 / --fs-xl 18 / --fs-2xl 20 / --fs-3xl 28`(px). line-height `--lh-tight 1.3 / --lh-normal 1.5`. weight `--fw-medium 500 / --fw-semibold 600 / --fw-bold 700 / --fw-heavy 800`. 폰트 `--font-sans`(Inter …) / `--font-mono`. 새 텍스트는 rem 리터럴 대신 이 토큰을 쓴다.
 
@@ -108,7 +108,7 @@ src/styles/
 
 `agent` 카테고리 색은 기존 보라(#5b46c2)가 chrome primary 보라(#5645d4)와 거의 겹쳐, 배지를 버튼·링크와 구분하기 위해 자홍(#a21caf)으로 옮겼다. 나머지 카테고리 색은 그대로다.
 
-> **알려진 예외 — router 레거시 팔레트.** `router/*.css`(특히 `shell.css`)는 아직 mock-lab 이전의 translucent-black 팔레트(`rgba(0,0,0,*)`, 슬레이트 `#1f2937`)를 쓴다. 이를 `--line`/`--text-*` 토큰으로 수렴하면 회색 톤이 cool→warm 으로 *눈에 보이게* 바뀌고 의미 매핑도 단순하지 않다(예: `.af-landing-error` 는 `--cat-remote` 가 아니라 `--red` 여야 한다). 별도의 시각 검토를 거친 후속 작업으로 진행한다.
+`router/*.css`(셸 포함)도 토큰 기반으로 수렴했다. 이전 translucent-black 팔레트(`rgba(0,0,0,*)`)는 역할별로 `--text-*`(텍스트)·`--line`/`--line-strong`(테두리)·`--surface-muted`(옅은 배경)에 매핑했고, 슬레이트 active fill `#1f2937` → `--text-strong`, 링크 `#2858a5` → `--blue`, 에러 `#b42318`(bare) → `--red`, 승인 초록 → `--success-*`, 카테고리 hex → `--cat-*` 로 바꿨다. 남는 raw 값은 의도적 투명 효과뿐이다: 모달 backdrop `rgba(0,0,0,0.3)`, 오버레이 `rgba(255,255,255,*)`, 카테고리 tint 배경 `rgba(<cat>,0.12)`.
 
 ## 글리프 매핑
 

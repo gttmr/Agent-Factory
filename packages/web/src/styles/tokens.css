@@ -30,6 +30,11 @@
   --red: #e03131;
   --blue: #2858a5;
   --success: #1aae39;
+  /* success state surfaces (approval chips, OK states) */
+  --success-faint: #f5fbf7;
+  --success-soft: #e6f6ec;
+  --success-line: #2f9c6a;
+  --success-text: #1c6a48;
 
   /* ---- status tint surfaces (ported from mock-lab) ---- */
   --tint-peach: #ffe8d4;
