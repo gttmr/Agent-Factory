@@ -27,6 +27,14 @@ const workflowKinds = new Set([
 ]);
 const remoteKinds = new Set(["a2a", "unknown"]);
 const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
+const runtimeBindings = new Set(["unresolved", "mcp", "remote_a2a"]);
+const scaffoldOutputModes = new Set(["smoke", "runnable"]);
+const smokeScaffoldOutputs = {
+  adapter: "contract_or_stub_only",
+  agent: "agent_shell_only",
+  workflow: "orchestration_shell_only",
+  remote_a2a: "contract_placeholder_only"
+};
 // Graph IR (ADK 2.0). Mirrors the GRAPH_* constant exports in
 // packages/web/src/analyzer/types.ts. The validator must stay
 // dependency-free, so the lists are duplicated here.
@@ -950,6 +958,13 @@ function validateScaffoldPlan(dir = root) {
   if (plan.raw_requirement_to_code !== false) {
     errors.push("scaffold plan must explicitly set raw_requirement_to_code to false.");
   }
+  // Absent output_mode is treated as smoke (fail-closed): smoke keeps the strict
+  // no-runnable-logic rules; runnable allows reviewed synthetic wiring. The
+  // raw_requirement_to_code / source invariants above hold in BOTH modes.
+  if (plan.output_mode !== undefined && !scaffoldOutputModes.has(plan.output_mode)) {
+    errors.push(`scaffold plan output_mode must be "smoke" or "runnable" when present.`);
+  }
+  const outputMode = plan.output_mode === "runnable" ? "runnable" : "smoke";
   if (!Array.isArray(plan.modules)) {
     errors.push("scaffold plan modules must be an array.");
     return;
@@ -972,22 +987,56 @@ function validateScaffoldPlan(dir = root) {
     if (!categories.has(module.module_category)) {
       errors.push(`${label} has invalid or missing module_category.`);
     }
-    if (module.no_runnable_business_logic !== true) {
-      errors.push(`${label} must set no_runnable_business_logic to true.`);
+    if (outputMode === "runnable") {
+      if (module.no_runnable_business_logic !== false) {
+        errors.push(`${label} must set no_runnable_business_logic to false in runnable output_mode.`);
+      }
+      if (module.scaffold_output !== "runnable") {
+        errors.push(`${label} scaffold_output must be "runnable" in runnable output_mode.`);
+      }
+    } else {
+      if (module.no_runnable_business_logic !== true) {
+        errors.push(`${label} must set no_runnable_business_logic to true in smoke output_mode.`);
+      }
+      const expected = smokeScaffoldOutputs[module.module_category];
+      if (expected && module.scaffold_output !== expected) {
+        errors.push(`${label} ${module.module_category} scaffold output must be ${expected}.`);
+      }
     }
-    if (module.module_category === "adapter" && module.scaffold_output !== "contract_or_stub_only") {
-      errors.push(`${label} adapter scaffold output must be contract_or_stub_only.`);
-    }
-    if (module.module_category === "agent" && module.scaffold_output !== "agent_shell_only") {
-      errors.push(`${label} agent scaffold output must be agent_shell_only.`);
-    }
-    if (module.module_category === "workflow" && module.scaffold_output !== "orchestration_shell_only") {
-      errors.push(`${label} workflow scaffold output must be orchestration_shell_only.`);
-    }
-    if (module.module_category === "remote_a2a" && module.scaffold_output !== "contract_placeholder_only") {
-      errors.push(`${label} remote_a2a scaffold output must be contract_placeholder_only.`);
-    }
+    validateScaffoldMcpBinding(module, label);
   });
+}
+
+// MCP binding consistency for scaffold modules. A partial binding (server or
+// tool without the other, or without access_protocol="mcp") is a bug that would
+// generate a broken connected adapter, so it is rejected in both modes.
+function validateScaffoldMcpBinding(module, label) {
+  if (
+    module.access_protocol !== undefined &&
+    module.access_protocol !== null &&
+    !accessProtocols.has(module.access_protocol)
+  ) {
+    errors.push(`${label} has invalid access_protocol "${module.access_protocol}".`);
+  }
+  if (
+    module.runtime_binding !== undefined &&
+    module.runtime_binding !== null &&
+    !runtimeBindings.has(module.runtime_binding)
+  ) {
+    errors.push(`${label} has invalid runtime_binding "${module.runtime_binding}".`);
+  }
+  const hasServer = typeof module.mcp_server === "string" && module.mcp_server.trim().length > 0;
+  const hasTool = typeof module.mcp_tool_name === "string" && module.mcp_tool_name.trim().length > 0;
+  // Any signal of an MCP binding (protocol, runtime_binding, or either field)
+  // requires a complete, non-blank binding so the generator can emit a connected
+  // adapter; otherwise it is a bug, not a silent unconnected downgrade.
+  const declaresMcp =
+    module.access_protocol === "mcp" || module.runtime_binding === "mcp" || hasServer || hasTool;
+  if (declaresMcp && (!hasServer || !hasTool || module.access_protocol !== "mcp")) {
+    errors.push(
+      `${label} has an incomplete MCP binding (require access_protocol="mcp" with non-empty mcp_server and mcp_tool_name).`
+    );
+  }
 }
 
 function validateSavedAnalysisFixtures(dir = root) {

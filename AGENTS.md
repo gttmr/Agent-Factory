@@ -144,7 +144,7 @@ For code-changing subagents, assign a clear file or module ownership boundary an
 - Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
 - ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
 - Required runtime contracts in `AnalysisResult.runtimeContracts` must be reviewed and approved before Runtime Handoff proceeds.
-- Generated source must stay a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic.
+- Generated source defaults to a smoke TODO/runtime-wiring handoff. A reviewed `scaffold-plan` `output_mode: runnable` (an approved capability) emits a runnable ADK 2.1 `Workflow` (Gemini `LlmAgent` nodes + synthetic Mock Lab MCP adapters) instead — still generated only from approved artifacts (`raw_requirement_to_code` stays `false`), never from raw requests, and never containing private endpoints, credentials, or real customer data.
 
 ## WSL Browser Verification
 

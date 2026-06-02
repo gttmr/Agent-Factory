@@ -79,7 +79,8 @@
           "modules": {
             "items": {
               "properties": {
-                "no_runnable_business_logic": { "const": false }
+                "no_runnable_business_logic": { "const": false },
+                "scaffold_output": { "const": "runnable" }
               }
             }
           }

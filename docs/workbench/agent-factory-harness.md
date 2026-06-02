@@ -95,7 +95,7 @@ Do not scaffold directly from:
 - missing Remote A2A contract details
 - private or organization-specific runtime assumptions
 
-A scaffold plan should make boundaries explicit before code exists. Generated source remains a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic. It must not include private banking endpoints, credentials, deployment scripts, or organization-specific runtime code. The default stub output location for skill-led runs is `artifacts/af/<req-id>/runtime-stub/`.
+A scaffold plan should make boundaries explicit before code exists. Generated source defaults to a TODO/runtime-wiring smoke handoff. A reviewed `output_mode: runnable` scaffold plan (this approved capability) instead emits a runnable ADK 2.1 `Workflow` graph — `LlmAgent` nodes calling Gemini and adapter nodes calling synthetic Mock Lab MCP servers — but it is still generated only from approved workbench artifacts (`raw_requirement_to_code` stays `false`), never from raw requirements. In either mode it must not include private banking endpoints, credentials, deployment scripts, real customer data, or organization-specific runtime code. The default stub output location for skill-led runs is `artifacts/af/<req-id>/runtime-stub/`.
 
 ### Missing-information two-layer gate
 
@@ -133,7 +133,7 @@ The registry must use synthetic data only. Do not add private banking endpoints,
 
 The pre-PR6 Runtime Handoff screen used to ship a `Smoke 일괄 실행` macro (`generate → install → start-web → check-web → chat-smoke`) plus an in-iframe `adk web` embedding. Do not reintroduce that macro or iframe surface. PR6 split the flow into BuildWorkbench (`/af/:reqId/build`) and VerifyWorkbench (`/af/:reqId/verify`), and VerifyWorkbench still only runs the fixed `validate-artifacts.mjs` / `npm run build` / `npm run test:analyzer` allow-list.
 
-BuildWorkbench may expose a narrow `ADK Chat 연결` bridge after `runtime-stub/` exists. That bridge installs dependencies only into `runtime-stub/.venv`, starts local `adk api_server --with_ui` on the runtime-smoke port, creates ADK sessions, and sends `/run` smoke messages against the generated stub app. The generated app must stay a synthetic smoke handoff: it can surface reviewed `runtime_mock` test doubles and TODO metadata, but must not include private endpoints, credentials, deployment scripts, real customer data, or runnable business logic.
+BuildWorkbench may expose a narrow `ADK Chat 연결` bridge after `runtime-stub/` exists. That bridge installs dependencies only into `runtime-stub/.venv`, starts local `adk api_server --with_ui` on the runtime-smoke port, creates ADK sessions, and sends `/run` smoke messages against the generated stub app. The generated app runs over synthetic inputs only: in smoke mode it surfaces reviewed `runtime_mock` test doubles and TODO metadata; in `runnable` mode it executes a real ADK `Workflow` (Gemini `LlmAgent` nodes plus synthetic Mock Lab MCP adapters). In both modes it must not include private endpoints, credentials, deployment scripts, or real customer data.
 
 ## Workbench surface
 
