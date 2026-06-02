@@ -331,9 +331,10 @@ def _collect_tool_inputs(
         if ctx.state.get(source_key) is not None:
             args[name] = ctx.state.get(source_key)
             continue
+        # Fall back to a field named source_key inside any upstream *_output dict.
         for key, value in ctx.state.items():
-            if key.endswith("_output") and isinstance(value, dict) and value.get(name) is not None:
-                args[name] = value.get(name)
+            if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
+                args[name] = value.get(source_key)
                 break
     missing = [name for name in required_names if name not in args]
     if missing:
@@ -1168,8 +1169,11 @@ function assertAcyclic(edges) {
 // rather than mis-generate. (Sets are declared inside the function to avoid a
 // temporal-dead-zone with the top-level buildFiles() call.)
 function assertRunnableGraphSupported() {
-  const unsupportedNodeKinds = new Set(["router", "loop_control", "human_input"]);
+  // remote_a2a is a real remote boundary, not lowered in v1 (degrading it to a
+  // stub would silently fake the remote agent), so it is rejected like routes/loops.
+  const unsupportedNodeKinds = new Set(["router", "loop_control", "human_input", "remote_a2a"]);
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
+  const unsupportedEdgeKinds = new Set(["route", "remote_a2a"]);
   const unsupportedContainerKinds = new Set([
     "dynamic_workflow",
     "loop_region",
@@ -1182,12 +1186,14 @@ function assertRunnableGraphSupported() {
     .map((node) => `${node.id} (${node.node_kind})`);
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode does not support these control-flow nodes yet: ${badNodes.join(", ")}. Use smoke mode or wait for route/loop/human-input lowering.`
+      `runnable mode does not support these control-flow nodes yet: ${badNodes.join(", ")}. Use smoke mode or wait for route/loop/human-input/remote lowering.`
     );
   }
-  const badContainers = nodes
-    .filter((node) => node && unsupportedContainerKinds.has(node.container_kind))
-    .map((node) => `${node.id} (${node.container_kind})`);
+  // Containers are a separate top-level array in Graph IR, not a node field.
+  const containers = Array.isArray(processFlow.containers) ? processFlow.containers : [];
+  const badContainers = containers
+    .filter((container) => container && unsupportedContainerKinds.has(container.container_kind))
+    .map((container) => `${container.id} (${container.container_kind})`);
   if (badContainers.length > 0) {
     throw new Error(
       `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. Use smoke mode or wait for loop/human-review/remote/dynamic lowering.`
@@ -1195,11 +1201,17 @@ function assertRunnableGraphSupported() {
   }
   const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
   const badEdges = edges
-    .filter((edge) => edge && unsupportedExecSemantics.has(edge.execution_semantics))
-    .map((edge) => `${edge.from}->${edge.to} (${edge.execution_semantics})`);
+    .filter(
+      (edge) =>
+        edge &&
+        (unsupportedExecSemantics.has(edge.execution_semantics) ||
+          unsupportedEdgeKinds.has(edge.edge_kind) ||
+          edge.is_remote_boundary_crossing === true)
+    )
+    .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
   if (badEdges.length > 0) {
     throw new Error(
-      `runnable mode does not support these edge semantics yet: ${badEdges.join(", ")}. Use smoke mode or wait for route/loop/remote lowering.`
+      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Use smoke mode or wait for route/loop/remote lowering.`
     );
   }
 }
