@@ -139,15 +139,13 @@ export function StageShell({
 
         {nextAction ? (
           <footer className="af-stage-cta">
-            {nextAction.to ? (
-              <Link
-                to={nextAction.to}
-                className={`ui-button ui-button-${nextAction.tone ?? "primary"}`}
-                aria-disabled={nextAction.disabled}
-              >
+            {nextAction.to && !nextAction.disabled ? (
+              <Link to={nextAction.to} className={`ui-button ui-button-${nextAction.tone ?? "primary"}`}>
                 {nextAction.label}
               </Link>
             ) : (
+              // disabled 또는 onClick variant — disabled 일 때 navigable Link 를 두면
+              // 키보드(Tab+Enter)로 게이트를 우회할 수 있어, 버튼으로 렌더해 막는다.
               <button
                 type="button"
                 className={`ui-button ui-button-${nextAction.tone ?? "primary"}`}

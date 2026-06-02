@@ -36,19 +36,6 @@ export interface RuntimeChatStartResult {
   status: RuntimeChatStatus;
 }
 
-export interface RuntimeChatSessionResult {
-  user_id: string;
-  session_id: string;
-  session: unknown;
-}
-
-export interface RuntimeChatMessageResult {
-  user_id: string;
-  session_id: string;
-  events: unknown[];
-  final_text: string;
-}
-
 export function useRuntimeChatStatus(reqId: string | undefined) {
   return useQuery<RuntimeChatStatus | null>({
     queryKey: ["af", reqId, "runtime-chat", "status"] as const,
@@ -59,7 +46,11 @@ export function useRuntimeChatStatus(reqId: string | undefined) {
       if (!response.ok) throw new AfApiError(response.status, "ADK runtime 상태 조회 실패");
       return (await response.json()) as RuntimeChatStatus;
     },
-    enabled: Boolean(reqId)
+    enabled: Boolean(reqId),
+    // ADK 프로세스는 UI 밖에서도 죽거나 멈출 수 있어, server.status / web_url 이
+    // stale 해지지 않도록 주기적으로 갱신한다(특히 '실행' 화면의 dev UI 링크).
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true
   });
 }
 
@@ -105,34 +96,7 @@ export function useStopRuntimeChat(reqId: string | undefined) {
   });
 }
 
-export function useCreateRuntimeChatSession(reqId: string | undefined) {
-  return useMutation({
-    mutationFn: async (input: { user_id: string; session_id?: string }) => {
-      if (!reqId) throw new Error("requirement_id 가 없습니다.");
-      const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-chat/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input)
-      });
-      const body = (await response.json()) as RuntimeChatSessionResult & { error?: string };
-      if (!response.ok) throw new AfApiError(response.status, body.error ?? "ADK session 생성 실패", body);
-      return body;
-    }
-  });
-}
-
-export function useSendRuntimeChatMessage(reqId: string | undefined) {
-  return useMutation({
-    mutationFn: async (input: { user_id: string; session_id: string; text: string }) => {
-      if (!reqId) throw new Error("requirement_id 가 없습니다.");
-      const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-chat/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input)
-      });
-      const body = (await response.json()) as RuntimeChatMessageResult & { error?: string };
-      if (!response.ok) throw new AfApiError(response.status, body.error ?? "ADK message 전송 실패", body);
-      return body;
-    }
-  });
-}
+// NOTE: 세션/메시지(useCreateRuntimeChatSession / useSendRuntimeChatMessage) 클라이언트
+// 훅은 AF 자체 간이 챗 제거(실행 화면이 ADK 공식 dev UI 로 링크)와 함께 삭제했다.
+// 서버의 /runtime-chat/{session,message} 엔드포인트는 아직 남아 있으며, 프로그램적
+// smoke 용도로 재사용될 수 있어 별도 정리(follow-up)로 둔다.

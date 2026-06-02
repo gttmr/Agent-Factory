@@ -237,9 +237,7 @@
   padding-top: var(--space-sm);
 }
 
-.af-stage-cta .ui-button[aria-disabled="true"],
 .af-stage-cta .ui-button:disabled {
-  pointer-events: none;
   opacity: 0.45;
   cursor: not-allowed;
 }
