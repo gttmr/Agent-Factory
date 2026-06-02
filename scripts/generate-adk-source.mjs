@@ -1169,9 +1169,6 @@ function assertAcyclic(edges) {
 // rather than mis-generate. (Sets are declared inside the function to avoid a
 // temporal-dead-zone with the top-level buildFiles() call.)
 function assertRunnableGraphSupported() {
-  // remote_a2a is a real remote boundary, not lowered in v1 (degrading it to a
-  // stub would silently fake the remote agent), so it is rejected like routes/loops.
-  const unsupportedNodeKinds = new Set(["router", "loop_control", "human_input", "remote_a2a"]);
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
   const unsupportedEdgeKinds = new Set(["route", "remote_a2a"]);
   const unsupportedContainerKinds = new Set([
@@ -1181,12 +1178,27 @@ function assertRunnableGraphSupported() {
     "remote_boundary"
   ]);
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
-  const badNodes = nodes
-    .filter((node) => node && unsupportedNodeKinds.has(node.node_kind))
-    .map((node) => `${node.id} (${node.node_kind})`);
+  const graph = graphIndexes();
+  // Allowlist: lowering can represent input/output (→ START/terminal) and
+  // module-bound agent/adapter/workflow nodes. ANY other node — control nodes
+  // (router/loop_control/human_input/join) or module_id-null function/tool
+  // intermediaries — is silently dropped by resolve(), which would break graph
+  // connectivity, so reject it. remote_a2a is a real remote boundary, not a safe
+  // synthetic stub, so it is rejected even when module-bound.
+  const allowedBareKinds = new Set(["input", "output"]);
+  const badNodes = [];
+  for (const node of nodes) {
+    if (!node || allowedBareKinds.has(node.node_kind)) continue;
+    const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
+    if (module) {
+      if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
+      continue;
+    }
+    badNodes.push(`${node.id} (${node.node_kind})`);
+  }
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode does not support these control-flow nodes yet: ${badNodes.join(", ")}. Use smoke mode or wait for route/loop/human-input/remote lowering.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Only input/output and module-bound agent/adapter/workflow nodes are supported (no router/loop/human-input/join/remote or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
   // Containers are a separate top-level array in Graph IR, not a node field.
