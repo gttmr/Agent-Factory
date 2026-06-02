@@ -1,6 +1,6 @@
 # Local MCP Mock Lab
 
-Mock Lab v0.1은 ADK Agent가 나중에 `McpToolset`으로 소비할 수 있는 MCP stdio mock server를 로컬에서 만들고 검증하기 위한 별도 앱이다. 기존 Agent Factory workbench의 `/af/:reqId/analyze`, `/design`, `/build`, `/verify` 흐름에는 붙이지 않는다.
+Mock Lab은 ADK Agent가 `McpToolset`(또는 stdio)으로 소비하는 MCP mock server를 로컬에서 만들고 검증하기 위한 별도 앱이다. 실행 중인 mock은 network MCP로도 노출되어 생성된 runnable ADK 번들이 직접 호출한다(아래 "Network MCP" 참고). 기존 Agent Factory workbench의 `/af/:reqId/analyze`, `/design`, `/build`, `/verify` 흐름에는 붙이지 않는다.
 
 ## 실행
 

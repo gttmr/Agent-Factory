@@ -47,7 +47,7 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 - `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
 - `af-run-manifest.json`: `artifacts/af/<req-id>/` 안에서 단계 상태, 출력 경로, 승인 상태, 검증 evidence를 연결하는 가벼운 manifest다.
 - `runs/<stage>/<run-id>/`: Stage Runner 실행 evidence다. `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, 실패 시 `diagnostics.md`를 담는다.
-- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 TODO-only source bundle이다. 실제 runtime wiring과 business logic은 후속 구현 task에서 채운다.
+- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 source bundle이다. 기본 smoke 모드는 TODO source이고 runtime wiring/business logic은 후속 구현 task에서 채운다. 승인된 `output_mode: runnable` 은 `LlmAgent` + Mock Lab MCP 어댑터로 실행 가능한 ADK 2.1 `Workflow` 를 생성한다(둘 다 raw requirement가 아닌 승인 artifact에서만 생성).
 - `validation-report.md`: 검증 명령과 결과, 남은 위험을 기록한다.
 - `catalog-delta.yaml`: catalog 재사용/등록/수정 제안이다. 실제 `catalog/*.yaml` 변경은 별도 승인 작업으로 처리한다.
 
