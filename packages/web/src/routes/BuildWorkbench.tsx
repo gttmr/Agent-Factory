@@ -23,6 +23,7 @@ import {
   useStopRuntimeChat
 } from "../state/useRuntimeChat";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
+import type { ScaffoldOutputMode } from "../analyzer/types";
 import type { CatalogEntry } from "../catalog/types";
 import { loadSeedCatalog } from "../catalog/seed";
 import type { ProcessStreamEvent } from "../state/useStreamingProcess";
@@ -64,6 +65,7 @@ export default function BuildWorkbench() {
   const handoffArtifact = useTextArtifact(reqId, "implementation-handoff.md");
   const saveHandoff = useSaveTextArtifact(reqId, "implementation-handoff.md");
 
+  const [outputMode, setOutputMode] = useState<ScaffoldOutputMode>("smoke");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [handoffDraft, setHandoffDraft] = useState<string>("");
@@ -95,9 +97,39 @@ export default function BuildWorkbench() {
       moduleCandidates: analysis.moduleCandidates,
       processFlow: analysis.processFlow,
       catalogEntries,
-      runtimeContracts: analysis.runtimeContracts ?? []
+      runtimeContracts: analysis.runtimeContracts ?? [],
+      outputMode
     });
-  }, [analysis, catalogEntries]);
+  }, [analysis, catalogEntries, outputMode]);
+
+  // Adapter connection summary (mirrors the generator: a complete MCP binding
+  // is connected, otherwise the adapter degrades to a synthetic stub).
+  const adapterConnections = useMemo(() => {
+    const adapters = (generatedPlan?.modules ?? []).filter((module) => module.module_category === "adapter");
+    const isConnected = (module: (typeof adapters)[number]) =>
+      module.access_protocol === "mcp" && Boolean(module.mcp_server) && Boolean(module.mcp_tool_name);
+    return {
+      connected: adapters.filter(isConnected),
+      unconnected: adapters.filter((module) => !isConnected(module))
+    };
+  }, [generatedPlan]);
+
+  // The toggle drives the in-memory generatedPlan, but build consumes the saved
+  // scaffold-plan.json. Reflect the persisted mode on load and flag unsaved drift.
+  const savedMode: ScaffoldOutputMode | null = scaffoldPlan
+    ? scaffoldPlan.output_mode === "runnable"
+      ? "runnable"
+      : "smoke"
+    : null;
+  const modeDirty = savedMode !== null && savedMode !== outputMode;
+
+  // Reflect the persisted plan's mode in the toggle when it loads/changes.
+  // (Only changes when the saved file changes, so it never fights a user toggle.)
+  useEffect(() => {
+    if (scaffoldPlan?.output_mode === "runnable" || scaffoldPlan?.output_mode === "smoke") {
+      setOutputMode(scaffoldPlan.output_mode);
+    }
+  }, [scaffoldPlan?.output_mode]);
 
   useEffect(() => {
     if (!handoffDirty && handoffArtifact.data) setHandoffDraft(handoffArtifact.data.content);
@@ -424,6 +456,35 @@ export default function BuildWorkbench() {
             </Button>
           }
         />
+        <div className="af-output-mode-toggle" role="group" aria-label="출력 모드">
+          <Button
+            type="button"
+            variant={outputMode === "smoke" ? "primary" : "ghost"}
+            aria-pressed={outputMode === "smoke"}
+            onClick={() => setOutputMode("smoke")}
+          >
+            smoke
+          </Button>
+          <Button
+            type="button"
+            variant={outputMode === "runnable" ? "primary" : "ghost"}
+            aria-pressed={outputMode === "runnable"}
+            onClick={() => setOutputMode("runnable")}
+          >
+            runnable
+          </Button>
+          <span className="af-output-mode-hint">
+            {outputMode === "runnable"
+              ? "Gemini LlmAgent 그래프 + Mock Lab MCP 어댑터를 실행합니다. runtime-stub/.env 에 GOOGLE_API_KEY 가 필요합니다."
+              : "synthetic 스모크 핸드오프입니다 (LLM/키 불필요)."}
+          </span>
+        </div>
+        {modeDirty ? (
+          <p className="af-output-mode-dirty" role="status">
+            저장된 scaffold-plan 은 <strong>{savedMode}</strong> 모드입니다. 현재 토글({outputMode})을 적용하려면 빌드 전에
+            scaffold-plan 을 재생성하세요.
+          </p>
+        ) : null}
         {scaffoldLoading ? <p className="af-landing-message">scaffold-plan 불러오는 중…</p> : null}
         {!generatedPlan ? (
           <EmptyState
@@ -436,6 +497,15 @@ export default function BuildWorkbench() {
             <li>런타임 계약 {generatedPlan.runtime_contracts.length}개</li>
             <li>can_generate_source: {generatedPlan.validation.can_generate_source ? "예" : "아니오"}</li>
             <li>blockers: {generatedPlan.validation.blockers.length}건, warnings: {generatedPlan.validation.warnings.length}건</li>
+            {outputMode === "runnable" ? (
+              <li>
+                어댑터 MCP 연결: connected {adapterConnections.connected.length} · unconnected{" "}
+                {adapterConnections.unconnected.length}
+                {adapterConnections.unconnected.length > 0
+                  ? ` (미연결: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
+                  : ""}
+              </li>
+            ) : null}
           </ul>
         )}
         {blockers.length > 0 ? (
