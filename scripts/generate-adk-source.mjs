@@ -1228,7 +1228,15 @@ function assertRunnableGraphSupported() {
       }
       const fromNode = graph.nodesById.get(edge.from);
       const toNode = graph.nodesById.get(edge.to);
-      return fromNode?.node_kind === "output" || toNode?.node_kind === "input";
+      // Reversed polarity (output as source / input as target) and a direct
+      // input->output passthrough all resolve to a dropped endpoint. After this,
+      // every surviving edge is input->module, module->module, or the intentional
+      // module->output terminal drop — guard and lowering agree exactly.
+      return (
+        fromNode?.node_kind === "output" ||
+        toNode?.node_kind === "input" ||
+        (fromNode?.node_kind === "input" && toNode?.node_kind === "output")
+      );
     })
     .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
   if (badEdges.length > 0) {
