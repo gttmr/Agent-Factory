@@ -233,6 +233,37 @@ test("runnable mode emits an ADK Workflow graph and the editable bundle config",
   }
 });
 
+test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/fan-in)", () => {
+  const cases = [
+    { name: "module-bound human_input node", mutate: (pf) => pf.nodes.push({ id: "h1", node_kind: "human_input", module_id: "mod-gen-agent" }) },
+    { name: "router node", mutate: (pf) => pf.nodes.push({ id: "r1", node_kind: "router", module_id: null }) },
+    { name: "module_id-null function node", mutate: (pf) => pf.nodes.push({ id: "f1", node_kind: "function", module_id: null }) },
+    { name: "route edge", mutate: (pf) => { pf.edges[0].edge_kind = "route"; } },
+    { name: "conditional edge", mutate: (pf) => { pf.edges[0].execution_semantics = "conditional"; } },
+    { name: "remote boundary edge", mutate: (pf) => { pf.edges[0].is_remote_boundary_crossing = true; } },
+    { name: "input->output passthrough", mutate: (pf) => pf.edges.push({ from: "in1", to: "out1", edge_kind: "event_output", execution_semantics: "normal_transition" }) },
+    { name: "dangling edge endpoint", mutate: (pf) => pf.edges.push({ from: "mod-gen-agent", to: "ghost", edge_kind: "event_output", execution_semantics: "normal_transition" }) },
+    { name: "loop_region container", mutate: (pf) => { (pf.containers ||= []).push({ id: "container-loop", container_kind: "loop_region" }); } }
+  ];
+  for (const testCase of cases) {
+    const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-reject-"));
+    try {
+      writeFixture(artifactRoot, { runnable: true });
+      const pfPath = join(artifactRoot, "process-flow.json");
+      const pf = JSON.parse(readFileSync(pfPath, "utf8"));
+      testCase.mutate(pf);
+      writeFileSync(pfPath, JSON.stringify(pf));
+      assert.throws(
+        () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+        /does not support|cannot lower/,
+        `expected runnable generation to reject: ${testCase.name}`
+      );
+    } finally {
+      rmSync(artifactRoot, { recursive: true, force: true });
+    }
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------

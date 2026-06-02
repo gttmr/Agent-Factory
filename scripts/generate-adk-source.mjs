@@ -1186,9 +1186,18 @@ function assertRunnableGraphSupported() {
   // connectivity, so reject it. remote_a2a is a real remote boundary, not a safe
   // synthetic stub, so it is rejected even when module-bound.
   const allowedBareKinds = new Set(["input", "output"]);
+  // Control / human / remote node kinds are NOT lowerable even if they happen to
+  // carry a module_id (the validator binds human_input leniently), so deny them
+  // by kind before the module-bound check — otherwise a module-bound human_input
+  // would mis-lower as an ordinary LlmAgent/FunctionNode.
+  const unlowerableNodeKinds = new Set(["router", "loop_control", "human_input", "join", "remote_a2a"]);
   const badNodes = [];
   for (const node of nodes) {
     if (!node || allowedBareKinds.has(node.node_kind)) continue;
+    if (unlowerableNodeKinds.has(node.node_kind)) {
+      badNodes.push(`${node.id} (${node.node_kind})`);
+      continue;
+    }
     const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
     if (module) {
       if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
@@ -1228,14 +1237,17 @@ function assertRunnableGraphSupported() {
       }
       const fromNode = graph.nodesById.get(edge.from);
       const toNode = graph.nodesById.get(edge.to);
+      // A dangling endpoint (node id not in the graph) also resolves to null and
+      // is silently dropped — reject it (don't rely only on processFlow.validation).
+      if (!fromNode || !toNode) return true;
       // Reversed polarity (output as source / input as target) and a direct
       // input->output passthrough all resolve to a dropped endpoint. After this,
       // every surviving edge is input->module, module->module, or the intentional
       // module->output terminal drop — guard and lowering agree exactly.
       return (
-        fromNode?.node_kind === "output" ||
-        toNode?.node_kind === "input" ||
-        (fromNode?.node_kind === "input" && toNode?.node_kind === "output")
+        fromNode.node_kind === "output" ||
+        toNode.node_kind === "input" ||
+        (fromNode.node_kind === "input" && toNode.node_kind === "output")
       );
     })
     .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
