@@ -1170,6 +1170,12 @@ function assertAcyclic(edges) {
 function assertRunnableGraphSupported() {
   const unsupportedNodeKinds = new Set(["router", "loop_control", "human_input"]);
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
+  const unsupportedContainerKinds = new Set([
+    "dynamic_workflow",
+    "loop_region",
+    "human_review_region",
+    "remote_boundary"
+  ]);
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
   const badNodes = nodes
     .filter((node) => node && unsupportedNodeKinds.has(node.node_kind))
@@ -1177,6 +1183,14 @@ function assertRunnableGraphSupported() {
   if (badNodes.length > 0) {
     throw new Error(
       `runnable mode does not support these control-flow nodes yet: ${badNodes.join(", ")}. Use smoke mode or wait for route/loop/human-input lowering.`
+    );
+  }
+  const badContainers = nodes
+    .filter((node) => node && unsupportedContainerKinds.has(node.container_kind))
+    .map((node) => `${node.id} (${node.container_kind})`);
+  if (badContainers.length > 0) {
+    throw new Error(
+      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. Use smoke mode or wait for loop/human-review/remote/dynamic lowering.`
     );
   }
   const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
