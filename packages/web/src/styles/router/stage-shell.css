@@ -49,8 +49,15 @@
 }
 
 .af-step-active {
-  border-color: var(--text-strong);
-  background: var(--surface-muted);
+  border-color: var(--accent);
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.af-step-active .af-step-label {
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
 }
 
 .af-step-locked {
@@ -74,8 +81,8 @@
 }
 
 .af-step-active .af-step-index {
-  border-color: var(--text-strong);
-  background: var(--text-strong);
+  border-color: var(--accent);
+  background: var(--accent);
   color: var(--surface);
 }
 
@@ -205,6 +212,23 @@
   gap: var(--space-2xl);
 }
 
+/* compact inline notice (import/save/manifest messages) */
+.af-stage-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface-muted);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.af-stage-notice .is-error {
+  color: var(--danger-text);
+}
+
 /* ---- next-action CTA (strong guidance) ---- */
 .af-stage-cta {
   display: flex;
@@ -213,9 +237,11 @@
   padding-top: var(--space-sm);
 }
 
-.af-stage-cta .ui-button[aria-disabled="true"] {
+.af-stage-cta .ui-button[aria-disabled="true"],
+.af-stage-cta .ui-button:disabled {
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ---- narrow width: rail becomes a horizontal tab strip ---- */
