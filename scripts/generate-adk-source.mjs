@@ -1193,12 +1193,20 @@ function assertRunnableGraphSupported() {
   const unlowerableNodeKinds = new Set(["router", "loop_control", "human_input", "join", "remote_a2a"]);
   const badNodes = [];
   for (const node of nodes) {
-    if (!node || allowedBareKinds.has(node.node_kind)) continue;
+    if (!node) continue;
+    const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
+    if (allowedBareKinds.has(node.node_kind)) {
+      // input/output are synthetic and must have module_id null. If one is
+      // module-bound, resolve() (which checks module_id before node_kind) would
+      // lower it as a module symbol instead of START/terminal — reject it so the
+      // guard matches resolve()'s precedence exactly.
+      if (module) badNodes.push(`${node.id} (${node.node_kind} bound to a module)`);
+      continue;
+    }
     if (unlowerableNodeKinds.has(node.node_kind)) {
       badNodes.push(`${node.id} (${node.node_kind})`);
       continue;
     }
-    const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
     if (module) {
       if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
       continue;

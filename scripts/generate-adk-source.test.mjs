@@ -236,6 +236,8 @@ test("runnable mode emits an ADK Workflow graph and the editable bundle config",
 test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/fan-in)", () => {
   const cases = [
     { name: "module-bound human_input node", mutate: (pf) => pf.nodes.push({ id: "h1", node_kind: "human_input", module_id: "mod-gen-agent" }) },
+    { name: "module-bound input node", mutate: (pf) => { pf.nodes.find((n) => n.id === "in1").module_id = "mod-gen-agent"; } },
+    { name: "module-bound output node", mutate: (pf) => { pf.nodes.find((n) => n.id === "out1").module_id = "mod-gen-adapter"; } },
     { name: "router node", mutate: (pf) => pf.nodes.push({ id: "r1", node_kind: "router", module_id: null }) },
     { name: "module_id-null function node", mutate: (pf) => pf.nodes.push({ id: "f1", node_kind: "function", module_id: null }) },
     { name: "route edge", mutate: (pf) => { pf.edges[0].edge_kind = "route"; } },
