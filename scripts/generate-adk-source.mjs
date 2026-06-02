@@ -313,7 +313,7 @@ def _mcp_url(module_id: str, mcp_server: str) -> str:
     configured = _adapter_cfg(module_id, "mcp_url", None)
     if configured:
         return str(configured)
-    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:7878").rstrip("/")
+    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5176/api/mock-lab/mcp").rstrip("/")
     return f"{base}/{mcp_server}"
 
 
@@ -471,7 +471,7 @@ function buildEnvExample() {
 # Gemini provider key — required for runnable mode. Synthetic inputs only.
 GOOGLE_API_KEY=
 # Optional: base URL of the Mock Lab network MCP endpoint for connected adapters.
-# AF_MOCK_LAB_MCP_URL=http://127.0.0.1:7878
+# AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp
 `;
 }
 
@@ -674,7 +674,7 @@ take effect on the next run. Put your \`GOOGLE_API_KEY\` in \`.env\` (gitignored
 ## Adapters and the Mock Lab
 
 Connected adapters call a live Mock Lab MCP tool over streamable-HTTP
-(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:7878\`). Adapters with no
+(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:5176/api/mock-lab/mcp\`). Adapters with no
 bound/running Mock Lab server stay as TODO stubs returning reviewed synthetic
 mock output and are listed under \`runtime.unconnected_adapters\` in
 \`workflow_manifest.json\`.

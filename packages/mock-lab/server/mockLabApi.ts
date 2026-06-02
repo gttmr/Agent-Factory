@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadCatalogPrefill } from "./catalogPrefillLoader";
+import { createMcpNetworkBridge } from "./mcpNetworkBridge";
 import { MockGenerationRegistry, readRunDetail } from "./mockRunner";
 import { MockProcessRegistry } from "./mockProcessRegistry";
 import { MockLabError, MockSpecStore } from "./mockSpecStore";
@@ -14,11 +15,24 @@ export function createMockLabMiddleware(repoRoot: string) {
   const store = new MockSpecStore({ repoRoot });
   const registry = new MockProcessRegistry({ repoRoot, store });
   const generationRegistry = new MockGenerationRegistry({ repoRoot, store });
+  const mcpBridge = createMcpNetworkBridge(registry, store);
 
   return async function mockLabMiddleware(req: IncomingMessage, res: ServerResponse, next: MiddlewareNext): Promise<void> {
     try {
       const parsed = parsePath(req);
       if (!parsed) return sendJson(res, 404, { error: "경로를 해석할 수 없습니다." });
+
+      // Network MCP exposure. Routed before any body read so the SDK transport
+      // can consume the raw request stream itself.
+      if (parsed.segments[0] === "mcp-discovery") {
+        const query = new URL(req.url ?? "", "http://mock-lab.local").searchParams;
+        return await mcpBridge.handleDiscovery(req, res, query);
+      }
+      if (parsed.segments[0] === "mcp") {
+        const key = parsed.segments[1];
+        if (!key) return sendJson(res, 404, { error: "mcp/<server> 경로가 필요합니다." });
+        return await mcpBridge.handleMcpRequest(req, res, key);
+      }
 
       if (parsed.segments.length === 0) {
         if (req.method === "GET") return sendJson(res, 200, await store.listMocks());
