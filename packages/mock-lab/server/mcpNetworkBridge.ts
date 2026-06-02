@@ -25,7 +25,7 @@ const SESSION_TTL_MS = 10 * 60 * 1000;
 interface SessionEntry {
   transport: StreamableHTTPServerTransport;
   server: Server;
-  createdAt: number;
+  lastSeen: number;
 }
 
 export function createMcpNetworkBridge(registry: MockProcessRegistry, store: MockSpecStore) {
@@ -38,7 +38,7 @@ export function createMcpNetworkBridge(registry: MockProcessRegistry, store: Moc
   function sweepStaleSessions(): void {
     const now = Date.now();
     for (const [id, entry] of sessions) {
-      if (now - entry.createdAt > SESSION_TTL_MS) {
+      if (now - entry.lastSeen > SESSION_TTL_MS) {
         sessions.delete(id);
         void entry.transport.close();
       }
@@ -77,6 +77,7 @@ export function createMcpNetworkBridge(registry: MockProcessRegistry, store: Moc
         sendJson(res, 404, { error: "Unknown or expired mcp-session-id." });
         return;
       }
+      entry.lastSeen = Date.now();
       await entry.transport.handleRequest(req, res);
       return;
     }
@@ -104,7 +105,7 @@ export function createMcpNetworkBridge(registry: MockProcessRegistry, store: Moc
       sessionIdGenerator: () => randomUUID(),
       enableJsonResponse: true,
       onsessioninitialized: (id) => {
-        sessions.set(id, { transport, server, createdAt: Date.now() });
+        sessions.set(id, { transport, server, lastSeen: Date.now() });
       }
     });
     // Only forget the session here; the SDK is already tearing the transport

@@ -218,6 +218,7 @@ root_agent = SyntheticRuntimeSmokeAgent(
 }
 
 function buildRunnableAgentPy() {
+  assertRunnableGraphSupported();
   const { edges, joins } = buildRunnableGraph();
   const orderedModules = orderedGraphModules();
   assertNoSymbolCollisions(orderedModules);
@@ -317,6 +318,32 @@ def _mcp_url(module_id: str, mcp_server: str) -> str:
     return f"{base}/{mcp_server}"
 
 
+def _collect_tool_inputs(
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
+) -> dict:
+    # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
+    # input_map (tool_input -> state/output key), (2) a top-level session-state
+    # value, or (3) a matching field inside an upstream node's *_output payload.
+    overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    args: dict = {}
+    for name in input_names:
+        source_key = overrides.get(name, name)
+        if ctx.state.get(source_key) is not None:
+            args[name] = ctx.state.get(source_key)
+            continue
+        for key, value in ctx.state.items():
+            if key.endswith("_output") and isinstance(value, dict) and value.get(name) is not None:
+                args[name] = value.get(name)
+                break
+    missing = [name for name in required_names if name not in args]
+    if missing:
+        raise RuntimeError(
+            f"{module_id}: required MCP tool inputs missing from session state / upstream outputs: {missing}. "
+            "Set an input_map for this adapter in agents.config.yaml."
+        )
+    return args
+
+
 ${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}# ---------------------------------------------------------------------------
 # Graph nodes
 # ---------------------------------------------------------------------------
@@ -389,18 +416,9 @@ function emitConnectedAdapterFunc(module) {
     from mcp.client.streamable_http import streamablehttp_client
 
     url = _mcp_url(${toPyStr(module.id)}, ${toPyStr(module.mcp_server)})
-    # TODO: map upstream node outputs (the *_output state keys) to these tool
-    # inputs once the bound Mock Lab tool schema is known. For now arguments are
-    # read from session state by reviewed input name.
-    input_names = ${toPythonLiteral(inputNames)}
-    required_names = ${toPythonLiteral(requiredNames)}
-    arguments = {name: ctx.state.get(name) for name in input_names if ctx.state.get(name) is not None}
-    missing = [name for name in required_names if name not in arguments]
-    if missing:
-        raise RuntimeError(
-            f"${escapePythonString(module.id)}: required MCP tool inputs missing from session state: {missing}. "
-            "Map upstream outputs to these inputs (agents.config.yaml / Mock Lab tool schema)."
-        )
+    arguments = _collect_tool_inputs(
+        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}
+    )
     async with streamablehttp_client(url) as (read_stream, write_stream, _close):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
@@ -453,6 +471,9 @@ function buildAgentsConfig() {
     lines.push(`    mcp_server: ${module.mcp_server ? module.mcp_server : "null"}`);
     lines.push(`    mcp_tool: ${module.mcp_tool_name ? module.mcp_tool_name : "null"}`);
     lines.push("    mcp_url: null  # default: $AF_MOCK_LAB_MCP_URL/<mcp_server>");
+    if (connected) {
+      lines.push("    input_map: {}  # optional: {tool_input_name: state_or_upstream_output_key}");
+    }
   }
 
   const workflows = modules.filter((module) => module.module_category === "workflow");
@@ -1137,6 +1158,34 @@ function assertAcyclic(edges) {
     const inCycle = [...nodes].filter((node) => inDegree.get(node) > 0);
     throw new Error(
       `runnable mode does not support cyclic/loop Graph IR yet (cycle involves: ${inCycle.join(", ")}). Use smoke mode or wait for loop lowering.`
+    );
+  }
+}
+
+// Runnable v1 lowers a DAG with fan-out/fan-in only. Conditional routing, loops,
+// human-input, and remote boundary crossing are NOT lowered yet — emitting them
+// as plain edges would silently produce a wrong graph, so reject them up front
+// rather than mis-generate. (Sets are declared inside the function to avoid a
+// temporal-dead-zone with the top-level buildFiles() call.)
+function assertRunnableGraphSupported() {
+  const unsupportedNodeKinds = new Set(["router", "loop_control", "human_input"]);
+  const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
+  const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
+  const badNodes = nodes
+    .filter((node) => node && unsupportedNodeKinds.has(node.node_kind))
+    .map((node) => `${node.id} (${node.node_kind})`);
+  if (badNodes.length > 0) {
+    throw new Error(
+      `runnable mode does not support these control-flow nodes yet: ${badNodes.join(", ")}. Use smoke mode or wait for route/loop/human-input lowering.`
+    );
+  }
+  const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
+  const badEdges = edges
+    .filter((edge) => edge && unsupportedExecSemantics.has(edge.execution_semantics))
+    .map((edge) => `${edge.from}->${edge.to} (${edge.execution_semantics})`);
+  if (badEdges.length > 0) {
+    throw new Error(
+      `runnable mode does not support these edge semantics yet: ${badEdges.join(", ")}. Use smoke mode or wait for route/loop/remote lowering.`
     );
   }
 }

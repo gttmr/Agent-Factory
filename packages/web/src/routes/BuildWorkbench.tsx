@@ -499,11 +499,12 @@ export default function BuildWorkbench() {
             <li>blockers: {generatedPlan.validation.blockers.length}건, warnings: {generatedPlan.validation.warnings.length}건</li>
             {outputMode === "runnable" ? (
               <li>
-                어댑터 MCP 연결: connected {adapterConnections.connected.length} · unconnected{" "}
+                어댑터 MCP 바인딩(선언): 선언됨 {adapterConnections.connected.length} · 미선언{" "}
                 {adapterConnections.unconnected.length}
                 {adapterConnections.unconnected.length > 0
-                  ? ` (미연결: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
+                  ? ` (미선언: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
                   : ""}
+                . 실제 연결 여부는 실행 시 Mock Lab MCP discovery로 확인합니다.
               </li>
             ) : null}
           </ul>
@@ -539,7 +540,11 @@ export default function BuildWorkbench() {
       <Panel>
         <SectionHeader
           title="Runtime stub"
-          description="scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 ADK 2.0 stub 을 생성합니다. business logic 은 TODO 로만 남습니다."
+          description={
+            outputMode === "runnable"
+              ? "scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 실행형 ADK 2.1 Workflow(Gemini LlmAgent + Mock Lab MCP 어댑터)를 생성합니다. 승인된 artifact 에서만 생성되며 private endpoint/credential/실데이터는 포함하지 않습니다."
+              : "scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 synthetic smoke stub 을 생성합니다. business logic 은 TODO 로만 남습니다."
+          }
           action={
             <Button
               type="button"
