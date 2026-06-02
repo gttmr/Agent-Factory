@@ -40,3 +40,4 @@
 @import "./router/a2a-contract.css" layer(router);
 @import "./router/analyze-progress.css" layer(router);
 @import "./router/stage-runner.css" layer(router);
+@import "./router/stage-shell.css" layer(router);

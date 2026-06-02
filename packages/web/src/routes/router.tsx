@@ -8,6 +8,7 @@ const AnalyzeWorkbench = lazy(() => import("./AnalyzeWorkbench"));
 const DesignWorkbench = lazy(() => import("./DesignWorkbench"));
 const BuildWorkbench = lazy(() => import("./BuildWorkbench"));
 const VerifyWorkbench = lazy(() => import("./VerifyWorkbench"));
+const RunSandbox = lazy(() => import("./RunSandbox"));
 const ReuseHubPage = lazy(() => import("./ReuseHubPage"));
 
 function PageFallback() {
@@ -67,6 +68,14 @@ export function AppRouter() {
           element={
             <WorkbenchLayout>
               <VerifyWorkbench />
+            </WorkbenchLayout>
+          }
+        />
+        <Route
+          path="/af/:reqId/run"
+          element={
+            <WorkbenchLayout>
+              <RunSandbox />
             </WorkbenchLayout>
           }
         />
