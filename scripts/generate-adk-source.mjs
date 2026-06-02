@@ -1212,14 +1212,24 @@ function assertRunnableGraphSupported() {
     );
   }
   const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
+  // resolve() maps input only as a source (→START) and drops output as a target
+  // (terminal). A reversed-polarity edge (output as source, or input as target)
+  // would survive the kind/semantic checks but silently drop an endpoint and
+  // disconnect the graph — reject it so the guard and lowering agree exactly.
   const badEdges = edges
-    .filter(
-      (edge) =>
-        edge &&
-        (unsupportedExecSemantics.has(edge.execution_semantics) ||
-          unsupportedEdgeKinds.has(edge.edge_kind) ||
-          edge.is_remote_boundary_crossing === true)
-    )
+    .filter((edge) => {
+      if (!edge) return false;
+      if (
+        unsupportedExecSemantics.has(edge.execution_semantics) ||
+        unsupportedEdgeKinds.has(edge.edge_kind) ||
+        edge.is_remote_boundary_crossing === true
+      ) {
+        return true;
+      }
+      const fromNode = graph.nodesById.get(edge.from);
+      const toNode = graph.nodesById.get(edge.to);
+      return fromNode?.node_kind === "output" || toNode?.node_kind === "input";
+    })
     .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
   if (badEdges.length > 0) {
     throw new Error(
