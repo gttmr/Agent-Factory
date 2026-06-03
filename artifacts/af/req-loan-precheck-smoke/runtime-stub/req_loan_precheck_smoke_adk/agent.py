@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from typing import AsyncGenerator
+import os
+from pathlib import Path
 from typing import Any
 
-from google.adk.agents import BaseAgent
-from google.adk.agents.invocation_context import InvocationContext
-from google.adk.events import Event
-from google.genai import types
+import yaml
+
+from google.adk import Context
+from google.adk.agents import LlmAgent
+from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 
 
-COMPONENT_CONTRACTS = {
+# Reviewed contract data for each approved module (synthetic test doubles only).
+COMPONENT_CONTRACTS: dict[str, dict] = {
     "mod-loan-precheck-workflow": {
+        "module_category": "workflow",
         "catalog_binding": {
             "catalog_id": "seed-workflow-loan_application_precheck_mock_workflow",
             "name": "loan_application_precheck_mock_workflow",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-            "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -77,17 +81,24 @@ COMPONENT_CONTRACTS = {
                 "route_to_manual_reviewer",
                 "preview_customer_notice_only"
             ]
-        }
+        },
+        "instruction": None,
+        "model": None,
+        "access_protocol": None,
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "n/a"
     },
     "mod-common-document-intake": {
+        "module_category": "workflow",
         "catalog_binding": {
             "catalog_id": "seed-workflow-common_document_intake_mock_workflow",
             "name": "common_document_intake_mock_workflow",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-            "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -150,17 +161,24 @@ COMPONENT_CONTRACTS = {
             "intake_warnings": [
                 "synthetic_document_context"
             ]
-        }
+        },
+        "instruction": None,
+        "model": None,
+        "access_protocol": None,
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "n/a"
     },
     "mod-customer-account-snapshot": {
+        "module_category": "adapter",
         "catalog_binding": {
             "catalog_id": "seed-adapter-customer_account_snapshot_mock_adapter",
             "name": "customer_account_snapshot_mock_adapter",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-            "Map reviewed inputs and outputs before replacing the TODO boundary."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -214,17 +232,24 @@ COMPONENT_CONTRACTS = {
                 "as_of": "2026-05-01T09:00:00+09:00",
                 "synthetic": True
             }
-        }
+        },
+        "instruction": None,
+        "model": None,
+        "access_protocol": "local",
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "unconnected"
     },
     "mod-loan-precheck-rule": {
+        "module_category": "adapter",
         "catalog_binding": {
             "catalog_id": "seed-adapter-loan_precheck_rule_mock_adapter",
             "name": "loan_precheck_rule_mock_adapter",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-            "Map reviewed inputs and outputs before replacing the TODO boundary."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -283,17 +308,24 @@ COMPONENT_CONTRACTS = {
                 "request_employment_certificate",
                 "route_to_manual_reviewer"
             ]
-        }
+        },
+        "instruction": None,
+        "model": None,
+        "access_protocol": "local",
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "unconnected"
     },
     "mod-loan-document-review": {
+        "module_category": "agent",
         "catalog_binding": {
             "catalog_id": "seed-agent-loan_document_review_mock_agent",
             "name": "loan_document_review_mock_agent",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-            "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -353,17 +385,24 @@ COMPONENT_CONTRACTS = {
                 "재직증명서 최신본을 추가 제출해야 합니다.",
                 "신청서 소득 금액과 소득증빙 금액 차이를 확인해야 합니다."
             ]
-        }
+        },
+        "instruction": "You are \"loan_document_review_mock_agent\".\nResponsibility: OCR와 정책 조회 결과를 바탕으로 대출 신청 서류의 누락, 불일치, 보완 필요 사항을 synthetic rule로 정리한다.\nInputs you receive: document_context, policy_matches.\nOutputs you must produce: document_review_result, missing_documents, followup_questions.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 문서 누락과 불일치를 synthetic evidence 기반으로 설명한다.",
+        "model": "gemini-2.5-flash",
+        "access_protocol": None,
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "n/a"
     },
     "mod-credit-risk-reasoning": {
+        "module_category": "agent",
         "catalog_binding": {
             "catalog_id": "seed-agent-credit_risk_reasoning_mock_agent",
             "name": "credit_risk_reasoning_mock_agent",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-            "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -429,17 +468,24 @@ COMPONENT_CONTRACTS = {
                 "자동 승인/거절이 아니라 담당자 검토 큐로 전달합니다.",
                 "synthetic demo 데이터이며 실제 신용 판단에 사용할 수 없습니다."
             ]
-        }
+        },
+        "instruction": "You are \"credit_risk_reasoning_mock_agent\".\nResponsibility: 고객 snapshot, rule result, 문서 검토 결과를 모아 사람이 확인할 위험 근거와 다음 조치를 설명한다.\nInputs you receive: customer_snapshot, rule_result, document_review_result.\nOutputs you must produce: risk_reasoning, approval_required, reviewer_notes.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 담당자가 확인할 위험 근거와 다음 조치를 설명한다.",
+        "model": "gemini-2.5-flash",
+        "access_protocol": None,
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "n/a"
     },
     "mod-customer-notice-template": {
+        "module_category": "adapter",
         "catalog_binding": {
             "catalog_id": "seed-adapter-customer_notice_template_mock_adapter",
             "name": "customer_notice_template_mock_adapter",
             "component_source": "stub"
         },
         "developer_todos": [
-            "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-            "Map reviewed inputs and outputs before replacing the TODO boundary."
+            "Review the catalog runtime contract and configure its runtime binding before invocation.",
+            "Map reviewed inputs and outputs before wiring runtime behavior."
         ],
         "inputs": [
             {
@@ -495,200 +541,235 @@ COMPONENT_CONTRACTS = {
                 "requires_human_approval": True,
                 "synthetic": True
             }
-        }
+        },
+        "instruction": None,
+        "model": None,
+        "access_protocol": "local",
+        "mcp_server": None,
+        "mcp_tool_name": None,
+        "connection_status": "unconnected"
     }
 }
-GRAPH_EDGES = [
-    ("START", "node_mod_loan_precheck_workflow"),
-    ("node_mod_loan_precheck_workflow", "node_mod_common_document_intake"),
-    ("node_mod_loan_precheck_workflow", "node_mod_customer_account_snapshot"),
-    ("node_mod_common_document_intake", "node_mod_loan_document_review"),
-    ("node_mod_customer_account_snapshot", "node_mod_loan_precheck_rule"),
-    ("node_mod_loan_document_review", "node_mod_credit_risk_reasoning"),
-    ("node_mod_loan_precheck_rule", "node_mod_credit_risk_reasoning"),
-    ("node_mod_credit_risk_reasoning", "node_mod_customer_notice_template"),
-    ("node_mod_customer_notice_template", "emit_workflow_result"),
-    ("node_mod_credit_risk_reasoning", "emit_workflow_result")
-]
-TERMINAL_OUTPUTS = [
-    "precheck_result",
-    "approval_required",
-    "next_actions"
-]
+
+# Per-developer overrides live in agents.config.yaml (sibling of this package).
+# This is how each developer individualizes the bundle; agent.py applies the
+# overrides at import time so editing the YAML actually changes behavior.
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "agents.config.yaml"
 
 
-def _event_output(module_id: str, module_name: str, node_input: Any = None):
-    contract = COMPONENT_CONTRACTS[module_id]
-    return {
-        "module_id": module_id,
-        "module_name": module_name,
-        "input": node_input,
+def _load_config() -> dict:
+    if not _CONFIG_PATH.exists():
+        return {}
+    try:
+        return yaml.safe_load(_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # malformed YAML, permissions, etc.
+        import sys
+
+        print(
+            f"[agent.py] WARNING: could not load {_CONFIG_PATH.name} ({exc}); "
+            "using seeded defaults.",
+            file=sys.stderr,
+        )
+        return {}
+
+
+_CONFIG = _load_config()
+
+
+def _override(section: str, module_id: str, key: str, default: Any) -> Any:
+    for entry in _CONFIG.get(section, []) or []:
+        if isinstance(entry, dict) and entry.get("id") == module_id:
+            value = entry.get(key)
+            if value is not None:
+                return value
+    return default
+
+
+def _agent_cfg(module_id: str, key: str, default: Any) -> Any:
+    return _override("agents", module_id, key, default)
+
+
+def _model_for(module_id: str, seed: str) -> str:
+    # Per-agent override wins; then the top-level default_model knob; then the seed.
+    per_agent = _override("agents", module_id, "model", None)
+    if per_agent:
+        return str(per_agent)
+    default_model = _CONFIG.get("default_model")
+    return str(default_model) if default_model else seed
+
+
+def _adapter_cfg(module_id: str, key: str, default: Any) -> Any:
+    return _override("adapters", module_id, key, default)
+
+
+def _mcp_url(module_id: str, mcp_server: str) -> str:
+    configured = _adapter_cfg(module_id, "mcp_url", None)
+    if configured:
+        return str(configured)
+    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5176/api/mock-lab/mcp").rstrip("/")
+    return f"{base}/{mcp_server}"
+
+
+def _collect_tool_inputs(
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
+) -> dict:
+    # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
+    # input_map (tool_input -> state/output key), (2) a top-level session-state
+    # value, or (3) a matching field inside an upstream node's *_output payload.
+    overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    args: dict = {}
+    for name in input_names:
+        source_key = overrides.get(name, name)
+        if ctx.state.get(source_key) is not None:
+            args[name] = ctx.state.get(source_key)
+            continue
+        # Fall back to a field named source_key inside any upstream *_output dict.
+        for key, value in ctx.state.items():
+            if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
+                args[name] = value.get(source_key)
+                break
+    missing = [name for name in required_names if name not in args]
+    if missing:
+        raise RuntimeError(
+            f"{module_id}: required MCP tool inputs missing from session state / upstream outputs: {missing}. "
+            "Set an input_map for this adapter in agents.config.yaml."
+        )
+    return args
+
+
+async def _fn_mod_loan_precheck_workflow(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: loan_application_precheck_mock_workflow — deterministic workflow coordinator placeholder.
+
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
+    contract = COMPONENT_CONTRACTS["mod-loan-precheck-workflow"]
+    payload = {
+        "module_id": "mod-loan-precheck-workflow",
+        "module_name": "loan_application_precheck_mock_workflow",
+        "connection_status": "coordinator",
         "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
         "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
     }
+    ctx.state["mod_loan_precheck_workflow_output"] = payload
+    return payload
 
+async def _fn_mod_common_document_intake(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: common_document_intake_mock_workflow — deterministic workflow coordinator placeholder.
 
-def TODO_IMPLEMENT_HERE_mod_loan_precheck_workflow(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("loan_application_precheck_mock_workflow requires developer implementation")
-
-
-def node_mod_loan_precheck_workflow(node_input: Any = None):
-    contract = COMPONENT_CONTRACTS["mod-loan-precheck-workflow"]
-    output = _event_output("mod-loan-precheck-workflow", "loan_application_precheck_mock_workflow", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_loan_precheck_workflow"
-    return output
-
-def TODO_IMPLEMENT_HERE_mod_common_document_intake(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("common_document_intake_mock_workflow requires developer implementation")
-
-
-def node_mod_common_document_intake(node_input: Any = None):
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
     contract = COMPONENT_CONTRACTS["mod-common-document-intake"]
-    output = _event_output("mod-common-document-intake", "common_document_intake_mock_workflow", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_common_document_intake"
-    return output
+    payload = {
+        "module_id": "mod-common-document-intake",
+        "module_name": "common_document_intake_mock_workflow",
+        "connection_status": "coordinator",
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
+    }
+    ctx.state["mod_common_document_intake_output"] = payload
+    return payload
 
-def TODO_IMPLEMENT_HERE_mod_customer_account_snapshot(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("customer_account_snapshot_mock_adapter requires developer implementation")
+async def _fn_mod_customer_account_snapshot(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: customer_account_snapshot_mock_adapter — unconnected adapter (no Mock Lab MCP server bound).
 
-
-def node_mod_customer_account_snapshot(node_input: Any = None):
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
     contract = COMPONENT_CONTRACTS["mod-customer-account-snapshot"]
-    output = _event_output("mod-customer-account-snapshot", "customer_account_snapshot_mock_adapter", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_customer_account_snapshot"
-    return output
+    payload = {
+        "module_id": "mod-customer-account-snapshot",
+        "module_name": "customer_account_snapshot_mock_adapter",
+        "connection_status": "unconnected",
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
+    }
+    ctx.state["mod_customer_account_snapshot_output"] = payload
+    return payload
 
-def TODO_IMPLEMENT_HERE_mod_loan_precheck_rule(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("loan_precheck_rule_mock_adapter requires developer implementation")
+async def _fn_mod_loan_precheck_rule(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: loan_precheck_rule_mock_adapter — unconnected adapter (no Mock Lab MCP server bound).
 
-
-def node_mod_loan_precheck_rule(node_input: Any = None):
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
     contract = COMPONENT_CONTRACTS["mod-loan-precheck-rule"]
-    output = _event_output("mod-loan-precheck-rule", "loan_precheck_rule_mock_adapter", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_loan_precheck_rule"
-    return output
+    payload = {
+        "module_id": "mod-loan-precheck-rule",
+        "module_name": "loan_precheck_rule_mock_adapter",
+        "connection_status": "unconnected",
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
+    }
+    ctx.state["mod_loan_precheck_rule_output"] = payload
+    return payload
 
-def TODO_IMPLEMENT_HERE_mod_loan_document_review(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("loan_document_review_mock_agent requires developer implementation")
+async def _fn_mod_customer_notice_template(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: customer_notice_template_mock_adapter — unconnected adapter (no Mock Lab MCP server bound).
 
-
-def node_mod_loan_document_review(node_input: Any = None):
-    contract = COMPONENT_CONTRACTS["mod-loan-document-review"]
-    output = _event_output("mod-loan-document-review", "loan_document_review_mock_agent", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_loan_document_review"
-    return output
-
-def TODO_IMPLEMENT_HERE_mod_credit_risk_reasoning(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("credit_risk_reasoning_mock_agent requires developer implementation")
-
-
-def node_mod_credit_risk_reasoning(node_input: Any = None):
-    contract = COMPONENT_CONTRACTS["mod-credit-risk-reasoning"]
-    output = _event_output("mod-credit-risk-reasoning", "credit_risk_reasoning_mock_agent", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_credit_risk_reasoning"
-    return output
-
-def TODO_IMPLEMENT_HERE_mod_customer_notice_template(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("customer_notice_template_mock_adapter requires developer implementation")
-
-
-def node_mod_customer_notice_template(node_input: Any = None):
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
     contract = COMPONENT_CONTRACTS["mod-customer-notice-template"]
-    output = _event_output("mod-customer-notice-template", "customer_notice_template_mock_adapter", node_input)
-    output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "TODO_IMPLEMENT_HERE_mod_customer_notice_template"
-    return output
-
-
-def emit_workflow_result(node_input: Any = None):
-    return {
-        "node_id": "workflow_result",
-        "terminal_outputs": TERMINAL_OUTPUTS,
-        "input": node_input,
-        "status": "runtime_mock_smoke",
+    payload = {
+        "module_id": "mod-customer-notice-template",
+        "module_name": "customer_notice_template_mock_adapter",
+        "connection_status": "unconnected",
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
     }
+    ctx.state["mod_customer_notice_template_output"] = payload
+    return payload
 
 
-def _synthetic_module_outputs():
-    return {
-        module_id: {
-            "module_name": contract["catalog_binding"]["name"] if contract.get("catalog_binding") else module_id,
-            "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
-            "runtime_mock": contract.get("runtime_mock"),
-            "developer_todos": contract["developer_todos"],
-        }
-        for module_id, contract in COMPONENT_CONTRACTS.items()
-    }
+# ---------------------------------------------------------------------------
+# Graph nodes
+# ---------------------------------------------------------------------------
+
+node_mod_loan_precheck_workflow = FunctionNode(func=_fn_mod_loan_precheck_workflow, name="mod_loan_precheck_workflow")
+
+node_mod_common_document_intake = FunctionNode(func=_fn_mod_common_document_intake, name="mod_common_document_intake")
+
+node_mod_customer_account_snapshot = FunctionNode(func=_fn_mod_customer_account_snapshot, name="mod_customer_account_snapshot")
+
+node_mod_loan_precheck_rule = FunctionNode(func=_fn_mod_loan_precheck_rule, name="mod_loan_precheck_rule")
+
+agent_mod_loan_document_review = LlmAgent(
+    name="mod_loan_document_review",
+    model=_model_for("mod-loan-document-review", "gemini-2.5-flash"),
+    instruction=_agent_cfg("mod-loan-document-review", "instruction", "You are \"loan_document_review_mock_agent\".\nResponsibility: OCR와 정책 조회 결과를 바탕으로 대출 신청 서류의 누락, 불일치, 보완 필요 사항을 synthetic rule로 정리한다.\nInputs you receive: document_context, policy_matches.\nOutputs you must produce: document_review_result, missing_documents, followup_questions.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 문서 누락과 불일치를 synthetic evidence 기반으로 설명한다."),
+    description="loan_document_review_mock_agent",
+    output_key="mod_loan_document_review_output",
+    mode="single_turn",
+)
+
+agent_mod_credit_risk_reasoning = LlmAgent(
+    name="mod_credit_risk_reasoning",
+    model=_model_for("mod-credit-risk-reasoning", "gemini-2.5-flash"),
+    instruction=_agent_cfg("mod-credit-risk-reasoning", "instruction", "You are \"credit_risk_reasoning_mock_agent\".\nResponsibility: 고객 snapshot, rule result, 문서 검토 결과를 모아 사람이 확인할 위험 근거와 다음 조치를 설명한다.\nInputs you receive: customer_snapshot, rule_result, document_review_result.\nOutputs you must produce: risk_reasoning, approval_required, reviewer_notes.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 담당자가 확인할 위험 근거와 다음 조치를 설명한다."),
+    description="credit_risk_reasoning_mock_agent",
+    output_key="mod_credit_risk_reasoning_output",
+    mode="single_turn",
+)
+
+node_mod_customer_notice_template = FunctionNode(func=_fn_mod_customer_notice_template, name="mod_customer_notice_template")
+
+join_1 = JoinNode(name="join_1")
 
 
-def _build_smoke_text(user_text: str = ""):
-    mock_count = sum(1 for contract in COMPONENT_CONTRACTS.values() if contract.get("runtime_mock") is not None)
-    terminal_outputs = ", ".join(TERMINAL_OUTPUTS) if TERMINAL_OUTPUTS else "none"
-    user_note = f" Received message: {user_text[:160]}" if user_text else ""
-    return (
-        "ADK runtime smoke for req_loan_precheck_smoke_adk: "
-        f"{len(COMPONENT_CONTRACTS)} approved modules loaded, "
-        f"{mock_count} synthetic runtime mocks available. "
-        f"Terminal outputs: {terminal_outputs}. "
-        "This response uses reviewed synthetic test doubles only; it is not real business logic."
-        f"{user_note}"
-    )
-
-
-def _latest_user_text(ctx: InvocationContext):
-    try:
-        events = list(getattr(ctx.session, "events", []) or [])
-    except Exception:
-        return ""
-    for event in reversed(events):
-        content = getattr(event, "content", None)
-        if not content or getattr(content, "role", None) != "user":
-            continue
-        parts = getattr(content, "parts", []) or []
-        text = "".join(getattr(part, "text", "") or "" for part in parts)
-        if text.strip():
-            return text.strip()
-    return ""
-
-
-class SyntheticRuntimeSmokeAgent(BaseAgent):
-    async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
-        yield Event(
-            invocation_id=ctx.invocation_id,
-            author=self.name,
-            branch=ctx.branch,
-            content=types.Content(
-                role="model",
-                parts=[types.Part(text=_build_smoke_text(_latest_user_text(ctx)))],
-            ),
-            output={
-                "status": "runtime_mock_smoke",
-                "guardrails": {
-                    "raw_requirement_to_code": False,
-                    "generated_business_logic": False,
-                    "private_data_or_endpoints": False,
-                },
-                "graph_edges": GRAPH_EDGES,
-                "terminal_outputs": TERMINAL_OUTPUTS,
-                "module_outputs": _synthetic_module_outputs(),
-            },
-        )
-
-
-root_agent = SyntheticRuntimeSmokeAgent(
+root_agent = Workflow(
     name="req_loan_precheck_smoke_adk",
-    description="Synthetic ADK runtime smoke bridge for reviewed Agent Factory handoff artifacts.",
+    description="Runnable ADK 2.1 workflow generated from reviewed Agent Factory artifacts for Synthetic loan precheck graph runtime handoff.",
+    edges=[
+        (agent_mod_loan_document_review, join_1),
+        (node_mod_loan_precheck_rule, join_1),
+        (join_1, agent_mod_credit_risk_reasoning),
+        (START, node_mod_loan_precheck_workflow),
+        (node_mod_loan_precheck_workflow, node_mod_common_document_intake),
+        (node_mod_loan_precheck_workflow, node_mod_customer_account_snapshot),
+        (node_mod_common_document_intake, agent_mod_loan_document_review),
+        (node_mod_customer_account_snapshot, node_mod_loan_precheck_rule),
+        (agent_mod_credit_risk_reasoning, node_mod_customer_notice_template),
+    ],
 )

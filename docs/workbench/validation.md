@@ -61,15 +61,18 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 - `runtime_mock`은 local smoke용 test double이며 synthetic data만 허용한다. private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 담지 않는다.
 - `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
 - `a2aContracts`는 Remote A2A 후보의 reviewed handoff다. DesignWorkbench의 `Remote A2A` 탭에서 모든 Remote A2A 후보가 매칭 계약을 갖고 `contract_status: approved`이며 readiness issue가 없어야 `runtime_contracts_approved` 게이트를 새로 켤 수 있다.
-- runnable business logic은 out of scope다.
-- `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성하며 TODO runtime wiring handoff로만 취급한다.
+- `output_mode`는 `smoke`(기본, 부재 시 smoke로 간주) 또는 `runnable`이다. validator는 `smoke`에서 모든 module이 `no_runnable_business_logic: true`와 category별 shell/stub `scaffold_output`을 갖도록, `runnable`에서는 `no_runnable_business_logic: false`와 `scaffold_output: "runnable"`을 갖도록 강제한다.
+- `source: approved_workbench_artifact`와 `raw_requirement_to_code: false`는 두 mode 모두에서 불변이다. runnable mode도 raw requirement가 아니라 승인된 artifact에서만 source를 생성한다.
+- adapter의 MCP 바인딩(`access_protocol: "mcp"` + `mcp_server` + `mcp_tool_name`)은 완전해야 하며 부분 바인딩은 validator가 거부한다. 바인딩이 없는 adapter는 unconnected로 표시되어 synthetic stub으로 생성된다.
+- `af-build-runtime-stub` output은 기본적으로 `artifacts/af/<req-id>/runtime-stub/`에 생성한다. smoke는 synthetic TODO handoff를, runnable은 reviewed synthetic wiring(`LlmAgent` + Mock Lab MCP)을 emit하되 두 mode 모두 private endpoint, credential, 실데이터를 담지 않는다.
 
 현재 ADK Runtime Handoff는 두 단계로 나뉘어 있다.
 
-- `/af/:reqId/build` (BuildWorkbench)는 분석 + seed catalog를 입력으로 client-side에서 `scaffold-plan.json`을 도출해 artifact root에 PUT하고, `POST /api/af/:id/runtime-stub/build`로 `scripts/generate-adk-source.mjs`를 spawn해 `runtime-stub/`을 채운다. 생성된 파일 목록과 텍스트 미리보기(< 500KB)를 노출하고 `implementation-handoff.md`를 inline 편집한다. Runtime stub이 존재하면 같은 화면의 `ADK Chat 연결` 패널에서 `runtime-stub/.venv`에 ADK dependency를 설치하고, 로컬 `adk api_server --with_ui`를 별도 포트(`8765`)로 시작해 ADK session 생성과 `/run` smoke 메시지를 보낼 수 있다.
+- `/af/:reqId/build` (BuildWorkbench)는 분석 + seed catalog를 입력으로 client-side에서 `scaffold-plan.json`을 도출해 artifact root에 PUT하고, `POST /api/af/:id/runtime-stub/build`로 `scripts/generate-adk-source.mjs`를 spawn해 `runtime-stub/`을 채운다. Scaffold plan 패널의 `smoke` / `runnable` 토글이 `output_mode`를 결정한다. `runnable`에서는 어댑터의 MCP 연결 상태(connected/unconnected)를 함께 표시하고, 실행에는 `runtime-stub/.env`의 `GOOGLE_API_KEY`가 필요하다. 생성된 파일 목록과 텍스트 미리보기(< 500KB)를 노출하고 `implementation-handoff.md`를 inline 편집한다. BuildWorkbench는 `StageShell`로 1실행(scaffold·stub 생성)·2검토(stub 파일·handoff)·3승인(`stub_ready_for_followup`)으로 나뉜다. ADK 런타임 연결은 BuildWorkbench가 아니라 게이트 없는 `실행` 화면에 있다(아래 `/af/:reqId/run` 참고).
+- `/af/:reqId/run` (RunSandbox, 승인 게이트 없음)은 `runtime-stub/`이 존재하면 `runtime-stub/.venv`에 ADK dependency를 설치하고, 로컬 `adk api_server --with_ui`를 별도 포트(`8765`)로 시작/중지하며 상태를 폴링하고, ADK 공식 dev UI(`web_url`)를 새 탭으로 연다. AF 자체 간이 챗은 제거했다(ADK가 `--with_ui`로 완성도 높은 chat/trace UI를 이미 제공). `adk api_server`는 `runtime-stub/.env`를 자동 로드하므로 키가 spawn argv에 노출되지 않는다.
 - `/af/:reqId/verify` (VerifyWorkbench)는 고정 allow-list(`validate-artifacts.mjs <root>`, `npm run build --prefix packages/web`, `npm run test:analyzer --prefix packages/web`) 세 명령만 child_process로 실행하고 stdout/stderr를 캡처해 `manifest.validation.{commands,last_result}`에 기록한다. `validation-report.md`와 `catalog-delta.yaml`을 inline 편집한다.
 
-PR6 마이그레이션 전에 제공하던 `Smoke 일괄 실행` 매크로와 in-iframe `adk web` 임베딩은 워크벤치에 다시 추가하지 않는다. 현재 chat smoke는 BuildWorkbench의 좁은 runtime-stub bridge로만 제공된다. 이 bridge는 승인된 handoff bundle의 synthetic `runtime_mock` payload와 TODO boundary만 사용하며, private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 포함하지 않는다. VerifyWorkbench allow-list는 그대로 유지된다.
+PR6 마이그레이션 전에 제공하던 `Smoke 일괄 실행` 매크로와 in-iframe `adk web` 임베딩은 워크벤치에 다시 추가하지 않는다. 현재는 게이트 없는 `실행` 화면(`/af/:reqId/run`)이 ADK 런타임 연결을 관리하고 ADK 공식 dev UI로 **링크**만 한다(iframe 임베드 아님, AF 자체 챗 아님). smoke 번들은 승인된 handoff의 synthetic `runtime_mock` payload와 TODO boundary만 노출하고, runnable 번들은 reviewed synthetic ADK `Workflow` wiring(Gemini `LlmAgent` + 연결된 Mock Lab MCP adapter)을 실행한다. 두 mode 모두 private endpoint, credential, 실제 고객/은행 데이터, 운영 배포 logic을 포함하지 않는다. VerifyWorkbench allow-list는 그대로 유지된다.
 
 ## Missing-information 2계층 게이트
 

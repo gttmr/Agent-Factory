@@ -129,95 +129,6 @@
   word-break: break-word;
 }
 
-.af-runtime-chat-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 300px) 1fr;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-@media (max-width: 900px) {
-  .af-runtime-chat-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.af-runtime-chat-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.af-runtime-chat-controls input,
-.af-runtime-chat-compose textarea {
-  width: 100%;
-}
-
-.af-runtime-chat-surface {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  overflow: hidden;
-}
-
-.af-runtime-chat-log {
-  min-height: 220px;
-  max-height: 360px;
-  overflow: auto;
-  padding: 10px;
-  background: var(--surface-muted);
-}
-
-.af-chat-message {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--fs-sm);
-}
-
-.af-chat-message:last-child {
-  border-bottom: 0;
-}
-
-.af-chat-message span {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.af-chat-message p {
-  margin: 0;
-  color: var(--text-strong);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.af-chat-message-user p {
-  color: var(--accent-strong);
-}
-
-.af-chat-message-system p {
-  color: var(--text-muted);
-}
-
-.af-runtime-chat-compose {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  padding: 10px;
-  border-top: 1px solid var(--line);
-}
-
-@media (max-width: 700px) {
-  .af-runtime-chat-compose {
-    grid-template-columns: 1fr;
-  }
-}
-
 .af-markdown-editor {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -290,4 +201,28 @@
 .smoke-macro-step-label {
   font-size: var(--fs-sm);
   color: var(--text-strong);
+}
+
+/* Scaffold output_mode toggle (BuildWorkbench) */
+.af-output-mode-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.af-output-mode-hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.af-output-mode-dirty {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--fs-sm);
+  color: var(--warning-text);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-line);
+  border-radius: 4px;
 }

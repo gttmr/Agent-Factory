@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5176 --strictPort",
     "build": "tsc --noEmit && vite build",
-    "test": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs server/mockLabCore.test.ts",
+    "test": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs server/mockLabCore.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs --test server/mcpNetworkBridge.test.ts",
     "preview": "vite preview --host 0.0.0.0 --port 4176 --strictPort"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@vitejs/plugin-react": "^5.0.0",
     "js-yaml": "^4.1.1",
     "react": "^19.0.0",

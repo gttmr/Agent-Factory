@@ -138,7 +138,9 @@ export function GraphCanvas({
   const nodeLabel = (id: string) => nodeById.get(id)?.label ?? id;
 
   return (
-    <div className="graph-canvas-root">
+    // hideInspector 일 때는 내부 inspector 열을 비우지 말고 grid 자체를 1열로 만들어
+    // 그래프 stage 가 전체 폭을 쓰게 한다(안 그러면 우측 inspector 열만큼 빈 공간이 남는다).
+    <div className={`graph-canvas-root${hideInspector ? " graph-canvas-root--no-inspector" : ""}`}>
       <section className="panel graph-canvas-panel">
         <div className="section-heading">
           <div>

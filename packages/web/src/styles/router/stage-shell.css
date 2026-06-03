@@ -1,0 +1,263 @@
+/* =====================================================================
+   Stage shell — shared scaffold for skill stages (분석/설계/개발/검증).
+   Left vertical step rail (1실행·2검토·3승인) + main pane:
+   always-visible summary strip → active step content → next-action CTA.
+   Loaded into @layer router from ./index.css.
+   ===================================================================== */
+
+.af-stage-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-5xl);
+  align-items: start;
+}
+
+/* ---- step rail ---- */
+.af-step-rail {
+  position: sticky;
+  top: var(--space-5xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.af-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.af-step {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.af-step:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.af-step-active {
+  border-color: var(--accent);
+  border-left-width: 3px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.af-step-active .af-step-label {
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
+.af-step-locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.af-step-index {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  border: 1px solid var(--line-strong);
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.af-step-active .af-step-index {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.af-step-done .af-step-index {
+  border-color: var(--success-line);
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.af-step-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.af-step-label {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text);
+}
+
+.af-step-hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-subtle);
+}
+
+.af-step-glyph {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+}
+
+.af-step-done .af-step-glyph {
+  color: var(--success-line);
+}
+
+.af-step-current .af-step-glyph {
+  color: var(--accent);
+}
+
+.af-step-blocked .af-step-glyph {
+  color: var(--danger-text);
+}
+
+/* ---- "다음에 할 일" guide block (strong guidance) ---- */
+.af-step-guide {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  padding: var(--space-lg);
+}
+
+.af-step-guide-eyebrow {
+  display: block;
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: var(--fw-semibold);
+  color: var(--accent-strong);
+  margin-bottom: var(--space-2xs);
+}
+
+.af-step-guide p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  line-height: var(--lh-normal);
+}
+
+/* ---- main pane ---- */
+.af-stage-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+  min-width: 0;
+}
+
+.af-stage-main-head h1 {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  color: var(--text-strong);
+}
+
+.af-stage-main-head .eyebrow {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3xs);
+}
+
+/* ---- always-visible summary strip ---- */
+.af-stage-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xl);
+  padding: var(--space-lg) var(--space-2xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.af-stage-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.af-stage-summary-item > span {
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.af-stage-summary-item > strong {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
+.af-stage-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+/* compact inline notice (import/save/manifest messages) */
+.af-stage-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface-muted);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.af-stage-notice .is-error {
+  color: var(--danger-text);
+}
+
+/* ---- next-action CTA (strong guidance) ---- */
+.af-stage-cta {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  padding-top: var(--space-sm);
+}
+
+.af-stage-cta .ui-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- narrow width: rail becomes a horizontal tab strip ---- */
+@media (max-width: 860px) {
+  .af-stage-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .af-step-rail {
+    position: static;
+  }
+
+  .af-step-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .af-step {
+    flex: 1 1 auto;
+  }
+}

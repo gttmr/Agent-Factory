@@ -19,6 +19,8 @@ if (!normalizedRequirement || typeof normalizedRequirement !== "object") {
 if (!processFlow || typeof processFlow !== "object") {
   throw new Error("Missing required artifact: process-flow.json or analysis-result.json:processFlow");
 }
+// Hard invariant in BOTH smoke and runnable modes: runnable output is still
+// generated from approved workbench artifacts, never from raw requirements.
 if (scaffoldPlan?.source !== "approved_workbench_artifact" || scaffoldPlan?.raw_requirement_to_code !== false) {
   throw new Error("scaffold-plan.json must be an approved_workbench_artifact with raw_requirement_to_code=false.");
 }
@@ -26,12 +28,16 @@ if (!Array.isArray(scaffoldPlan.modules) || scaffoldPlan.modules.length === 0) {
   throw new Error("scaffold-plan.json must contain at least one approved module.");
 }
 const modules = scaffoldPlan.modules;
+const outputMode = scaffoldPlan.output_mode === "runnable" ? "runnable" : "smoke";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 if (scaffoldPlan.validation?.can_generate_source === false) {
   throw new Error(`scaffold-plan.json has blockers: ${(scaffoldPlan.validation.blockers ?? []).join("; ")}`);
 }
 validateRunInputs();
 
 const packageName = `${toPythonIdentifier(normalizedRequirement.id || scaffoldPlan.requirement_id || "agent_factory_workflow")}_adk`;
+const connectedAdapters = modules.filter((module) => adapterConnection(module) === "mcp_connected");
+const unconnectedAdapters = modules.filter((module) => adapterConnection(module) === "unconnected");
 const files = buildFiles();
 
 Object.entries(files).forEach(([relativePath, content]) => {
@@ -41,12 +47,15 @@ Object.entries(files).forEach(([relativePath, content]) => {
 });
 updateRunManifest();
 
-console.log(`ADK source generated from scaffold-plan.json: ${join(outputRoot, packageName)}`);
+console.log(`ADK source generated from scaffold-plan.json (output_mode=${outputMode}): ${join(outputRoot, packageName)}`);
 console.log(`Run from ${outputRoot}:`);
 console.log("  python3 -m venv .venv");
 console.log("  source .venv/bin/activate");
 console.log("  pip install -r requirements.txt");
-console.log(`  python -m compileall ${packageName} tests`);
+if (outputMode === "runnable") {
+  console.log("  cp .env.example .env   # then set GOOGLE_API_KEY=...");
+}
+console.log(`  python -m compileall ${packageName}`);
 console.log("  python -m pytest -q");
 
 function readJson(name, fallbackName) {
@@ -65,7 +74,7 @@ function readOptionalJson(name) {
 }
 
 function buildFiles() {
-  return {
+  const base = {
     [`${packageName}/__init__.py`]: "from .agent import root_agent\n",
     [`${packageName}/agent.py`]: buildAgentPy(),
     [`${packageName}/workflow_manifest.json`]: `${JSON.stringify(buildManifest(), null, 2)}\n`,
@@ -73,12 +82,31 @@ function buildFiles() {
     "implementation-handoff.md": buildImplementationHandoff(),
     "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(), null, 2)}\n`,
     "requirements.txt": buildRequirements(),
-    "tests/test_workflow_contract.py": buildContractTest(),
+    // tests live INSIDE the agent package so the ADK agents_dir (the bundle
+    // root) has only the package as a non-dot subdir. Otherwise `adk
+    // api_server` scans a sibling `tests/` as an app and the dev UI errors
+    // with "No root_agent found for 'tests'".
+    [`${packageName}/tests/__init__.py`]: "",
+    [`${packageName}/tests/test_workflow_contract.py`]: buildContractTest(),
     "README.md": buildReadme()
   };
+  if (outputMode === "runnable") {
+    base["agents.config.yaml"] = buildAgentsConfig();
+    base[".env.example"] = buildEnvExample();
+    base[".gitignore"] = buildGitignore();
+  }
+  return base;
 }
 
+// ---------------------------------------------------------------------------
+// agent.py — dual mode
+// ---------------------------------------------------------------------------
+
 function buildAgentPy() {
+  return outputMode === "runnable" ? buildRunnableAgentPy() : buildSmokeAgentPy();
+}
+
+function buildSmokeAgentPy() {
   const functions = modules.map(buildNodeFunction).join("\n\n");
   const graphEdges = buildGraphWorkflowEdges();
 
@@ -194,6 +222,294 @@ root_agent = SyntheticRuntimeSmokeAgent(
 `;
 }
 
+function buildRunnableAgentPy() {
+  assertRunnableGraphSupported();
+  const { edges, joins } = buildRunnableGraph();
+  const orderedModules = orderedGraphModules();
+  assertNoSymbolCollisions(orderedModules);
+  const nodeBlocks = [];
+  const funcBlocks = [];
+
+  for (const module of orderedModules) {
+    if (isAgentModule(module)) {
+      nodeBlocks.push(emitAgentNode(module));
+    } else if (adapterConnection(module) === "mcp_connected") {
+      funcBlocks.push(emitConnectedAdapterFunc(module));
+      nodeBlocks.push(emitFunctionNodeDecl(module));
+    } else {
+      funcBlocks.push(emitStubFunc(module));
+      nodeBlocks.push(emitFunctionNodeDecl(module));
+    }
+  }
+
+  const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.sym)})`);
+  const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
+  const description = `Runnable ADK 2.1 workflow generated from reviewed Agent Factory artifacts for ${truncate(
+    normalizedRequirement.title || packageName
+  )}.`;
+
+  return `from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from google.adk import Context
+from google.adk.agents import LlmAgent
+from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
+
+
+# Reviewed contract data for each approved module (synthetic test doubles only).
+COMPONENT_CONTRACTS: dict[str, dict] = ${toPythonLiteral(componentContracts())}
+
+# Per-developer overrides live in agents.config.yaml (sibling of this package).
+# This is how each developer individualizes the bundle; agent.py applies the
+# overrides at import time so editing the YAML actually changes behavior.
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "agents.config.yaml"
+
+
+def _load_config() -> dict:
+    if not _CONFIG_PATH.exists():
+        return {}
+    try:
+        return yaml.safe_load(_CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # malformed YAML, permissions, etc.
+        import sys
+
+        print(
+            f"[agent.py] WARNING: could not load {_CONFIG_PATH.name} ({exc}); "
+            "using seeded defaults.",
+            file=sys.stderr,
+        )
+        return {}
+
+
+_CONFIG = _load_config()
+
+
+def _override(section: str, module_id: str, key: str, default: Any) -> Any:
+    for entry in _CONFIG.get(section, []) or []:
+        if isinstance(entry, dict) and entry.get("id") == module_id:
+            value = entry.get(key)
+            if value is not None:
+                return value
+    return default
+
+
+def _agent_cfg(module_id: str, key: str, default: Any) -> Any:
+    return _override("agents", module_id, key, default)
+
+
+def _model_for(module_id: str, seed: str) -> str:
+    # Per-agent override wins; then the top-level default_model knob; then the seed.
+    per_agent = _override("agents", module_id, "model", None)
+    if per_agent:
+        return str(per_agent)
+    default_model = _CONFIG.get("default_model")
+    return str(default_model) if default_model else seed
+
+
+def _adapter_cfg(module_id: str, key: str, default: Any) -> Any:
+    return _override("adapters", module_id, key, default)
+
+
+def _mcp_url(module_id: str, mcp_server: str) -> str:
+    configured = _adapter_cfg(module_id, "mcp_url", None)
+    if configured:
+        return str(configured)
+    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5176/api/mock-lab/mcp").rstrip("/")
+    return f"{base}/{mcp_server}"
+
+
+def _collect_tool_inputs(
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
+) -> dict:
+    # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
+    # input_map (tool_input -> state/output key), (2) a top-level session-state
+    # value, or (3) a matching field inside an upstream node's *_output payload.
+    overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    args: dict = {}
+    for name in input_names:
+        source_key = overrides.get(name, name)
+        if ctx.state.get(source_key) is not None:
+            args[name] = ctx.state.get(source_key)
+            continue
+        # Fall back to a field named source_key inside any upstream *_output dict.
+        for key, value in ctx.state.items():
+            if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
+                args[name] = value.get(source_key)
+                break
+    missing = [name for name in required_names if name not in args]
+    if missing:
+        raise RuntimeError(
+            f"{module_id}: required MCP tool inputs missing from session state / upstream outputs: {missing}. "
+            "Set an input_map for this adapter in agents.config.yaml."
+        )
+    return args
+
+
+${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}# ---------------------------------------------------------------------------
+# Graph nodes
+# ---------------------------------------------------------------------------
+
+${nodeBlocks.join("\n\n")}
+${joinDecls.length ? `\n${joinDecls.join("\n")}\n` : ""}
+
+root_agent = Workflow(
+    name=${toPyStr(packageName)},
+    description=${toPyStr(description)},
+    edges=${edgeLiteral},
+)
+`;
+}
+
+function emitAgentNode(module) {
+  const sym = nodeSymbol(module);
+  const instruction = module.instruction || `You are ${module.name}. Operate only on the synthetic inputs in session state.`;
+  return `${sym} = LlmAgent(
+    name=${toPyStr(pyNodeName(module))},
+    model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
+    instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
+    description=${toPyStr(truncate(module.name))},
+    output_key=${toPyStr(stateKey(module))},
+    mode="single_turn",
+)`;
+}
+
+function emitFunctionNodeDecl(module) {
+  return `${nodeSymbol(module)} = FunctionNode(func=${funcName(module)}, name=${toPyStr(pyNodeName(module))})`;
+}
+
+function emitStubFunc(module) {
+  const kindNote =
+    module.module_category === "workflow"
+      ? "deterministic workflow coordinator placeholder"
+      : adapterConnection(module) === "unconnected"
+        ? "unconnected adapter (no Mock Lab MCP server bound)"
+        : "reviewed TODO boundary";
+  const connectionStatus = module.module_category === "adapter" ? "unconnected" : "coordinator";
+  return `async def ${funcName(module)}(ctx: Context) -> dict:
+    """TODO_IMPLEMENT_HERE: ${escapePythonString(module.name)} — ${kindNote}.
+
+    Returns reviewed synthetic test-double output only; no real business logic.
+    """
+    contract = COMPONENT_CONTRACTS[${toPyStr(module.id)}]
+    payload = {
+        "module_id": ${toPyStr(module.id)},
+        "module_name": ${toPyStr(module.name)},
+        "connection_status": ${toPyStr(connectionStatus)},
+        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
+        "runtime_mock": contract.get("runtime_mock"),
+        "developer_todos": contract.get("developer_todos", []),
+    }
+    ctx.state[${toPyStr(stateKey(module))}] = payload
+    return payload`;
+}
+
+function emitConnectedAdapterFunc(module) {
+  const inputNames = (module.inputs ?? []).map((field) => field.name).filter(Boolean);
+  const requiredNames = (module.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
+  return `async def ${funcName(module)}(ctx: Context) -> dict:
+    """Calls the live Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)} (synthetic Mock Lab only).
+
+    Deterministic adapter: opens an MCP session and calls the named tool directly
+    so a real tools/call happens (verifiable in audit), instead of relying on a
+    model to choose the tool.
+    """
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    url = _mcp_url(${toPyStr(module.id)}, ${toPyStr(module.mcp_server)})
+    arguments = _collect_tool_inputs(
+        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}
+    )
+    async with streamablehttp_client(url) as (read_stream, write_stream, _close):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            tool_result = await session.call_tool(${toPyStr(module.mcp_tool_name)}, arguments=arguments)
+    content = getattr(tool_result, "content", None) or []
+    payload = {
+        "module_id": ${toPyStr(module.id)},
+        "module_name": ${toPyStr(module.name)},
+        "connection_status": "mcp_connected",
+        "status": "mcp_tool_called",
+        "mcp_server": ${toPyStr(module.mcp_server)},
+        "mcp_tool": ${toPyStr(module.mcp_tool_name)},
+        "result": [getattr(part, "text", str(part)) for part in content],
+    }
+    ctx.state[${toPyStr(stateKey(module))}] = payload
+    return payload`;
+}
+
+// ---------------------------------------------------------------------------
+// Runnable bundle support files
+// ---------------------------------------------------------------------------
+
+function buildAgentsConfig() {
+  const lines = [];
+  lines.push("# agents.config.yaml — per-node overrides for the runnable ADK bundle.");
+  lines.push("# Edit model / instruction / mcp_url here. agent.py loads this at import and");
+  lines.push("# applies the overrides, so editing this file actually changes behavior.");
+  lines.push("# This file plus .env is how each developer individualizes the generated bundle.");
+  lines.push(`default_model: ${DEFAULT_MODEL}`);
+
+  const agents = modules.filter(isAgentModule);
+  lines.push("agents:");
+  if (!agents.length) lines.push("  []");
+  for (const module of agents) {
+    lines.push(`  - id: ${module.id}`);
+    lines.push(`    name: ${pyNodeName(module)}`);
+    lines.push(`    model: ${module.model || DEFAULT_MODEL}`);
+    lines.push("    instruction: |");
+    const instruction = module.instruction || `You are ${module.name}.`;
+    for (const line of String(instruction).split("\n")) lines.push(`      ${line}`);
+  }
+
+  const adapters = modules.filter((module) => module.module_category === "adapter");
+  lines.push("adapters:");
+  if (!adapters.length) lines.push("  []");
+  for (const module of adapters) {
+    const connected = adapterConnection(module) === "mcp_connected";
+    lines.push(`  - id: ${module.id}`);
+    lines.push(`    connection: ${connected ? "mcp_connected" : "unconnected"}`);
+    lines.push(`    mcp_server: ${module.mcp_server ? module.mcp_server : "null"}`);
+    lines.push(`    mcp_tool: ${module.mcp_tool_name ? module.mcp_tool_name : "null"}`);
+    lines.push("    mcp_url: null  # default: $AF_MOCK_LAB_MCP_URL/<mcp_server>");
+    if (connected) {
+      lines.push("    input_map: {}  # optional: {tool_input_name: state_or_upstream_output_key}");
+    }
+  }
+
+  const workflows = modules.filter((module) => module.module_category === "workflow");
+  if (workflows.length) {
+    lines.push("workflows:");
+    for (const module of workflows) {
+      lines.push(`  - id: ${module.id}`);
+      lines.push("    note: deterministic coordinator placeholder; expand into a sub-graph in a follow-up.");
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function buildEnvExample() {
+  return `# Copy to .env (gitignored). ADK auto-loads .env for the agent at runtime.
+# Gemini provider key — required for runnable mode. Synthetic inputs only.
+GOOGLE_API_KEY=
+# Optional: base URL of the Mock Lab network MCP endpoint for connected adapters.
+# AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp
+`;
+}
+
+function buildGitignore() {
+  return `.env\n.venv/\n__pycache__/\n*.pyc\n`;
+}
+
+// ---------------------------------------------------------------------------
+// Smoke-mode dead-stub node functions (preserved for the smoke bundle)
+// ---------------------------------------------------------------------------
+
 function buildNodeFunction(module) {
   return `def ${todoFunctionName(module)}(node_input: Any = None):
     """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
@@ -209,21 +525,49 @@ def ${nodeFunctionName(module)}(node_input: Any = None):
 }
 
 function buildManifest() {
+  const guardrails =
+    outputMode === "runnable"
+      ? {
+          raw_requirement_to_code: false,
+          generated_business_logic: false,
+          private_data_or_endpoints: false,
+          runnable_synthetic_wiring: true
+        }
+      : {
+          raw_requirement_to_code: false,
+          generated_business_logic: false,
+          private_data_or_endpoints: false
+        };
   return {
     package: packageName,
+    output_mode: outputMode,
     requirement: {
       id: normalizedRequirement.id,
       title: normalizedRequirement.title,
       status: normalizedRequirement.status
     },
-    guardrails: {
-      raw_requirement_to_code: false,
-      generated_business_logic: false,
-      private_data_or_endpoints: false
-    },
+    guardrails,
+    runtime:
+      outputMode === "runnable"
+        ? {
+            provider: "gemini",
+            default_model: DEFAULT_MODEL,
+            connected_adapters: connectedAdapters.map((module) => ({
+              module_id: module.id,
+              module_name: module.name,
+              mcp_server: module.mcp_server ?? null,
+              mcp_tool_name: module.mcp_tool_name ?? null
+            })),
+            unconnected_adapters: unconnectedAdapters.map((module) => ({
+              module_id: module.id,
+              module_name: module.name
+            }))
+          }
+        : null,
     scaffold_plan: {
       source: scaffoldPlan.source,
       raw_requirement_to_code: scaffoldPlan.raw_requirement_to_code,
+      output_mode: outputMode,
       approved_module_count: scaffoldPlan.modules.length,
       excluded_modules: scaffoldPlan.excluded_modules ?? []
     },
@@ -244,14 +588,59 @@ function buildManifest() {
 }
 
 function buildRequirements() {
+  if (outputMode === "runnable") {
+    const adk = connectedAdapters.length ? "google-adk[mcp]>=2.1.0" : "google-adk>=2.1.0";
+    return `${[adk, "google-genai>=1.0.0", "pyyaml>=6.0", "pytest"].join("\n")}\n`;
+  }
   return `${["google-adk>=2.0.0", "pytest"].join("\n")}\n`;
 }
 
 function buildContractTest() {
+  if (outputMode === "runnable") {
+    return `import importlib.util
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_agent_source_declares_runnable_workflow():
+    source = (ROOT / "${packageName}" / "agent.py").read_text(encoding="utf-8")
+    assert "from google.adk.workflow import" in source
+    assert "from google.adk.agents import LlmAgent" in source
+    assert "root_agent = Workflow(" in source
+    assert "SyntheticRuntimeSmokeAgent" not in source
+    assert 'mode="single_turn"' in source
+
+
+def test_manifest_declares_runnable_mode():
+    manifest = (ROOT / "${packageName}" / "workflow_manifest.json").read_text(encoding="utf-8")
+    assert '"output_mode": "runnable"' in manifest
+    assert '"raw_requirement_to_code": false' in manifest
+    assert '"private_data_or_endpoints": false' in manifest
+    assert '"runtime"' in manifest
+
+
+def test_runtime_chat_smoke_contract_is_present():
+    smoke = (ROOT / "runtime-chat-smoke.json").read_text(encoding="utf-8")
+    assert '"appName": "${packageName}"' in smoke
+    assert '"port": 8765' in smoke
+
+
+@pytest.mark.skipif(importlib.util.find_spec("google.adk") is None, reason="google-adk not installed")
+def test_root_agent_is_a_workflow():
+    from google.adk.workflow import Workflow
+
+    module = importlib.import_module("${packageName}.agent")
+    assert isinstance(module.root_agent, Workflow)
+`;
+  }
   return `from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_agent_source_declares_adk_workflow():
@@ -281,6 +670,51 @@ def test_runtime_chat_smoke_contract_is_present():
 }
 
 function buildReadme() {
+  if (outputMode === "runnable") {
+    return `# ${packageName}
+
+Runnable ADK 2.1 workflow generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
+
+\`\`\`bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # then set GOOGLE_API_KEY=...
+python -m compileall ${packageName}
+python -m pytest -q
+\`\`\`
+
+## What this bundle is
+
+- \`root_agent\` is a \`google.adk.workflow.Workflow\` graph. Agent nodes are
+  \`LlmAgent\` instances that call Gemini; adapter nodes are deterministic
+  \`FunctionNode\`s. The graph runs over **synthetic inputs only** — no private
+  endpoints, credentials, or real customer data.
+- Generated from reviewed Agent Factory artifacts (\`raw_requirement_to_code=false\`).
+
+## Individualize it
+
+Edit \`agents.config.yaml\` to override any node's \`model\` or \`instruction\`
+(and an adapter's \`mcp_url\`). \`agent.py\` loads this file at import, so changes
+take effect on the next run. Put your \`GOOGLE_API_KEY\` in \`.env\` (gitignored).
+
+## Adapters and the Mock Lab
+
+Connected adapters call a live Mock Lab MCP tool over streamable-HTTP
+(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:5176/api/mock-lab/mcp\`). Adapters with no
+bound/running Mock Lab server stay as TODO stubs returning reviewed synthetic
+mock output and are listed under \`runtime.unconnected_adapters\` in
+\`workflow_manifest.json\`.
+
+## ADK runtime chat
+
+\`\`\`bash
+adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
+curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
+\`\`\`
+`;
+  }
   return `# ${packageName}
 
 Generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
@@ -289,7 +723,7 @@ Generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m compileall ${packageName} tests
+python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
 
@@ -307,6 +741,11 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 }
 
 function buildRuntimeChatSmoke() {
+  const sample = firstSmokeSample();
+  const text =
+    outputMode === "runnable"
+      ? sample || `Run the ${normalizedRequirement.title} workflow over synthetic sample inputs and summarize the result.`
+      : `Run a synthetic ADK chat smoke for ${normalizedRequirement.title}.`;
   return {
     host: "127.0.0.1",
     port: 8765,
@@ -315,19 +754,49 @@ function buildRuntimeChatSmoke() {
     sessionId: "af-smoke",
     newMessage: {
       role: "user",
-      parts: [
-        {
-          text: `Run a synthetic ADK chat smoke for ${normalizedRequirement.title}.`
-        }
-      ]
+      parts: [{ text }]
     }
   };
+}
+
+function firstSmokeSample() {
+  for (const module of modules) {
+    const sample = module.smoke_spec?.sample_user_message;
+    if (typeof sample === "string" && sample.trim()) return sample.trim();
+  }
+  return "";
 }
 
 function buildImplementationHandoff() {
   const todoLines = scaffoldPlan.modules.flatMap((module) =>
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
+  if (outputMode === "runnable") {
+    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: bind a Mock Lab MCP server or keep the synthetic stub.`);
+    return `# Implementation Handoff (runnable mode)
+
+Generated from reviewed scaffold-plan.json for ${normalizedRequirement.title}.
+
+## What runs today
+
+- Agent nodes call Gemini; connected adapter nodes call live Mock Lab MCP tools.
+- Everything runs over synthetic inputs only.
+
+## Boundaries that still must hold
+
+- Do not add private endpoints, credentials, customer data, or deployment scripts.
+- Keep adapter calls pointed at synthetic Mock Lab servers, not real systems.
+- Individualize via agents.config.yaml and .env, not by hard-coding secrets.
+
+## Unconnected adapters (synthetic stub until a Mock Lab server is bound)
+
+${unconnected.length ? unconnected.join("\n") : "- none"}
+
+## Reviewed TODO notes
+
+${todoLines.length ? todoLines.join("\n") : "- Review generated nodes before production wiring."}
+`;
+  }
   return `# Implementation Handoff
 
 Generated from reviewed scaffold-plan.json for ${normalizedRequirement.title}.
@@ -346,17 +815,30 @@ ${todoLines.length ? todoLines.join("\n") : "- Review generated TODO_IMPLEMENT_H
 
 function componentContracts() {
   return Object.fromEntries(
-    scaffoldPlan.modules.map((module) => [
-      module.id,
-      {
+    scaffoldPlan.modules.map((module) => {
+      const base = {
         catalog_binding: module.catalog_binding ?? null,
         developer_todos: module.developer_todos,
         inputs: module.inputs,
         outputs: module.outputs,
         risk_signals: module.risk_signals,
         runtime_mock: module.runtime_mock ?? null
-      }
-    ])
+      };
+      if (outputMode !== "runnable") return [module.id, base];
+      return [
+        module.id,
+        {
+          module_category: module.module_category,
+          ...base,
+          instruction: module.instruction ?? null,
+          model: module.model ?? null,
+          access_protocol: module.access_protocol ?? null,
+          mcp_server: module.mcp_server ?? null,
+          mcp_tool_name: module.mcp_tool_name ?? null,
+          connection_status: adapterConnection(module)
+        }
+      ];
+    })
   );
 }
 
@@ -456,7 +938,7 @@ function updateRunManifest() {
     validation: {
       commands: uniqueStrings([
         ...(Array.isArray(runManifest.validation?.commands) ? runManifest.validation.commands : []),
-        `python3 -m compileall ${outputDir}${packageName} ${outputDir}tests`,
+        `python3 -m compileall ${outputDir}${packageName}`,
         `cd ${outputDir} && python -m pytest -q`
       ]),
       last_result: runManifest.validation?.last_result ?? "not_run"
@@ -572,6 +1054,261 @@ function graphEndpoint(nodeId, side, graph) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Runnable graph lowering — Python symbols, fan-out via repeated edges,
+// fan-in via a synthetic JoinNode (normal nodes do NOT wait for all preds).
+// ---------------------------------------------------------------------------
+
+function buildRunnableGraph() {
+  const graph = graphIndexes();
+  const resolve = (nodeId, side) => {
+    const node = graph.nodesById.get(nodeId);
+    if (!node) return null;
+    if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
+      return nodeSymbol(graph.moduleById.get(node.module_id));
+    }
+    if (side === "from" && node.node_kind === "input") return "START";
+    return null; // output nodes (terminal markers) and unknowns are dropped
+  };
+
+  const baseEdges = [];
+  const seen = new Set();
+  const add = (from, to) => {
+    if (!from || !to || from === to) return;
+    const key = `${from}->${to}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    baseEdges.push([from, to]);
+  };
+
+  if (Array.isArray(processFlow.edges)) {
+    for (const edge of processFlow.edges) {
+      const from = resolve(edge.from, "from");
+      const to = resolve(edge.to, "to");
+      if (from && to && from === to && from !== "START") {
+        throw new Error(
+          `runnable mode does not support self-loop/loop Graph IR yet (node ${from}). Use smoke mode or wait for loop lowering.`
+        );
+      }
+      add(from, to);
+    }
+  }
+
+  // Every module node must be reachable from START.
+  const incoming = new Set(baseEdges.map(([, to]) => to));
+  for (const node of graph.moduleNodes) {
+    const sym = nodeSymbol(graph.moduleById.get(node.module_id));
+    if (!incoming.has(sym)) add("START", sym);
+  }
+
+  // Fan-in: any target with >1 distinct predecessor gets a JoinNode.
+  const sourcesByTarget = new Map();
+  for (const [from, to] of baseEdges) {
+    if (!sourcesByTarget.has(to)) sourcesByTarget.set(to, []);
+    sourcesByTarget.get(to).push(from);
+  }
+  const joins = [];
+  const finalEdges = [];
+  const joined = new Set();
+  let joinIndex = 0;
+  for (const [target, sources] of sourcesByTarget) {
+    if (sources.length > 1) {
+      const joinSym = `join_${++joinIndex}`;
+      joins.push({ sym: joinSym, target });
+      for (const source of sources) finalEdges.push([source, joinSym]);
+      finalEdges.push([joinSym, target]);
+      joined.add(target);
+    }
+  }
+  for (const [from, to] of baseEdges) {
+    if (!joined.has(to)) finalEdges.push([from, to]);
+  }
+
+  if (finalEdges.length === 0) {
+    throw new Error("processFlow does not provide any usable Graph IR edges for runnable workflow generation.");
+  }
+  assertAcyclic(finalEdges);
+  return { edges: finalEdges, joins };
+}
+
+// Runnable v1 supports DAG + fan-out/fan-in only. A cycle (incl. one created by
+// a back-edge feeding a JoinNode, which would deadlock waiting on a successor)
+// is rejected with a clear error rather than emitting a broken/looping graph.
+function assertAcyclic(edges) {
+  const adjacency = new Map();
+  const inDegree = new Map();
+  const nodes = new Set();
+  for (const [from, to] of edges) {
+    nodes.add(from);
+    nodes.add(to);
+  }
+  for (const node of nodes) {
+    adjacency.set(node, []);
+    inDegree.set(node, 0);
+  }
+  for (const [from, to] of edges) {
+    adjacency.get(from).push(to);
+    inDegree.set(to, inDegree.get(to) + 1);
+  }
+  const queue = [...nodes].filter((node) => inDegree.get(node) === 0);
+  let visited = 0;
+  while (queue.length) {
+    const node = queue.shift();
+    visited += 1;
+    for (const next of adjacency.get(node)) {
+      inDegree.set(next, inDegree.get(next) - 1);
+      if (inDegree.get(next) === 0) queue.push(next);
+    }
+  }
+  if (visited !== nodes.size) {
+    const inCycle = [...nodes].filter((node) => inDegree.get(node) > 0);
+    throw new Error(
+      `runnable mode does not support cyclic/loop Graph IR yet (cycle involves: ${inCycle.join(", ")}). Use smoke mode or wait for loop lowering.`
+    );
+  }
+}
+
+// Runnable v1 lowers a DAG with fan-out/fan-in only. Conditional routing, loops,
+// human-input, and remote boundary crossing are NOT lowered yet — emitting them
+// as plain edges would silently produce a wrong graph, so reject them up front
+// rather than mis-generate. (Sets are declared inside the function to avoid a
+// temporal-dead-zone with the top-level buildFiles() call.)
+function assertRunnableGraphSupported() {
+  const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
+  const unsupportedEdgeKinds = new Set(["route", "remote_a2a"]);
+  const unsupportedContainerKinds = new Set([
+    "dynamic_workflow",
+    "loop_region",
+    "human_review_region",
+    "remote_boundary"
+  ]);
+  const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
+  const graph = graphIndexes();
+  // Allowlist: lowering can represent input/output (→ START/terminal) and
+  // module-bound agent/adapter/workflow nodes. ANY other node — control nodes
+  // (router/loop_control/human_input/join) or module_id-null function/tool
+  // intermediaries — is silently dropped by resolve(), which would break graph
+  // connectivity, so reject it. remote_a2a is a real remote boundary, not a safe
+  // synthetic stub, so it is rejected even when module-bound.
+  const allowedBareKinds = new Set(["input", "output"]);
+  // Control / human / remote node kinds are NOT lowerable even if they happen to
+  // carry a module_id (the validator binds human_input leniently), so deny them
+  // by kind before the module-bound check — otherwise a module-bound human_input
+  // would mis-lower as an ordinary LlmAgent/FunctionNode.
+  const unlowerableNodeKinds = new Set(["router", "loop_control", "human_input", "join", "remote_a2a"]);
+  const badNodes = [];
+  for (const node of nodes) {
+    if (!node) continue;
+    const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
+    if (allowedBareKinds.has(node.node_kind)) {
+      // input/output are synthetic and must have module_id null. If one is
+      // module-bound, resolve() (which checks module_id before node_kind) would
+      // lower it as a module symbol instead of START/terminal — reject it so the
+      // guard matches resolve()'s precedence exactly.
+      if (module) badNodes.push(`${node.id} (${node.node_kind} bound to a module)`);
+      continue;
+    }
+    if (unlowerableNodeKinds.has(node.node_kind)) {
+      badNodes.push(`${node.id} (${node.node_kind})`);
+      continue;
+    }
+    if (module) {
+      if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
+      continue;
+    }
+    badNodes.push(`${node.id} (${node.node_kind})`);
+  }
+  if (badNodes.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Only input/output and module-bound agent/adapter/workflow nodes are supported (no router/loop/human-input/join/remote or module_id-null intermediary nodes). Use smoke mode.`
+    );
+  }
+  // Containers are a separate top-level array in Graph IR, not a node field.
+  const containers = Array.isArray(processFlow.containers) ? processFlow.containers : [];
+  const badContainers = containers
+    .filter((container) => container && unsupportedContainerKinds.has(container.container_kind))
+    .map((container) => `${container.id} (${container.container_kind})`);
+  if (badContainers.length > 0) {
+    throw new Error(
+      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. Use smoke mode or wait for loop/human-review/remote/dynamic lowering.`
+    );
+  }
+  const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
+  // resolve() maps input only as a source (→START) and drops output as a target
+  // (terminal). A reversed-polarity edge (output as source, or input as target)
+  // would survive the kind/semantic checks but silently drop an endpoint and
+  // disconnect the graph — reject it so the guard and lowering agree exactly.
+  const badEdges = edges
+    .filter((edge) => {
+      if (!edge) return false;
+      if (
+        unsupportedExecSemantics.has(edge.execution_semantics) ||
+        unsupportedEdgeKinds.has(edge.edge_kind) ||
+        edge.is_remote_boundary_crossing === true
+      ) {
+        return true;
+      }
+      const fromNode = graph.nodesById.get(edge.from);
+      const toNode = graph.nodesById.get(edge.to);
+      // A dangling endpoint (node id not in the graph) also resolves to null and
+      // is silently dropped — reject it (don't rely only on processFlow.validation).
+      if (!fromNode || !toNode) return true;
+      // Reversed polarity (output as source / input as target) and a direct
+      // input->output passthrough all resolve to a dropped endpoint. After this,
+      // every surviving edge is input->module, module->module, or the intentional
+      // module->output terminal drop — guard and lowering agree exactly.
+      return (
+        fromNode.node_kind === "output" ||
+        toNode.node_kind === "input" ||
+        (fromNode.node_kind === "input" && toNode.node_kind === "output")
+      );
+    })
+    .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
+  if (badEdges.length > 0) {
+    throw new Error(
+      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Use smoke mode or wait for route/loop/remote lowering.`
+    );
+  }
+}
+
+// Defense-in-depth: module ids are pattern-constrained (^mod-[a-z0-9-]+$) so
+// sanitization should not collide, but a collision would silently overwrite a
+// node/function — fail loudly instead.
+function assertNoSymbolCollisions(orderedModules) {
+  const seen = new Map();
+  for (const module of orderedModules) {
+    const symbols = [
+      ["node symbol", nodeSymbol(module)],
+      ["function name", funcName(module)],
+      ["node name", pyNodeName(module)],
+      ["state key", stateKey(module)]
+    ];
+    for (const [kind, value] of symbols) {
+      const key = `${kind}::${value}`;
+      if (seen.has(key)) {
+        throw new Error(`runnable codegen ${kind} collision "${value}" between ${seen.get(key)} and ${module.id}.`);
+      }
+      seen.set(key, module.id);
+    }
+  }
+}
+
+function orderedGraphModules() {
+  // Emit nodes in Graph IR node order so the file is stable and readable.
+  const graph = graphIndexes();
+  const ordered = graph.moduleNodes
+    .map((node) => graph.moduleById.get(node.module_id))
+    .filter(Boolean);
+  const seen = new Set(ordered.map((module) => module.id));
+  for (const module of modules) {
+    if (!seen.has(module.id)) {
+      ordered.push(module);
+      seen.add(module.id);
+    }
+  }
+  return ordered;
+}
+
 function graphIndexes() {
   const moduleById = new Map(modules.map((module) => [module.id, module]));
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
@@ -580,6 +1317,36 @@ function graphIndexes() {
     (node) => node && typeof node.module_id === "string" && moduleById.has(node.module_id)
   );
   return { moduleById, moduleNodes, nodesById };
+}
+
+// ---------------------------------------------------------------------------
+// Module classification + symbol naming
+// ---------------------------------------------------------------------------
+
+function isAgentModule(module) {
+  return module.module_category === "agent";
+}
+
+function adapterConnection(module) {
+  if (module.module_category !== "adapter") return "n/a";
+  if (module.access_protocol === "mcp" && module.mcp_server && module.mcp_tool_name) return "mcp_connected";
+  return "unconnected";
+}
+
+function nodeSymbol(module) {
+  return `${isAgentModule(module) ? "agent_" : "node_"}${toPythonIdentifier(module.id)}`;
+}
+
+function funcName(module) {
+  return `_fn_${toPythonIdentifier(module.id)}`;
+}
+
+function pyNodeName(module) {
+  return toPythonIdentifier(module.id);
+}
+
+function stateKey(module) {
+  return `${toPythonIdentifier(module.id)}_output`;
 }
 
 function nodeFunctionName(module) {
@@ -595,16 +1362,46 @@ function toPythonIdentifier(value) {
   return /^[a-z_]/.test(identifier) ? identifier || "workflow" : `node_${identifier}`;
 }
 
-function toPythonLiteral(value) {
-  return JSON.stringify(value, null, 4)
-    .replace(/\btrue\b/g, "True")
-    .replace(/\bfalse\b/g, "False")
-    .replace(/\bnull\b/g, "None");
+function toPythonLiteral(value, indent = 0) {
+  // Recursive emitter: strings stay opaque (via toPyStr) so values like "true"
+  // or "null" are never rewritten; only real booleans/null become True/False/None.
+  // Matches JSON.stringify(value, null, 4) spacing for ASCII data so smoke output
+  // stays byte-identical.
+  const pad = "    ".repeat(indent);
+  const padInner = "    ".repeat(indent + 1);
+  if (value === null || value === undefined) return "None";
+  if (typeof value === "boolean") return value ? "True" : "False";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "None";
+  if (typeof value === "string") return toPyStr(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const items = value.map((item) => `${padInner}${toPythonLiteral(item, indent + 1)}`).join(",\n");
+    return `[\n${items}\n${pad}]`;
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "{}";
+    const items = entries
+      .map(([key, val]) => `${padInner}${toPyStr(key)}: ${toPythonLiteral(val, indent + 1)}`)
+      .join(",\n");
+    return `{\n${items}\n${pad}}`;
+  }
+  return "None";
 }
 
 function toPythonEdgeTupleLiteral(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return "[]";
   return `[\n${rows.map(([from, to]) => `    (${JSON.stringify(from)}, ${JSON.stringify(to)})`).join(",\n")}\n]`;
+}
+
+function toPyStr(value) {
+  // JSON string escapes (\n, \", \\, \uXXXX) are all valid Python string escapes.
+  return JSON.stringify(String(value ?? ""));
+}
+
+function truncate(value, max = 200) {
+  const text = String(value ?? "");
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function escapePythonString(value) {

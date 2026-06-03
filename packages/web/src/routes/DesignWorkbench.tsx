@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
 import type { Selection } from "../components/GraphCanvas";
 import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
@@ -45,6 +46,23 @@ const SIDEBAR_TABS = [
 ] as const;
 type SidebarTab = (typeof SIDEBAR_TABS)[number]["id"];
 
+type DesignStepId = "run" | "review" | "approve";
+const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
+
+// ──────────────────────────────────────────────────────────────────────────
+// 검토 스텝의 우측 Inspector 패널은 당분간 사용하지 않는다 (그래프 캔버스에 폭을
+// 양보하기 위해). 코드는 삭제하지 않고 이 플래그로 비활성화만 했다 — 다시 켜려면
+// INSPECTOR_ENABLED = true 로 바꾸면 3-pane(모듈 사이드바 | 캔버스 | Inspector)이
+// 복원된다.
+//
+// 비활성 동안 함께 휴면 상태가 되는 것: Runtime 계약 / Remote A2A 탭의 *편집*
+// 인스펙터(RuntimeContractInspector / A2AContractInspector)와 노드/엣지 앵커
+// 코멘트 *작성* 패널(SelectionHeader + 우측 CommentThread). 사이드바의 목록/선택과
+// Comments 탭의 읽기 표시는 그대로 동작한다. 관련 핸들러(handleSaveRuntimeContract,
+// handleSaveA2AContract, handleCreateComment)와 import 도 재활성화를 위해 보존한다.
+// ──────────────────────────────────────────────────────────────────────────
+const INSPECTOR_ENABLED = false;
+
 const GraphCanvas = lazy(async () => {
   const module = await import("../components/GraphCanvas");
   return { default: module.GraphCanvas };
@@ -53,7 +71,6 @@ const GraphCanvas = lazy(async () => {
 export default function DesignWorkbench() {
   const params = useParams<{ reqId: string }>();
   const reqId = params.reqId;
-  const navigate = useNavigate();
   const { touch } = useRecentRoots();
   useEffect(() => {
     if (reqId) touch(reqId);
@@ -108,6 +125,16 @@ export default function DesignWorkbench() {
     Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
   const runtimeGateEnabled =
     Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady && a2aContractsReady;
+
+  // 스텝 상태 파생 — 게이트 재계산이 아니라 산출물/승인 상태에서 읽기만 한다.
+  const hasGraph = Boolean(graphIR);
+  const reviewReady =
+    allCandidatesApproved && errorCount === 0 && runtimeContractsReady && a2aContractsReady;
+  const boundariesApproved = Boolean(manifest?.approvals.boundaries_approved);
+  const runtimeApproved = Boolean(manifest?.approvals.runtime_contracts_approved);
+  const bothApproved = boundariesApproved && runtimeApproved;
+  const defaultStep: DesignStepId = !hasGraph ? "run" : !reviewReady ? "review" : "approve";
+  const [activeStep, setActiveStep] = useStageStep(DESIGN_STEP_IDS, defaultStep);
 
   const anchor = useMemo<CommentAnchor | null>(() => {
     if (selection.nodeId) return { kind: "node", node_id: selection.nodeId };
@@ -212,25 +239,102 @@ export default function DesignWorkbench() {
     );
   }
 
+  const steps: StageStep[] = [
+    {
+      id: "run",
+      label: "1. 실행",
+      hint: "경계·Graph IR 생성",
+      status: hasGraph ? "done" : activeStep === "run" ? "current" : "todo"
+    },
+    {
+      id: "review",
+      label: "2. 검토",
+      hint: "모듈·그래프·계약",
+      available: hasGraph,
+      status: !hasGraph
+        ? "todo"
+        : reviewReady
+          ? "done"
+          : activeStep === "review"
+            ? "current"
+            : "blocked"
+    },
+    {
+      id: "approve",
+      label: "3. 승인",
+      hint: "경계·계약 게이트",
+      available: hasGraph,
+      status: bothApproved
+        ? "done"
+        : !reviewReady
+          ? hasGraph
+            ? "blocked"
+            : "todo"
+          : activeStep === "approve"
+            ? "current"
+            : "todo"
+    }
+  ];
+
+  const nextAction = buildDesignNextAction({
+    activeStep: activeStep as DesignStepId,
+    reqId,
+    hasAnalysis: Boolean(analysis),
+    analysisReviewed: Boolean(manifest?.approvals.analysis_reviewed),
+    hasGraph,
+    reviewReady,
+    bothApproved,
+    onAdvance: setActiveStep
+  });
+
+  const notice =
+    manifestLoading || analysisLoading || actionMessage ? (
+      <div className="af-stage-notice" role="status">
+        {manifestLoading || analysisLoading ? <span>데이터 불러오는 중…</span> : null}
+        {actionMessage ? <span>{actionMessage}</span> : null}
+      </div>
+    ) : null;
+
   return (
-    <div className="af-design-shell">
-      <StageRunnerPanel
-        reqId={reqId}
-        stage="design"
-        skillName="af-design-boundaries"
-        title="Design Skill Runner"
-        description="reviewed analysis-result.json 을 기준으로 모듈 경계, Graph IR, Runtime 계약, A2A 계약 변경 제안을 생성합니다. 성공한 run 도 approval gate 를 자동으로 켜지 않습니다."
-        headerAction={
-          <div className="af-action-row">
-            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/analyze`}>
-              Analyze 로
-            </Link>
-            <Link className="ui-button ui-button-ghost" to={`/af/${reqId}/build`}>
-              Build 로
-            </Link>
-          </div>
-        }
-        metrics={[
+    <StageShell
+      eyebrow={`설계 · ${reqId}`}
+      title="설계"
+      steps={steps}
+      activeStep={activeStep}
+      onStepChange={setActiveStep}
+      summary={
+        <>
+          <DesignSummaryItem
+            label="모듈"
+            value={
+              analysis
+                ? `approved ${analysis.moduleCandidates.filter((c) => c.status === "approved").length}/${analysis.moduleCandidates.length}`
+                : "—"
+            }
+          />
+          <DesignSummaryItem label="Graph IR" value={`nodes ${graphIR?.nodes?.length ?? 0} · err ${errorCount}`} />
+          <DesignSummaryItem
+            label="Runtime/A2A"
+            value={`runtime ${runtimeContracts.length} · A2A ${a2aContracts.length}`}
+          />
+          <DesignSummaryItem
+            label="게이트"
+            value={`${boundariesApproved ? "경계✓" : "경계·"} ${runtimeApproved ? "계약✓" : "계약·"}`}
+          />
+        </>
+      }
+      nextAction={nextAction}
+    >
+      {notice}
+
+      {activeStep === "run" ? (
+        <StageRunnerPanel
+          reqId={reqId}
+          stage="design"
+          skillName="af-design-boundaries"
+          title="Design Skill Runner"
+          description="reviewed analysis-result.json 을 기준으로 모듈 경계, Graph IR, Runtime 계약, A2A 계약 변경 제안을 생성합니다. 성공한 run 도 approval gate 를 자동으로 켜지 않습니다."
+          metrics={[
           {
             label: "analysis_reviewed",
             value: manifest?.approvals.analysis_reviewed ? "true" : "false",
@@ -259,28 +363,23 @@ export default function DesignWorkbench() {
         }
         currentArtifactEtag={analysisEtag}
         runButtonLabel="Design 실행"
-        buildRunBody={(model) => ({ model })}
-      />
-
-      {manifestLoading || analysisLoading || actionMessage ? (
-        <Panel>
-          {manifestLoading || analysisLoading ? <p className="af-landing-message">데이터 불러오는 중…</p> : null}
-          {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
-        </Panel>
+          buildRunBody={(model) => ({ model })}
+        />
       ) : null}
 
-      {!analysis ? (
-        <Panel>
-          <EmptyState
-            title="analysis-result.json 이 없습니다"
-            description="Analyze 단계에서 분석 결과를 먼저 import 하세요."
-          />
-          <Link className="ui-button ui-button-primary" to={`/af/${reqId}/analyze`}>
-            Analyze 로 이동
-          </Link>
-        </Panel>
-      ) : (
-        <div className="af-design-grid">
+      {activeStep === "review" ? (
+        !analysis ? (
+          <Panel>
+            <EmptyState
+              title="analysis-result.json 이 없습니다"
+              description="Analyze 단계에서 분석 결과를 먼저 import 하세요."
+            />
+            <Link className="ui-button ui-button-primary" to={`/af/${reqId}/analyze`}>
+              Analyze 로 이동
+            </Link>
+          </Panel>
+        ) : (
+          <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
           <aside className="af-design-sidebar" aria-label="설계 사이드바">
             <nav className="af-design-tabs" role="tablist">
               {SIDEBAR_TABS.map((tab) => (
@@ -396,48 +495,54 @@ export default function DesignWorkbench() {
             )}
           </section>
 
-          <aside className="af-design-inspector" aria-label="선택 검토 패널">
-            {activeTab === "runtime" ? (
-              <RuntimeContractInspector
-                key={selectedContract?.contract_id ?? "none"}
-                contract={selectedContract}
-                saving={saveAnalysisMutation.isPending}
-                onSave={handleSaveRuntimeContract}
-                onCancel={() => setActionMessage(null)}
-              />
-            ) : activeTab === "a2a" ? (
-              <A2AContractInspector
-                key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
-                candidate={selectedA2ARow?.candidate ?? null}
-                contract={selectedA2ARow?.contract ?? null}
-                saving={saveAnalysisMutation.isPending}
-                onSave={handleSaveA2AContract}
-                onCancel={() => setActionMessage(null)}
-              />
-            ) : (
-              <>
-                <SelectionHeader selection={selection} graphIR={graphIR} />
-                <CommentThread
-                  reqId={reqId}
-                  comments={comments}
-                  anchor={anchor}
-                  authorName={authorName}
-                  authorRole={authorRole}
-                  isMutating={createComment.isPending}
-                  onAuthorNameChange={setAuthorName}
-                  onAuthorRoleChange={setAuthorRole}
-                  onCreate={handleCreateComment}
-                  onUpdate={(id, body) => updateComment.mutate({ id, body })}
-                  onDelete={(id) => deleteComment.mutate(id)}
+          {/* 우측 Inspector 패널 — INSPECTOR_ENABLED 로 비활성화됨(상단 주석 참고).
+              false 인 동안 캔버스가 이 영역까지 차지하도록 grid 는 2열로 전환된다. */}
+          {INSPECTOR_ENABLED ? (
+            <aside className="af-design-inspector" aria-label="선택 검토 패널">
+              {activeTab === "runtime" ? (
+                <RuntimeContractInspector
+                  key={selectedContract?.contract_id ?? "none"}
+                  contract={selectedContract}
+                  saving={saveAnalysisMutation.isPending}
+                  onSave={handleSaveRuntimeContract}
+                  onCancel={() => setActionMessage(null)}
                 />
-              </>
-            )}
-          </aside>
-        </div>
-      )}
+              ) : activeTab === "a2a" ? (
+                <A2AContractInspector
+                  key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
+                  candidate={selectedA2ARow?.candidate ?? null}
+                  contract={selectedA2ARow?.contract ?? null}
+                  saving={saveAnalysisMutation.isPending}
+                  onSave={handleSaveA2AContract}
+                  onCancel={() => setActionMessage(null)}
+                />
+              ) : (
+                <>
+                  <SelectionHeader selection={selection} graphIR={graphIR} />
+                  <CommentThread
+                    reqId={reqId}
+                    comments={comments}
+                    anchor={anchor}
+                    authorName={authorName}
+                    authorRole={authorRole}
+                    isMutating={createComment.isPending}
+                    onAuthorNameChange={setAuthorName}
+                    onAuthorRoleChange={setAuthorRole}
+                    onCreate={handleCreateComment}
+                    onUpdate={(id, body) => updateComment.mutate({ id, body })}
+                    onDelete={(id) => deleteComment.mutate(id)}
+                  />
+                </>
+              )}
+            </aside>
+          ) : null}
+          </div>
+        )
+      ) : null}
 
-      {manifest ? (
-        <Panel tone="muted">
+      {activeStep === "approve" ? (
+        manifest ? (
+          <Panel tone="muted">
           <SectionHeader
             title="Gate: boundaries_approved"
             description={
@@ -525,20 +630,77 @@ export default function DesignWorkbench() {
                   : "남은 issue 있음"}
             </li>
           </ul>
-          <div className="af-action-row">
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={!manifest.approvals.boundaries_approved || !manifest.approvals.runtime_contracts_approved}
-              onClick={() => navigate(`/af/${reqId}/build`)}
-            >
-              Build 워크벤치로 이동
-            </Button>
-          </div>
         </Panel>
+        ) : (
+          <Panel>
+            <EmptyState title="manifest 없음" description="af-run-manifest.json 을 확인하세요." />
+          </Panel>
+        )
       ) : null}
+    </StageShell>
+  );
+}
+
+function DesignSummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="af-stage-summary-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
+}
+
+function buildDesignNextAction({
+  activeStep,
+  reqId,
+  hasAnalysis,
+  analysisReviewed,
+  hasGraph,
+  reviewReady,
+  bothApproved,
+  onAdvance
+}: {
+  activeStep: DesignStepId;
+  reqId: string;
+  hasAnalysis: boolean;
+  analysisReviewed: boolean;
+  hasGraph: boolean;
+  reviewReady: boolean;
+  bothApproved: boolean;
+  onAdvance: (id: DesignStepId) => void;
+}): StageNextAction {
+  if (activeStep === "run") {
+    return {
+      label: "검토로 →",
+      onClick: () => onAdvance("review"),
+      disabled: !hasGraph,
+      hint: hasGraph
+        ? "경계·Graph IR 제안이 준비됐습니다. ‘2. 검토’에서 모듈·그래프·계약을 확인하세요."
+        : !hasAnalysis
+          ? "Analyze 단계에서 분석 결과를 먼저 만들어야 Design 을 실행할 수 있습니다."
+          : !analysisReviewed
+            ? "Analyze 단계에서 analysis_reviewed 게이트를 먼저 통과하세요."
+            : "Design 을 실행해 Graph IR·계약 제안을 생성하세요."
+    };
+  }
+  if (activeStep === "review") {
+    return {
+      label: "승인으로 →",
+      onClick: () => onAdvance("approve"),
+      disabled: !hasGraph,
+      hint: reviewReady
+        ? "모든 모듈 approved · Graph IR 오류 0 · Runtime/A2A 계약 준비 완료. ‘3. 승인’에서 게이트를 토글하세요."
+        : "모듈을 모두 approved 로, Graph IR 오류를 0 으로, Runtime/A2A 계약을 준비 상태로 만든 뒤 승인할 수 있습니다."
+    };
+  }
+  return {
+    label: "개발 단계로 →",
+    to: `/af/${reqId}/build`,
+    disabled: !bothApproved,
+    hint: bothApproved
+      ? "경계·계약 승인이 끝났습니다. 개발(Build) 단계로 이동하세요."
+      : "boundaries_approved 와 runtime_contracts_approved 를 모두 통과해야 다음 단계로 갈 수 있습니다."
+  };
 }
 
 interface ModuleSidebarProps {

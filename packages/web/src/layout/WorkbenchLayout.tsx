@@ -43,6 +43,17 @@ export function WorkbenchLayout({ children }: WorkbenchLayoutProps) {
               {stageLabels[stage]}
             </NavLink>
           ))}
+          <span className="af-stage-nav-divider" aria-hidden="true" />
+          <NavLink
+            to={reqId ? `/af/${reqId}/run` : "/"}
+            className={({ isActive }) =>
+              `af-stage-link af-stage-link-tool${isActive ? " af-stage-link-active" : ""}`
+            }
+            aria-disabled={!reqId}
+            title="ADK 런타임 실행 — 승인 게이트가 없는 도구 화면"
+          >
+            실행
+          </NavLink>
           <NavLink
             to="/catalog"
             className={({ isActive }) => `af-stage-link af-stage-link-aux${isActive ? " af-stage-link-active" : ""}`}

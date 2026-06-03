@@ -14,19 +14,22 @@
       <div class="page-eyebrow">화면 투어 · 2/9</div>
       <h1 class="page-title">2. 워크벤치 한 바퀴</h1>
       <p class="page-lede">
-        현재 Agent Factory 워크벤치는 Landing과 Analyze/Design/Build/Verify, Reuse Hub로 나뉜
-        5-route review console이다. Landing에서 artifact root를 고르고, Reuse Hub는 별도
-        <code>/catalog</code> route에서 연다. Analyze와 Design의 첫 화면에는 Stage Runner가 있고, 스킬 실행 결과는
-        diff/preview 후 사용자가 적용해야 canonical artifact가 바뀐다.
+        현재 Agent Factory 워크벤치는 Landing, 4개 스킬 스테이지(Analyze/Design/Build/Verify),
+        게이트 없는 도구 화면 <strong>실행</strong>, Reuse Hub로 나뉜다. Landing에서 artifact root를 고르고,
+        Reuse Hub는 별도 <code>/catalog</code> route에서 연다. 4개 스킬 스테이지는 공용 <code>StageShell</code>로
+        <strong>좌측 스텝 레일(1실행 · 2검토 · 3승인)</strong>을 두어 한 단계 안에서도 지금 할 일만 보이게 나눈다
+        (활성 스텝은 얕은 <code>?step=</code> 쿼리). 스킬 실행 결과는 diff/preview 후 사용자가 적용해야
+        canonical artifact가 바뀐다.
       </p>
 
       <section class="block">
         <h2>현재 route 흐름</h2>
         <div class="graph-mock">/ Landing
-  -> /af/:reqId/analyze  Analyze Stage Runner + AnalysisResult review
-  -> /af/:reqId/design   Design Stage Runner + module/Graph/Runtime review
-  -> /af/:reqId/build    scaffold-plan + runtime-stub handoff
-  -> /af/:reqId/verify   validation commands + reports
+  -> /af/:reqId/analyze  실행→검토→승인 (Analyze Runner / AnalysisResult / analysis_reviewed)
+  -> /af/:reqId/design   실행→검토→승인 (Design Runner / 2-pane Graph IR(Inspector 휴면) / boundaries+runtime gates)
+  -> /af/:reqId/build    실행→검토→승인 (scaffold+stub / 파일·handoff / stub_ready)
+  -> /af/:reqId/verify   실행→기록 (validation commands / report+delta, 게이트 없음)
+  -> /af/:reqId/run      실행 (게이트 없는 도구 화면 — ADK runtime + dev UI 링크)
   -> /catalog            Reuse Hub</div>
         <p>모든 route는 <code>artifacts/af/&lt;req-id&gt;/</code>를 단일 저장소로 사용한다. 브라우저 localStorage는 최근 root와 코멘트 작성자 캐시에만 쓰고, 분석 결과나 단계 상태를 저장하지 않는다.</p>
       </section>
@@ -59,18 +62,25 @@
             <div class="step-num">4</div>
             <div class="step-body">
               <h4>Build — Runtime Handoff 준비</h4>
-              <p>승인된 analysis artifact와 seed catalog로 <code>scaffold-plan.json</code>을 만들고, <code>runtime-stub/</code> source bundle을 생성한다. raw requirement는 source generation 입력이 될 수 없다.</p>
+              <p>스텝 레일로 1실행(<code>scaffold-plan.json</code> + <code>runtime-stub/</code> source bundle 생성) · 2검토(stub 파일·<code>implementation-handoff.md</code>) · 3승인(<code>stub_ready_for_followup</code>)으로 나뉜다. raw requirement는 source generation 입력이 될 수 없다. ADK 런타임 연결/실행은 이 화면이 아니라 아래 <strong>실행</strong> 화면에 있다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">5</div>
             <div class="step-body">
               <h4>Verify — 검증 evidence 기록</h4>
-              <p>고정 allow-list 검증 명령을 실행하고 <code>manifest.validation.last_result</code>, <code>validation-report.md</code>, <code>catalog-delta.yaml</code>을 갱신한다. 실제 <code>adk web</code>이나 chat smoke는 워크벤치 밖 별도 터미널에서 수행한다.</p>
+              <p>승인 게이트가 없어 2스텝(실행·기록)이다. 고정 allow-list 검증 명령을 실행하고 <code>manifest.validation.last_result</code>, <code>validation-report.md</code>, <code>catalog-delta.yaml</code>을 갱신한다.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">6</div>
+            <div class="step-body">
+              <h4>실행 — ADK 런타임 (게이트 없음)</h4>
+              <p><code>/af/:reqId/run</code>. <code>runtime-stub/</code>이 생성된 뒤 <code>runtime-stub/.venv</code>에 ADK dependency를 설치하고, 로컬 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며, ADK 공식 dev UI(채팅·세션·이벤트·트레이스)를 새 탭으로 <strong>링크</strong>한다. 워크벤치 자체 챗은 만들지 않고 ADK가 제공하는 UI를 그대로 쓴다(iframe 임베드 아님). 승인 게이트가 없는 보조 도구 화면이라 <code>afRunStageIds</code>에 들어가지 않는다.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">7</div>
             <div class="step-body">
               <h4>Reuse Hub — catalog 연결과 등록 제안</h4>
               <p><code>/catalog</code>에서 reusable Agent/Workflow/Adapter/Remote A2A 계약을 검색한다. 현재 root 후보에 pin하거나, 새 등록 제안을 root의 <code>catalog-delta.yaml</code>에 append한다. <code>catalog/*.yaml</code>은 UI가 직접 수정하지 않는다.</p>
@@ -116,7 +126,7 @@
           </figure>
           <figure class="doc-figure">
             <img src="assets/onboarding-build.png" alt="Build Workbench 화면" />
-            <figcaption>Build route는 승인된 artifact에서 scaffold-plan과 TODO-only runtime stub을 만든다.</figcaption>
+            <figcaption>Build route는 승인된 artifact에서 scaffold-plan과 runtime stub(기본 smoke TODO; runnable 모드는 실행형 ADK Workflow)을 만든다.</figcaption>
           </figure>
           <figure class="doc-figure">
             <img src="assets/onboarding-verify.png" alt="Verify Workbench 화면" />

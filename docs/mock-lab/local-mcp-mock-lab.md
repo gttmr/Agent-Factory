@@ -1,6 +1,6 @@
 # Local MCP Mock Lab
 
-Mock Lab v0.1은 ADK Agent가 나중에 `McpToolset`으로 소비할 수 있는 MCP stdio mock server를 로컬에서 만들고 검증하기 위한 별도 앱이다. 기존 Agent Factory workbench의 `/af/:reqId/analyze`, `/design`, `/build`, `/verify` 흐름에는 붙이지 않는다.
+Mock Lab은 ADK Agent가 `McpToolset`(또는 stdio)으로 소비하는 MCP mock server를 로컬에서 만들고 검증하기 위한 별도 앱이다. 실행 중인 mock은 network MCP로도 노출되어 생성된 runnable ADK 번들이 직접 호출한다(아래 "Network MCP" 참고). 기존 Agent Factory workbench의 `/af/:reqId/analyze`, `/design`, `/build`, `/verify` 흐름에는 붙이지 않는다.
 
 ## 실행
 
@@ -39,7 +39,16 @@ Smoke test는 다음을 확인한다.
 - `tools/list`: tool name, description, inputSchema, outputSchema 존재
 - `tools/call`: sample input 검증, `structuredContent` 존재, outputSchema 검증, text content 존재, synthetic marker 존재, audit log 기록
 
-생성된 MCP stdio server는 ADK `McpToolset` 소비를 염두에 둔 local test double이다. ADK smoke agent 생성과 A2A mock server는 v0.1 범위가 아니다.
+생성된 MCP stdio server는 local test double이다. 같은 child를 network MCP로도 노출한다(아래). A2A mock server는 v0.1 범위가 아니다.
+
+## Network MCP (Streamable HTTP)
+
+생성된 ADK **runnable** 번들의 connected adapter가 실제 tool을 호출할 수 있도록, 실행 중인 stdio child를 Streamable-HTTP MCP 엔드포인트로 다시 노출한다. 공식 MCP TypeScript SDK(`@modelcontextprotocol/sdk`)로 구현하며 별도 HTTP/SSE 핸드셰이크를 직접 만들지 않는다(`server/mcpNetworkBridge.ts`).
+
+- `ALL /api/mock-lab/mcp/<key>` — `<key>`(mock_id, `server_name`, 또는 `source.catalog_entry_name`)로 실행 중인 child를 찾아 Streamable-HTTP MCP server를 띄운다. `tools/list`와 `tools/call`은 `MockProcessRegistry.sendJsonRpc`로 child에 그대로 위임하므로 single source of truth와 기존 audit log를 재사용한다. bridge 자체는 business logic을 추가하지 않는다. child가 실행 중이 아니면 409를 반환한다.
+- `GET /api/mock-lab/mcp-discovery` — 저장된 mock과 running 여부, live `tools/list` tool 이름, `mcp_url`(`/api/mock-lab/mcp/<mock_id>`)을 반환한다. `?server=<name>&tool=<tool>`로 adapter↔server 매칭을 조회한다. **connected**는 in-memory process가 running이고 해당 tool이 live `tools/list`에 있는 경우만 true다(persisted `server-state.json`의 running은 advisory).
+
+생성된 runnable 번들은 `AF_MOCK_LAB_MCP_URL`(기본 `http://127.0.0.1:5176/api/mock-lab/mcp`) + `<mcp_server>`로 `streamablehttp_client`를 연결하거나, `agents.config.yaml`의 adapter `mcp_url`로 override한다. 모든 호출은 synthetic Mock Lab 한정이며 private endpoint/credential/실데이터를 담지 않는다.
 
 ## Non-goals
 

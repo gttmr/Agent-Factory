@@ -160,7 +160,7 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
         return;
       }
 
-      // /api/af/:id/runtime-chat/{status,install,start,stop,session,message}
+      // /api/af/:id/runtime-chat/{status,install,start,stop}
       if (rest[0] === "runtime-chat") {
         return await handleRuntimeChat(runtimeChat, reqId, rest.slice(1), req, res);
       }
@@ -251,24 +251,6 @@ async function handleRuntimeChat(
       return;
     }
     sendJson(res, 200, await runtimeChat.stop(reqId));
-    return;
-  }
-  if (action === "session") {
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
-      return;
-    }
-    const body = await readJsonBody(req).catch(() => ({}));
-    sendJson(res, 200, await runtimeChat.createSession(reqId, isRecord(body) ? body : {}));
-    return;
-  }
-  if (action === "message") {
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
-      return;
-    }
-    const body = await readJsonBody(req).catch(() => ({}));
-    sendJson(res, 200, await runtimeChat.sendMessage(reqId, isRecord(body) ? body : {}));
     return;
   }
   sendJson(res, 404, { error: "알 수 없는 runtime-chat 경로입니다." });

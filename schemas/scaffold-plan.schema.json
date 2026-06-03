@@ -18,6 +18,11 @@
       "type": "boolean",
       "const": false
     },
+    "output_mode": {
+      "type": "string",
+      "enum": ["smoke", "runnable"],
+      "description": "Defaults to smoke when absent. runnable allows reviewed LlmAgent/MCP wiring; raw_requirement_to_code stays false in both modes."
+    },
     "modules": {
       "type": "array",
       "items": {
@@ -62,6 +67,46 @@
       }
     }
   },
+  "allOf": [
+    {
+      "description": "Correlate output_mode with module runnable flags. Absent output_mode is treated as smoke.",
+      "if": {
+        "required": ["output_mode"],
+        "properties": { "output_mode": { "const": "runnable" } }
+      },
+      "then": {
+        "properties": {
+          "modules": {
+            "items": {
+              "properties": {
+                "no_runnable_business_logic": { "const": false },
+                "scaffold_output": { "const": "runnable" }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "modules": {
+            "items": {
+              "properties": {
+                "no_runnable_business_logic": { "const": true },
+                "scaffold_output": {
+                  "enum": [
+                    "contract_or_stub_only",
+                    "agent_shell_only",
+                    "orchestration_shell_only",
+                    "contract_placeholder_only"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "module": {
       "type": "object",
@@ -128,11 +173,11 @@
         },
         "scaffold_output": {
           "type": "string",
-          "enum": ["contract_or_stub_only", "agent_shell_only", "orchestration_shell_only", "contract_placeholder_only"]
+          "enum": ["contract_or_stub_only", "agent_shell_only", "orchestration_shell_only", "contract_placeholder_only", "runnable"]
         },
         "no_runnable_business_logic": {
           "type": "boolean",
-          "const": true
+          "description": "true in smoke mode; the validator allows false only when the plan's output_mode is runnable."
         },
         "catalog_binding": {
           "anyOf": [{ "$ref": "#/$defs/catalog_binding" }, { "type": "null" }]
@@ -171,6 +216,36 @@
         },
         "runtime_mock": {
           "anyOf": [{ "type": "object" }, { "type": "null" }]
+        },
+        "instruction": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "model": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "access_protocol": {
+          "anyOf": [
+            { "type": "string", "enum": ["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "mcp_server": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "mcp_tool_name": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "mcp_schema_ref": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "mcp_auth_mode": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "runtime_binding": {
+          "anyOf": [
+            { "type": "string", "enum": ["unresolved", "mcp", "remote_a2a"] },
+            { "type": "null" }
+          ]
         }
       }
     },

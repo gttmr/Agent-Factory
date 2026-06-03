@@ -30,7 +30,7 @@
 
           <div class="glossary-entry">
             <h4>ADK Runtime Handoff</h4>
-            <p>승인된 workbench artifact와 manifest approval만 입력으로 받아 TODO-only runtime stub source bundle을 만드는 review-gated handoff. <em>배포가 아니다.</em></p>
+            <p>승인된 workbench artifact와 manifest approval만 입력으로 받아 runtime stub source bundle을 만드는 review-gated handoff(기본 smoke TODO; 승인된 <code>runnable</code> 모드는 실행형 ADK Workflow). <em>배포가 아니다.</em></p>
           </div>
 
           <div class="glossary-entry">
@@ -40,7 +40,7 @@
 
           <div class="glossary-entry">
             <h4>af-analyze-requirement / af-design-boundaries / af-build-runtime-stub / af-verify-feedback</h4>
-            <p>Agent Factory 4단계 DLC skill. 분석 artifact 생성, boundary/runtime/catalog 설계 승인, TODO-only ADK runtime stub 생성, 검증과 feedback 기록을 순서대로 담당한다.</p>
+            <p>Agent Factory 4단계 DLC skill. 분석 artifact 생성, boundary/runtime/catalog 설계 승인, ADK runtime stub 생성(기본 smoke TODO; <code>runnable</code> 모드는 실행형 Workflow), 검증과 feedback 기록을 순서대로 담당한다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -99,8 +99,18 @@
           </div>
 
           <div class="glossary-entry">
-            <h4>chat-smoke <span class="term-tag">PR6 이후 워크벤치에서 제거</span></h4>
-            <p>generated ADK app에 대해 session을 만들고 <code>/run</code> endpoint를 호출해 응답을 확인하던 dev smoke. PR6 마이그레이션에서 워크벤치 UI 내 chat-smoke / <code>adk web</code> 임베드 / <code>Smoke 일괄 실행</code> 매크로는 모두 제거됐다. 같은 검증이 필요하면 생성된 <code>runtime-stub/</code>에 대해 별도 터미널에서 <code>adk web</code>을 실행한다.</p>
+            <h4>chat-smoke <span class="term-tag">워크벤치 자체 챗 제거 → ADK dev UI 링크</span></h4>
+            <p>generated ADK app에 대해 session을 만들고 <code>/run</code> endpoint를 호출해 응답을 확인하던 dev smoke. PR6에서 <code>adk web</code> iframe 임베드와 <code>Smoke 일괄 실행</code> 매크로가 제거됐고, 이후 워크벤치 <strong>자체</strong> 챗(session/message)도 제거됐다. 대신 <strong>실행</strong> 화면(<code>/af/:reqId/run</code>)이 <code>adk api_server --with_ui</code>를 띄우고 ADK가 제공하는 공식 dev UI(채팅·세션·이벤트·트레이스)로 새 탭 링크한다. 코드 레벨 smoke(<code>pytest</code> 등)는 생성된 번들에서 직접 돌린다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>실행 (RunSandbox)</h4>
+            <p><code>/af/:reqId/run</code> route. 승인 게이트가 <strong>없는</strong> 도구 화면이다. <code>runtime-stub/</code> 생성 후 <code>runtime-stub/.venv</code>에 ADK dependency를 설치하고, 로컬 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며 상태를 폴링하고, ADK 공식 dev UI(<code>web_url</code>)를 새 탭으로 링크한다. 보조 nav 항목일 뿐이며 <code>afRunStageIds</code>(=manifest 스테이지 스키마/게이트 칩)에 포함되지 않는다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>StageShell</h4>
+            <p><code>packages/web/src/layout/StageShell.tsx</code>. 4개 스킬 스테이지가 공유하는 셸 — 좌측 스텝 레일(1실행 · 2검토 · 3승인, Verify는 게이트가 없어 실행·기록 2스텝), 항상 보이는 산출물 요약 strip, "다음에 할 일" 가이드, 하단 next-action CTA로 구성된다. 활성 스텝은 얕은 <code>?step=</code> 쿼리(<code>useStageStep</code>)이고 첫 미완료 스텝으로 착지한다. 스텝 status는 <code>manifest.approvals.*</code> + 산출물 존재에서 <em>읽기만</em> 하고 게이트를 재계산하지 않는다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -330,7 +340,7 @@
 
           <div class="glossary-entry">
             <h4>smoke_spec</h4>
-            <p>승인된 후보의 chat smoke 계약 데이터. synthetic input, sample message, expected output shape를 포함한다. <code>analysis-result.json</code>과 catalog 항목에는 그대로 남아 있으며 외부 ADK smoke 도구가 소비한다(PR6 이후 워크벤치 UI에는 chat-smoke runner가 없다).</p>
+            <p>승인된 후보의 chat smoke 계약 데이터. synthetic input, sample message, expected output shape를 포함한다. <code>analysis-result.json</code>과 catalog 항목에는 그대로 남아 있으며, <strong>실행</strong> 화면이 띄우는 ADK 공식 dev UI나 외부 ADK smoke 도구가 소비한다(워크벤치 자체 chat-smoke runner는 없다).</p>
           </div>
 
           <div class="glossary-entry">

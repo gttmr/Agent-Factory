@@ -65,7 +65,7 @@ Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level
 
 Catalog entries are runtime-oriented contracts. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
 
-ADK runtime baseline: ADK 2.0. ADK Python 2.0 is GA as of May 19, 2026. `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`. ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis.
+ADK taxonomy/Graph IR baseline: ADK 2.0 (ADK Python 2.0 GA as of May 19, 2026). This baseline governs classification only — `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`, and ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis. The runnable source generator targets the ADK 2.1 `google.adk.workflow.Workflow` runtime (a minor-version detail of the generated bundle, not a change to the classification baseline).
 
 ## Agent Factory Harness
 
@@ -144,7 +144,7 @@ For code-changing subagents, assign a clear file or module ownership boundary an
 - Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
 - ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
 - Required runtime contracts in `AnalysisResult.runtimeContracts` must be reviewed and approved before Runtime Handoff proceeds.
-- Generated source must stay a TODO/runtime wiring handoff unless a separate task explicitly approves runnable business logic.
+- Generated source defaults to a smoke TODO/runtime-wiring handoff. A reviewed `scaffold-plan` `output_mode: runnable` (an approved capability) emits a runnable ADK 2.1 `Workflow` (Gemini `LlmAgent` nodes + synthetic Mock Lab MCP adapters) instead — still generated only from approved artifacts (`raw_requirement_to_code` stays `false`), never from raw requests, and never containing private endpoints, credentials, or real customer data.
 
 ## WSL Browser Verification
 

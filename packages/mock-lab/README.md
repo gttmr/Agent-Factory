@@ -2,6 +2,8 @@
 
 Mock Lab is a separate local app for defining and testing synthetic MCP stdio mock servers. It is not mounted into the existing `/af/:reqId/*` workbench routes.
 
+Running mocks are also re-exposed over network MCP (Streamable HTTP) at `/api/mock-lab/mcp/<key>`, with discovery at `/api/mock-lab/mcp-discovery`, so a generated runnable ADK bundle's connected adapter can call them live. See `docs/mock-lab/local-mcp-mock-lab.md`.
+
 ## Run
 
 ```bash

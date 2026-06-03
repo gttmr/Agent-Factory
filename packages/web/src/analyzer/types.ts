@@ -464,6 +464,15 @@ export interface CatalogBinding {
   component_source: ComponentSource;
 }
 
+/**
+ * Scaffold output mode. `smoke` (default) keeps the synthetic, no-runnable-logic
+ * handoff. `runnable` emits the reviewed ADK 2.1 LlmAgent/Workflow graph that
+ * calls Gemini and live Mock Lab MCP servers. In BOTH modes the source is still
+ * the approved workbench artifacts — `raw_requirement_to_code` stays false and
+ * raw requirements never drive code generation.
+ */
+export type ScaffoldOutputMode = "smoke" | "runnable";
+
 export interface ScaffoldPlanModule {
   id: string;
   name: string;
@@ -473,7 +482,8 @@ export interface ScaffoldPlanModule {
   adapter_kind: AdapterKind | null;
   remote_contract_kind: RemoteContractKind | null;
   scaffold_output: string;
-  no_runnable_business_logic: true;
+  /** `true` in smoke mode; `false` is allowed only when `ScaffoldPlan.output_mode === "runnable"`. */
+  no_runnable_business_logic: boolean;
   catalog_binding?: CatalogBinding;
   developer_todos: string[];
   inputs: FieldSpec[];
@@ -482,6 +492,21 @@ export interface ScaffoldPlanModule {
   required_review_fields: string[];
   smoke_spec?: ModuleSmokeSpec | null;
   runtime_mock?: Record<string, unknown> | null;
+  /**
+   * Runnable-mode wiring. Null/absent in smoke mode. `instruction`/`model` seed
+   * the LlmAgent for agent-kind modules; the `mcp_*`/`access_protocol`/
+   * `runtime_binding` fields declare the intended Mock Lab MCP binding for
+   * adapter-kind modules. Live connected/unconnected status is resolved by the
+   * generator against the running Mock Lab registry, not recorded here.
+   */
+  instruction?: string | null;
+  model?: string | null;
+  access_protocol?: AccessProtocol | null;
+  mcp_server?: string | null;
+  mcp_tool_name?: string | null;
+  mcp_schema_ref?: string | null;
+  mcp_auth_mode?: string | null;
+  runtime_binding?: "unresolved" | "mcp" | "remote_a2a" | null;
 }
 
 export interface ScaffoldPlanRuntimeContract {
@@ -510,6 +535,8 @@ export interface ScaffoldPlan {
   requirement_id: string;
   source: "approved_workbench_artifact";
   raw_requirement_to_code: false;
+  /** Defaults to `smoke`. Drives `no_runnable_business_logic` and `scaffold_output` semantics. */
+  output_mode: ScaffoldOutputMode;
   modules: ScaffoldPlanModule[];
   runtime_contracts: ScaffoldPlanRuntimeContract[];
   excluded_modules: ExcludedScaffoldModule[];

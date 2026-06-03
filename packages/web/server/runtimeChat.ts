@@ -6,7 +6,6 @@ import type { ArtifactRootStore } from "./artifactRootStore";
 
 export const DEFAULT_ADK_CHAT_PORT = 8765;
 const DEFAULT_ADK_HOST = "127.0.0.1";
-const DEFAULT_USER_ID = "af-reviewer";
 
 export interface RuntimeChatStatus {
   port: number;
@@ -46,19 +45,6 @@ export interface RuntimeChatStartResult {
 export interface RuntimeChatStopResult {
   ok: boolean;
   status: RuntimeChatStatus;
-}
-
-export interface RuntimeChatSessionResult {
-  user_id: string;
-  session_id: string;
-  session: unknown;
-}
-
-export interface RuntimeChatMessageResult {
-  user_id: string;
-  session_id: string;
-  events: unknown[];
-  final_text: string;
 }
 
 export interface RuntimeChatManagerOptions {
@@ -205,62 +191,6 @@ export class RuntimeChatManager {
     };
   }
 
-  async createSession(
-    reqId: string,
-    input: { user_id?: string; session_id?: string; state?: Record<string, unknown> }
-  ): Promise<RuntimeChatSessionResult> {
-    const ctx = await this.context(reqId);
-    const userId = cleanId(input.user_id) || DEFAULT_USER_ID;
-    const sessionId = cleanId(input.session_id) || createSessionId();
-    const response = await fetch(
-      `${baseUrl(ctx)}/apps/${encodeURIComponent(ctx.appName)}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input.state ?? {})
-      }
-    );
-    if (!response.ok) throw new Error(await response.text());
-    return {
-      user_id: userId,
-      session_id: sessionId,
-      session: await response.json()
-    };
-  }
-
-  async sendMessage(
-    reqId: string,
-    input: { user_id?: string; session_id?: string; text?: string }
-  ): Promise<RuntimeChatMessageResult> {
-    const ctx = await this.context(reqId);
-    const userId = cleanId(input.user_id) || DEFAULT_USER_ID;
-    const sessionId = cleanId(input.session_id);
-    const text = typeof input.text === "string" ? input.text.trim() : "";
-    if (!sessionId) throw new Error("session_id is required.");
-    if (!text) throw new Error("message text is required.");
-    const response = await fetch(`${baseUrl(ctx)}/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        appName: ctx.appName,
-        userId,
-        sessionId,
-        newMessage: {
-          role: "user",
-          parts: [{ text }]
-        }
-      })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    const events = (await response.json()) as unknown[];
-    return {
-      user_id: userId,
-      session_id: sessionId,
-      events,
-      final_text: extractFinalTextFromAdkEvents(events)
-    };
-  }
-
   private async context(reqId: string): Promise<RuntimeContext> {
     const rootDir = this.store.resolveRootDir(reqId);
     const stubDir = join(rootDir, "runtime-stub");
@@ -392,14 +322,6 @@ function normalizePort(value: number): number {
 
 function baseUrl(ctx: { host: string; port: number }): string {
   return `http://${ctx.host}:${ctx.port}`;
-}
-
-function createSessionId(): string {
-  return `af-${Date.now().toString(36)}`;
-}
-
-function cleanId(value: unknown): string {
-  return typeof value === "string" ? value.trim().replace(/[^A-Za-z0-9_.-]/g, "-").slice(0, 80) : "";
 }
 
 function tail(value: string, max = 20_000): string {

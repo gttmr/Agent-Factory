@@ -2,6 +2,7 @@
   "requirement_id": "req-loan-precheck-smoke",
   "source": "approved_workbench_artifact",
   "raw_requirement_to_code": false,
+  "output_mode": "runnable",
   "modules": [
     {
       "id": "mod-loan-precheck-workflow",
@@ -11,16 +12,16 @@
       "workflow_kind": "graph",
       "adapter_kind": null,
       "remote_contract_kind": null,
-      "scaffold_output": "orchestration_shell_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-workflow-loan_application_precheck_mock_workflow",
         "name": "loan_application_precheck_mock_workflow",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -51,11 +52,6 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "input_contract",
-        "output_contract",
-        "eval_placeholders"
-      ],
       "risk_signals": [
         "personal_data",
         "financial_data",
@@ -65,6 +61,41 @@
         "human_approval_required",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "SYNTHETIC loan application DEMO-001 을 사전심사하고 다음 조치를 알려줘.",
+        "synthetic_inputs": {
+          "loan_application": {
+            "case_id": "LOAN-DEMO-CASE-001",
+            "customer_identifier": "CUST-DEMO-001",
+            "requested_amount": 30000000
+          },
+          "submitted_documents": [
+            {
+              "document_uri": "synthetic://loan/demo/application-pack.pdf"
+            }
+          ]
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "precheck_result",
+            "approval_required",
+            "next_actions"
+          ]
+        },
+        "expected_event_markers": [
+          "precheck_result",
+          "approval_required",
+          "next_actions"
+        ],
+        "mock_sources": [
+          "catalog/workflows.yaml: loan_application_precheck_mock_workflow"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "precheck_result": {
           "case_id": "LOAN-DEMO-CASE-001",
@@ -84,7 +115,15 @@
           "route_to_manual_reviewer",
           "preview_customer_notice_only"
         ]
-      }
+      },
+      "instruction": null,
+      "model": null,
+      "access_protocol": null,
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-common-document-intake",
@@ -94,16 +133,16 @@
       "workflow_kind": "graph",
       "adapter_kind": null,
       "remote_contract_kind": null,
-      "scaffold_output": "orchestration_shell_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-workflow-common_document_intake_mock_workflow",
         "name": "common_document_intake_mock_workflow",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -134,16 +173,37 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "input_contract",
-        "output_contract",
-        "eval_placeholders"
-      ],
       "risk_signals": [
         "personal_data",
         "financial_data",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "제출 문서 package에서 synthetic document_context를 만들어라.",
+        "synthetic_inputs": {
+          "document_package": {
+            "document_uri": "synthetic://loan/demo/application-pack.pdf"
+          }
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "document_context",
+            "intake_artifacts",
+            "intake_warnings"
+          ]
+        },
+        "expected_event_markers": [
+          "document_context"
+        ],
+        "mock_sources": [
+          "catalog/workflows.yaml: common_document_intake_mock_workflow"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "document_context": {
           "document_package_id": "DOC-PKG-DEMO-001",
@@ -171,7 +231,15 @@
         "intake_warnings": [
           "synthetic_document_context"
         ]
-      }
+      },
+      "instruction": null,
+      "model": null,
+      "access_protocol": null,
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-customer-account-snapshot",
@@ -181,16 +249,16 @@
       "workflow_kind": null,
       "adapter_kind": "data_query",
       "remote_contract_kind": null,
-      "scaffold_output": "contract_or_stub_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-adapter-customer_account_snapshot_mock_adapter",
         "name": "customer_account_snapshot_mock_adapter",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-        "Map reviewed inputs and outputs before replacing the TODO boundary."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -221,17 +289,39 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "auth_required",
-        "timeout",
-        "retry",
-        "side_effect"
-      ],
       "risk_signals": [
         "personal_data",
         "financial_data",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "CUST-DEMO-001 의 synthetic account snapshot 을 조회한다.",
+        "synthetic_inputs": {
+          "customer_identifier": "CUST-DEMO-001",
+          "snapshot_scope": [
+            "account_summary"
+          ]
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "customer_snapshot",
+            "account_summary",
+            "data_freshness"
+          ]
+        },
+        "expected_event_markers": [
+          "customer_snapshot",
+          "account_summary"
+        ],
+        "mock_sources": [
+          "catalog/adapters.yaml: customer_account_snapshot_mock_adapter"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "customer_snapshot": {
           "customer_id": "CUST-DEMO-001",
@@ -250,7 +340,15 @@
           "as_of": "2026-05-01T09:00:00+09:00",
           "synthetic": true
         }
-      }
+      },
+      "instruction": null,
+      "model": null,
+      "access_protocol": "local",
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-loan-precheck-rule",
@@ -260,16 +358,16 @@
       "workflow_kind": null,
       "adapter_kind": "rule_registry",
       "remote_contract_kind": null,
-      "scaffold_output": "contract_or_stub_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-adapter-loan_precheck_rule_mock_adapter",
         "name": "loan_precheck_rule_mock_adapter",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-        "Map reviewed inputs and outputs before replacing the TODO boundary."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -300,17 +398,39 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "auth_required",
-        "timeout",
-        "retry",
-        "side_effect"
-      ],
       "risk_signals": [
         "customer_impact",
         "credit_decision_support",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "loan_precheck_demo_v1 rules 를 synthetic case feature 로 평가한다.",
+        "synthetic_inputs": {
+          "rule_set_key": "loan_precheck_demo_v1",
+          "case_features": {
+            "customer_id": "CUST-DEMO-001"
+          }
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "rule_result",
+            "matched_rules",
+            "required_actions"
+          ]
+        },
+        "expected_event_markers": [
+          "rule_result",
+          "required_actions"
+        ],
+        "mock_sources": [
+          "catalog/adapters.yaml: loan_precheck_rule_mock_adapter"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "rule_result": {
           "rule_set_key": "loan_precheck_demo_v1",
@@ -334,7 +454,15 @@
           "request_employment_certificate",
           "route_to_manual_reviewer"
         ]
-      }
+      },
+      "instruction": null,
+      "model": null,
+      "access_protocol": "local",
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-loan-document-review",
@@ -344,16 +472,16 @@
       "workflow_kind": null,
       "adapter_kind": null,
       "remote_contract_kind": null,
-      "scaffold_output": "agent_shell_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-agent-loan_document_review_mock_agent",
         "name": "loan_document_review_mock_agent",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -384,15 +512,48 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "input_contract",
-        "output_contract",
-        "eval_placeholders"
-      ],
       "risk_signals": [
         "financial_data",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "문서 누락과 불일치를 synthetic evidence 기반으로 설명한다.",
+        "synthetic_inputs": {
+          "document_context": {
+            "document_package_id": "DOC-PKG-DEMO-001",
+            "normalized_document_type": "loan_application_pack",
+            "extracted_fields": {
+              "requested_amount": 30000000,
+              "stated_annual_income": 75000000,
+              "proof_annual_income": 72000000
+            },
+            "policy_basis": [
+              "LOAN-DOC-REQ-001",
+              "LOAN-RISK-DSR-002"
+            ]
+          },
+          "policy_matches": []
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "document_review_result",
+            "missing_documents",
+            "followup_questions"
+          ]
+        },
+        "expected_event_markers": [
+          "document_review_result",
+          "missing_documents"
+        ],
+        "mock_sources": [
+          "catalog/agents.yaml: loan_document_review_mock_agent"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "document_review_result": {
           "decision": "supplement_required",
@@ -418,7 +579,15 @@
           "재직증명서 최신본을 추가 제출해야 합니다.",
           "신청서 소득 금액과 소득증빙 금액 차이를 확인해야 합니다."
         ]
-      }
+      },
+      "instruction": "You are \"loan_document_review_mock_agent\".\nResponsibility: OCR와 정책 조회 결과를 바탕으로 대출 신청 서류의 누락, 불일치, 보완 필요 사항을 synthetic rule로 정리한다.\nInputs you receive: document_context, policy_matches.\nOutputs you must produce: document_review_result, missing_documents, followup_questions.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 문서 누락과 불일치를 synthetic evidence 기반으로 설명한다.",
+      "model": "gemini-2.5-flash",
+      "access_protocol": null,
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-credit-risk-reasoning",
@@ -428,16 +597,16 @@
       "workflow_kind": null,
       "adapter_kind": null,
       "remote_contract_kind": null,
-      "scaffold_output": "agent_shell_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-agent-credit_risk_reasoning_mock_agent",
         "name": "credit_risk_reasoning_mock_agent",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-        "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -473,17 +642,66 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "input_contract",
-        "output_contract",
-        "eval_placeholders"
-      ],
       "risk_signals": [
         "credit_decision_support",
         "customer_impact",
         "human_approval_required",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "담당자가 확인할 위험 근거와 다음 조치를 설명한다.",
+        "synthetic_inputs": {
+          "customer_snapshot": {
+            "customer_id": "CUST-DEMO-001",
+            "display_name": "김데모",
+            "kyc_status": "verified",
+            "relationship_years": 7,
+            "masking": "synthetic"
+          },
+          "rule_result": {
+            "rule_set_key": "loan_precheck_demo_v1",
+            "outcome": "review_required",
+            "score_band": "B",
+            "hard_stop": false
+          },
+          "document_review_result": {
+            "decision": "supplement_required",
+            "checked_items": [
+              "loan_application_form",
+              "income_certificate",
+              "identity_document"
+            ],
+            "mismatches": [
+              {
+                "field": "annual_income",
+                "document_value": 72000000,
+                "application_value": 75000000,
+                "severity": "medium"
+              }
+            ],
+            "confidence": 0.94
+          }
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "risk_reasoning",
+            "approval_required",
+            "reviewer_notes"
+          ]
+        },
+        "expected_event_markers": [
+          "risk_reasoning",
+          "approval_required"
+        ],
+        "mock_sources": [
+          "catalog/agents.yaml: credit_risk_reasoning_mock_agent"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "risk_reasoning": {
           "summary": "소득 증빙 불일치와 최근 DSR 경고로 담당자 확인이 필요합니다.",
@@ -508,7 +726,15 @@
           "자동 승인/거절이 아니라 담당자 검토 큐로 전달합니다.",
           "synthetic demo 데이터이며 실제 신용 판단에 사용할 수 없습니다."
         ]
-      }
+      },
+      "instruction": "You are \"credit_risk_reasoning_mock_agent\".\nResponsibility: 고객 snapshot, rule result, 문서 검토 결과를 모아 사람이 확인할 위험 근거와 다음 조치를 설명한다.\nInputs you receive: customer_snapshot, rule_result, document_review_result.\nOutputs you must produce: risk_reasoning, approval_required, reviewer_notes.\nOperate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials.\nExample user message: 담당자가 확인할 위험 근거와 다음 조치를 설명한다.",
+      "model": "gemini-2.5-flash",
+      "access_protocol": null,
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     },
     {
       "id": "mod-customer-notice-template",
@@ -518,16 +744,16 @@
       "workflow_kind": null,
       "adapter_kind": "template",
       "remote_contract_kind": null,
-      "scaffold_output": "contract_or_stub_only",
-      "no_runnable_business_logic": true,
+      "scaffold_output": "runnable",
+      "no_runnable_business_logic": false,
       "catalog_binding": {
         "catalog_id": "seed-adapter-customer_notice_template_mock_adapter",
         "name": "customer_notice_template_mock_adapter",
         "component_source": "stub"
       },
       "developer_todos": [
-        "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-        "Map reviewed inputs and outputs before replacing the TODO boundary."
+        "Review the catalog runtime contract and configure its runtime binding before invocation.",
+        "Map reviewed inputs and outputs before wiring runtime behavior."
       ],
       "inputs": [
         {
@@ -563,16 +789,37 @@
           "required": true
         }
       ],
-      "required_review_fields": [
-        "auth_required",
-        "timeout",
-        "retry",
-        "side_effect"
-      ],
       "risk_signals": [
         "external_message",
         "audit_required"
       ],
+      "required_review_fields": [
+        "developer_todos"
+      ],
+      "smoke_spec": {
+        "sample_user_message": "보완 요청 internal preview 템플릿을 조회한다.",
+        "synthetic_inputs": {
+          "template_key": "loan_supplement_request_demo",
+          "locale": "ko-KR",
+          "channel": "internal_preview"
+        },
+        "expected_output_shape": {
+          "type": "object",
+          "required": [
+            "template",
+            "required_variables",
+            "approval_constraints"
+          ]
+        },
+        "expected_event_markers": [
+          "template",
+          "approval_constraints"
+        ],
+        "mock_sources": [
+          "catalog/adapters.yaml: customer_notice_template_mock_adapter"
+        ],
+        "ready": true
+      },
       "runtime_mock": {
         "template": {
           "template_key": "loan_supplement_request_demo",
@@ -589,7 +836,15 @@
           "requires_human_approval": true,
           "synthetic": true
         }
-      }
+      },
+      "instruction": null,
+      "model": null,
+      "access_protocol": "local",
+      "mcp_server": null,
+      "mcp_tool_name": null,
+      "mcp_schema_ref": null,
+      "mcp_auth_mode": null,
+      "runtime_binding": "unresolved"
     }
   ],
   "runtime_contracts": [],
@@ -652,8 +907,8 @@
         "module_name": "loan_application_precheck_mock_workflow",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-          "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -661,8 +916,8 @@
         "module_name": "common_document_intake_mock_workflow",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-          "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -670,8 +925,8 @@
         "module_name": "customer_account_snapshot_mock_adapter",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-          "Map reviewed inputs and outputs before replacing the TODO boundary."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -679,8 +934,8 @@
         "module_name": "loan_precheck_rule_mock_adapter",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-          "Map reviewed inputs and outputs before replacing the TODO boundary."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -688,8 +943,8 @@
         "module_name": "loan_document_review_mock_agent",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-          "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -697,8 +952,8 @@
         "module_name": "credit_risk_reasoning_mock_agent",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Implement this module in TODO_IMPLEMENT_HERE after the reviewed handoff is accepted.",
-          "Map reviewed inputs, validate outputs, and keep credentials, private endpoints, and business logic out of generated code."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       },
       {
@@ -706,8 +961,8 @@
         "module_name": "customer_notice_template_mock_adapter",
         "reason": "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary",
         "developer_todos": [
-          "Review the catalog runtime contract and configure its approved runtime binding before invocation.",
-          "Map reviewed inputs and outputs before replacing the TODO boundary."
+          "Review the catalog runtime contract and configure its runtime binding before invocation.",
+          "Map reviewed inputs and outputs before wiring runtime behavior."
         ]
       }
     ]
@@ -716,9 +971,13 @@
     "can_generate_source": true,
     "blockers": [],
     "warnings": [
-      "All modules are catalog-bound synthetic contracts; runtime wiring remains TODO-only.",
-      "Credit decision support is reviewer-assist smoke data only; no automatic approval or rejection is generated.",
-      "customer_notice_template_mock_adapter returns internal preview content only and must not send external messages."
+      "loan_application_precheck_mock_workflow: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "common_document_intake_mock_workflow: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "customer_account_snapshot_mock_adapter: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "loan_precheck_rule_mock_adapter: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "loan_document_review_mock_agent: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "credit_risk_reasoning_mock_agent: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved",
+      "customer_notice_template_mock_adapter: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved"
     ]
   }
 }
