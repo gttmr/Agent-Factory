@@ -45,6 +45,12 @@ CLI 스킬 4단계를 1:1 라우트로 옮긴 워크벤치가 한 화면에 실�
 - 라이브 Gemini 스모크(runnable 모드 실제 실행)는 사용자 키/비용 필요 — 미검증.
 - **푸시 완료**: `48458ff..09ce0e7`을 `origin/feat/port-mock-lab-design-system`에 푸시. 기존 **PR #21**(base=main)에 합쳐 Phase-1 + 재설계 = 28커밋, 제목/본문 갱신. **리뷰·머지 대기**(아직 미머지).
 
+## 후속 개선 (리뷰 중, origin 미푸시 로컬 커밋)
+- `4b8dcd2` — 설계 검토 캔버스 확장: 우측 Inspector를 `INSPECTOR_ENABLED=false`로 비활성(코드 보존), `GraphCanvas` `hideInspector` 시 `.graph-canvas-root--no-inspector` 1열 → React Flow가 전체 폭 사용(927→1295px). 휴면 기능: Runtime/A2A 계약 편집 인스펙터·앵커 코멘트 작성.
+- `6a1ee10` — 생성기: 생성 테스트를 `<pkg>/tests/`(패키지 내부)로 이동 → `adk api_server`가 번들 루트에서 패키지만 앱으로 스캔(이전엔 형제 `tests/`를 앱으로 보고 "No root_agent found for 'tests'" 에러). compileall은 `<pkg>`만. 샘플 `req-loan-precheck-smoke`를 runnable로 재생성 → ADK dev UI에 다중 노드 Workflow(LlmAgent+어댑터+JoinNode) 표시 확인.
+- 문서 감사: 위 변경에 맞춰 design-system / harness / CLAUDE / validation / onboarding(02·07) 의 "3-pane·Inspector·Runtime 계약 편집·tests 레이아웃" 서술을 현행화.
+- 어댑터 5개는 Mock Lab MCP 미바인딩(unconnected TODO 스텁) — 실제 어댑터 호출엔 Mock Lab MCP 서버 연결 필요. runnable 채팅엔 `runtime-stub/.env`의 `GOOGLE_API_KEY` 필요.
+
 ## 불변식 (재설계 내내 지킴)
 - `manifest.approvals.*` 단일 진실원, 후보 status에서 재계산 안 함, StageRunner 성공이 게이트 자동 토글 안 함.
 - 한국어 UI 라벨 보존, 디자인 토큰/`CategoryBadge` 사용, raw 카테고리 `<span>` 금지.

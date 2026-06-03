@@ -26,7 +26,7 @@
         <h2>현재 route 흐름</h2>
         <div class="graph-mock">/ Landing
   -> /af/:reqId/analyze  실행→검토→승인 (Analyze Runner / AnalysisResult / analysis_reviewed)
-  -> /af/:reqId/design   실행→검토→승인 (Design Runner / 3-pane Graph IR / boundaries+runtime gates)
+  -> /af/:reqId/design   실행→검토→승인 (Design Runner / 2-pane Graph IR(Inspector 휴면) / boundaries+runtime gates)
   -> /af/:reqId/build    실행→검토→승인 (scaffold+stub / 파일·handoff / stub_ready)
   -> /af/:reqId/verify   실행→기록 (validation commands / report+delta, 게이트 없음)
   -> /af/:reqId/run      실행 (게이트 없는 도구 화면 — ADK runtime + dev UI 링크)

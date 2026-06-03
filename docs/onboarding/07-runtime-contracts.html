@@ -66,7 +66,7 @@
 
       <section class="block">
         <h2>검토 화면 — DesignWorkbench의 Runtime 계약 탭</h2>
-        <p>현재 Runtime 계약은 <code>/af/:reqId/design</code>의 <strong>Runtime 계약</strong> 탭에서 검토한다. Design Stage Runner가 계약 보강을 proposed artifact로 제안할 수 있고, reviewer는 diff/preview 후 적용한 다음 readiness issue가 0건인지 확인한다. <code>runtime_contracts_approved</code>는 사람이 토글하는 manifest gate이며 runner 성공만으로 자동 변경되지 않는다.</p>
+        <p>현재 Runtime 계약은 <code>/af/:reqId/design</code> 검토 스텝의 <strong>Runtime 계약</strong> 사이드바 탭에서 readiness를 확인한다. (참고: 그래프 뷰에 폭을 양보하려고 우측 Inspector의 <em>인라인 계약 편집기</em>는 현재 비활성이다 — <code>INSPECTOR_ENABLED=false</code>. 계약 보강은 Design Stage Runner proposal을 diff/preview 후 적용하거나 artifact를 외부 편집해서 반영한다.) <code>runtime_contracts_approved</code>는 사람이 토글하는 manifest gate이며 runner 성공만으로 자동 변경되지 않는다.</p>
         <div class="callout info">
           <div class="icon">i</div>
           <div class="body">

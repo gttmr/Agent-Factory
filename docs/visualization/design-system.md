@@ -21,7 +21,7 @@
   - 중앙 상단: 항상 보이는 요약 strip(핵심 산출물 한 줄 요약). 그 아래 활성 스텝 콘텐츠. 하단: 다음 단계로 가는 next-action CTA(강한 가이드).
   - 활성 스텝은 얕은 `?step=run|review|approve` 쿼리 파라미터로 관리하고(`useStageStep`), 파라미터가 없으면 첫 미완료 스텝으로 착지한다. 스텝 status는 manifest.approvals + 산출물 존재에서 **읽기만** 하고 게이트를 재계산하지 않는다.
   - 게이트 토글(승인 스텝)은 `useApprovalGate` 경유다. Skill Runner 성공이 게이트를 자동으로 켜지 않는다.
-- Design 검토 스텝은 StageShell 중앙에 기존 3-pane(모듈·캔버스·Inspector)을 그대로 둔다. Verify는 승인 게이트가 없어 2스텝(실행·기록)만 쓴다. `실행` 화면은 스텝 레일 없는 단일 도구 화면으로, ADK 런타임 연결 제어 + ADK 공식 dev UI(`web_url`, :8765)로의 링크 버튼만 둔다(AF 자체 간이 챗은 제거).
+- Design 검토 스텝은 현재 **2-pane**(모듈 사이드바 │ 넓은 그래프 캔버스)이다. 우측 Inspector 패널은 그래프 뷰에 폭을 양보하려고 비활성화돼 있다(`DesignWorkbench`의 `INSPECTOR_ENABLED=false`, `GraphCanvas`는 `hideInspector`로 `.graph-canvas-root--no-inspector` 1열). 플래그를 `true`로 되돌리면 3-pane(모듈·캔버스·Inspector)으로 복원된다. 비활성 동안 Runtime/A2A 계약 *편집* 인스펙터와 노드/엣지 앵커 코멘트 *작성*은 휴면이다(사이드바의 목록·선택과 Comments 탭 읽기는 동작). Verify는 승인 게이트가 없어 2스텝(실행·기록)만 쓴다. `실행` 화면은 스텝 레일 없는 단일 도구 화면으로, ADK 런타임 연결 제어 + ADK 공식 dev UI(`web_url`, :8765)로의 링크 버튼만 둔다(AF 자체 간이 챗은 제거).
 
 980px 이하에서는 stage navigation과 gate chip이 줄바꿈되어도 본문을 밀어내지 않도록 간격을 줄이고, 860px 이하에서는 StageShell 좌측 레일이 가로 탭으로 접힌다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
@@ -203,7 +203,7 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 - container overlay는 흐름의 실제 범위를 가려서는 안 된다. 점선 경계와 낮은 대비 배경으로 node/edge 읽기를 방해하지 않게 한다.
 - Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 포함 node의 bounding box를 감싸는 내부 region으로 표시한다.
 
-**Graph Inspector**
+**Graph Inspector** *(현재 Design 검토 스텝에서 우측 Inspector 패널은 비활성 — 위 "화면 골격" 참고. 아래는 재활성(`INSPECTOR_ENABLED=true`) 시의 명세다. 비활성 동안에도 노드/엣지 선택 하이라이트와 사이드바 표시는 동작한다.)*
 - 노드 선택 시 `node_kind`, `module_id`, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
 - 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
 - 선택된 edge는 label 유무와 관계없이 선 자체를 굵게 표시하고 다른 edge보다 위에 렌더링해 선택 상태를 즉시 알 수 있어야 한다.
