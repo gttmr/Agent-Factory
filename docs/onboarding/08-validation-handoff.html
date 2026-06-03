@@ -65,14 +65,13 @@ npm run test:analyzer --prefix packages/web</pre>
       </section>
 
       <section class="block">
-        <h2>워크벤치 밖에서 하는 smoke</h2>
-        <p>PR6 이후 워크벤치 UI 안에는 <code>adk web</code> iframe, ADK API <code>/run</code> chat smoke, <strong>Smoke 일괄 실행</strong> macro가 없다. 생성된 source bundle에 대해 실제 ADK Web 또는 chat smoke가 필요하면 별도 터미널에서 실행한다.</p>
+        <h2>런타임 실행과 smoke</h2>
+        <p>워크벤치 UI 안에는 여전히 <code>adk web</code> <strong>iframe 임베드</strong>도, 워크벤치 자체 챗도, <strong>Smoke 일괄 실행</strong> macro도 없다. 대신 게이트 없는 <strong>실행</strong> 화면(<code>/af/:reqId/run</code>)이 <code>runtime-stub/</code>에 대해 <code>adk api_server --with_ui</code>(8765)를 시작/중지하고 ADK 공식 dev UI(채팅·트레이스)를 새 탭으로 <strong>링크</strong>한다. 코드 레벨 smoke(<code>compileall</code>/<code>pytest</code>)는 생성된 번들에서 직접 돌린다.</p>
         <table class="ref-table">
           <thead><tr><th>검증</th><th>위치</th></tr></thead>
           <tbody>
             <tr><td><code>compileall</code>, <code>pytest</code></td><td>생성된 <code>runtime-stub/</code> 또는 별도 export 디렉터리</td></tr>
-            <tr><td><code>adk web</code></td><td>워크벤치 밖 터미널</td></tr>
-            <tr><td>chat smoke</td><td>별도 ADK runtime/API against generated stub</td></tr>
+            <tr><td>ADK dev UI (채팅·세션·이벤트·트레이스)</td><td>실행 화면이 <code>adk api_server --with_ui</code>를 띄우고 <code>web_url</code>로 링크 (새 탭)</td></tr>
           </tbody>
         </table>
       </section>
@@ -125,14 +124,14 @@ cd packages/web &amp;&amp; npm run build</pre>
           </div>
         </div>
 
-        <div class="quiz" data-correct="outside">
-          <div class="quiz-question">Q2. 생성된 stub으로 <code>adk web</code>과 chat smoke를 돌리고 싶다. 현재 워크벤치 UI 안에서 바로 실행하나?</div>
+        <div class="quiz" data-correct="link">
+          <div class="quiz-question">Q2. 생성된 stub의 ADK 챗·트레이스 UI를 보고 싶다. 워크벤치는 이걸 어떻게 제공하나?</div>
           <div class="quiz-options">
-            <button data-value="inside">예 — 워크벤치 안에서 한 번에 실행한다</button>
-            <button data-value="outside">아니오 — 별도 터미널에서 generated stub을 대상으로 실행한다</button>
+            <button data-value="embed">워크벤치가 자체 챗 UI를 만들어 안에 임베드한다</button>
+            <button data-value="link">실행 화면이 <code>adk api_server --with_ui</code>를 띄우고 ADK 공식 dev UI로 링크한다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: 별도 터미널.</strong> 현재 UI는 Build/Verify evidence 경계까지만 제공한다.</p>
+            <p><strong>정답: 실행 화면의 링크.</strong> ADK가 <code>--with_ui</code>로 제공하는 완성형 dev UI(채팅·세션·이벤트·트레이스)를 새 탭으로 연다 — 워크벤치 자체 챗이나 iframe 임베드는 만들지 않는다. 코드 레벨 smoke(<code>pytest</code> 등)는 생성된 번들에서 직접 돌린다.</p>
           </div>
         </div>
 
