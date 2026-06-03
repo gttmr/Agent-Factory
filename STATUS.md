@@ -39,7 +39,7 @@ CLI 스킬 4단계를 1:1 라우트로 옮긴 워크벤치가 한 화면에 실�
 - NIT: `.af-run-shell` gap 토큰화
 
 ## 남은 것 / 후속
-- **서버 dead-code**: `/api/af/:id/runtime-chat/{session,message}` 엔드포인트 + `runtimeChat.ts`의 createSession/sendMessage는 UI 미사용이나 잔존(테스트 영향 검토 후 별도 정리). 위치: `server/afArtifactsApi.ts`, `server/runtimeChat.ts`.
+- ~~서버 dead-code (runtime-chat session/message)~~ → **정리 완료**: `/runtime-chat/{session,message}` 라우트, `RuntimeChatManager.createSession/sendMessage`, `RuntimeChatSessionResult`/`RuntimeChatMessageResult`, `createSessionId`/`cleanId`/`DEFAULT_USER_ID` 제거. status/install/start/stop만 유지. `extractFinalTextFromAdkEvents`는 테스트되는 순수 유틸이라 유지. 전체 `test:analyzer` 스위트 통과.
 - **onboarding HTML**(`docs/onboarding/*.html`): "DO NOT EDIT" 생성물이라 미수정 — 구 플로우(02-workbench-tour 등) 재생성 필요.
 - **CSS NIT**: StageShell의 구조적 px(레일 220px, 860px 브레이크포인트)는 토큰 없음 — 기존 design.css 관례(260/320px)와 일치시켜 유지.
 - 라이브 Gemini 스모크(runnable 모드 실제 실행)는 사용자 키/비용 필요 — 미검증.

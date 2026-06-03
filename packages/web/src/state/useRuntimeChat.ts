@@ -96,7 +96,7 @@ export function useStopRuntimeChat(reqId: string | undefined) {
   });
 }
 
-// NOTE: 세션/메시지(useCreateRuntimeChatSession / useSendRuntimeChatMessage) 클라이언트
-// 훅은 AF 자체 간이 챗 제거(실행 화면이 ADK 공식 dev UI 로 링크)와 함께 삭제했다.
-// 서버의 /runtime-chat/{session,message} 엔드포인트는 아직 남아 있으며, 프로그램적
-// smoke 용도로 재사용될 수 있어 별도 정리(follow-up)로 둔다.
+// NOTE: AF 자체 간이 챗(세션/메시지)은 제거됐다 — 실행 화면이 ADK 공식 dev UI 로 링크한다.
+// 클라이언트 훅(useCreateRuntimeChatSession / useSendRuntimeChatMessage)과 서버
+// /runtime-chat/{session,message} 엔드포인트(RuntimeChatManager.createSession/sendMessage)도
+// 함께 삭제했다. status/install/start/stop 만 남는다.
