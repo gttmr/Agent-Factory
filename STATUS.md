@@ -43,7 +43,7 @@ CLI 스킬 4단계를 1:1 라우트로 옮긴 워크벤치가 한 화면에 실�
 - ~~onboarding HTML 미수정~~ → **갱신 완료**: onboarding HTML은 (생성물이 아니라) 수작업 파일이었음. `02-workbench-tour`(라우트/스텝레일/실행 화면), `08-validation-handoff`(런타임 실행 섹션 + 퀴즈 Q2 정답 교정), `09-glossary`(chat-smoke 항목 + 실행/StageShell 신규 항목), `06-review-board`(smoke_spec 소비처)를 새 플로우로 수정하고 `file://`로 렌더·퀴즈 동작 확인. index.html의 고차원 파이프라인 서술(analyze→…→verify)은 그대로 유지(실행은 게이트 밖 보조 도구).
 - **CSS NIT**: StageShell의 구조적 px(레일 220px, 860px 브레이크포인트)는 토큰 없음 — 기존 design.css 관례(260/320px)와 일치시켜 유지.
 - 라이브 Gemini 스모크(runnable 모드 실제 실행)는 사용자 키/비용 필요 — 미검증.
-- 미병합/미푸시: 브랜치에 커밋만 됨(merge/push는 사용자 요청 대기).
+- **푸시 완료**: `48458ff..09ce0e7`을 `origin/feat/port-mock-lab-design-system`에 푸시. 기존 **PR #21**(base=main)에 합쳐 Phase-1 + 재설계 = 28커밋, 제목/본문 갱신. **리뷰·머지 대기**(아직 미머지).
 
 ## 불변식 (재설계 내내 지킴)
 - `manifest.approvals.*` 단일 진실원, 후보 status에서 재계산 안 함, StageRunner 성공이 게이트 자동 토글 안 함.
