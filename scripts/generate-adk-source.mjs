@@ -55,7 +55,7 @@ console.log("  pip install -r requirements.txt");
 if (outputMode === "runnable") {
   console.log("  cp .env.example .env   # then set GOOGLE_API_KEY=...");
 }
-console.log(`  python -m compileall ${packageName} tests`);
+console.log(`  python -m compileall ${packageName}`);
 console.log("  python -m pytest -q");
 
 function readJson(name, fallbackName) {
@@ -82,7 +82,12 @@ function buildFiles() {
     "implementation-handoff.md": buildImplementationHandoff(),
     "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(), null, 2)}\n`,
     "requirements.txt": buildRequirements(),
-    "tests/test_workflow_contract.py": buildContractTest(),
+    // tests live INSIDE the agent package so the ADK agents_dir (the bundle
+    // root) has only the package as a non-dot subdir. Otherwise `adk
+    // api_server` scans a sibling `tests/` as an app and the dev UI errors
+    // with "No root_agent found for 'tests'".
+    [`${packageName}/tests/__init__.py`]: "",
+    [`${packageName}/tests/test_workflow_contract.py`]: buildContractTest(),
     "README.md": buildReadme()
   };
   if (outputMode === "runnable") {
@@ -598,7 +603,7 @@ from pathlib import Path
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_agent_source_declares_runnable_workflow():
@@ -635,7 +640,7 @@ def test_root_agent_is_a_workflow():
   return `from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_agent_source_declares_adk_workflow():
@@ -675,7 +680,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # then set GOOGLE_API_KEY=...
-python -m compileall ${packageName} tests
+python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
 
@@ -718,7 +723,7 @@ Generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m compileall ${packageName} tests
+python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
 
@@ -933,7 +938,7 @@ function updateRunManifest() {
     validation: {
       commands: uniqueStrings([
         ...(Array.isArray(runManifest.validation?.commands) ? runManifest.validation.commands : []),
-        `python3 -m compileall ${outputDir}${packageName} ${outputDir}tests`,
+        `python3 -m compileall ${outputDir}${packageName}`,
         `cd ${outputDir} && python -m pytest -q`
       ]),
       last_result: runManifest.validation?.last_result ?? "not_run"

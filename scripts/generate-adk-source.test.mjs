@@ -143,7 +143,7 @@ function readBundle(outputRoot) {
     packageName,
     manifest: JSON.parse(readFileSync(join(outputRoot, packageName, "workflow_manifest.json"), "utf8")),
     agentSource: readFileSync(join(outputRoot, packageName, "agent.py"), "utf8"),
-    contractTest: readFileSync(join(outputRoot, "tests", "test_workflow_contract.py"), "utf8")
+    contractTest: readFileSync(join(outputRoot, packageName, "tests", "test_workflow_contract.py"), "utf8")
   };
 }
 
