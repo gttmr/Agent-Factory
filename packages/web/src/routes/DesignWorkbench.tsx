@@ -49,6 +49,20 @@ type SidebarTab = (typeof SIDEBAR_TABS)[number]["id"];
 type DesignStepId = "run" | "review" | "approve";
 const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
 
+// ──────────────────────────────────────────────────────────────────────────
+// 검토 스텝의 우측 Inspector 패널은 당분간 사용하지 않는다 (그래프 캔버스에 폭을
+// 양보하기 위해). 코드는 삭제하지 않고 이 플래그로 비활성화만 했다 — 다시 켜려면
+// INSPECTOR_ENABLED = true 로 바꾸면 3-pane(모듈 사이드바 | 캔버스 | Inspector)이
+// 복원된다.
+//
+// 비활성 동안 함께 휴면 상태가 되는 것: Runtime 계약 / Remote A2A 탭의 *편집*
+// 인스펙터(RuntimeContractInspector / A2AContractInspector)와 노드/엣지 앵커
+// 코멘트 *작성* 패널(SelectionHeader + 우측 CommentThread). 사이드바의 목록/선택과
+// Comments 탭의 읽기 표시는 그대로 동작한다. 관련 핸들러(handleSaveRuntimeContract,
+// handleSaveA2AContract, handleCreateComment)와 import 도 재활성화를 위해 보존한다.
+// ──────────────────────────────────────────────────────────────────────────
+const INSPECTOR_ENABLED = false;
+
 const GraphCanvas = lazy(async () => {
   const module = await import("../components/GraphCanvas");
   return { default: module.GraphCanvas };
@@ -365,7 +379,7 @@ export default function DesignWorkbench() {
             </Link>
           </Panel>
         ) : (
-          <div className="af-design-grid">
+          <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
           <aside className="af-design-sidebar" aria-label="설계 사이드바">
             <nav className="af-design-tabs" role="tablist">
               {SIDEBAR_TABS.map((tab) => (
@@ -481,43 +495,47 @@ export default function DesignWorkbench() {
             )}
           </section>
 
-          <aside className="af-design-inspector" aria-label="선택 검토 패널">
-            {activeTab === "runtime" ? (
-              <RuntimeContractInspector
-                key={selectedContract?.contract_id ?? "none"}
-                contract={selectedContract}
-                saving={saveAnalysisMutation.isPending}
-                onSave={handleSaveRuntimeContract}
-                onCancel={() => setActionMessage(null)}
-              />
-            ) : activeTab === "a2a" ? (
-              <A2AContractInspector
-                key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
-                candidate={selectedA2ARow?.candidate ?? null}
-                contract={selectedA2ARow?.contract ?? null}
-                saving={saveAnalysisMutation.isPending}
-                onSave={handleSaveA2AContract}
-                onCancel={() => setActionMessage(null)}
-              />
-            ) : (
-              <>
-                <SelectionHeader selection={selection} graphIR={graphIR} />
-                <CommentThread
-                  reqId={reqId}
-                  comments={comments}
-                  anchor={anchor}
-                  authorName={authorName}
-                  authorRole={authorRole}
-                  isMutating={createComment.isPending}
-                  onAuthorNameChange={setAuthorName}
-                  onAuthorRoleChange={setAuthorRole}
-                  onCreate={handleCreateComment}
-                  onUpdate={(id, body) => updateComment.mutate({ id, body })}
-                  onDelete={(id) => deleteComment.mutate(id)}
+          {/* 우측 Inspector 패널 — INSPECTOR_ENABLED 로 비활성화됨(상단 주석 참고).
+              false 인 동안 캔버스가 이 영역까지 차지하도록 grid 는 2열로 전환된다. */}
+          {INSPECTOR_ENABLED ? (
+            <aside className="af-design-inspector" aria-label="선택 검토 패널">
+              {activeTab === "runtime" ? (
+                <RuntimeContractInspector
+                  key={selectedContract?.contract_id ?? "none"}
+                  contract={selectedContract}
+                  saving={saveAnalysisMutation.isPending}
+                  onSave={handleSaveRuntimeContract}
+                  onCancel={() => setActionMessage(null)}
                 />
-              </>
-            )}
+              ) : activeTab === "a2a" ? (
+                <A2AContractInspector
+                  key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
+                  candidate={selectedA2ARow?.candidate ?? null}
+                  contract={selectedA2ARow?.contract ?? null}
+                  saving={saveAnalysisMutation.isPending}
+                  onSave={handleSaveA2AContract}
+                  onCancel={() => setActionMessage(null)}
+                />
+              ) : (
+                <>
+                  <SelectionHeader selection={selection} graphIR={graphIR} />
+                  <CommentThread
+                    reqId={reqId}
+                    comments={comments}
+                    anchor={anchor}
+                    authorName={authorName}
+                    authorRole={authorRole}
+                    isMutating={createComment.isPending}
+                    onAuthorNameChange={setAuthorName}
+                    onAuthorRoleChange={setAuthorRole}
+                    onCreate={handleCreateComment}
+                    onUpdate={(id, body) => updateComment.mutate({ id, body })}
+                    onDelete={(id) => deleteComment.mutate(id)}
+                  />
+                </>
+              )}
             </aside>
+          ) : null}
           </div>
         )
       ) : null}

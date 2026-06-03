@@ -16,6 +16,12 @@
   align-items: start;
 }
 
+/* hideInspector(예: DesignWorkbench 검토 스텝) — 내부 inspector 열을 없애고
+   그래프 stage 가 전체 폭을 차지한다. */
+.graph-canvas-root--no-inspector {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .graph-canvas-panel {
   display: grid;
   gap: var(--space-xl);
