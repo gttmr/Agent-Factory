@@ -39,7 +39,7 @@ Build/Verify Stage Runner 확장은 아직 numbered brief가 없는 별도 후�
 | 질문 | 선택 |
 |---|---|
 | 새 세션 진입점 문서는 어디에 어떤 방식으로 남길까요? | `09 브리프 (Recommended)` — `docs/workbench/follow-ups/09-skill-runner-workbench.md`를 만들고 INDEX/STATUS에서 링크한다. |
-| 웹 화면과 스킬의 강한 연동은 어느 수준까지 목표로 할까요? | `서버 실행 (Recommended)` — 웹 버튼이 서버 API를 호출하고 서버가 스킬/Codex CLI를 실행해 artifact를 갱신한다. |
+| 웹 화면과 스킬의 강한 연동은 어느 수준까지 목표로 할까요? | `서버 실행 (Recommended)` — 웹 버튼이 서버 API를 호출하고 서버가 Codex SDK 기반 stage runner를 실행해 artifact를 제안한다. |
 | 첫 구현 브리프의 범위는 어디까지 잡을까요? | `Analyze+Design (Recommended)` — 요구사항 분석과 경계 설계 실행/검토 흐름부터 강하게 연결한다. |
 
 ### Gate, artifact 적용, 로그
@@ -70,7 +70,7 @@ Build/Verify Stage Runner 확장은 아직 numbered brief가 없는 별도 후�
 
 | 질문 | 선택 |
 |---|---|
-| 서버 Skill Runner는 어떤 실행 계약으로 설계할까요? | `Codex exec (Recommended)` — 서버가 stage별 prompt와 SKILL.md를 묶어 `codex exec` 계열 명령을 실행한다. |
+| 서버 Skill Runner는 어떤 실행 계약으로 설계할까요? | 당시 결정은 `Codex exec`였지만, 현재 구현은 `@openai/codex-sdk` TypeScript SDK의 `thread.runStreamed()` 경로로 대체됐다. |
 | Stage Runner API는 어떤 형태가 좋습니까? | `공통 API (Recommended)` — `POST /api/af/:id/stages/:stage/run` 하나로 stage별 실행을 통합한다. |
 | 실행 진행 상황은 어떤 방식으로 화면에 전달할까요? | `SSE 통일 (Recommended)` — 모든 stage run progress를 SSE 이벤트로 통일한다. |
 
@@ -95,7 +95,7 @@ Build/Verify Stage Runner 확장은 아직 numbered brief가 없는 별도 후�
 | 질문 | 선택 |
 |---|---|
 | manifest에 run 기록을 추가할 때 기존 artifact root와의 호환성은 어떻게 처리할까요? | `Optional 추가 (Recommended)` — 새 필드는 모두 optional로 두고 기존 manifest는 그대로 읽히게 한다. |
-| 1차 검증에서 실제 Codex CLI 스킬 실행까지 smoke에 포함할까요? | `실제 Codex 포함` — 실제 `codex exec` 호출을 포함한다. |
+| 1차 검증에서 실제 Codex 실행까지 smoke에 포함할까요? | `실제 Codex 포함` — 현재 smoke 기준은 SDK thread 실행과 run artifact 확인이다. |
 | 09 브리프 완료 기준의 필수 검증 명령은 어떻게 둘까요? | `기본+시나리오 (Recommended)` — `npm run build`, `npm run test:analyzer`, `validate-artifacts templates`, UI smoke를 요구한다. |
 
 ### Codex 실패와 run 파일명
@@ -119,7 +119,7 @@ Build/Verify Stage Runner 확장은 아직 numbered brief가 없는 별도 후�
 | 질문 | 선택 |
 |---|---|
 | 09 브리프에서 Build/Verify Skill Runner는 어느 정도까지 다룰까요? | `로드맵만 (Recommended)` — 1차 구현은 Analyze+Design이고 Build/Verify는 동일 패턴 적용 계획만 명시한다. |
-| 기존 `/api/analyze-requirement`, `/runtime-stub/build`, `/verify/run`은 어떻게 다룰까요? | `감싸서 재사용 (Recommended)` — 공통 Stage Runner가 기존 API/함수를 내부에서 호출하거나 점진적으로 감싼다. |
+| 기존 `/api/analyze-requirement`, `/runtime-stub/build`, `/verify/run`은 어떻게 다룰까요? | 당시 결정은 점진적 래핑이었지만, 현재 `/api/analyze-requirement` direct analyzer는 제거됐고 Build/Verify는 별도 경로로 유지한다. |
 | 09 브리프 작성 시 active docs 정합화는 어디까지 포함할까요? | `브리프만 (Recommended)` — 이번 문서화는 follow-ups/09, INDEX, STATUS만 다루고 active docs 수정은 구현 브리프에 맡긴다. |
 
 ## 현재 구현 방향
@@ -245,14 +245,14 @@ Approval source of truth는 계속 `manifest.approvals.*`다. `stage_runs.*.stat
 
 동작:
 
-- 기존 `/api/analyze-requirement` 또는 내부 `codexAnalyzer` 실행 로직은 Stage Runner 흐름에 흡수됐다.
+- 기존 `/api/analyze-requirement` 또는 내부 `codexAnalyzer` 실행 로직은 제거됐고, Analyze 실행은 Stage Runner SDK 경로로 통일됐다.
 - 결과는 proposed `analysis-result.json`으로 저장한다.
 - 사용자가 적용하면 현재 root의 canonical `analysis-result.json`으로 반영한다.
 - `analysis_reviewed`는 자동 토글하지 않는다.
 
 주의:
 
-- 기존 Analyze 화면의 직접 Codex CLI 분석 기능은 Stage Runner 패널로 흡수됐다.
+- 기존 Analyze 화면의 직접 분석 기능은 Stage Runner 패널로 흡수됐고, 현재 direct analyzer endpoint는 제거됐다.
 - 외부 `af-analyze-requirement` skill이 만든 `analysis-result.json` import 경로는 유지한다.
 
 ### Design Runner
@@ -322,7 +322,7 @@ Codex 실행은 길어질 수 있다. SSE event와 run folder를 같이 사용�
 
 ### 기존 브리프 drift
 
-09 문서화 당시 `INDEX.md`에는 `/api/analyze-requirement`와 실제 UI 경로의 관계가 어긋난 문장이 있었다. 현재 INDEX/STATUS는 Stage Runner 기본 경로와 direct/internal analyzer primitive 관계를 기준으로 정리되어 있어야 한다.
+09 문서화 당시 `INDEX.md`에는 `/api/analyze-requirement`와 실제 UI 경로의 관계가 어긋난 문장이 있었다. 현재 INDEX/STATUS는 Stage Runner 기본 경로와 제거된 direct analyzer 관계를 기준으로 정리되어 있어야 한다.
 
 ## Acceptance criteria
 

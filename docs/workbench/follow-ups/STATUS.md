@@ -36,8 +36,8 @@ git log --oneline origin/codex/runtime-contract-review..HEAD
 
 브리프 진행 중 사용자가 명시한 운영 정책. 다음 세션에서 다시 묻지 않는다.
 
-- **brief 06 — Analyze pipeline**: 옵션 B 채택 기록은 유효하지만 UI 표면은 brief 09에서 Stage Runner로 흡수됐다. 현재 기본 Analyze 실행 경로는 `/api/af/:reqId/stages/analyze/run`이고, `/api/analyze-requirement` SSE endpoint 와 `packages/web/server/codexAnalyzer.ts` 는 direct/internal analyzer primitive로 보존한다. 외부 `af-analyze-requirement` skill import 경로도 계속 살아있다.
-- **brief 09 — Skill Runner Workbench 상위 브리프**: Analyze + Design 을 1차 범위로 한다. 웹 화면은 공통 Stage Runner API와 SSE로 서버 실행을 요청하고, 서버는 stage별 prompt + `SKILL.md` 기반 `codex exec` 계열 실행을 담당한다. 스킬 결과는 `runs/<stage>/<run-id>/`에 먼저 저장하고 diff/preview 후 사용자가 적용한다. approval gate는 스킬이 자동 토글하지 않는다. 같은 `reqId`는 root 단위 lock으로 동시 실행을 막는다. `manifest.stage_runs`는 optional 요약 필드로만 추가한다. 실제 Codex smoke 실패는 API/UI/fake runner 결과와 host-verified 환경 원인을 분리 보고한다.
+- **brief 06 — Analyze pipeline**: 옵션 B 채택 기록은 유효하지만 UI 표면은 brief 09에서 Stage Runner로 흡수됐다. 현재 기본 Analyze 실행 경로는 `/api/af/:reqId/stages/analyze/run`이고, `/api/analyze-requirement` SSE endpoint 와 `packages/web/server/codexAnalyzer.ts` 는 제거됐다. 외부 `af-analyze-requirement` skill import 경로는 계속 살아있다.
+- **brief 09 — Skill Runner Workbench 상위 브리프**: Analyze + Design 을 1차 범위로 한다. 웹 화면은 공통 Stage Runner API와 SSE로 서버 실행을 요청하고, 서버는 stage별 prompt + `SKILL.md` 기반 실행을 `@openai/codex-sdk` TypeScript SDK로 담당한다. 스킬 결과는 `runs/<stage>/<run-id>/`에 먼저 저장하고 diff/preview 후 사용자가 적용한다. approval gate는 스킬이 자동 토글하지 않는다. 같은 `reqId`는 root 단위 lock으로 동시 실행을 막는다. `manifest.stage_runs`는 optional 요약 필드로만 추가한다. 실제 Codex smoke 실패는 API/UI/fake runner 결과와 host-verified 환경 원인을 분리 보고한다.
 - **commit 정책**: 한 브리프 = 한 commit. push 는 사용자 명시 없이 금지. (memory: `feedback_commit_per_pr.md`)
 
 ## 브리프 구현 상태 요약
@@ -61,7 +61,7 @@ git log --oneline origin/codex/runtime-contract-review..HEAD
 
 Analyze + Design 화면을 공통 Stage Runner 모델로 연결했다.
 
-- 신규 `packages/web/server/stageRunner.ts` — stage별 `codex exec` 실행, fake 실행 모드, root 단위 lock, run artifact 기록, diff/apply, diagnostics 보존
+- 신규 `packages/web/server/stageRunner.ts` — stage별 Codex SDK 실행, fake 실행 모드, root 단위 lock, run artifact 기록, diff/apply, diagnostics 보존
 - `/api/af/:reqId/stages/:stage/*` — `run`, `cancel`(501 후속), `runs`, `run detail`, `apply`
 - `af-run-manifest.json` — optional `stage_runs` 실행 요약을 tolerant하게 읽고 검증
 - `AnalyzeWorkbench` / `DesignWorkbench` — 첫 Panel에 Skill Runner UI, 최근 run, event log, proposed artifact diff/preview, 명시적 apply
@@ -89,7 +89,7 @@ PR1~PR6 라우터 셸 마이그레이션 후 잔존한 stale 표현 정리. 코�
 - `docs/workbench/validation.md`, `docs/workbench/agent-factory-harness.md`:
   - Module Review Inspector / SavedAnalysisRecord landing 흐름 / Smoke 일괄 실행 매크로 섹션을 BuildWorkbench + VerifyWorkbench 분리로 다시 씀
   - Resolution Draft 적용 책임을 `af-design-boundaries` skill 로 이전 명시
-  - Codex CLI draft-schema 절은 이후 brief 06/09에서 “Stage Runner 기본 경로 + direct/internal primitive” 모델로 재정렬됨
+  - Codex draft-schema 절은 이후 brief 06/09에서 “Stage Runner SDK 기본 경로 + direct analyzer 제거” 모델로 재정렬됨
 - `docs/onboarding/*.html`: 09-glossary 항목 갱신 + 챕터 02/03/05/06/07/08/index 상단 deprecation 배너
 - `README.md`, `docs/README.md`: artifact-root-first 흐름으로 갱신
 
@@ -113,8 +113,8 @@ MCP 스모크 (req-pr-runtime 에 contract 2개 craft → readiness 7→0 → �
 
 운영 정책 옵션 B 채택. 이후 brief 09에서 직접 재분석 패널은 Stage Runner UI로 흡수됐다.
 
-- 신규 `packages/web/src/state/useAnalyze.ts` — 당시 `/api/analyze-requirement` SSE 호출, `AnalyzerProgressEvent[]` 누적, `completed` 시 `normalizeAnalysisResultForWorkbench` 후 analysis-result.json PUT, AbortController 지원. 현재 기본 UI 경로는 `useStageRunner`.
-- `packages/web/src/routes/AnalyzeWorkbench.tsx` — 당시 “Codex CLI 재분석” 패널. 현재는 Analyze Skill Runner 패널이 그 역할을 담당한다.
+- 삭제됨 `packages/web/src/state/useAnalyze.ts` — 당시 `/api/analyze-requirement` SSE 호출 hook. 현재 기본 UI 경로는 `useStageRunner`.
+- `packages/web/src/routes/AnalyzeWorkbench.tsx` — 당시 “재분석” 패널. 현재는 Analyze Skill Runner 패널이 그 역할을 담당한다.
 - `packages/web/src/styles-router.css` — `.af-analyze-progress*` 클래스
 - `useCatalog` 평탄화 헬퍼 `flattenCatalogForAnalyzer` 로 catalog payload 동봉
 

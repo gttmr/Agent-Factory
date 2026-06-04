@@ -11,13 +11,20 @@ import { useRecentRoots } from "../state/useRecentRoots";
 import { putArtifactJson } from "../state/apiClient";
 import { parseAnalysisResultArtifact } from "../analyzer/analysisArtifactImport";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AnalyzeCatalogEntry } from "../state/useAnalyze";
 import { useCatalog, type CatalogHubEntry } from "../state/useCatalog";
 import { resolveAnalyzeRawText } from "../analyzer/analyzeInput";
 import { canToggleAnalysisReviewed as canToggleAnalysisReviewedGate } from "../analyzer/analysisReviewGate";
 
 type AnalyzeStepId = "run" | "review" | "approve";
 const ANALYZE_STEP_IDS: AnalyzeStepId[] = ["run", "review", "approve"];
+
+interface AnalyzeCatalogEntry {
+  id?: string;
+  name: string;
+  module_category: "agent" | "workflow" | "adapter" | "remote_a2a";
+  subtype?: string | null;
+  [key: string]: unknown;
+}
 
 export default function AnalyzeWorkbench() {
   const params = useParams<{ reqId: string }>();

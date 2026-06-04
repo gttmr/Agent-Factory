@@ -99,6 +99,20 @@ export interface GeneratedFileInfo {
 
 export type MockGenerateStatus = "running" | "completed" | "failed" | "cancelled";
 
+export interface MockCodexUsage {
+  input_tokens: number;
+  cached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens: number;
+}
+
+export interface MockCodexMetadata {
+  backend: "sdk" | "fake";
+  thread_id: string | null;
+  event_count: number;
+  usage: MockCodexUsage | null;
+}
+
 export interface MockGenerateSummary {
   run_id: string;
   mock_id: string;
@@ -115,6 +129,7 @@ export interface MockGenerateSummary {
     errors: string[];
   };
   last_error: string | null;
+  codex?: MockCodexMetadata;
 }
 
 export interface MockRunDetail {

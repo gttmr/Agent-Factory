@@ -44,7 +44,23 @@ export interface StageRunEvent {
   elapsedMs?: number;
   title?: string;
   snippet?: string;
+  rawEventType?: string;
+  itemType?: string;
+  status?: string;
+  toolName?: string;
   summary?: StageRunSummary;
+}
+
+export interface StageRunCodexMetadata {
+  backend: "sdk" | "fake";
+  thread_id: string | null;
+  event_count: number;
+  usage: {
+    input_tokens: number;
+    cached_input_tokens: number;
+    output_tokens: number;
+    reasoning_output_tokens: number;
+  } | null;
 }
 
 export interface StageRunSummary {
@@ -62,6 +78,7 @@ export interface StageRunSummary {
     errors: string[];
   };
   last_error: string | null;
+  codex?: StageRunCodexMetadata;
 }
 
 export interface StageRunArtifactDiff {

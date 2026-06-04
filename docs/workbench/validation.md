@@ -6,7 +6,7 @@ Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰�
 Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)를 통해 artifact root 디렉터리를 직접 읽고 쓰며, `manifest.approvals.*`를 게이트 UI의 단일 진실로 사용한다.
 초기 분석 결과는 Analyze Stage Runner 또는 Landing/단계 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. Stage Runner 결과는 먼저 `runs/<stage>/<run-id>/proposed-artifacts/`에 저장되고, 사용자가 diff/preview 후 적용할 때 canonical artifact가 갱신된다.
 현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)와 optional `stage_runs`를 tolerant하게 읽는다.
-`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path를 검증한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
+`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path와 lightweight `stage_runs.*.codex` metadata(`backend`, nullable `thread_id`, non-negative `event_count`)를 검증한다. SDK token `usage`는 manifest가 아니라 `runs/<stage>/<run-id>/result-summary.json`에만 둔다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
 
 ## module-candidates.json
 
@@ -33,16 +33,9 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`)�
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
 - DesignWorkbench의 모듈 검토 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
 
-## Live analyzer draft schema
+## Analyze validation
 
-`schemas/analysis-draft.schema.json`은 live Codex CLI의 내부 반환 계약이다.
-이 schema는 저장/export artifact가 아니며, CLI 출력량을 줄이기 위한 compact transport shape다.
-워크벤치 UI의 기본 Analyze 경로는 Stage Runner API(`/api/af/:reqId/stages/analyze/run`)다. Stage Runner가 내부적으로 Codex CLI 또는 skill 실행을 수행하고 proposed `analysis-result.json`을 만든 뒤, apply 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다. `/api/analyze-requirement` SSE compact-draft endpoint는 direct analyzer primitive로 유지되며, 외부 `af-analyze-requirement` producer가 만든 결과를 Landing/단계 import 버튼으로 적재하는 경로도 유지한다.
-
-- Draft는 `normalizedRequirement`, `evidence`, `moduleCandidates`, `processFlow`의 결정 정보를 담는다.
-- Catalog reuse 후보는 반복되는 inputs/outputs/runtime metadata 대신 `catalog_entry_id`와 필요한 override만 담을 수 있다.
-- Draft Graph IR은 node/edge 중심의 compact shape를 허용하고, 서버가 containers, lanes, nullable/default fields를 hydrate한다.
-- Draft prompt와 schema는 canonical edge/container id 예시를 제공한다. 그래도 runtime은 `e-001`, `c-root` 같은 축약 id를 final artifact 저장/검증 전에 보정하는 방어선을 둔다.
+워크벤치 UI의 Analyze 경로는 Stage Runner API(`/api/af/:reqId/stages/analyze/run`)다. Analyze/Design Stage Runner는 서버 사이드 `@openai/codex-sdk` TypeScript SDK로 `af-analyze-requirement` 또는 `af-design-boundaries`를 실행하고, proposed artifact를 만든 뒤, apply 시점에 `validateAnalysisResult`가 최종 artifact 형태를 검증한다. `/api/analyze-requirement` direct analyzer와 compact draft schema는 더 이상 지원 경로가 아니다. 외부 `af-analyze-requirement` producer가 만든 결과를 Landing/단계 import 버튼으로 적재하는 경로는 유지한다.
 - Graph IR soft validation은 load/migration/client backstop에서 반복 실행될 수 있으므로 structural error를 누적 append하지 않고 현재 정규화 결과 기준으로 다시 계산한다.
 - Codex `--output-schema` response format 제약 때문에 draft schema의 모든 object는 `properties`의 모든 key를 `required`에 포함하고, 값이 없을 수 있는 필드는 nullable로 표현한다.
 - Hydrated 결과는 기존 `AnalysisResult` shape와 validator 기준을 통과해야 한다.

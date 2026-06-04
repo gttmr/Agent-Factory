@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { spawn, type ChildProcess } from "node:child_process";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Codex, type ThreadEvent, type ThreadItem, type Usage } from "@openai/codex-sdk";
 import type { GeneratedFileInfo } from "../src/types/mockSpec";
 import { collectFiles, MockLabError, MockSpecStore, readJson, writeJsonFile } from "./mockSpecStore";
 
@@ -9,6 +9,20 @@ const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-c
 const DEFAULT_MODEL = "gpt-5.5";
 
 export type MockGenerateStatus = "running" | "completed" | "failed" | "cancelled";
+
+export interface MockCodexUsage {
+  input_tokens: number;
+  cached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens: number;
+}
+
+export interface MockCodexMetadata {
+  backend: "sdk" | "fake";
+  thread_id: string | null;
+  event_count: number;
+  usage: MockCodexUsage | null;
+}
 
 export interface MockGenerateSummary {
   run_id: string;
@@ -26,6 +40,7 @@ export interface MockGenerateSummary {
     errors: string[];
   };
   last_error: string | null;
+  codex?: MockCodexMetadata;
 }
 
 export interface MockRunDetail {
@@ -37,26 +52,38 @@ export interface MockRunDetail {
   stderr: string;
 }
 
-export interface MockCommandSpec {
-  command: string;
-  args: string[];
-  displayCommand: string;
+export interface MockRunEvent {
+  phase: string;
+  message: string;
+  rawEventType?: string;
+  itemType?: string;
+  status?: string;
+  toolName?: string;
+  snippet?: string;
 }
 
-export type MockCommandBuilder = (input: {
+export interface MockCodexGeneratorInput {
   repoRoot: string;
   specPath: string;
-  outputPath: string;
+  runDir: string;
+  proposedDir: string;
   model: string;
   prompt: string;
-}) => MockCommandSpec;
+  signal: AbortSignal;
+  emit: (event: MockRunEvent) => Promise<void>;
+  updateMetadata: (metadata: MockCodexMetadata) => Promise<void>;
+}
+
+export interface MockCodexGenerator {
+  run(input: MockCodexGeneratorInput): Promise<MockCodexMetadata>;
+}
 
 interface ActiveGeneration {
   mockId: string;
   runId: string;
   runDir: string;
   proposedDir: string;
-  child: ChildProcess;
+  controller: AbortController;
   startedAt: Date;
   summary: MockGenerateSummary;
   timeout: NodeJS.Timeout | null;
@@ -72,20 +99,20 @@ export class MockGenerationRegistry {
   private readonly options: {
     repoRoot: string;
     store: MockSpecStore;
-    commandBuilder: MockCommandBuilder;
+    codexGenerator: MockCodexGenerator;
     timeoutMs: number;
   };
 
   constructor(options: {
     repoRoot: string;
     store: MockSpecStore;
-    commandBuilder?: MockCommandBuilder;
+    codexGenerator?: MockCodexGenerator;
     timeoutMs?: number;
   }) {
     this.options = {
       repoRoot: options.repoRoot,
       store: options.store,
-      commandBuilder: options.commandBuilder ?? buildDefaultCodexCommand,
+      codexGenerator: options.codexGenerator ?? new SdkMockCodexGenerator(),
       timeoutMs: options.timeoutMs ?? DEFAULT_GENERATION_TIMEOUT_MS
     };
   }
@@ -104,13 +131,7 @@ export class MockGenerationRegistry {
     const specPath = join(this.options.store.resolveMockDir(input.mockId), "mock-spec.json");
     const startedAt = new Date();
     const prompt = buildCodexPrompt({ repoRoot: this.options.repoRoot, specPath, outputPath: proposedDir });
-    const commandSpec = this.options.commandBuilder({
-      repoRoot: this.options.repoRoot,
-      specPath,
-      outputPath: proposedDir,
-      model,
-      prompt
-    });
+    const controller = new AbortController();
     const request = {
       mock_id: input.mockId,
       run_id: runId,
@@ -124,10 +145,6 @@ export class MockGenerationRegistry {
     await writeJsonFile(join(runDir, "request.json"), request);
     await appendEvent(runDir, "started", "Codex mock server generation started.");
 
-    const child = spawn(commandSpec.command, commandSpec.args, {
-      cwd: this.options.repoRoot,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
     const summary: MockGenerateSummary = {
       run_id: runId,
       mock_id: input.mockId,
@@ -136,21 +153,22 @@ export class MockGenerationRegistry {
       started_at: startedAt.toISOString(),
       finished_at: null,
       elapsed_ms: 0,
-      pid: child.pid ?? null,
-      command: commandSpec.displayCommand,
+      pid: null,
+      command: "codex sdk",
       proposed_files: [],
       validation: {
         ok: false,
         errors: []
       },
-      last_error: null
+      last_error: null,
+      codex: createMockCodexMetadata("sdk")
     };
     const entry: ActiveGeneration = {
       mockId: input.mockId,
       runId,
       runDir,
       proposedDir,
-      child,
+      controller,
       startedAt,
       summary,
       timeout: null,
@@ -160,36 +178,13 @@ export class MockGenerationRegistry {
     };
     this.activeByMockId.set(input.mockId, entry);
     await writeJsonFile(join(runDir, "result-summary.json"), summary);
-    await appendEvent(runDir, "spawned", `Codex process started with pid ${summary.pid ?? "unknown"}.`);
+    await appendEvent(runDir, "spawned", "Codex SDK thread requested.");
+    void this.runGeneration(entry, { specPath, prompt, model });
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      void appendOutput(runDir, "codex-stdout.jsonl", chunk.toString("utf8"));
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      void appendOutput(runDir, "codex-stderr.txt", chunk.toString("utf8"));
-    });
-    child.on("error", (error) => {
-      void this.finalize(entry, "failed", error.message);
-    });
-    child.on("close", (code) => {
-      const status = entry.cancelRequested ? "cancelled" : code === 0 ? "completed" : "failed";
-      const lastError =
-        status === "cancelled"
-          ? "generation cancelled"
-          : entry.timedOut
-            ? `generation timed out after ${this.options.timeoutMs}ms`
-            : code === 0
-              ? null
-              : `codex exec failed with exit ${code ?? -1}`;
-      void this.finalize(entry, status, lastError);
-    });
     entry.timeout = setTimeout(() => {
       entry.timedOut = true;
       void appendEvent(runDir, "timeout", `Generation timed out after ${this.options.timeoutMs}ms.`);
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        if (!child.killed) child.kill("SIGKILL");
-      }, 2000);
+      controller.abort();
     }, this.options.timeoutMs);
 
     return { ...summary };
@@ -203,11 +198,55 @@ export class MockGenerationRegistry {
     entry.cancelRequested = true;
     entry.summary = await this.writeInterimSummary(entry, "cancelled", "generation cancelled");
     await appendEvent(entry.runDir, "cancelled", "Generation cancellation requested.");
-    entry.child.kill("SIGTERM");
-    setTimeout(() => {
-      if (!entry.child.killed) entry.child.kill("SIGKILL");
-    }, 2000);
+    entry.controller.abort();
     return { ...entry.summary };
+  }
+
+  private async runGeneration(
+    entry: ActiveGeneration,
+    input: { specPath: string; prompt: string; model: string }
+  ): Promise<void> {
+    try {
+      const codex = await this.options.codexGenerator.run({
+        repoRoot: this.options.repoRoot,
+        specPath: input.specPath,
+        runDir: entry.runDir,
+        proposedDir: entry.proposedDir,
+        model: input.model,
+        prompt: input.prompt,
+        signal: entry.controller.signal,
+        emit: async (event) => {
+          await appendOutput(entry.runDir, "codex-stdout.jsonl", `${JSON.stringify(redactSecretsValue(event))}\n`);
+          await appendEvent(entry.runDir, event);
+        },
+        updateMetadata: async (metadata) => {
+          entry.summary = {
+            ...entry.summary,
+            codex: copyMockCodexMetadata(metadata)
+          };
+          await writeJsonFile(join(entry.runDir, "result-summary.json"), entry.summary);
+        }
+      });
+      entry.summary = {
+        ...entry.summary,
+        codex: copyMockCodexMetadata(codex)
+      };
+      await this.finalize(entry, entry.cancelRequested ? "cancelled" : "completed", entry.cancelRequested ? "generation cancelled" : null);
+    } catch (error) {
+      const finalStatus = entry.cancelRequested ? "cancelled" : "failed";
+      const finalError =
+        entry.cancelRequested
+          ? "generation cancelled"
+          : entry.timedOut
+            ? `generation timed out after ${this.options.timeoutMs}ms`
+            : error instanceof Error
+              ? error.message
+              : "codex sdk generation failed";
+      if (finalStatus === "failed") {
+        await appendOutput(entry.runDir, "codex-stderr.txt", finalError);
+      }
+      await this.finalize(entry, finalStatus, finalError);
+    }
   }
 
   private async finalize(entry: ActiveGeneration, status: MockGenerateStatus, lastError: string | null): Promise<void> {
@@ -268,7 +307,8 @@ export class MockGenerationRegistry {
         ok: false,
         errors: lastError ? [lastError] : []
       },
-      last_error: lastError
+      last_error: lastError,
+      codex: entry.summary.codex
     };
     await writeJsonFile(join(entry.runDir, "result-summary.json"), summary);
     return summary;
@@ -374,25 +414,58 @@ function normalizeModel(value: unknown): string {
   return typeof value === "string" && ALLOWED_MODELS.has(value) ? value : DEFAULT_MODEL;
 }
 
-function buildDefaultCodexCommand(input: {
-  repoRoot: string;
-  specPath: string;
-  outputPath: string;
-  model: string;
-  prompt: string;
-}): MockCommandSpec {
-  return {
-    command: "codex",
-    args: ["exec", "--json", "--model", input.model, "--cd", input.repoRoot, input.prompt],
-    displayCommand: `codex exec --json --model ${input.model} --cd ${input.repoRoot}`
-  };
+export class SdkMockCodexGenerator implements MockCodexGenerator {
+  async run(input: MockCodexGeneratorInput): Promise<MockCodexMetadata> {
+    const codex = new Codex();
+    const thread = codex.startThread({
+      model: input.model,
+      workingDirectory: input.repoRoot,
+      sandboxMode: "workspace-write",
+      approvalPolicy: "never",
+      networkAccessEnabled: false
+    });
+    const metadata = createMockCodexMetadata("sdk");
+    const { events } = await thread.runStreamed(input.prompt, { signal: input.signal });
+    let turnFailure: string | null = null;
+
+    for await (const event of events) {
+      metadata.event_count += 1;
+      if (event.type === "thread.started") {
+        metadata.thread_id = event.thread_id;
+      } else if (event.type === "turn.completed") {
+        metadata.usage = normalizeCodexUsage(event.usage);
+      } else if (event.type === "turn.failed") {
+        turnFailure = event.error.message;
+      }
+      if (!metadata.thread_id) {
+        metadata.thread_id = thread.id;
+      }
+      await input.updateMetadata(copyMockCodexMetadata(metadata));
+      await appendRawCodexEvent(input.runDir, event);
+      await input.emit(mapCodexEvent(event));
+    }
+
+    if (turnFailure) {
+      throw new Error(turnFailure);
+    }
+    return copyMockCodexMetadata(metadata);
+  }
 }
 
-async function appendEvent(runDir: string, phase: string, message: string): Promise<void> {
-  const event = { phase, message, at: new Date().toISOString() };
+async function appendEvent(runDir: string, phase: string, message: string): Promise<void>;
+async function appendEvent(runDir: string, event: MockRunEvent): Promise<void>;
+async function appendEvent(runDir: string, eventOrPhase: MockRunEvent | string, message?: string): Promise<void> {
+  const event =
+    typeof eventOrPhase === "string"
+      ? { phase: eventOrPhase, message: message ?? "", at: new Date().toISOString() }
+      : { ...eventOrPhase, at: new Date().toISOString() };
   const path = join(runDir, "events.jsonl");
   const existing = await readFile(path, "utf8").catch(() => "");
   await writeFile(path, `${existing}${JSON.stringify(event)}\n`, "utf8");
+}
+
+async function appendRawCodexEvent(runDir: string, event: ThreadEvent): Promise<void> {
+  await appendFile(join(runDir, "codex-events.jsonl"), `${JSON.stringify(redactSecretsValue(event))}\n`, "utf8");
 }
 
 async function appendOutput(runDir: string, filename: string, value: string): Promise<void> {
@@ -441,11 +514,190 @@ function inferStartedAtFromRunId(runId: string): string | null {
   return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`;
 }
 
+function createMockCodexMetadata(backend: MockCodexMetadata["backend"]): MockCodexMetadata {
+  return {
+    backend,
+    thread_id: null,
+    event_count: 0,
+    usage: null
+  };
+}
+
+function copyMockCodexMetadata(metadata: MockCodexMetadata): MockCodexMetadata {
+  return {
+    backend: metadata.backend,
+    thread_id: metadata.thread_id,
+    event_count: metadata.event_count,
+    usage: metadata.usage ? { ...metadata.usage } : null
+  };
+}
+
+function normalizeCodexUsage(usage: Usage | null | undefined): MockCodexUsage | null {
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens,
+    cached_input_tokens: usage.cached_input_tokens,
+    output_tokens: usage.output_tokens,
+    reasoning_output_tokens: usage.reasoning_output_tokens
+  };
+}
+
+function mapCodexEvent(event: ThreadEvent): MockRunEvent {
+  switch (event.type) {
+    case "thread.started":
+      return {
+        phase: "codex_event",
+        message: "Codex SDK thread started.",
+        rawEventType: event.type,
+        status: "started",
+        snippet: event.thread_id
+      };
+    case "turn.started":
+      return {
+        phase: "codex_event",
+        message: "Codex turn started.",
+        rawEventType: event.type,
+        status: "started"
+      };
+    case "turn.completed":
+      return {
+        phase: "codex_event",
+        message: "Codex turn completed.",
+        rawEventType: event.type,
+        status: "completed",
+        snippet: formatUsage(event.usage)
+      };
+    case "turn.failed":
+      return {
+        phase: "codex_event",
+        message: event.error.message,
+        rawEventType: event.type,
+        status: "failed"
+      };
+    case "error":
+      return {
+        phase: "codex_event",
+        message: event.message,
+        rawEventType: event.type,
+        status: "failed"
+      };
+    case "item.started":
+    case "item.updated":
+    case "item.completed":
+      return mapCodexItemEvent(event.type, event.item);
+  }
+}
+
+function mapCodexItemEvent(rawEventType: "item.started" | "item.updated" | "item.completed", item: ThreadItem): MockRunEvent {
+  const itemStatus = getItemStatus(item) ?? (rawEventType === "item.completed" ? "completed" : undefined);
+  const title = getItemTitle(item);
+  return {
+    phase: "codex_event",
+    message: itemStatus ? `${title} ${itemStatus}` : title,
+    rawEventType,
+    itemType: item.type,
+    status: itemStatus,
+    toolName: getItemToolName(item),
+    snippet: getItemSnippet(item)
+  };
+}
+
+function getItemTitle(item: ThreadItem): string {
+  switch (item.type) {
+    case "command_execution":
+      return "command execution";
+    case "file_change":
+      return "file change";
+    case "mcp_tool_call":
+      return "mcp tool call";
+    case "agent_message":
+      return "agent message";
+    case "reasoning":
+      return "reasoning";
+    case "web_search":
+      return "web search";
+    case "todo_list":
+      return "todo list";
+    case "error":
+      return "error";
+  }
+}
+
+function getItemStatus(item: ThreadItem): string | undefined {
+  return "status" in item && typeof item.status === "string" ? item.status : undefined;
+}
+
+function getItemToolName(item: ThreadItem): string | undefined {
+  switch (item.type) {
+    case "command_execution":
+      return "command";
+    case "mcp_tool_call":
+      return `${item.server}.${item.tool}`;
+    case "web_search":
+      return "web_search";
+    default:
+      return undefined;
+  }
+}
+
+function getItemSnippet(item: ThreadItem): string | undefined {
+  switch (item.type) {
+    case "command_execution":
+      return truncate([item.command, item.aggregated_output].filter(Boolean).join("\n"), 1000);
+    case "file_change":
+      return truncate(item.changes.map((change) => `${change.kind} ${change.path}`).join(", "), 1000);
+    case "mcp_tool_call":
+      return truncate(item.error?.message ?? stringifySnippet(item.result ?? item.arguments), 1000);
+    case "agent_message":
+    case "reasoning":
+      return truncate(item.text, 1000);
+    case "web_search":
+      return truncate(item.query, 1000);
+    case "todo_list":
+      return truncate(item.items.map((todo) => `${todo.completed ? "done" : "todo"} ${todo.text}`).join("\n"), 1000);
+    case "error":
+      return truncate(item.message, 1000);
+  }
+}
+
+function stringifySnippet(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(redactSecretsValue(value)) ?? "";
+}
+
+function formatUsage(usage: Usage): string {
+  return [
+    `input ${usage.input_tokens}`,
+    `cached ${usage.cached_input_tokens}`,
+    `output ${usage.output_tokens}`,
+    `reasoning ${usage.reasoning_output_tokens}`
+  ].join(" · ");
+}
+
 function redactSecrets(value: string): string {
   return value
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
     .replace(/(api[_-]?key["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
     .replace(/(token["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]");
+}
+
+function redactSecretsValue<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => redactSecretsValue(item)) as T;
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      if (/token|secret|password|credential|authorization|api[_-]?key|private[_-]?key/i.test(key)) {
+        result[key] = "[redacted]";
+      } else {
+        result[key] = redactSecretsValue(raw);
+      }
+    }
+    return result as T;
+  }
+  if (typeof value === "string") {
+    return redactSecrets(value) as T;
+  }
+  return value;
 }
 
 function truncate(value: string, max: number): string {

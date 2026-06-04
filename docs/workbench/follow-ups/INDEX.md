@@ -19,7 +19,7 @@
 | 03 | `03-runtime-contract-review-surface.md` | 완료 | `RuntimeContractPanel.tsx`, DesignWorkbench `Runtime 계약` 탭, `runtime_contracts_approved` gate 구현됨. |
 | 04 | `04-a2a-contract-review-surface.md` | 완료 | Remote A2A 편집 탭, readiness validator, runtime gate 연동이 구현됨. |
 | 05 | `05-sse-streaming.md` | 완료 | `verify/run`, `runtime-stub/build`가 SSE live log 와 기존 JSON 경로를 모두 지원함. |
-| 06 | `06-analyze-pipeline.md` | 완료 / 09에 흡수 | 옵션 B hook은 구현됐고 현재 UI 기본 실행은 Analyze Stage Runner. `/api/analyze-requirement`는 direct/internal primitive. |
+| 06 | `06-analyze-pipeline.md` | 완료 / 09에 흡수 / direct endpoint 제거 | 옵션 B hook은 brief 09의 Stage Runner로 대체됐고 현재 UI 기본 실행은 Analyze Stage Runner. `/api/analyze-requirement`는 제거됐다. |
 | 07 | `07-onboarding-html-refresh.md` | 완료 | 정적 onboarding HTML과 새 screenshot asset이 route shell + Stage Runner 모델로 갱신됨. |
 | 08 | `08-perf-and-bundle.md` | 완료 | GraphCanvas child lazy split과 Vite build 정량 기록이 완료됨. `_perf-notes.md` 참고. |
 | 09 | `09-skill-runner-workbench.md` | 완료 | Analyze + Design Stage Runner, run evidence, diff/apply, gate 분리 구현됨. Build/Verify runner는 후속 제외 범위. |
@@ -38,7 +38,7 @@
 ## 마이그레이션 후 변경된 사실 (브리프 작성 시 가정)
 
 - 라우트: `/`, `/af/:reqId/{analyze,design,build,verify}`, `/catalog` 5개. `/legacy` 는 제거됨.
-- 서버 미들웨어: `/api/af/:reqId/stages/:stage/*` (Analyze/Design Stage Runner), `/api/analyze-requirement` (direct/internal Codex CLI primitive), `/api/af`, `/api/af-collab`, `/api/catalog`.
+- 서버 미들웨어: `/api/af/:reqId/stages/:stage/*` (Analyze/Design Stage Runner), `/api/af`, `/api/af-collab`, `/api/catalog`.
 - 삭제된 컴포넌트: `RequirementIntake`, `AnalysisTracePanel`, `SavedAnalyses`, `CatalogManager`, legacy `ModuleReview`(+ Inspector), legacy `RuntimeContractReview`, `A2AContractReview`(+ subdir), `AdkRuntimeWorkbench`, `WorkbenchShell`, `ui/review.tsx`. 현재 DesignWorkbench에는 새 Runtime 계약 검토 탭이 있다.
 - 삭제된 analyzer 파일: `exampleRequirement.ts`, `providers.ts`, `savedAnalyses.ts`, `adkSource.ts`, `adkGraph.ts`.
 - 삭제된 서버 미들웨어 파일: `adkRuntime.ts`, `moduleResolution.ts`.

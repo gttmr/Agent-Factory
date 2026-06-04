@@ -33,7 +33,22 @@ const manifest = parseAfRunManifest(
         output_artifacts: [
           "runs/analyze/20260527T130000Z-analyze-a1b2c3/proposed-artifacts/analysis-result.json"
         ],
-        last_error: null
+        last_error: null,
+        codex: {
+          backend: "sdk",
+          thread_id: "thread-sdk-001",
+          event_count: 7
+        }
+      },
+      design: {
+        latest_run_id: "20260527T130500Z-design-d4e5f6",
+        status: "failed",
+        started_at: "2026-05-27T13:05:00.000Z",
+        finished_at: "2026-05-27T13:05:10.000Z",
+        skill_name: "af-design-boundaries",
+        model: "gpt-5.5",
+        output_artifacts: [],
+        last_error: "Design run 은 analysis_reviewed=true 상태에서만 실행할 수 있습니다."
       }
     }
   }),
@@ -48,7 +63,12 @@ assert.equal(manifest.approvals.analysis_reviewed, true);
 assert.equal(manifest.validation.last_result, "failed");
 assert.equal(manifest.stage_runs?.analyze?.latest_run_id, "20260527T130000Z-analyze-a1b2c3");
 assert.equal(manifest.stage_runs?.analyze?.status, "completed");
-assert.equal(manifest.stage_runs?.design, undefined);
+assert.deepEqual(manifest.stage_runs?.analyze?.codex, {
+  backend: "sdk",
+  thread_id: "thread-sdk-001",
+  event_count: 7
+});
+assert.equal(manifest.stage_runs?.design?.codex, undefined);
 
 const summary = summarizeAfRunManifest(manifest);
 assert.equal(summary.stageLabel, "설계");
@@ -63,6 +83,8 @@ const serialized = serializeAfRunManifest(manifest);
 assert.ok(serialized.endsWith("\n"));
 assert.equal(JSON.parse(serialized).requirement_id, "req-001");
 assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-analyze-requirement");
+assert.equal(JSON.parse(serialized).stage_runs.analyze.codex.thread_id, "thread-sdk-001");
+assert.equal(JSON.parse(serialized).stage_runs.design.codex, undefined);
 
 assert.throws(() => parseAfRunManifest("[]", "bad.json"), /object/);
 assert.throws(() => parseAfRunManifest(JSON.stringify({ requirement_id: "" }), "bad.json"), /requirement_id/);

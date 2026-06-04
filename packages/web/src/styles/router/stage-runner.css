@@ -261,7 +261,7 @@
   display: grid;
   grid-template-columns: 80px minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: baseline;
+  align-items: start;
   border-top: 1px solid var(--line);
   padding-top: 6px;
   font-size: var(--fs-xs);
@@ -270,6 +270,33 @@
 .af-runner-events li span {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-muted);
+}
+
+.af-runner-event-body {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.af-runner-event-body strong,
+.af-runner-event-body small,
+.af-runner-event-body p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.af-runner-event-body strong,
+.af-runner-event-body small {
+  white-space: nowrap;
+}
+
+.af-runner-event-body p {
+  max-height: 4.2em;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 1180px) {

@@ -48,6 +48,5 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 - Human-facing overview: [../README.md](../README.md)
 - Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
 - Shared schemas: [../schemas](../schemas)
-- Live analyzer compact draft schema: [../schemas/analysis-draft.schema.json](../schemas/analysis-draft.schema.json)
 - 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. ADK 2.0 문서를 우선 조회하고 ADK 1.x 문서는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
 - Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files. The AF DLC stage skills are active operating entrypoints; `_shared` is reference material only.

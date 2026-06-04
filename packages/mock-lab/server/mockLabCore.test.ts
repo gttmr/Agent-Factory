@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadCatalogPrefill } from "./catalogPrefillLoader.ts";
-import { MockGenerationRegistry, buildCodexPrompt, createRunId } from "./mockRunner.ts";
+import {
+  MockGenerationRegistry,
+  buildCodexPrompt,
+  createRunId,
+  type MockCodexGenerator
+} from "./mockRunner.ts";
 import { MockProcessRegistry } from "./mockProcessRegistry.ts";
 import { MockSpecStore } from "./mockSpecStore.ts";
 import { validateMockSpec, validateValueAgainstSchema } from "./schemaValidation.ts";
@@ -112,35 +117,21 @@ const generation = new MockGenerationRegistry({
   repoRoot,
   store,
   timeoutMs: 5000,
-  commandBuilder: ({ outputPath }) => ({
-    command: process.execPath,
-    args: [
-      "-e",
-      [
-        "const fs = require('node:fs');",
-        "const path = require('node:path');",
-        "const out = process.argv[1];",
-        "setTimeout(() => {",
-        "  fs.mkdirSync(path.join(out, 'src'), { recursive: true });",
-        "  fs.writeFileSync(path.join(out, 'package.json'), JSON.stringify({ type: 'module', scripts: { start: 'node --experimental-strip-types src/server.ts' } }, null, 2));",
-        "  fs.writeFileSync(path.join(out, 'src/server.ts'), 'console.log(\"synthetic server\")\\n');",
-        "  console.log(JSON.stringify({ event: 'fake-codex-complete' }));",
-        "}, 50);",
-        "setTimeout(() => {}, 120);"
-      ].join("\n"),
-      outputPath
-    ],
-    displayCommand: "fake codex complete"
-  })
+  codexGenerator: createFakeCodexGenerator()
 });
 const startedGeneration = await generation.start({ mockId: validSpec.mock_id, model: "gpt-5.5" });
 assert.equal(startedGeneration.status, "running");
-assert.ok(startedGeneration.pid);
+assert.equal(startedGeneration.pid, null);
+assert.equal(startedGeneration.command, "codex sdk");
+assert.equal(startedGeneration.codex?.backend, "sdk");
 const runningRuns = await store.listRuns(validSpec.mock_id);
 assert.equal((runningRuns[0] as { status: string }).status, "running");
 await waitFor(async () => {
   const detail = await readRunDetailForTest(store, validSpec.mock_id, startedGeneration.run_id);
   assert.equal(detail.summary.status, "completed");
+  assert.equal(detail.summary.codex?.thread_id, "thread-mock-lab-test");
+  assert.equal(detail.summary.codex?.event_count, 2);
+  assert.match(detail.stdout, /thread.started/);
   assert.deepEqual(
     detail.proposed_files.map((file) => file.path).sort(),
     ["package.json", "src/server.ts"]
@@ -151,11 +142,7 @@ const cancellableGeneration = new MockGenerationRegistry({
   repoRoot,
   store,
   timeoutMs: 5000,
-  commandBuilder: () => ({
-    command: process.execPath,
-    args: ["-e", "setInterval(() => {}, 1000);"],
-    displayCommand: "fake codex slow"
-  })
+  codexGenerator: createBlockingCodexGenerator()
 });
 const cancellableRun = await cancellableGeneration.start({ mockId: validSpec.mock_id, model: "gpt-5.5" });
 const duplicateRun = await cancellableGeneration.start({ mockId: validSpec.mock_id, model: "gpt-5.5" });
@@ -163,6 +150,7 @@ assert.equal(duplicateRun.run_id, cancellableRun.run_id);
 assert.equal(duplicateRun.status, "running");
 const cancelledRun = await cancellableGeneration.cancel(validSpec.mock_id, cancellableRun.run_id);
 assert.equal(cancelledRun.status, "cancelled");
+assert.equal(cancelledRun.codex?.thread_id, "thread-mock-lab-blocking");
 await waitFor(async () => {
   const detail = await readRunDetailForTest(store, validSpec.mock_id, cancellableRun.run_id);
   assert.equal(detail.summary.status, "cancelled");
@@ -245,6 +233,71 @@ async function writeGeneratedFile(root: string, relativePath: string, content: s
 async function readRunDetailForTest(store: MockSpecStore, mockId: string, runId: string) {
   const { readRunDetail } = await import("./mockRunner.ts");
   return await readRunDetail(store, mockId, runId);
+}
+
+function createFakeCodexGenerator(): MockCodexGenerator {
+  return {
+    async run(input) {
+      await input.updateMetadata({
+        backend: "sdk",
+        thread_id: "thread-mock-lab-test",
+        event_count: 1,
+        usage: null
+      });
+      await input.emit({
+        phase: "codex_event",
+        message: "thread started",
+        rawEventType: "thread.started",
+        status: "started",
+        snippet: "thread-mock-lab-test"
+      });
+      await writeGeneratedFile(
+        input.proposedDir,
+        "package.json",
+        JSON.stringify({ type: "module", scripts: { start: "node --experimental-strip-types src/server.ts" } }, null, 2)
+      );
+      await writeGeneratedFile(input.proposedDir, "src/server.ts", "console.log(\"synthetic server\")");
+      await input.emit({
+        phase: "codex_event",
+        message: "turn completed",
+        rawEventType: "turn.completed",
+        status: "completed"
+      });
+      return {
+        backend: "sdk",
+        thread_id: "thread-mock-lab-test",
+        event_count: 2,
+        usage: {
+          input_tokens: 10,
+          cached_input_tokens: 2,
+          output_tokens: 4,
+          reasoning_output_tokens: 1
+        }
+      };
+    }
+  };
+}
+
+function createBlockingCodexGenerator(): MockCodexGenerator {
+  return {
+    async run(input) {
+      await input.updateMetadata({
+        backend: "sdk",
+        thread_id: "thread-mock-lab-blocking",
+        event_count: 1,
+        usage: null
+      });
+      await new Promise<void>((_resolve, reject) => {
+        input.signal.addEventListener("abort", () => reject(new Error("generation cancelled")), { once: true });
+      });
+      return {
+        backend: "sdk",
+        thread_id: "thread-mock-lab-blocking",
+        event_count: 1,
+        usage: null
+      };
+    }
+  };
 }
 
 async function waitFor(assertion: () => Promise<void>, timeoutMs = 3000): Promise<void> {

@@ -1,7 +1,7 @@
 # Analysis Guide
 
 이 문서는 사용자 요구사항을 Agent Factory 분석 산출물로 바꾸는 기본 절차다.
-현재 기본 운영 모델은 skill-led DLC 흐름이다. Workbench는 Analyze/Design Stage Runner 패널로 `af-analyze-requirement`, `af-design-boundaries` 실행을 서버에 요청하고, proposed artifact를 diff/preview 후 적용한다.
+현재 기본 운영 모델은 skill-led DLC 흐름이다. Workbench는 Analyze/Design Stage Runner 패널로 `af-analyze-requirement`, `af-design-boundaries` 실행을 서버에 요청하고, 서버는 `@openai/codex-sdk` TypeScript SDK로 Codex thread를 시작해 proposed artifact를 생성한다. 사용자는 diff/preview 후에만 canonical artifact에 적용한다.
 첫 사용자는 개발 리더이며, v1.0의 임시 은행 도메인은 `고객`, `수신`, `여신`, `카드`, `리스크`다.
 
 ## 분석 순서
@@ -63,16 +63,11 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 - Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK Runtime Handoff는 승인된 후보와 `scaffold-plan`만 사용하며, 생성물은 실제 runtime 설정과 비즈니스 로직을 TODO 경계로 남긴다.
 - LLM이 만든 Resolution Draft는 승인 근거가 아니라 검토 초안이다. object schema와 smoke 계약은 개발 리더가 DesignWorkbench에서 확인하고 명시적으로 적용해야 scaffold 입력으로 쓰인다.
 
-## Live analyzer 실행 계약
+## Stage Runner 실행 계약
 
-Analyze Stage Runner는 raw requirement 입력 경로에서 Codex CLI 실행을 요청할 수 있다. Skill-led 운영에서는 외부 `af-analyze-requirement` 실행 결과를 import할 수도 있고, workbench는 후속 preview/apply, 시각화, guided edit의 보조 표면이 된다.
-단, direct live analyzer CLI가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다는 기존 계약은 유지한다.
-
-- CLI에는 `schemas/analysis-draft.schema.json` compact draft schema를 `--output-schema`로 전달한다.
-- 실행 시 `/tmp/agent-factory-codex-*/analyzer-context-index.md`를 만들어 active docs, schema, catalog 위치와 주요 section을 안내한다.
-- 모델은 index를 지도처럼 사용하고, 정확한 판단이 필요하면 원본 `docs/`, `schemas/`, `catalog/` 파일을 `rg`나 bounded `sed`로 직접 확인한다.
-- Compact draft에는 분류 판단, rationale, `catalog_entry_id`, Graph IR topology 같은 결정 정보를 담는다.
-- 서버는 draft를 catalog와 schema 기본값으로 hydrate해 기존 `AnalysisResult` 형태로 만든 뒤 기존 Graph IR/A2A normalization과 validation을 수행한다.
+Analyze/Design Stage Runner는 raw requirement 또는 canonical artifact를 입력으로 `@openai/codex-sdk` TypeScript SDK의 `thread.runStreamed()`를 사용한다. Stage Runner thread는 repo root에서 `sandboxMode: "workspace-write"`, `approvalPolicy: "never"`, `networkAccessEnabled: false`로 실행되며 `runs/<stage>/<run-id>/proposed-artifacts/`만 제안 출력 위치로 쓴다. 실행 시작 즉시 `result-summary.json`과 manifest stage run entry가 `running`으로 저장되고, `thread_id`, SDK event count, token usage는 `result-summary.json`에 남긴다. Workbench는 running run을 polling해 탭 이동 후에도 같은 run을 표시하고 새 실행 버튼을 막는다. raw SDK event는 redacted `codex-events.jsonl`로 보존한다.
+Skill-led 운영에서는 외부 `af-analyze-requirement` 실행 결과를 import할 수도 있고, workbench는 후속 preview/apply, 시각화, guided edit의 보조 표면이 된다.
+`/api/analyze-requirement` direct live analyzer와 `schemas/analysis-draft.schema.json` compact draft transport는 제거됐다. 현재 Analyze 실행은 Stage Runner SDK 경로 또는 외부 producer artifact import로 통일한다.
 - Spark 모델에서 실패해도 다른 모델로 자동 fallback하지 않는다. 실패 원인은 `max_output_tokens`, `context_window_exceeded`, `stream_incomplete`, `turn_failed`처럼 구분해 trace와 로그에 남긴다.
 
 ## ADK 문서 사용

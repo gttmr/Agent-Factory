@@ -54,24 +54,35 @@ export function StageRunnerPanel({
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const runsQuery = useStageRuns(reqId, stage);
   const runs = runsQuery.data ?? [];
-  const detailQuery = useStageRunDetail(reqId, stage, selectedRunId);
+  const runningRun = runs.find((run) => run.status === "running") ?? null;
+  const isServerRunning = Boolean(runningRun);
+  const isRunStatePending = runsQuery.isPending;
+  const detailQuery = useStageRunDetail(reqId, stage, selectedRunId, {
+    refetchInterval: isServerRunning ? 2000 : false
+  });
   const applyMutation = useApplyStageRun(reqId, stage, currentArtifactEtag);
   const startMutation = useStartStageRun(reqId, stage, (event) => {
     setLiveEvents((prev) => [...prev, event]);
   });
 
   useEffect(() => {
+    if (runningRun && selectedRunId !== runningRun.run_id) {
+      setSelectedRunId(runningRun.run_id);
+      return;
+    }
     if (!selectedRunId && runs[0]) {
       setSelectedRunId(runs[0].run_id);
     }
-  }, [runs, selectedRunId]);
+  }, [runningRun, runs, selectedRunId]);
 
   const selectedRun = detailQuery.data?.summary ?? runs.find((run) => run.run_id === selectedRunId) ?? null;
   const detail = detailQuery.data;
-  const displayedEvents = startMutation.isPending ? liveEvents : detail?.events ?? [];
-  const canRun = !disabledReason && !startMutation.isPending;
+  const isRunning = startMutation.isPending || isServerRunning;
+  const displayedEvents = startMutation.isPending && liveEvents.length > 0 ? liveEvents : detail?.events ?? [];
+  const canRun = !disabledReason && !isRunning && !isRunStatePending;
   const canApply = Boolean(detail?.summary.status === "completed" && detail.diff_summary.files.every((file) => file.valid));
   const latest = runs[0] ?? null;
+  const codexMetadata = selectedRun?.codex ?? latest?.codex ?? null;
 
   function handleRun() {
     setActionMessage(null);
@@ -107,11 +118,11 @@ export function StageRunnerPanel({
   }
 
   const statusText = useMemo(() => {
-    if (startMutation.isPending) return "running";
+    if (isRunning) return "running";
     if (selectedRun) return selectedRun.status;
     if (latest) return latest.status;
     return "not_run";
-  }, [latest, selectedRun, startMutation.isPending]);
+  }, [isRunning, latest, selectedRun]);
 
   return (
     <Panel className="af-stage-runner">
@@ -125,6 +136,9 @@ export function StageRunnerPanel({
         <span className={`af-runner-status af-runner-status-${statusText}`}>{statusText}</span>
         <span>latest {latest?.run_id ?? "—"}</span>
         <span>model {selectedModel}</span>
+        <span>backend {codexMetadata?.backend ?? "—"}</span>
+        <span>thread {formatThreadId(codexMetadata?.thread_id)}</span>
+        <span>SDK events {typeof codexMetadata?.event_count === "number" ? codexMetadata.event_count : "—"}</span>
       </div>
 
       <div className="af-runner-grid">
@@ -135,7 +149,7 @@ export function StageRunnerPanel({
               label="모델"
               value={selectedModel}
               onChange={(event) => setSelectedModel(event.target.value as CodexAnalyzerModel)}
-              disabled={startMutation.isPending}
+              disabled={isRunning || isRunStatePending}
             >
               {codexAnalyzerModels.map((model) => (
                 <option key={model} value={model}>
@@ -144,9 +158,12 @@ export function StageRunnerPanel({
               ))}
             </SelectField>
             <Button type="button" variant="primary" onClick={handleRun} disabled={!canRun}>
-              {startMutation.isPending ? "실행 중…" : runButtonLabel}
+              {isRunning ? "실행 중…" : isRunStatePending ? "상태 확인 중…" : runButtonLabel}
             </Button>
           </div>
+          {isServerRunning && !startMutation.isPending ? (
+            <p className="af-landing-message">실행 중인 run 을 다시 연결했습니다. 완료될 때까지 새 실행은 막힙니다.</p>
+          ) : null}
           {disabledReason ? <p className="af-runner-readiness-blocked">{disabledReason}</p> : null}
           {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
           {startMutation.isError ? (
@@ -238,7 +255,11 @@ export function StageRunnerPanel({
             {displayedEvents.slice(-12).map((event, index) => (
               <li key={`${event.phase}-${event.at ?? index}-${index}`}>
                 <span>{event.phase}</span>
-                <strong>{event.title ?? event.message}</strong>
+                <div className="af-runner-event-body">
+                  <strong>{event.title ?? event.message}</strong>
+                  {formatEventMeta(event) ? <small>{formatEventMeta(event)}</small> : null}
+                  {event.snippet ? <p>{event.snippet}</p> : null}
+                </div>
                 {typeof event.elapsedMs === "number" ? <small>{event.elapsedMs}ms</small> : null}
               </li>
             ))}
@@ -258,4 +279,13 @@ function formatElapsed(ms: number | null): string {
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   return `${(bytes / 1024).toFixed(1)}KB`;
+}
+
+function formatThreadId(threadId: string | null | undefined): string {
+  if (!threadId) return "—";
+  return threadId.length > 18 ? `${threadId.slice(0, 10)}…${threadId.slice(-6)}` : threadId;
+}
+
+function formatEventMeta(event: StageRunEvent): string {
+  return [event.rawEventType, event.itemType, event.status, event.toolName].filter(Boolean).join(" · ");
 }

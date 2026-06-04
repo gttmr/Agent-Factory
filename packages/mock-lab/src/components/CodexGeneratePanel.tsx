@@ -147,8 +147,10 @@ export default function CodexGeneratePanel({
           <div className="meta-grid">
             <span>run</span>
             <strong>{selectedSummary.run_id}</strong>
-            <span>pid</span>
-            <strong>{selectedSummary.pid ?? "-"}</strong>
+            <span>{selectedSummary.codex ? "thread" : "pid"}</span>
+            <strong>{selectedSummary.codex ? formatThreadId(selectedSummary.codex.thread_id) : selectedSummary.pid ?? "-"}</strong>
+            <span>SDK events</span>
+            <strong>{selectedSummary.codex?.event_count ?? "-"}</strong>
             <span>elapsed</span>
             <strong>{formatElapsed(selectedSummary)}</strong>
             <span>files</span>
@@ -218,4 +220,9 @@ function tail(value: string): string {
     .slice(-10)
     .map((line) => (line.length > 640 ? `${line.slice(0, 640)} ... [truncated]` : line))
     .join("\n");
+}
+
+function formatThreadId(threadId: string | null | undefined): string {
+  if (!threadId) return "-";
+  return threadId.length > 18 ? `${threadId.slice(0, 10)}...${threadId.slice(-6)}` : threadId;
 }

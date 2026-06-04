@@ -23,14 +23,20 @@ export function useStageRuns(reqId: string | undefined, stage: StageRunStage) {
   });
 }
 
-export function useStageRunDetail(reqId: string | undefined, stage: StageRunStage, runId: string | null) {
+export function useStageRunDetail(
+  reqId: string | undefined,
+  stage: StageRunStage,
+  runId: string | null,
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery<StageRunDetail | null>({
     queryKey: ["af", reqId, "stage-runs", stage, runId] as const,
     queryFn: async () => {
       if (!reqId || !runId) return null;
       return await fetchStageRun(reqId, stage, runId);
     },
-    enabled: Boolean(reqId && runId)
+    enabled: Boolean(reqId && runId),
+    refetchInterval: options?.refetchInterval ?? false
   });
 }
 

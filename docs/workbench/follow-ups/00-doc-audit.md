@@ -21,11 +21,11 @@ PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으�
   - L150: "intake 단계에서 예시 불러오기를 누른다" — intake 단계와 예시 불러오기 버튼 모두 PR6 에서 제거됨.
   - 전체적으로 wizard 9 step (intake → analysis → modules → graph → contracts → catalog → saved → export) 흐름으로 서술되어 있다.
 - `docs/onboarding/09-glossary.html`
-  - L97-98: "Codex CLI… `/api/analyze-requirement` SSE endpoint를 통해 호출되고" — 엔드포인트는 남아있지만 워크벤치 UI 에서 호출하지 않는다. 용어 정의로는 유지하되 "현재 워크벤치 UI 에서는 직접 호출하지 않으며 af-analyze-requirement skill 이 호출한다" 한 줄 추가 필요.
+  - L97-98: "Codex CLI… `/api/analyze-requirement` SSE endpoint를 통해 호출되고" — 이후 Stage Runner SDK 경로로 전환됐고 direct endpoint는 제거됐다. glossary는 Codex SDK thread 기반 실행으로 갱신됐다.
   - 다른 항목들도 `예시 불러오기`, `Module Review` UI, `SavedAnalysisRecord` 같은 wizard 전용 단어가 정의되어 있으면 갱신 또는 deprecate 표기.
 - `docs/onboarding/index.html` 및 03~08 챕터 — 9-step flow 기반 가능성 높음. 페이지 별로 한 번씩 brain check.
 - `docs/workbench/validation.md`
-  - L38: "schemas/analysis-draft.schema.json은 live Codex CLI의 내부 반환 계약" — 사실이지만, "워크벤치 UI 는 이 endpoint 를 호출하지 않는다 — 검증은 import 시 `validateAnalysisResult` 가 담당" 같은 정합화 필요.
+  - L38: "schemas/analysis-draft.schema.json은 live Codex CLI의 내부 반환 계약" — 이후 compact draft schema와 direct endpoint가 제거됐다. 현재 검증 문서는 Stage Runner SDK와 `validateAnalysisResult` 계약으로 갱신됐다.
 - `docs/workbench/review-board.md`, `docs/workbench/process-flow.md`, `docs/workbench/taxonomy.md`, `docs/workbench/analysis-guide.md`, `docs/workbench/workflow-decision-guide.md`
   - wizard 화면이 아니라 schema / taxonomy 자체를 기술하는 문서. 빠르게 한 번 훑고 `AdkRuntimeWorkbench` / `useWorkbenchState` / `예시 불러오기` 등 surface 단어가 있는지만 확인.
 - `docs/README.md` (docs 디렉터리 소개)
@@ -38,12 +38,12 @@ PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으�
 ### 명시적 정상 / 의도된 잔존
 
 - `docs/archive/**` 는 archived. 손대지 않는다.
-- `packages/web/server/codexAnalyzer.ts` 와 `/api/analyze-requirement` SSE endpoint 자체는 유지 (해체 결정은 06-analyze-pipeline.md 에서 다룸). 따라서 문서에서 "이 endpoint 가 존재한다" 는 서술은 사실 그대로 둔다.
+- 이 감사 당시에는 `packages/web/server/codexAnalyzer.ts` 와 `/api/analyze-requirement` SSE endpoint가 의도된 잔존이었다. 이후 06/09 후속 작업에서 제거됐으므로 새 작업의 현재 사실로 사용하지 않는다.
 
 ## 작업 정의 (Done means)
 
 1. `docs/workbench/follow-ups/INDEX.md` 의 "마이그레이션 후 변경된 사실" 섹션과 100% 정합한 상태로 위 의심 위치들을 갱신.
-2. 의도된 잔존 (Codex SSE endpoint 존재 사실, archive 디렉터리) 은 그대로 두되, 필요한 곳에 "워크벤치 UI 에서 직접 호출하지 않음" 한 줄을 추가.
+2. 의도된 잔존은 그대로 두되, 후속 작업으로 제거된 direct analyzer 관련 서술은 최신 STATUS/INDEX를 우선한다.
 3. `docs/onboarding/*.html` 가 새 흐름 (Landing → import → `/af/:id/analyze` → … → `/af/:id/verify` → Reuse Hub) 를 따라가도록 본문/스크린샷/캡션 갱신. 스크린샷이 옛 화면이라면 적어도 placeholder 텍스트로 교체하고 별도 브리프(07) 에서 새 스크린샷 확보.
 4. 갱신 자체로 schema/code 가 함께 바뀔 일은 없어야 한다. 코드가 바뀌어야 하는 점이 발견되면 그 항목은 적절한 다른 브리프(03–08)로 옮긴다.
 
@@ -65,7 +65,7 @@ grep -rn "wizard\|useWorkbenchState\|LegacyWizard\|exampleRequirement\|예시 �
 ## Out of scope
 
 - 새 onboarding 스크린샷 캡처 → `07-onboarding-html-refresh.md` 로 분리.
-- Codex CLI endpoint 자체를 제거할지 결정 → `06-analyze-pipeline.md` 로 분리.
+- Codex direct analyzer 제거 여부 결정 → `06-analyze-pipeline.md` 로 분리했고, 후속 Stage Runner SDK 전환에서 제거됐다.
 
 ## 위험 / 메모
 

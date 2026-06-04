@@ -71,7 +71,7 @@ State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog
 
 ### Analyzer pipeline
 
-`packages/web/server/stageRunner.ts` is the Analyze/Design execution contract. It creates sortable run ids, writes `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, and optional `diagnostics.md`, then updates optional `manifest.stage_runs`. The legacy `/api/analyze-requirement` analyzer endpoint remains available as an internal/direct analysis primitive, but Stage Runner apply is the path that preserves diff-before-canonical behavior.
+`packages/web/server/stageRunner.ts` is the Analyze/Design execution contract. It creates sortable run ids, writes `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, and optional `diagnostics.md`, then updates optional `manifest.stage_runs`. Stage Runner apply is the only in-workbench Analyze execution path that preserves diff-before-canonical behavior.
 
 ### Taxonomy contract (load-bearing)
 

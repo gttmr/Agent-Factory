@@ -24,7 +24,7 @@ Catalog prefill은 Mock Spec Editor의 `+ tool`을 누를 때 뜨는 3x3 선택 
 
 ## Generate And Apply
 
-`POST /api/mock-lab/:mockId/generate`는 현재 `mock-spec.json`을 검증한 뒤 백그라운드 `codex exec` run을 시작하고 즉시 `run_id`와 `running` 상태를 반환한다. Codex는 `artifacts/mock-lab/<mock-id>/runs/<run-id>/proposed-files/` 아래에만 파일을 쓴다.
+`POST /api/mock-lab/:mockId/generate`는 현재 `mock-spec.json`을 검증한 뒤 백그라운드 Codex SDK thread를 시작하고 즉시 `run_id`와 `running` 상태를 반환한다. Codex는 `artifacts/mock-lab/<mock-id>/runs/<run-id>/proposed-files/` 아래에만 파일을 쓴다. Raw SDK events는 `codex-events.jsonl`에 보존되고, `result-summary.json.codex`에는 backend/thread/event metadata가 기록된다.
 
 `GET /api/mock-lab/:mockId/runs`와 `GET /api/mock-lab/:mockId/runs/:runId`는 실행 중 run도 표시한다. 실행 중에는 partial proposed files, event log, stdout/stderr tail을 볼 수 있고, `POST /api/mock-lab/:mockId/runs/:runId/cancel`로 중단할 수 있다.
 
