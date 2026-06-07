@@ -12,3 +12,4 @@ generated/**/.venv/
 generated/**/.adk/
 artifacts/**/.venv/
 artifacts/**/.adk/
+.agent-factory/runtime.env

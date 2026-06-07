@@ -175,6 +175,8 @@ function assertSmokeBundle(outputRoot) {
 
 function assertRunnableBundle(outputRoot) {
   const { packageName, manifest, agentSource } = readBundle(outputRoot);
+  const envExample = readFileSync(join(outputRoot, ".env.example"), "utf8");
+  const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
   assertCommonBundle(outputRoot, manifest);
   assert.equal(manifest.output_mode, "runnable");
   assert.equal(manifest.guardrails.runnable_synthetic_wiring, true);
@@ -185,6 +187,9 @@ function assertRunnableBundle(outputRoot) {
   assert.match(agentSource, /from google\.adk\.agents import LlmAgent/);
   assert.match(agentSource, /root_agent = Workflow\(/);
   assert.match(agentSource, /mode="single_turn"/);
+  assert.match(agentSource, /http:\/\/127\.0\.0\.1:5173\/api\/mock-lab\/mcp/);
+  assert.match(agentSource, /AF_RUNTIME_ENV_FILE/);
+  assert.match(agentSource, /\.agent-factory\/runtime\.env/);
   assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
   // The fixture adapter is unconnected → emitted as a FunctionNode stub and
   // classified as unconnected in the manifest.
@@ -198,6 +203,11 @@ function assertRunnableBundle(outputRoot) {
   assert.ok(existsSync(join(outputRoot, "agents.config.yaml")), "runnable bundle must emit agents.config.yaml");
   assert.ok(existsSync(join(outputRoot, ".env.example")), "runnable bundle must emit .env.example");
   assert.ok(existsSync(join(outputRoot, ".gitignore")), "runnable bundle must emit .gitignore");
+  assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
+  assert.match(envExample, /AF_RUNTIME_ENV_FILE/);
+  assert.match(envExample, /\.agent-factory\/runtime\.env/);
+  assert.match(readme, /Copy \.env\.example to \.agent-factory\/runtime\.env/);
+  assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
   return packageName;
 }
 

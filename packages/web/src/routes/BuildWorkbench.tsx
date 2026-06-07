@@ -14,12 +14,19 @@ import {
   useScaffoldPlan,
   fetchRuntimeStubFile
 } from "../state/useScaffoldPlan";
+import { useMockLabDiscovery, type MockLabDiscoveryPayload, type MockLabDiscoveryServer } from "../state/useMockLabDiscovery";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
-import type { ScaffoldOutputMode } from "../analyzer/types";
+import type { ScaffoldOutputMode, ScaffoldPlan, ScaffoldPlanModule } from "../analyzer/types";
 import type { CatalogEntry } from "../catalog/types";
 import { loadSeedCatalog } from "../catalog/seed";
 import type { ProcessStreamEvent } from "../state/useStreamingProcess";
+import {
+  applyMockLabBinding,
+  buildMockLabRoute,
+  isMcpBoundAdapter,
+  type MockLabBindingSelection
+} from "../mock-lab/mockLabIntegration";
 
 interface StreamLogEntry {
   id: number;
@@ -53,6 +60,7 @@ export default function BuildWorkbench() {
   const [handoffDraft, setHandoffDraft] = useState<string>("");
   const [handoffDirty, setHandoffDirty] = useState(false);
   const [buildStreamLog, setBuildStreamLog] = useState<StreamLogEntry[]>([]);
+  const [bindingOverrides, setBindingOverrides] = useState<Record<string, MockLabBindingSelection>>({});
   const buildStreamLogRef = useRef<HTMLPreElement | null>(null);
   const buildStreamSeq = useRef(0);
 
@@ -66,6 +74,7 @@ export default function BuildWorkbench() {
     queryFn: async () => loadSeedCatalog()
   });
   const catalogEntries = catalog.data ?? [];
+  const mockLabDiscovery = useMockLabDiscovery(outputMode === "runnable");
 
   const generatedPlan = useMemo(() => {
     if (!analysis || !analysis.processFlow) return null;
@@ -79,17 +88,38 @@ export default function BuildWorkbench() {
     });
   }, [analysis, catalogEntries, outputMode]);
 
+  useEffect(() => {
+    if (!scaffoldPlan?.modules) return;
+    const next: Record<string, MockLabBindingSelection> = {};
+    for (const module of scaffoldPlan.modules) {
+      if (isMcpBoundAdapter(module)) {
+        next[module.id] = {
+          mcpServer: module.mcp_server!,
+          mcpToolName: module.mcp_tool_name!,
+          mcpSchemaRef: module.mcp_schema_ref ?? null
+        };
+      }
+    }
+    setBindingOverrides(next);
+  }, [scaffoldPlan]);
+
+  const effectivePlan = useMemo<ScaffoldPlan | null>(() => {
+    if (!generatedPlan) return null;
+    return Object.entries(bindingOverrides).reduce(
+      (plan, [moduleId, selection]) => applyMockLabBinding(plan, moduleId, selection),
+      generatedPlan
+    );
+  }, [bindingOverrides, generatedPlan]);
+
   // Adapter connection summary (mirrors the generator: a complete MCP binding
   // is connected, otherwise the adapter degrades to a synthetic stub).
   const adapterConnections = useMemo(() => {
-    const adapters = (generatedPlan?.modules ?? []).filter((module) => module.module_category === "adapter");
-    const isConnected = (module: (typeof adapters)[number]) =>
-      module.access_protocol === "mcp" && Boolean(module.mcp_server) && Boolean(module.mcp_tool_name);
+    const adapters = (effectivePlan?.modules ?? []).filter((module) => module.module_category === "adapter");
     return {
-      connected: adapters.filter(isConnected),
-      unconnected: adapters.filter((module) => !isConnected(module))
+      connected: adapters.filter(isMcpBoundAdapter),
+      unconnected: adapters.filter((module) => !isMcpBoundAdapter(module))
     };
-  }, [generatedPlan]);
+  }, [effectivePlan]);
 
   // The toggle drives the in-memory generatedPlan, but build consumes the saved
   // scaffold-plan.json. Reflect the persisted mode on load and flag unsaved drift.
@@ -144,11 +174,32 @@ export default function BuildWorkbench() {
   }
 
   function handleSavePlan() {
-    if (!generatedPlan) return;
-    saveScaffold.mutate(generatedPlan, {
+    if (!effectivePlan) return;
+    saveScaffold.mutate(effectivePlan, {
       onSuccess: () => setActionMessage("scaffold-plan.json 저장 완료"),
       onError: (error) => setActionMessage(error instanceof Error ? error.message : "저장 실패")
     });
+  }
+
+  function handleMockLabBinding(module: ScaffoldPlanModule, value: string) {
+    if (!value) {
+      setBindingOverrides((current) => {
+        const next = { ...current };
+        delete next[module.id];
+        return next;
+      });
+      return;
+    }
+    const [mockId, toolName] = value.split("::");
+    if (!mockId || !toolName) return;
+    setBindingOverrides((current) => ({
+      ...current,
+      [module.id]: {
+        mcpServer: mockId,
+        mcpToolName: toolName,
+        mcpSchemaRef: module.mcp_schema_ref ?? null
+      }
+    }));
   }
 
   function handleBuildStub() {
@@ -207,8 +258,8 @@ export default function BuildWorkbench() {
     );
   }
 
-  const blockers = scaffoldPlan?.validation?.blockers ?? generatedPlan?.validation?.blockers ?? [];
-  const warnings = scaffoldPlan?.validation?.warnings ?? generatedPlan?.validation?.warnings ?? [];
+  const blockers = scaffoldPlan?.validation?.blockers ?? effectivePlan?.validation?.blockers ?? [];
+  const warnings = scaffoldPlan?.validation?.warnings ?? effectivePlan?.validation?.warnings ?? [];
 
   const steps: StageStep[] = [
     {
@@ -265,7 +316,7 @@ export default function BuildWorkbench() {
       summary={
         <>
           <BuildSummaryItem label="출력 모드" value={outputMode} />
-          <BuildSummaryItem label="모듈" value={generatedPlan ? `${generatedPlan.modules.length}개` : "—"} />
+          <BuildSummaryItem label="모듈" value={effectivePlan ? `${effectivePlan.modules.length}개` : "—"} />
           <BuildSummaryItem label="stub 파일" value={`${runtimeStub?.files?.length ?? 0}개`} />
           <BuildSummaryItem label="게이트" value={stubApproved ? "stub_ready✓" : "stub_ready·"} />
         </>
@@ -296,7 +347,7 @@ export default function BuildWorkbench() {
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={!generatedPlan || !designGatesReady || saveScaffold.isPending}
+                  disabled={!effectivePlan || !designGatesReady || saveScaffold.isPending}
                   onClick={handleSavePlan}
                 >
                   {saveScaffold.isPending ? "저장 중…" : scaffoldPlan ? "scaffold-plan 재생성" : "scaffold-plan 생성"}
@@ -322,7 +373,7 @@ export default function BuildWorkbench() {
               </Button>
               <span className="af-output-mode-hint">
                 {outputMode === "runnable"
-                  ? "Gemini LlmAgent 그래프 + Mock Lab MCP 어댑터를 실행합니다. runtime-stub/.env 에 GOOGLE_API_KEY 가 필요합니다."
+                  ? "Gemini LlmAgent 그래프 + Mock Lab MCP 어댑터를 실행합니다. GOOGLE_API_KEY 는 .agent-factory/runtime.env 에 둡니다."
                   : "synthetic 스모크 핸드오프입니다 (LLM/키 불필요)."}
               </span>
             </div>
@@ -333,17 +384,17 @@ export default function BuildWorkbench() {
               </p>
             ) : null}
             {scaffoldLoading ? <p className="af-landing-message">scaffold-plan 불러오는 중…</p> : null}
-            {!generatedPlan ? (
+            {!effectivePlan ? (
               <EmptyState
                 title="분석 결과가 없습니다"
                 description="Analyze 단계에서 analysis-result.json 을 먼저 import 하세요."
               />
             ) : (
               <ul className="af-gate-summary">
-                <li>모듈 후보 → 승인된 모듈 {generatedPlan.modules.length}개 / 제외 {generatedPlan.excluded_modules.length}개</li>
-                <li>런타임 계약 {generatedPlan.runtime_contracts.length}개</li>
-                <li>can_generate_source: {generatedPlan.validation.can_generate_source ? "예" : "아니오"}</li>
-                <li>blockers: {generatedPlan.validation.blockers.length}건, warnings: {generatedPlan.validation.warnings.length}건</li>
+                <li>모듈 후보 → 승인된 모듈 {effectivePlan.modules.length}개 / 제외 {effectivePlan.excluded_modules.length}개</li>
+                <li>런타임 계약 {effectivePlan.runtime_contracts.length}개</li>
+                <li>can_generate_source: {effectivePlan.validation.can_generate_source ? "예" : "아니오"}</li>
+                <li>blockers: {effectivePlan.validation.blockers.length}건, warnings: {effectivePlan.validation.warnings.length}건</li>
                 {outputMode === "runnable" ? (
                   <li>
                     어댑터 MCP 바인딩(선언): 선언됨 {adapterConnections.connected.length} · 미선언{" "}
@@ -356,6 +407,16 @@ export default function BuildWorkbench() {
                 ) : null}
               </ul>
             )}
+            {outputMode === "runnable" && effectivePlan ? (
+              <MockLabBindingPanel
+                plan={effectivePlan}
+                discovery={mockLabDiscovery.data ?? null}
+                discoveryLoading={mockLabDiscovery.isLoading}
+                discoveryError={mockLabDiscovery.error}
+                reqId={reqId}
+                onChange={handleMockLabBinding}
+              />
+            ) : null}
             {blockers.length > 0 ? (
               <details open className="af-blocker-list">
                 <summary>blockers ({blockers.length})</summary>
@@ -555,6 +616,113 @@ function BuildSummaryItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function MockLabBindingPanel({
+  plan,
+  discovery,
+  discoveryLoading,
+  discoveryError,
+  reqId,
+  onChange
+}: {
+  plan: ScaffoldPlan;
+  discovery: MockLabDiscoveryPayload | null;
+  discoveryLoading: boolean;
+  discoveryError: unknown;
+  reqId: string;
+  onChange: (module: ScaffoldPlanModule, value: string) => void;
+}) {
+  const adapters = plan.modules.filter((module) => module.module_category === "adapter");
+  const options = mockLabToolOptions(discovery);
+  return (
+    <div className="af-mcp-binding-panel">
+      <div className="af-mcp-binding-header">
+        <div>
+          <strong>Mock Lab MCP 바인딩</strong>
+          <p>running Mock Lab tool을 명시적으로 선택해야 generated ADK adapter가 live MCP를 호출합니다.</p>
+        </div>
+        <Link className="ui-button ui-button-secondary" to={buildMockLabRoute({ reqId })}>
+          Mock Lab 열기
+        </Link>
+      </div>
+      {discoveryLoading ? <p className="af-landing-message">Mock Lab discovery 조회 중…</p> : null}
+      {discoveryError ? (
+        <p className="af-landing-error">{discoveryError instanceof Error ? discoveryError.message : "Mock Lab discovery 조회 실패"}</p>
+      ) : null}
+      {!discoveryLoading && options.length === 0 ? (
+        <p className="af-landing-message">실행 중인 Mock Lab tool이 없습니다. Mock Lab에서 server를 start한 뒤 다시 선택하세요.</p>
+      ) : null}
+      <div className="af-mcp-binding-list">
+        {adapters.map((module) => {
+          const selectedValue = selectedMockLabValue(module, options);
+          return (
+            <div className="af-mcp-binding-row" key={module.id}>
+              <div className="af-mcp-binding-module">
+                <strong>{module.name}</strong>
+                <code>{module.id}</code>
+                {isMcpBoundAdapter(module) ? (
+                  <span>
+                    bound: {module.mcp_server} / {module.mcp_tool_name}
+                  </span>
+                ) : (
+                  <span>unconnected synthetic stub</span>
+                )}
+              </div>
+              <select
+                value={selectedValue}
+                onChange={(event) => onChange(module, event.currentTarget.value)}
+                disabled={options.length === 0}
+                aria-label={`${module.name} Mock Lab MCP tool 선택`}
+              >
+                <option value="">선택 안 함</option>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <Link className="ui-button ui-button-ghost" to={buildMockLabRoute({ adapterName: module.name, reqId })}>
+                Mock 만들기
+              </Link>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface MockLabToolOption {
+  value: string;
+  label: string;
+  server: MockLabDiscoveryServer;
+  toolName: string;
+}
+
+function mockLabToolOptions(discovery: MockLabDiscoveryPayload | null): MockLabToolOption[] {
+  return (discovery?.servers ?? [])
+    .filter((server) => server.running)
+    .flatMap((server) =>
+      (server.tools ?? []).map((toolName) => ({
+        value: `${server.mock_id}::${toolName}`,
+        label: `${server.mock_id} · ${toolName}`,
+        server,
+        toolName
+      }))
+    );
+}
+
+function selectedMockLabValue(module: ScaffoldPlanModule, options: MockLabToolOption[]): string {
+  if (!module.mcp_server || !module.mcp_tool_name) return "";
+  const match = options.find(
+    (option) =>
+      option.toolName === module.mcp_tool_name &&
+      (option.server.mock_id === module.mcp_server ||
+        option.server.server_name === module.mcp_server ||
+        option.server.catalog_entry_name === module.mcp_server)
+  );
+  return match?.value ?? "";
 }
 
 function buildBuildNextAction({

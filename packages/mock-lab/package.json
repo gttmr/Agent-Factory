@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5176 --strictPort",
     "build": "tsc --noEmit && vite build",
-    "test": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs server/mockLabCore.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs --test server/mcpNetworkBridge.test.ts",
+    "test": "node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/catalogPrefillSelection.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs server/mockLabCore.test.ts && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs --test server/mcpNetworkBridge.test.ts",
     "preview": "vite preview --host 0.0.0.0 --port 4176 --strictPort"
   },
   "dependencies": {

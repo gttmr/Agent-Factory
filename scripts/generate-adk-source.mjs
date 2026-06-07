@@ -53,7 +53,7 @@ console.log("  python3 -m venv .venv");
 console.log("  source .venv/bin/activate");
 console.log("  pip install -r requirements.txt");
 if (outputMode === "runnable") {
-  console.log("  cp .env.example .env   # then set GOOGLE_API_KEY=...");
+  console.log("  # copy .env.example to <repo>/.agent-factory/runtime.env and set GOOGLE_API_KEY there");
 }
 console.log(`  python -m compileall ${packageName}`);
 console.log("  python -m pytest -q");
@@ -264,10 +264,67 @@ from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 # Reviewed contract data for each approved module (synthetic test doubles only).
 COMPONENT_CONTRACTS: dict[str, dict] = ${toPythonLiteral(componentContracts())}
 
-# Per-developer overrides live in agents.config.yaml (sibling of this package).
-# This is how each developer individualizes the bundle; agent.py applies the
-# overrides at import time so editing the YAML actually changes behavior.
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "agents.config.yaml"
+# Shared secrets live in <repo>/.agent-factory/runtime.env, or in the file
+# pointed to by AF_RUNTIME_ENV_FILE. agents.config.yaml stays per-bundle and
+# contains behavior overrides only.
+_BUNDLE_DIR = Path(__file__).resolve().parent.parent
+_CONFIG_PATH = _BUNDLE_DIR / "agents.config.yaml"
+_DEFAULT_RUNTIME_ENV_RELATIVE_PATH = ".agent-factory/runtime.env"
+
+
+def _parse_runtime_env(source: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in source.lstrip("\\ufeff").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.replace("_", "A").isalnum() or key[0].isdigit():
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] == '"':
+            value = (
+                value[1:-1]
+                .replace("\\\\n", "\\n")
+                .replace("\\\\r", "\\r")
+                .replace("\\\\t", "\\t")
+                .replace('\\\\"', '"')
+                .replace("\\\\\\\\", "\\\\")
+            )
+        elif len(value) >= 2 and value[0] == value[-1] == "'":
+            value = value[1:-1]
+        else:
+            value = value.split(" #", 1)[0].strip()
+        values[key] = value
+    return values
+
+
+def _central_runtime_env_path() -> Path:
+    configured = os.environ.get("AF_RUNTIME_ENV_FILE")
+    if configured:
+        path = Path(configured).expanduser()
+        return path if path.is_absolute() else (Path.cwd() / path).resolve()
+    for root in (_BUNDLE_DIR, *_BUNDLE_DIR.parents):
+        candidate = root / _DEFAULT_RUNTIME_ENV_RELATIVE_PATH
+        if candidate.exists():
+            return candidate
+    return _BUNDLE_DIR / _DEFAULT_RUNTIME_ENV_RELATIVE_PATH
+
+
+def _load_central_runtime_env() -> None:
+    path = _central_runtime_env_path()
+    if not path.exists():
+        return
+    for key, value in _parse_runtime_env(path.read_text(encoding="utf-8")).items():
+        os.environ[key] = value
+
+
+_load_central_runtime_env()
 
 
 def _load_config() -> dict:
@@ -319,7 +376,7 @@ def _mcp_url(module_id: str, mcp_server: str) -> str:
     configured = _adapter_cfg(module_id, "mcp_url", None)
     if configured:
         return str(configured)
-    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5176/api/mock-lab/mcp").rstrip("/")
+    base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5173/api/mock-lab/mcp").rstrip("/")
     return f"{base}/{mcp_server}"
 
 
@@ -452,7 +509,7 @@ function buildAgentsConfig() {
   lines.push("# agents.config.yaml — per-node overrides for the runnable ADK bundle.");
   lines.push("# Edit model / instruction / mcp_url here. agent.py loads this at import and");
   lines.push("# applies the overrides, so editing this file actually changes behavior.");
-  lines.push("# This file plus .env is how each developer individualizes the generated bundle.");
+  lines.push("# Shared secrets live in <repo>/.agent-factory/runtime.env, not in this bundle.");
   lines.push(`default_model: ${DEFAULT_MODEL}`);
 
   const agents = modules.filter(isAgentModule);
@@ -494,11 +551,12 @@ function buildAgentsConfig() {
 }
 
 function buildEnvExample() {
-  return `# Copy to .env (gitignored). ADK auto-loads .env for the agent at runtime.
-# Gemini provider key — required for runnable mode. Synthetic inputs only.
-GOOGLE_API_KEY=
-# Optional: base URL of the Mock Lab network MCP endpoint for connected adapters.
-# AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp
+  return `# Shared Agent Factory runtime env template.
+# Copy this file to <repo>/.agent-factory/runtime.env, or set AF_RUNTIME_ENV_FILE.
+# Do not copy Gemini keys into each runtime-stub/.env.
+#
+# GOOGLE_API_KEY=...
+# AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5173/api/mock-lab/mcp
 `;
 }
 
@@ -679,7 +737,8 @@ Runnable ADK 2.1 workflow generated from approved scaffold-plan.json for ${norma
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then set GOOGLE_API_KEY=...
+mkdir -p ../../../../.agent-factory
+cp .env.example ../../../../.agent-factory/runtime.env
 python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
@@ -696,12 +755,16 @@ python -m pytest -q
 
 Edit \`agents.config.yaml\` to override any node's \`model\` or \`instruction\`
 (and an adapter's \`mcp_url\`). \`agent.py\` loads this file at import, so changes
-take effect on the next run. Put your \`GOOGLE_API_KEY\` in \`.env\` (gitignored).
+take effect on the next run.
+
+Copy .env.example to .agent-factory/runtime.env at the repository root and
+put shared runtime secrets there. You can also point \`AF_RUNTIME_ENV_FILE\` at a
+different file. Do not repeat \`GOOGLE_API_KEY\` in every runtime-stub.
 
 ## Adapters and the Mock Lab
 
 Connected adapters call a live Mock Lab MCP tool over streamable-HTTP
-(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:5176/api/mock-lab/mcp\`). Adapters with no
+(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:5173/api/mock-lab/mcp\`). Adapters with no
 bound/running Mock Lab server stay as TODO stubs returning reviewed synthetic
 mock output and are listed under \`runtime.unconnected_adapters\` in
 \`workflow_manifest.json\`.
@@ -786,7 +849,7 @@ Generated from reviewed scaffold-plan.json for ${normalizedRequirement.title}.
 
 - Do not add private endpoints, credentials, customer data, or deployment scripts.
 - Keep adapter calls pointed at synthetic Mock Lab servers, not real systems.
-- Individualize via agents.config.yaml and .env, not by hard-coding secrets.
+- Individualize behavior via agents.config.yaml and shared secrets via .agent-factory/runtime.env, not by hard-coding secrets.
 
 ## Unconnected adapters (synthetic stub until a Mock Lab server is bound)
 

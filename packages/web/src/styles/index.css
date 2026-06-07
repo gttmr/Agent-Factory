@@ -35,6 +35,7 @@
 @import "./router/comments.css" layer(router);
 @import "./router/build-verify.css" layer(router);
 @import "./router/catalog.css" layer(router);
+@import "./router/mock-lab.css" layer(router);
 @import "./router/modal-drawer.css" layer(router);
 @import "./router/runtime-contract.css" layer(router);
 @import "./router/a2a-contract.css" layer(router);

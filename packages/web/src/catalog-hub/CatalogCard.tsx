@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { CategoryBadge, SubtypeBadge } from "../components/CategoryBadge";
 import { Button } from "../ui/primitives";
 import type { CatalogHubEntry } from "../state/useCatalog";
@@ -6,9 +7,10 @@ interface CatalogCardProps {
   entry: CatalogHubEntry;
   onPin?: (entry: CatalogHubEntry) => void;
   pinDisabledReason?: string;
+  mockLabHref?: string;
 }
 
-export function CatalogCard({ entry, onPin, pinDisabledReason }: CatalogCardProps) {
+export function CatalogCard({ entry, onPin, pinDisabledReason, mockLabHref }: CatalogCardProps) {
   return (
     <article className="af-catalog-card">
       <header className="af-catalog-card-header">
@@ -46,17 +48,24 @@ export function CatalogCard({ entry, onPin, pinDisabledReason }: CatalogCardProp
             <span className="af-catalog-flag af-catalog-flag-binding">{entry.runtime_binding}</span>
           ) : null}
         </div>
-        {onPin ? (
-          <Button
-            type="button"
-            variant="primary"
-            disabled={Boolean(pinDisabledReason)}
-            onClick={() => onPin(entry)}
-            title={pinDisabledReason ?? "현재 root 의 모듈 후보에 catalog 바인딩을 추가합니다."}
-          >
-            현재 root 에 핀
-          </Button>
-        ) : null}
+        <div className="af-catalog-card-actions">
+          {mockLabHref ? (
+            <Link className="ui-button ui-button-secondary" to={mockLabHref}>
+              Mock Lab
+            </Link>
+          ) : null}
+          {onPin ? (
+            <Button
+              type="button"
+              variant="primary"
+              disabled={Boolean(pinDisabledReason)}
+              onClick={() => onPin(entry)}
+              title={pinDisabledReason ?? "현재 root 의 모듈 후보에 catalog 바인딩을 추가합니다."}
+            >
+              현재 root 에 핀
+            </Button>
+          ) : null}
+        </div>
       </footer>
       {pinDisabledReason ? <small className="af-catalog-disabled-hint">{pinDisabledReason}</small> : null}
     </article>

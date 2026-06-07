@@ -1,0 +1,693 @@
+.af-mocklab-page {
+  --afml-primary: var(--accent);
+  --afml-primary-pressed: var(--accent-strong);
+  --afml-canvas: var(--surface);
+  --afml-surface: var(--surface-muted);
+  --afml-surface-soft: var(--page-bg);
+  --afml-hairline: var(--line);
+  --afml-hairline-strong: var(--line-strong);
+  --afml-ink: var(--text-strong);
+  --afml-charcoal: var(--text);
+  --afml-slate: var(--text-muted);
+  --afml-steel: var(--text-subtle);
+  --afml-error: var(--red);
+  --afml-warning: var(--amber);
+  --afml-success: var(--success);
+  --afml-tint-mint: var(--success-soft);
+  --afml-tint-yellow: var(--warning-soft);
+  --afml-tint-lavender: rgba(86, 69, 212, 0.1);
+  --afml-radius-button: 6px;
+  --afml-radius-card: 8px;
+  --afml-radius-pill: 9999px;
+}
+
+.af-mocklab-page *,
+.af-mocklab-page *::before,
+.af-mocklab-page *::after {
+  box-sizing: border-box;
+}
+
+.af-mocklab-page button,
+.af-mocklab-page input,
+.af-mocklab-page select,
+.af-mocklab-page textarea {
+  font: inherit;
+}
+
+.af-mocklab-page p,
+.af-mocklab-page h1,
+.af-mocklab-page h2 {
+  margin: 0;
+}
+
+.af-mocklab-page h1,
+.af-mocklab-page h2 {
+  color: var(--afml-ink);
+  letter-spacing: 0;
+}
+
+.af-mocklab-page h1 {
+  font-size: var(--fs-2xl);
+  line-height: 1.2;
+}
+
+.af-mocklab-page h2 {
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+}
+
+.af-mocklab-page .afml-shell {
+  min-height: 0;
+}
+
+.af-mocklab-page .afml-header {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+}
+
+.af-mocklab-page .eyebrow {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.af-mocklab-page .header-actions,
+.af-mocklab-page .button-row,
+.af-mocklab-page .badge-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.af-mocklab-page .afml-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(520px, 1.55fr) minmax(320px, 0.9fr);
+  grid-template-areas:
+    "catalog editor generate"
+    "catalog editor server"
+    "smoke smoke smoke";
+}
+
+.af-mocklab-page .pane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.af-mocklab-page .catalog-pane {
+  grid-area: catalog;
+}
+
+.af-mocklab-page .editor-pane {
+  grid-area: editor;
+}
+
+.af-mocklab-page .generate-pane {
+  grid-area: generate;
+}
+
+.af-mocklab-page .server-pane {
+  grid-area: server;
+}
+
+.af-mocklab-page .smoke-pane {
+  grid-area: smoke;
+}
+
+.af-mocklab-page .panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.af-mocklab-page .panel-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.af-mocklab-page .panel-heading p {
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+  margin-top: 4px;
+}
+
+.af-mocklab-page .button {
+  align-items: center;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  min-height: 36px;
+  justify-content: center;
+  padding: 6px 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.af-mocklab-page .button.primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: white;
+}
+
+.af-mocklab-page .button.primary:hover {
+  background: var(--accent-strong);
+}
+
+.af-mocklab-page .button.secondary {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text-strong);
+}
+
+.af-mocklab-page .button:disabled {
+  background: var(--surface-muted);
+  border-color: var(--line);
+  color: var(--text-subtle);
+  cursor: not-allowed;
+}
+
+.af-mocklab-page .field,
+.af-mocklab-page .json-editor {
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  gap: 6px;
+}
+
+.af-mocklab-page .field input,
+.af-mocklab-page .field select,
+.af-mocklab-page .json-editor textarea {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-strong);
+  min-height: 40px;
+  outline: none;
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.af-mocklab-page .json-editor textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.af-mocklab-page .field input:focus,
+.af-mocklab-page .field select:focus,
+.af-mocklab-page .json-editor textarea:focus {
+  border-color: var(--accent);
+}
+
+.af-mocklab-page .checkbox-field {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 10px;
+}
+
+.af-mocklab-page .form-grid,
+.af-mocklab-page .prefill-list,
+.af-mocklab-page .saved-mock-list,
+.af-mocklab-page .run-list,
+.af-mocklab-page .validation-list,
+.af-mocklab-page .run-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-mocklab-page .form-grid.three,
+.af-mocklab-page .json-grid,
+.af-mocklab-page .result-grid,
+.af-mocklab-page .tail-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.af-mocklab-page .form-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.af-mocklab-page .json-grid,
+.af-mocklab-page .tail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.af-mocklab-page .result-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.af-mocklab-page .status-badge {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  min-height: 24px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.af-mocklab-page .status-badge.success {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.af-mocklab-page .status-badge.warning {
+  background: var(--warning-soft);
+  color: var(--amber);
+}
+
+.af-mocklab-page .status-badge.error {
+  background: var(--surface);
+  color: var(--red);
+}
+
+.af-mocklab-page .status-badge.purple {
+  background: rgba(86, 69, 212, 0.1);
+  color: var(--accent);
+}
+
+.af-mocklab-page .saved-mock-item,
+.af-mocklab-page .prefill-item,
+.af-mocklab-page .catalog-choice-card,
+.af-mocklab-page .result-block {
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.af-mocklab-page .saved-mock-item {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 10px;
+  width: 100%;
+}
+
+.af-mocklab-page .saved-mock-item.active,
+.af-mocklab-page .saved-mock-item:hover,
+.af-mocklab-page .prefill-item:hover,
+.af-mocklab-page .catalog-choice-card:hover {
+  border-color: var(--accent);
+}
+
+.af-mocklab-page .saved-mock-select {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.af-mocklab-page .saved-mock-main,
+.af-mocklab-page .prefill-item,
+.af-mocklab-page .catalog-choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.af-mocklab-page .saved-mock-main {
+  min-width: 0;
+}
+
+.af-mocklab-page .saved-mock-main strong,
+.af-mocklab-page .prefill-title,
+.af-mocklab-page .run-row span:first-child,
+.af-mocklab-page .catalog-choice-card strong {
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.af-mocklab-page .saved-mock-main span,
+.af-mocklab-page .saved-mock-time,
+.af-mocklab-page .prefill-meta,
+.af-mocklab-page .compact-json,
+.af-mocklab-page .catalog-choice-card > span:not(.badge-row) {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.af-mocklab-page .saved-mock-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.af-mocklab-page .inline-x-button,
+.af-mocklab-page .modal-close,
+.af-mocklab-page .toast-close {
+  align-items: center;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1;
+}
+
+.af-mocklab-page .inline-x-button,
+.af-mocklab-page .toast-close {
+  height: 24px;
+  width: 24px;
+}
+
+.af-mocklab-page .inline-x-button,
+.af-mocklab-page .modal-close {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-subtle);
+}
+
+.af-mocklab-page .inline-x-button:hover,
+.af-mocklab-page .modal-close:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.af-mocklab-page .empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+  padding: 14px;
+  text-align: center;
+}
+
+.af-mocklab-page .prefill-item,
+.af-mocklab-page .catalog-choice-card {
+  cursor: pointer;
+  padding: 12px;
+  text-align: left;
+}
+
+.af-mocklab-page .tool-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.af-mocklab-page .tool-tab,
+.af-mocklab-page .tool-add-button {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.af-mocklab-page .tool-tab.active {
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  color: white;
+}
+
+.af-mocklab-page .tool-tab-button,
+.af-mocklab-page .tool-add-button,
+.af-mocklab-page .tool-tab-remove {
+  background: transparent;
+  border: 0;
+  color: var(--text-subtle);
+  cursor: pointer;
+  padding: 7px 12px;
+}
+
+.af-mocklab-page .tool-tab.active .tool-tab-button,
+.af-mocklab-page .tool-tab.active .tool-tab-remove {
+  color: white;
+}
+
+.af-mocklab-page .tool-tab-remove {
+  border-left: 1px solid var(--line);
+  font-weight: 700;
+  padding-left: 9px;
+  padding-right: 10px;
+}
+
+.af-mocklab-page .error-line,
+.af-mocklab-page .field-error {
+  color: var(--red);
+  font-size: var(--fs-xs);
+}
+
+.af-mocklab-page .warning-line {
+  color: var(--amber);
+  font-size: var(--fs-xs);
+}
+
+.af-mocklab-page .run-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding-top: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.af-mocklab-page .meta-grid {
+  display: grid;
+  gap: 6px 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.af-mocklab-page .meta-grid span {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+.af-mocklab-page .meta-grid strong {
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.af-mocklab-page .file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.af-mocklab-page .file-list span {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  padding: 4px 8px;
+}
+
+.af-mocklab-page .modal-backdrop {
+  align-items: center;
+  background: rgba(26, 26, 26, 0.28);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 30;
+}
+
+.af-mocklab-page .catalog-modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(26, 26, 26, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: min(760px, calc(100vh - 48px));
+  max-width: 1120px;
+  overflow: auto;
+  padding: 18px;
+  width: min(1120px, calc(100vw - 48px));
+}
+
+.af-mocklab-page .modal-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.af-mocklab-page .modal-heading p {
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+  margin-top: 4px;
+}
+
+.af-mocklab-page .modal-close {
+  flex: 0 0 auto;
+  height: 30px;
+  width: 30px;
+}
+
+.af-mocklab-page .catalog-choice-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(140px, auto));
+  min-height: 444px;
+}
+
+.af-mocklab-page .catalog-choice-card.new-tool-card {
+  background: var(--surface);
+  border-style: dashed;
+}
+
+.af-mocklab-page .catalog-choice-card.new-tool-card strong {
+  color: var(--accent);
+}
+
+.af-mocklab-page .catalog-choice-placeholder {
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  min-height: 140px;
+}
+
+.af-mocklab-page .catalog-pagination {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.af-mocklab-page .catalog-pagination span {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+  min-width: 84px;
+  text-align: center;
+}
+
+.af-mocklab-page .tail-box,
+.af-mocklab-page .tail-grid pre,
+.af-mocklab-page .result-block pre {
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.af-mocklab-page .result-block {
+  padding: 12px;
+}
+
+.af-mocklab-page .result-block.ok {
+  background: var(--success-soft);
+}
+
+.af-mocklab-page .result-block strong {
+  display: block;
+  font-size: var(--fs-sm);
+  margin-bottom: 8px;
+}
+
+.af-mocklab-page .toast {
+  align-items: center;
+  background: var(--text-strong);
+  border-radius: 999px;
+  bottom: 18px;
+  color: white;
+  display: inline-flex;
+  font-size: var(--fs-sm);
+  gap: 10px;
+  left: 50%;
+  max-width: min(720px, calc(100vw - 48px));
+  padding: 8px 10px 8px 16px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+.af-mocklab-page .toast span {
+  overflow-wrap: anywhere;
+}
+
+.af-mocklab-page .toast-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: white;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.af-mocklab-page .toast-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1120px) {
+  .af-mocklab-page .afml-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "catalog"
+      "editor"
+      "generate"
+      "server"
+      "smoke";
+  }
+
+  .af-mocklab-page .form-grid.three,
+  .af-mocklab-page .json-grid,
+  .af-mocklab-page .tail-grid,
+  .af-mocklab-page .result-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .af-mocklab-page .afml-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

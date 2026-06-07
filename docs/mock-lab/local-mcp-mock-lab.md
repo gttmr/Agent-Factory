@@ -1,6 +1,6 @@
 # Local MCP Mock Lab
 
-Mock Lab은 ADK Agent가 `McpToolset`(또는 stdio)으로 소비하는 MCP mock server를 로컬에서 만들고 검증하기 위한 별도 앱이다. 실행 중인 mock은 network MCP로도 노출되어 생성된 runnable ADK 번들이 직접 호출한다(아래 "Network MCP" 참고). 기존 Agent Factory workbench의 `/af/:reqId/analyze`, `/design`, `/build`, `/verify` 흐름에는 붙이지 않는다.
+Mock Lab은 ADK Agent가 `McpToolset`(또는 stdio)으로 소비하는 MCP mock server를 로컬에서 만들고 검증하기 위한 Adapter runtime lab이다. 기본 사용자 경로는 5173 workbench의 `/mock-lab` 단일 Shell route이며, 실행 중인 mock은 network MCP로도 노출되어 생성된 runnable ADK 번들이 직접 호출한다(아래 "Network MCP" 참고). `packages/mock-lab` standalone 앱은 개발/과도기용으로 유지한다.
 
 ## 실행
 
@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-기본 URL은 `http://127.0.0.1:5176/` 이다. 기존 `packages/web` 수동 테스트 포트인 `5173`을 사용하지 않는다.
+기본 URL은 `http://127.0.0.1:5173/mock-lab` 이다. standalone 개발 앱을 직접 확인할 때만 `http://127.0.0.1:5176/` 을 사용한다.
 
 ## Catalog Prefill
 
@@ -18,7 +18,7 @@ npm run dev
 
 좌측 패널은 저장된 Mock server 목록만 표시한다. 저장된 Mock은 선택해서 편집하거나 삭제할 수 있고, 삭제는 `artifacts/mock-lab/<mock-id>/` 아래의 해당 Mock artifact를 제거한다.
 
-Catalog prefill은 Mock Spec Editor의 `+ tool`을 누를 때 뜨는 3x3 선택 창에서 사용한다. 첫 칸의 `new`를 선택하면 catalog prefill 없이 빈 tool을 직접 작성하고, adapter를 선택하면 새로 추가된 tool의 `inputSchema`, `outputSchema`, `successResponse`, `riskSignals`, `auditRequired`를 채운다. 선택지가 9개를 넘으면 페이지네이션으로 이동한다. 이 prefill은 tool draft를 빠르게 채우는 시작점일 뿐 자동 승인된 runtime contract가 아니다. Mock Lab은 `catalog/*.yaml`을 저장하거나 수정하지 않는다.
+Catalog prefill은 Mock Spec Editor의 `+ tool`을 누를 때 뜨는 3x3 선택 창에서 사용한다. Reuse Hub Adapter 카드에서 `Mock Lab`을 누르면 `/mock-lab?adapter=<catalog-name>&req=<reqId>`로 이동하고, 해당 catalog prefill draft를 바로 연다. 첫 칸의 `new`를 선택하면 catalog prefill 없이 빈 tool을 직접 작성하고, adapter를 선택하면 새로 추가된 tool의 `inputSchema`, `outputSchema`, `successResponse`, `riskSignals`, `auditRequired`를 채운다. 선택지가 9개를 넘으면 페이지네이션으로 이동한다. 이 prefill은 tool draft를 빠르게 채우는 시작점일 뿐 자동 승인된 runtime contract가 아니다. Mock Lab은 `catalog/*.yaml`을 저장하거나 수정하지 않는다.
 
 저장된 Mock 삭제는 `DELETE /api/mock-lab/:mockId`를 사용한다. 삭제 전에 실행 중인 generated server process가 있으면 stop을 시도한다.
 
@@ -48,7 +48,7 @@ Smoke test는 다음을 확인한다.
 - `ALL /api/mock-lab/mcp/<key>` — `<key>`(mock_id, `server_name`, 또는 `source.catalog_entry_name`)로 실행 중인 child를 찾아 Streamable-HTTP MCP server를 띄운다. `tools/list`와 `tools/call`은 `MockProcessRegistry.sendJsonRpc`로 child에 그대로 위임하므로 single source of truth와 기존 audit log를 재사용한다. bridge 자체는 business logic을 추가하지 않는다. child가 실행 중이 아니면 409를 반환한다.
 - `GET /api/mock-lab/mcp-discovery` — 저장된 mock과 running 여부, live `tools/list` tool 이름, `mcp_url`(`/api/mock-lab/mcp/<mock_id>`)을 반환한다. `?server=<name>&tool=<tool>`로 adapter↔server 매칭을 조회한다. **connected**는 in-memory process가 running이고 해당 tool이 live `tools/list`에 있는 경우만 true다(persisted `server-state.json`의 running은 advisory).
 
-생성된 runnable 번들은 `AF_MOCK_LAB_MCP_URL`(기본 `http://127.0.0.1:5176/api/mock-lab/mcp`) + `<mcp_server>`로 `streamablehttp_client`를 연결하거나, `agents.config.yaml`의 adapter `mcp_url`로 override한다. 모든 호출은 synthetic Mock Lab 한정이며 private endpoint/credential/실데이터를 담지 않는다.
+생성된 runnable 번들은 `AF_MOCK_LAB_MCP_URL`(기본 `http://127.0.0.1:5173/api/mock-lab/mcp`) + `<mcp_server>`로 `streamablehttp_client`를 연결하거나, `agents.config.yaml`의 adapter `mcp_url`로 override한다. BuildWorkbench의 runnable mode에서는 reviewer가 running Mock Lab tool을 명시적으로 선택해 `scaffold-plan.json`의 adapter MCP binding을 저장한다. 모든 호출은 synthetic Mock Lab 한정이며 private endpoint/credential/실데이터를 담지 않는다.
 
 ## Non-goals
 

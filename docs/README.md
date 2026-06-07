@@ -23,7 +23,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 ## 보조 참조
 
 - [Local MCP Mock Lab](./mock-lab/local-mcp-mock-lab.md)
-  `catalog/adapters.yaml`을 read-only prefill 소스로 사용해 별도 Mock Lab 앱에서 MCP stdio mock server를 생성, 실행, smoke test 하고, 실행 중인 mock을 network MCP(`/api/mock-lab/mcp/<key>` + `/api/mock-lab/mcp-discovery`)로 노출해 runnable ADK 번들이 호출할 수 있게 하는 흐름이다. 기존 `/af/:reqId/*` workbench route와 분리된다.
+  `catalog/adapters.yaml`을 read-only prefill 소스로 사용해 Mock Lab에서 MCP stdio mock server를 생성, 실행, smoke test 하고, 실행 중인 mock을 network MCP(`/api/mock-lab/mcp/<key>` + `/api/mock-lab/mcp-discovery`)로 노출해 runnable ADK 번들이 호출할 수 있게 하는 흐름이다. 기본 사용자 경로는 5173 workbench의 `/mock-lab`이며, `packages/mock-lab`의 5176 standalone 앱은 개발/과도기용으로 유지한다.
 - [Agent Factory DLC skills](../.agents/skills)
   `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, `af-verify-feedback`가 schema-first artifact 생산, 경계 승인, TODO runtime stub, 검증 feedback을 담당한다.
 - [Target agent architecture](./reference/target-agent-architecture/README.md)
