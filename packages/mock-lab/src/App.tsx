@@ -7,6 +7,7 @@ import MockSpecEditor from "./components/MockSpecEditor";
 import SavedMocksPanel from "./components/SavedMocksPanel";
 import SmokeTestPanel from "./components/SmokeTestPanel";
 import StatusBadge from "./components/StatusBadge";
+import { resolveCatalogPrefillSpec } from "./catalogPrefillSelection";
 import { createEmptyMockSpec, type CatalogPrefillPayload, type MockServerStatus, type MockSpec } from "./types/mockSpec";
 import { validateMockSpec } from "../server/schemaValidation";
 
@@ -39,6 +40,21 @@ export default function App() {
       const [nextCatalog, nextMocks] = await Promise.all([fetchCatalogPrefill(), listMocks()]);
       setCatalog(nextCatalog);
       setMocks(nextMocks);
+      const requestedPrefill = resolveCatalogPrefillSpec(nextCatalog, readRequestedAdapterName());
+      if (requestedPrefill) {
+        const existing = nextMocks.find(
+          (mock) => mock.mock_id === requestedPrefill.mock_id || mock.server_name === requestedPrefill.server_name
+        );
+        if (existing) {
+          await loadMock(existing.mock_id);
+        } else {
+          setSpec(requestedPrefill);
+          setServerStatus(null);
+          setSavedSpecFingerprint(null);
+          setMessage(`${requestedPrefill.mock_id} catalog prefill 불러옴`);
+        }
+        return;
+      }
       if (nextMocks[0]) await loadMock(nextMocks[0].mock_id);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "초기 데이터를 불러오지 못했습니다.");
@@ -162,4 +178,9 @@ export default function App() {
 
 function fingerprintMockSpec(spec: MockSpec): string {
   return JSON.stringify(spec);
+}
+
+function readRequestedAdapterName(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("adapter");
 }

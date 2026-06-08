@@ -1,6 +1,6 @@
 # Agent Factory Mock Lab
 
-Mock Lab is a separate local app for defining and testing synthetic MCP stdio mock servers. It is not mounted into the existing `/af/:reqId/*` workbench routes.
+Mock Lab defines and tests synthetic MCP stdio mock servers. The default user-facing surface is now the main workbench route `http://127.0.0.1:5173/mock-lab`; this standalone package app remains useful for isolated Mock Lab development.
 
 Running mocks are also re-exposed over network MCP (Streamable HTTP) at `/api/mock-lab/mcp/<key>`, with discovery at `/api/mock-lab/mcp-discovery`, so a generated runnable ADK bundle's connected adapter can call them live. See `docs/mock-lab/local-mcp-mock-lab.md`.
 
@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5176/`.
+Open `http://127.0.0.1:5176/` for the standalone development app. Use `http://127.0.0.1:5173/mock-lab` for the integrated workbench shell.
 
 ## Guardrails
 

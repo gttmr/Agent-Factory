@@ -7,6 +7,7 @@ import { createAfArtifactsMiddleware } from "./server/afArtifactsApi";
 import { createAfCatalogMiddleware } from "./server/afCatalogApi";
 import { createAfCollaborationMiddleware } from "./server/afCollaborationApi";
 import { createCodexAnalyzerMiddleware } from "./server/codexAnalyzer";
+import { createMockLabMiddleware } from "../mock-lab/server/mockLabApi";
 
 const webRoot = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(webRoot, "../..");
@@ -31,12 +32,14 @@ function agentFactoryServerPlugin(): Plugin {
       server.middlewares.use("/api/af-collab", createAfCollaborationMiddleware(repoRoot));
       server.middlewares.use("/api/af", createAfArtifactsMiddleware(repoRoot));
       server.middlewares.use("/api/catalog", createAfCatalogMiddleware(repoRoot));
+      server.middlewares.use("/api/mock-lab", createMockLabMiddleware(repoRoot));
     },
     configurePreviewServer(server) {
       server.middlewares.use("/api/analyze-requirement", createCodexAnalyzerMiddleware(repoRoot));
       server.middlewares.use("/api/af-collab", createAfCollaborationMiddleware(repoRoot));
       server.middlewares.use("/api/af", createAfArtifactsMiddleware(repoRoot));
       server.middlewares.use("/api/catalog", createAfCatalogMiddleware(repoRoot));
+      server.middlewares.use("/api/mock-lab", createMockLabMiddleware(repoRoot));
     }
   };
 }

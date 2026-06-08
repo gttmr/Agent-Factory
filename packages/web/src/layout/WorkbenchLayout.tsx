@@ -60,6 +60,12 @@ export function WorkbenchLayout({ children }: WorkbenchLayoutProps) {
           >
             Reuse Hub
           </NavLink>
+          <NavLink
+            to="/mock-lab"
+            className={({ isActive }) => `af-stage-link af-stage-link-lab${isActive ? " af-stage-link-active" : ""}`}
+          >
+            Mock Lab
+          </NavLink>
         </nav>
         <div className="af-gate-row" aria-label="승인 게이트">
           {manifest ? (

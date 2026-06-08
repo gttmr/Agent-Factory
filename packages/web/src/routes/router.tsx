@@ -10,6 +10,7 @@ const BuildWorkbench = lazy(() => import("./BuildWorkbench"));
 const VerifyWorkbench = lazy(() => import("./VerifyWorkbench"));
 const RunSandbox = lazy(() => import("./RunSandbox"));
 const ReuseHubPage = lazy(() => import("./ReuseHubPage"));
+const MockLabPage = lazy(() => import("./MockLabPage"));
 
 function PageFallback() {
   return (
@@ -36,6 +37,14 @@ export function AppRouter() {
           element={
             <WorkbenchLayout>
               <ReuseHubPage />
+            </WorkbenchLayout>
+          }
+        />
+        <Route
+          path="/mock-lab"
+          element={
+            <WorkbenchLayout>
+              <MockLabPage />
             </WorkbenchLayout>
           }
         />

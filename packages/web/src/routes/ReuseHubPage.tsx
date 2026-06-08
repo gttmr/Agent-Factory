@@ -7,6 +7,7 @@ import { RegisterProposalDrawer } from "../catalog-hub/RegisterProposalDrawer";
 import { useCatalog, type CatalogCategory, type CatalogHubEntry } from "../state/useCatalog";
 import { useArtifactRoots } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
+import { buildMockLabRoute } from "../mock-lab/mockLabIntegration";
 
 const CATEGORY_TABS: Array<{ id: CatalogCategory; label: string }> = [
   { id: "agent", label: "Agent" },
@@ -176,6 +177,11 @@ export default function ReuseHubPage() {
               entry={entry}
               onPin={(item) => setPinTarget(item)}
               pinDisabledReason={pinDisabledReason}
+              mockLabHref={
+                entry.category === "adapter"
+                  ? buildMockLabRoute({ adapterName: entry.name, reqId: activeReqId || null })
+                  : undefined
+              }
             />
           ))}
         </div>

@@ -226,3 +226,77 @@
   border: 1px solid var(--warning-line);
   border-radius: 4px;
 }
+
+.af-mcp-binding-panel {
+  margin-top: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: var(--space-md);
+}
+
+.af-mcp-binding-header,
+.af-mcp-binding-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 420px) auto;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.af-mcp-binding-header {
+  margin-bottom: var(--space-sm);
+}
+
+.af-mcp-binding-header p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.af-mcp-binding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-mcp-binding-row {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.af-mcp-binding-module {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.af-mcp-binding-module strong {
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.af-mcp-binding-module code,
+.af-mcp-binding-module span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.af-mcp-binding-row select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 4px 8px;
+}
+
+@media (max-width: 900px) {
+  .af-mcp-binding-header,
+  .af-mcp-binding-row {
+    grid-template-columns: 1fr;
+  }
+}

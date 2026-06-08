@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import type { ArtifactRootStore } from "./artifactRootStore";
+import { buildRuntimeProcessEnv } from "./runtimeEnv";
 
 export const DEFAULT_ADK_CHAT_PORT = 8765;
 const DEFAULT_ADK_HOST = "127.0.0.1";
@@ -134,13 +135,10 @@ export class RuntimeChatManager {
       throw new Error("ADK dependency is not installed. Run runtime-chat/install first.");
     }
     const command = buildAdkServerCommand(ctx);
+    const env = await buildRuntimeProcessEnv({ repoRoot: this.repoRoot, stubDir: ctx.stubDir });
     const child = spawn(command.command, command.args, {
       cwd: ctx.stubDir,
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: "1",
-        PYTHONPATH: ctx.stubDir
-      },
+      env,
       stdio: ["ignore", "pipe", "pipe"],
       detached: true
     });

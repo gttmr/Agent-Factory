@@ -127,6 +127,14 @@
   gap: 8px;
 }
 
+.af-catalog-card-actions {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .af-catalog-flags {
   display: flex;
   gap: 4px;

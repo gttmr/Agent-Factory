@@ -204,7 +204,7 @@ function formatElapsed(summary: MockGenerateSummary): string {
 }
 
 function latestEvent(detail: MockRunDetail | null): string | null {
-  const event = detail?.events.at(-1);
+  const event = detail?.events[detail.events.length - 1];
   if (!event || typeof event !== "object" || Array.isArray(event)) return null;
   const phase = "phase" in event && typeof event.phase === "string" ? event.phase : "event";
   const message = "message" in event && typeof event.message === "string" ? event.message : "";

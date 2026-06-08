@@ -15,7 +15,7 @@
 `packages/web/src/layout/WorkbenchLayout.tsx`(상단 셸)와 `packages/web/src/layout/StageShell.tsx`(스테이지 내부 셸), route별 workbench 화면이 현재 workbench의 기본 골격이다.
 
 - 상단(`WorkbenchLayout`): `Agent Factory` 이름, artifact root 전환, approval gate chip 4개, stage navigation.
-- stage navigation은 `/af/:reqId/analyze`, `/design`, `/build`, `/verify`로 4개 승인 스테이지를 나누고, 그 뒤에 **게이트 없는 보조 nav `실행`(`/af/:reqId/run`)** 과 `Reuse Hub`(`/catalog`)를 둔다. `실행`은 `afRunStageIds`(= manifest 스키마/게이트 칩의 원천)에 넣지 않는다 — 보조 nav 링크일 뿐이다.
+- stage navigation은 `/af/:reqId/analyze`, `/design`, `/build`, `/verify`로 4개 승인 스테이지를 나누고, 그 뒤에 **게이트 없는 보조 nav `실행`(`/af/:reqId/run`)**, `Reuse Hub`(`/catalog`), `Mock Lab`(`/mock-lab`)을 둔다. `실행`과 `Mock Lab`은 `afRunStageIds`(= manifest 스키마/게이트 칩의 원천)에 넣지 않는다 — 보조 nav 링크일 뿐이다.
 - 스테이지 내부(`StageShell`): CLI 스킬 한 단계를 **좌측 스텝 레일(1실행·2검토·3승인)** 로 더 잘게 나눠, 선택된 스텝의 작업면만 중앙에 보인다. 한 화면에 실행+검토+승인을 한꺼번에 쌓지 않는다.
   - 좌측 레일: 스텝별 상태 글리프(`done ✓` / `current ●` / `todo ○` / `blocked ⚠`)와 활성 스텝 강조(accent 테두리·좌측 바·채운 index), 그리고 하단의 "다음에 할 일" 가이드 블록.
   - 중앙 상단: 항상 보이는 요약 strip(핵심 산출물 한 줄 요약). 그 아래 활성 스텝 콘텐츠. 하단: 다음 단계로 가는 next-action CTA(강한 가이드).
