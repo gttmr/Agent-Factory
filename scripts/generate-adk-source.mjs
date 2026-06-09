@@ -394,7 +394,8 @@ def _collect_tool_inputs(
             args[name] = ctx.state.get(source_key)
             continue
         # Fall back to a field named source_key inside any upstream *_output dict.
-        for key, value in ctx.state.items():
+        # ADK's State object is not a dict (no .items()); to_dict() merges base + delta.
+        for key, value in ctx.state.to_dict().items():
             if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
                 args[name] = value.get(source_key)
                 break
