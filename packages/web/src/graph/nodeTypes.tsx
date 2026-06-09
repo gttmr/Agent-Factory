@@ -171,7 +171,6 @@ function PillNode({ data, kind }: NodeProps<GraphNodeData> & { kind: "input" | "
     >
       <HandleStrip />
       <CollaborationBadges data={data} />
-      <span className="graph-node-eyebrow">{kind}</span>
       <strong className="graph-node-label">{graphNode.label}</strong>
     </div>
   );

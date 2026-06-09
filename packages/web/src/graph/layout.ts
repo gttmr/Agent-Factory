@@ -46,7 +46,13 @@ export interface LayoutResult {
 const NODE_WIDTH = 232;
 const NODE_HEIGHT = 116;
 const ROUTER_SIZE = 96;
-const JOIN_SIZE = 56;
+const JOIN_SIZE = 56; // loop_control box
+// join box hugs its 22px dot so the left/right edge handles anchor at the
+// circle's perimeter (vertical center = dot center). The join label is rendered
+// as an absolute caption below the box, so it does not inflate the box.
+const JOIN_DOT_BOX = 26;
+const PILL_WIDTH = 148; // input/output — fits the variable name with no eyebrow
+const PILL_HEIGHT = 64;
 const WORKFLOW_PADDING_X = 42;
 const WORKFLOW_PADDING_Y = 54;
 const REGION_PADDING_X = 18;
@@ -65,11 +71,10 @@ const LANE_ORDER: LaneId[] = [
 
 function nodeSize(node: GraphNode): { width: number; height: number } {
   if (node.node_kind === "router") return { width: ROUTER_SIZE, height: ROUTER_SIZE };
-  if (node.node_kind === "join" || node.node_kind === "loop_control") {
-    return { width: JOIN_SIZE, height: JOIN_SIZE };
-  }
+  if (node.node_kind === "join") return { width: JOIN_DOT_BOX, height: JOIN_DOT_BOX };
+  if (node.node_kind === "loop_control") return { width: JOIN_SIZE, height: JOIN_SIZE };
   if (node.node_kind === "input" || node.node_kind === "output") {
-    return { width: 140, height: 56 };
+    return { width: PILL_WIDTH, height: PILL_HEIGHT };
   }
   return { width: NODE_WIDTH, height: NODE_HEIGHT };
 }

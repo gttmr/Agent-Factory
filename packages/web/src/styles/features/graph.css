@@ -271,7 +271,12 @@
   font-size: var(--fs-xs);
 }
 
+/* Join box hugs the dot (layout.ts JOIN_DOT_BOX). The dot is the only flow
+   child so place-items:center puts its center on the box mid-line — i.e. exactly
+   where the left/right edge handles anchor. The label is an absolute caption
+   below the box so it never shifts the dot off-center. */
 .graph-node-join {
+  position: relative;
   display: grid;
   place-items: center;
   background: transparent;
@@ -284,12 +289,20 @@
   border-radius: 50%;
   background: var(--cat-workflow-line);
   display: block;
-  margin-bottom: var(--space-2xs);
 }
 .graph-node-join-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 3px;
+  max-width: 104px;
+  text-align: center;
+  white-space: normal;
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   color: var(--text-muted);
+  pointer-events: none;
 }
 
 .graph-node-loop {
@@ -305,14 +318,26 @@
   color: var(--cat-workflow);
 }
 
+/* Input/output pills show the variable name only (no INPUT/OUTPUT eyebrow).
+   in vs out stays legible via lane position + the --cat-input/--cat-output tint.
+   Clamp keeps a long name inside the fixed box instead of spilling below it. */
 .graph-node-pill {
   display: grid;
-  gap: var(--space-3xs);
   place-items: center;
   background: #f0f1ec;
   border-color: var(--line);
   border-radius: var(--radius-pill);
   text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  overflow: hidden;
+}
+.graph-node-pill > .graph-node-label {
+  width: 100%;
+  font-size: var(--fs-xs);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 .graph-node-input { background: var(--cat-input-soft, #fff8e8); }
 .graph-node-output { background: var(--cat-output-soft, #f0f1ec); }

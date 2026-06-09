@@ -5,7 +5,14 @@ import { StageShell, useStageStep, type StageNextAction, type StageStep } from "
 import type { Selection } from "../components/GraphCanvas";
 import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
-import type { AnalysisResult, ModuleCandidate, RuntimeContract } from "../analyzer/types";
+import { GraphInspector } from "../components/GraphInspector";
+import type {
+  AnalysisResult,
+  GraphEdge,
+  GraphNode,
+  ModuleCandidate,
+  RuntimeContract
+} from "../analyzer/types";
 import {
   A2AContractInspector,
   A2AContractSidebar,
@@ -141,6 +148,27 @@ export default function DesignWorkbench() {
     if (selection.edgeId) return { kind: "edge", edge_id: selection.edgeId };
     return null;
   }, [selection]);
+
+  // 좌측 사이드바 상단에 선택한 노드/엣지 상세를 표시하기 위한 파생값.
+  // (GraphCanvas 내부 inspector 와 동일한 derivation — id 매핑도 layout.ts 와 맞춘다.)
+  const nodeById = useMemo(
+    () => new Map<string, GraphNode>((graphIR?.nodes ?? []).map((n) => [n.id, n])),
+    [graphIR]
+  );
+  const edgeById = useMemo(
+    () => new Map<string, GraphEdge>((graphIR?.edges ?? []).map((e, i) => [e.id ?? `edge-${i}`, e])),
+    [graphIR]
+  );
+  const candidateById = useMemo(() => {
+    const map = new Map<string, ModuleCandidate>();
+    for (const candidate of analysis?.moduleCandidates ?? []) map.set(candidate.id, candidate);
+    return map;
+  }, [analysis]);
+  const selectedNode = selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null;
+  const selectedEdge = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
+  const selectedCandidate =
+    selectedNode && selectedNode.module_id ? candidateById.get(selectedNode.module_id) ?? null : null;
+  const nodeLabel = (id: string) => nodeById.get(id)?.label ?? id;
 
   if (!reqId) {
     return (
@@ -379,101 +407,18 @@ export default function DesignWorkbench() {
             </Link>
           </Panel>
         ) : (
+          <div className="af-design-split">
           <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
-          <aside className="af-design-sidebar" aria-label="설계 사이드바">
-            <nav className="af-design-tabs" role="tablist">
-              {SIDEBAR_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  className={`af-design-tab${activeTab === tab.id ? " af-design-tab-active" : ""}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  {tab.label}
-                  {tab.id === "comments" && comments.length > 0 ? (
-                    <span className="af-design-tab-count">{comments.length}</span>
-                  ) : null}
-                  {tab.id === "path" && highlights.length > 0 ? (
-                    <span className="af-design-tab-count">{highlights.length}</span>
-                  ) : null}
-                </button>
-              ))}
-            </nav>
-            <div className="af-design-sidebar-body">
-              {activeTab === "modules" ? (
-                <ModuleSidebar
-                  candidates={analysis.moduleCandidates}
-                  selection={selection}
-                  onSelectModule={(moduleId) => {
-                    if (!graphIR) return;
-                    const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
-                    setSelection({ nodeId: node?.id ?? null, edgeId: null });
-                    setActiveTab("graph");
-                  }}
-                />
-              ) : null}
-              {activeTab === "graph" ? (
-                <GraphSidebar
-                  selection={selection}
-                  errorCount={errorCount}
-                  warningCount={warningCount}
-                  nodes={graphIR?.nodes?.map((n) => ({ id: n.id, label: n.label, kind: n.node_kind })) ?? []}
-                  edges={
-                    graphIR?.edges?.map((e) => ({ id: e.id ?? "", from: e.from, to: e.to, kind: e.edge_kind })) ?? []
-                  }
-                  onSelectNode={(id) => setSelection({ nodeId: id, edgeId: null })}
-                  onSelectEdge={(id) => setSelection({ nodeId: null, edgeId: id })}
-                />
-              ) : null}
-              {activeTab === "runtime" ? (
-                <RuntimeContractSidebar
-                  contracts={runtimeContracts}
-                  selectedContractId={selectedContractId}
-                  onSelect={(contractId) => setSelectedContractId(contractId)}
-                />
-              ) : null}
-              {activeTab === "a2a" ? (
-                <A2AContractSidebar
-                  candidates={analysis.moduleCandidates}
-                  contracts={a2aContracts}
-                  selectedModuleId={selectedA2ARow?.candidate.id ?? null}
-                  onSelect={(moduleId) => setSelectedA2AModuleId(moduleId)}
-                />
-              ) : null}
-              {activeTab === "comments" ? (
-                <CommentThread
-                  reqId={reqId}
-                  comments={comments}
-                  anchor={null}
-                  authorName={authorName}
-                  authorRole={authorRole}
-                  isMutating={createComment.isPending}
-                  onAuthorNameChange={setAuthorName}
-                  onAuthorRoleChange={setAuthorRole}
-                  onCreate={() => undefined}
-                  onUpdate={(id, body) => updateComment.mutate({ id, body })}
-                  onDelete={(id) => deleteComment.mutate(id)}
-                  emptyHint="Graph IR 또는 모듈 탭에서 노드/엣지를 먼저 선택하세요."
-                />
-              ) : null}
-              {activeTab === "path" ? (
-                <PathTracePanel
-                  graphIR={graphIR}
-                  author={authorName}
-                  saving={createHighlight.isPending}
-                  onSelectNode={(id) => setSelection({ nodeId: id, edgeId: null })}
-                  onCreateHighlight={(input) =>
-                    createHighlight.mutate(input, {
-                      onSuccess: () => setActionMessage("path highlight 저장 완료"),
-                      onError: (error) =>
-                        setActionMessage(error instanceof Error ? error.message : "highlight 저장 실패")
-                    })
-                  }
-                />
-              ) : null}
-            </div>
+          <aside className="af-design-sidebar" aria-label="선택 노드/엣지 정보">
+            <GraphInspector
+              selectedNode={selectedNode}
+              selectedEdge={selectedEdge}
+              nodeLabel={nodeLabel}
+              candidate={selectedCandidate}
+              a2aContracts={a2aContracts}
+              onNavigateToA2AContracts={() => setActiveTab("a2a")}
+              onClose={() => setSelection({ nodeId: null, edgeId: null })}
+            />
           </aside>
 
           <section className="af-design-canvas-pane" aria-label="Graph IR">
@@ -536,6 +481,108 @@ export default function DesignWorkbench() {
               )}
             </aside>
           ) : null}
+          </div>
+
+          <div className="af-design-bottom" aria-label="모듈·Graph IR·계약 패널">
+            <nav className="af-design-tabs" role="tablist">
+              {SIDEBAR_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  className={`af-design-tab${activeTab === tab.id ? " af-design-tab-active" : ""}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.label}
+                  {tab.id === "comments" && comments.length > 0 ? (
+                    <span className="af-design-tab-count">{comments.length}</span>
+                  ) : null}
+                  {tab.id === "path" && highlights.length > 0 ? (
+                    <span className="af-design-tab-count">{highlights.length}</span>
+                  ) : null}
+                </button>
+              ))}
+            </nav>
+            <div className="af-design-sidebar-body">
+              {activeTab === "modules" ? (
+                <ModuleSidebar
+                  candidates={analysis.moduleCandidates}
+                  selection={selection}
+                  onSelectModule={(moduleId) => {
+                    if (!graphIR) return;
+                    const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
+                    setSelection({ nodeId: node?.id ?? null, edgeId: null });
+                    setActiveTab("graph");
+                  }}
+                />
+              ) : null}
+              {activeTab === "graph" ? (
+                <GraphSidebar
+                  selection={selection}
+                  errorCount={errorCount}
+                  warningCount={warningCount}
+                  nodes={graphIR?.nodes?.map((n) => ({ id: n.id, label: n.label, kind: n.node_kind })) ?? []}
+                  edges={
+                    graphIR?.edges?.map((e, i) => ({
+                      id: e.id ?? `edge-${i}`,
+                      from: e.from,
+                      to: e.to,
+                      kind: e.edge_kind
+                    })) ?? []
+                  }
+                  onSelectNode={(id) => setSelection({ nodeId: id, edgeId: null })}
+                  onSelectEdge={(id) => setSelection({ nodeId: null, edgeId: id })}
+                />
+              ) : null}
+              {activeTab === "runtime" ? (
+                <RuntimeContractSidebar
+                  contracts={runtimeContracts}
+                  selectedContractId={selectedContractId}
+                  onSelect={(contractId) => setSelectedContractId(contractId)}
+                />
+              ) : null}
+              {activeTab === "a2a" ? (
+                <A2AContractSidebar
+                  candidates={analysis.moduleCandidates}
+                  contracts={a2aContracts}
+                  selectedModuleId={selectedA2ARow?.candidate.id ?? null}
+                  onSelect={(moduleId) => setSelectedA2AModuleId(moduleId)}
+                />
+              ) : null}
+              {activeTab === "comments" ? (
+                <CommentThread
+                  reqId={reqId}
+                  comments={comments}
+                  anchor={null}
+                  authorName={authorName}
+                  authorRole={authorRole}
+                  isMutating={createComment.isPending}
+                  onAuthorNameChange={setAuthorName}
+                  onAuthorRoleChange={setAuthorRole}
+                  onCreate={() => undefined}
+                  onUpdate={(id, body) => updateComment.mutate({ id, body })}
+                  onDelete={(id) => deleteComment.mutate(id)}
+                  emptyHint="Graph IR 또는 모듈 탭에서 노드/엣지를 먼저 선택하세요."
+                />
+              ) : null}
+              {activeTab === "path" ? (
+                <PathTracePanel
+                  graphIR={graphIR}
+                  author={authorName}
+                  saving={createHighlight.isPending}
+                  onSelectNode={(id) => setSelection({ nodeId: id, edgeId: null })}
+                  onCreateHighlight={(input) =>
+                    createHighlight.mutate(input, {
+                      onSuccess: () => setActionMessage("path highlight 저장 완료"),
+                      onError: (error) =>
+                        setActionMessage(error instanceof Error ? error.message : "highlight 저장 실패")
+                    })
+                  }
+                />
+              ) : null}
+            </div>
+          </div>
           </div>
         )
       ) : null}
