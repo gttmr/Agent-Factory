@@ -1,0 +1,111 @@
+{
+  "schema_ref": "catalog.page_analysis.recommend_behavior_scenarios.v1",
+  "server": "page-analysis-mcp",
+  "tool": "recommend_behavior_scenarios",
+  "title": "Behavior scenario recommendation",
+  "description": "Synthetic contract for recommending scenarios from behavior classification and a selected page id.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "scenario_design_purpose",
+      "scenario_target",
+      "business_domain",
+      "page_id"
+    ],
+    "properties": {
+      "scenario_design_purpose": { "type": "string" },
+      "scenario_target": { "type": "string" },
+      "business_domain": { "type": "string" },
+      "page_id": { "type": "string" },
+      "additional_required_information": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "synthetic",
+      "source",
+      "analysis_result",
+      "scenario_recommendations",
+      "recommended_page_id"
+    ],
+    "properties": {
+      "synthetic": { "type": "boolean" },
+      "source": { "type": "string" },
+      "analysis_result": { "type": "object" },
+      "scenario_recommendations": {
+        "type": "array",
+        "items": { "type": "object" }
+      },
+      "recommended_page_id": { "type": "string" }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "auto_transfer_recovery_scenario",
+      "arguments": {
+        "scenario_design_purpose": "자동이체 설정 전환율 개선",
+        "scenario_target": "설정 이탈 감소",
+        "business_domain": "적금 상품",
+        "page_id": "svc-savings-auto-transfer-setup",
+        "additional_required_information": "대/중/소 행동 유형 기반"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "analysis_result": {
+          "method": "behavior_scenario_recommendation"
+        },
+        "scenario_recommendations": [
+          {
+            "scenario_id": "auto_transfer_setup_recovery"
+          }
+        ],
+        "recommended_page_id": "svc-savings-auto-transfer-setup"
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_page_id",
+      "arguments": {
+        "page_id": ""
+      },
+      "isError": true,
+      "message": "page_id is required"
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"scenario_recommendations\":1}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "analysis_result": {
+        "method": "behavior_scenario_recommendation",
+        "behavior_path": {
+          "large": "가입/전환",
+          "medium": "자동이체",
+          "small": "설정 이탈"
+        },
+        "summary": "자동이체 설정 이탈 사용자를 복귀시키는 synthetic scenario 후보를 추천합니다."
+      },
+      "scenario_recommendations": [
+        {
+          "scenario_id": "auto_transfer_setup_recovery",
+          "title": "자동이체 설정 복귀 유도",
+          "trigger": "amount_input_abandonment",
+          "expected_page_id": "svc-savings-auto-transfer-setup"
+        }
+      ],
+      "recommended_page_id": "svc-savings-auto-transfer-setup"
+    },
+    "isError": false
+  }
+}

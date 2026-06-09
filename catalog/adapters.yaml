@@ -292,3 +292,213 @@ adapters:
       - financial_data
       - audit_required
     notes: Sync read-only legacy lookup synthetic 계약이다. callback broker와 Context Manager는 기본 필수값이 아니다.
+
+  - name: page_candidate_rag_mock_adapter
+    adapter_kind: retrieval
+    owner_domain: 디지털채널
+    status: approved
+    access_protocol: mcp
+    mcp_server: page-analysis-mcp
+    mcp_tool_name: search_page_candidates
+    mcp_schema_ref: catalog.page_analysis.search_page_candidates.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: query
+        type: text
+        required: true
+      - name: scenario_design_purpose
+        type: text
+        required: true
+      - name: scenario_target_business_domain
+        type: string
+        required: true
+      - name: customer_behavior_classification
+        type: object
+        required: true
+    outputs:
+      - name: page_candidates
+        type: array<object>
+      - name: retrieval_metadata
+        type: object
+    risk_signals:
+      - financial_data
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      page_candidates:
+        - page_id: svc-savings-auto-transfer-setup
+          service_id: savings
+          page_name: 적금 자동이체 설정
+          behavior_path:
+            large: 가입/전환
+            medium: 자동이체
+            small: 설정 이탈
+          score: 0.94
+          evidence:
+            - synthetic-rag-page-catalog:autotransfer
+            - behavior-taxonomy:auto-transfer-dropoff
+      retrieval_metadata:
+        query_id: rag-page-demo-001
+        corpus: synthetic-page-catalog-v1
+        effective_date: "2026-06-08"
+    notes: 고객 행동 유형 분류와 사용자 쿼리를 받아 synthetic page 후보를 반환하는 RAG MCP mock Adapter다.
+
+  - name: user_flow_analysis_mock_adapter
+    adapter_kind: computation
+    owner_domain: 디지털채널
+    status: approved
+    access_protocol: mcp
+    mcp_server: page-analysis-mcp
+    mcp_tool_name: analyze_user_flow
+    mcp_schema_ref: catalog.page_analysis.analyze_user_flow.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: scenario_design_purpose
+        type: text
+        required: true
+      - name: scenario_target
+        type: text
+        required: true
+      - name: business_domain
+        type: string
+        required: true
+      - name: page_id
+        type: string
+        required: true
+      - name: additional_required_information
+        type: text
+        required: false
+    outputs:
+      - name: analysis_result
+        type: object
+      - name: recommended_page_id
+        type: string
+    risk_signals:
+      - financial_data
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      analysis_result:
+        method: user_flow_analysis
+        page_id: svc-savings-auto-transfer-setup
+        summary: 자동이체 금액 입력 이후 인증 진입 전 단계에서 synthetic 이탈이 높습니다.
+        findings:
+          - step: amount_input
+            signal: hesitation
+            synthetic_dropoff_rate: 0.31
+          - step: auth_entry
+            signal: retry
+            synthetic_dropoff_rate: 0.18
+      recommended_page_id: svc-savings-auto-transfer-setup
+    notes: 선택된 page_id의 synthetic funnel 병목을 반환하는 유저플로우 분석 MCP mock Adapter다.
+
+  - name: behavior_scenario_recommendation_mock_adapter
+    adapter_kind: computation
+    owner_domain: 디지털채널
+    status: approved
+    access_protocol: mcp
+    mcp_server: page-analysis-mcp
+    mcp_tool_name: recommend_behavior_scenarios
+    mcp_schema_ref: catalog.page_analysis.recommend_behavior_scenarios.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: scenario_design_purpose
+        type: text
+        required: true
+      - name: scenario_target
+        type: text
+        required: true
+      - name: business_domain
+        type: string
+        required: true
+      - name: page_id
+        type: string
+        required: true
+      - name: additional_required_information
+        type: text
+        required: false
+    outputs:
+      - name: analysis_result
+        type: object
+      - name: scenario_recommendations
+        type: array<object>
+      - name: recommended_page_id
+        type: string
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      analysis_result:
+        method: behavior_scenario_recommendation
+        behavior_path:
+          large: 가입/전환
+          medium: 자동이체
+          small: 설정 이탈
+        summary: 자동이체 설정 이탈 사용자를 복귀시키는 synthetic scenario 후보를 추천합니다.
+      scenario_recommendations:
+        - scenario_id: auto_transfer_setup_recovery
+          title: 자동이체 설정 복귀 유도
+          trigger: amount_input_abandonment
+          expected_page_id: svc-savings-auto-transfer-setup
+      recommended_page_id: svc-savings-auto-transfer-setup
+    notes: 행동 유형 분류와 page_id를 받아 synthetic scenario 추천을 반환하는 MCP mock Adapter다.
+
+  - name: page_customer_sql_analysis_mock_adapter
+    adapter_kind: data_query
+    owner_domain: 데이터분석
+    status: approved
+    access_protocol: mcp
+    mcp_server: page-analysis-mcp
+    mcp_tool_name: execute_page_customer_sql
+    mcp_schema_ref: catalog.page_analysis.execute_page_customer_sql.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: sql_text
+        type: text
+        required: true
+    outputs:
+      - name: analysis_result
+        type: object
+      - name: recommended_page_id
+        type: string
+      - name: query_summary
+        type: object
+    risk_signals:
+      - financial_data
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      analysis_result:
+        method: text_to_sql_analysis
+        summary: synthetic SQL aggregation에서 자동이체 설정 페이지의 재방문 대비 완료율이 낮게 나타납니다.
+        metrics:
+          - name: synthetic_visits
+            value: 1280
+          - name: synthetic_completion_rate
+            value: 0.42
+      recommended_page_id: svc-savings-auto-transfer-setup
+      query_summary:
+        readonly: true
+        tables:
+          - synthetic_page_events
+        row_count: 3
+        sql_hash: synthetic-sql-hash-001
+    notes: T2S 솔루션이 만든 reviewed SQL 전문을 소비하는 synthetic readonly page/customer 분석 MCP mock Adapter다.

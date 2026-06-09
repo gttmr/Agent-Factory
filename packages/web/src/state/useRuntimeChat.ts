@@ -16,6 +16,12 @@ export interface RuntimeChatStatus {
   server: {
     status: "stopped" | "running" | "failed";
     pid: number | null;
+    managed: boolean;
+    owner_matches_runtime: boolean;
+    can_stop: boolean;
+    message: string | null;
+    port_owner_pid: number | null;
+    port_owner_command: string | null;
     exit_code: number | null;
     stdout_tail: string;
     stderr_tail: string;
@@ -88,7 +94,7 @@ export function useStopRuntimeChat(reqId: string | undefined) {
     mutationFn: async () => {
       if (!reqId) throw new Error("requirement_id 가 없습니다.");
       const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-chat/stop`, { method: "POST" });
-      const body = (await response.json()) as { ok: boolean; status: RuntimeChatStatus; error?: string };
+      const body = (await response.json()) as { ok: boolean; message: string | null; status: RuntimeChatStatus; error?: string };
       if (!response.ok) throw new AfApiError(response.status, body.error ?? "ADK runtime 중지 실패", body);
       return body;
     },

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ArtifactRootStore } from "./artifactRootStore.ts";
@@ -24,17 +25,18 @@ try {
   );
   await writeFile(join(stubDir, "requirements.txt"), "google-adk\npytest\n", "utf8");
 
-  const manager = new RuntimeChatManager({ repoRoot, store });
+  const statusPort = await getAvailablePort();
+  const manager = new RuntimeChatManager({ repoRoot, store, port: statusPort });
   const status = await manager.status("req-chat");
 
   assert.equal(DEFAULT_ADK_CHAT_PORT, 8765);
-  assert.equal(status.port, 8765);
+  assert.equal(status.port, statusPort);
   assert.equal(status.host, "127.0.0.1");
   assert.equal(status.app_name, "req_chat_adk");
   assert.equal(status.installed, false);
   assert.equal(status.server.status, "stopped");
-  assert.equal(status.api_base_url, "http://127.0.0.1:8765");
-  assert.equal(status.web_url, "http://127.0.0.1:8765");
+  assert.equal(status.api_base_url, `http://127.0.0.1:${statusPort}`);
+  assert.equal(status.web_url, `http://127.0.0.1:${statusPort}`);
 
   const command = buildAdkServerCommand({ stubDir, host: "127.0.0.1", port: 8765 });
   assert.equal(command.command, join(stubDir, ".venv/bin/adk"));
@@ -58,6 +60,67 @@ try {
     { content: { parts: [{ text: "Synthetic loan precheck response" }], role: "model" } }
   ]);
   assert.equal(finalText, "Synthetic loan precheck response");
+
+  await store.createRoot("req-adopt");
+  const adoptPort = await getAvailablePort();
+  const adoptStubDir = join(repoRoot, "artifacts/af/req-adopt/runtime-stub");
+  await mkdir(join(adoptStubDir, "req_adopt_adk"), { recursive: true });
+  await mkdir(join(adoptStubDir, ".venv/bin"), { recursive: true });
+  await writeFile(
+    join(adoptStubDir, "req_adopt_adk/workflow_manifest.json"),
+    `${JSON.stringify({ package: "req_adopt_adk" }, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(join(adoptStubDir, ".venv/bin/python"), "#!/bin/sh\nexit 0\n", "utf8");
+  await writeFile(
+    join(adoptStubDir, ".venv/bin/adk"),
+    [
+      "#!/usr/bin/env node",
+      "const http = require('node:http');",
+      "const args = process.argv.slice(2);",
+      "const port = Number(args[args.indexOf('--port') + 1]);",
+      "const host = args[args.indexOf('--host') + 1] || '127.0.0.1';",
+      "const server = http.createServer((_req, res) => res.end('fake adk'));",
+      "server.listen(port, host);",
+      "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+      "setInterval(() => undefined, 1000);",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  await chmod(join(adoptStubDir, ".venv/bin/python"), 0o755);
+  await chmod(join(adoptStubDir, ".venv/bin/adk"), 0o755);
+
+  const firstManager = new RuntimeChatManager({ repoRoot, store, port: adoptPort });
+  const started = await firstManager.start("req-adopt");
+  assert.equal(started.ok, true);
+  assert.equal(started.status.server.status, "running");
+  assert.ok(started.status.server.pid);
+
+  const restartedManager = new RuntimeChatManager({ repoRoot, store, port: adoptPort });
+  const adopted = await restartedManager.status("req-adopt");
+  assert.equal(adopted.server.status, "running");
+  assert.equal(adopted.server.managed, true);
+  assert.equal(adopted.server.can_stop, true);
+  assert.equal(adopted.server.pid, started.status.server.pid);
+
+  const stopped = await restartedManager.stop("req-adopt");
+  assert.equal(stopped.ok, true);
+  assert.equal(stopped.status.server.status, "stopped");
 } finally {
   await rm(repoRoot, { recursive: true, force: true });
+}
+
+function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === "object") resolve(address.port);
+        else reject(new Error("Could not allocate a local test port."));
+      });
+    });
+  });
 }

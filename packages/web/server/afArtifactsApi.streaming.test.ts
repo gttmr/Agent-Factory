@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -225,7 +226,7 @@ async function assertRuntimeChatLifecycle(request: ReturnType<typeof createReque
     server: { status: string; pid: number | null };
   }>(await request({ url: "/req-runtime/runtime-chat/status" }));
   assert.equal(before.installed, false);
-  assert.equal(before.port, 8765);
+  assert.equal(before.port, Number(process.env.AF_ADK_CHAT_PORT));
   assert.equal(before.app_name, "req_stream_adk");
   assert.equal(before.server.status, "stopped");
 
@@ -348,10 +349,12 @@ class FakeResponse extends Writable {
 
 const repoRoot = await mkdtemp(join(tmpdir(), "af-artifacts-api-stream-"));
 const originalPath = process.env.PATH ?? "";
+const originalRuntimePort = process.env.AF_ADK_CHAT_PORT;
 
 try {
   await writeFakeScripts(repoRoot);
   process.env.PATH = `${join(repoRoot, "bin")}:${originalPath}`;
+  process.env.AF_ADK_CHAT_PORT = String(await getAvailablePort());
   const request = createRequester(repoRoot);
 
   await createRoot(request, "req-stream");
@@ -365,5 +368,21 @@ try {
   await assertRuntimeChatLifecycle(request, repoRoot);
 } finally {
   process.env.PATH = originalPath;
+  if (originalRuntimePort === undefined) delete process.env.AF_ADK_CHAT_PORT;
+  else process.env.AF_ADK_CHAT_PORT = originalRuntimePort;
   await rm(repoRoot, { recursive: true, force: true });
+}
+
+function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === "object") resolve(address.port);
+        else reject(new Error("Could not allocate a local test port."));
+      });
+    });
+  });
 }
