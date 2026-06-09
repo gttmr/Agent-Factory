@@ -561,7 +561,7 @@ function buildEnvExample() {
 }
 
 function buildGitignore() {
-  return `.env\n.venv/\n__pycache__/\n*.pyc\n`;
+  return `.env\n.venv/\n.adk/\n__pycache__/\n*.pyc\n`;
 }
 
 // ---------------------------------------------------------------------------

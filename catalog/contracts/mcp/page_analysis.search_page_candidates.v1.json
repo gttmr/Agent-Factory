@@ -1,0 +1,135 @@
+{
+  "schema_ref": "catalog.page_analysis.search_page_candidates.v1",
+  "server": "page-analysis-mcp",
+  "tool": "search_page_candidates",
+  "title": "Page candidate RAG retrieval",
+  "description": "Synthetic retrieval contract for selecting page candidates from user intent and customer behavior classification.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "query",
+      "scenario_design_purpose",
+      "scenario_target_business_domain",
+      "customer_behavior_classification"
+    ],
+    "properties": {
+      "query": { "type": "string" },
+      "scenario_design_purpose": { "type": "string" },
+      "scenario_target_business_domain": { "type": "string" },
+      "customer_behavior_classification": { "type": "object" },
+      "top_k": { "type": "integer" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "synthetic",
+      "source",
+      "page_candidates",
+      "retrieval_metadata"
+    ],
+    "properties": {
+      "synthetic": { "type": "boolean" },
+      "source": { "type": "string" },
+      "page_candidates": {
+        "type": "array",
+        "items": { "type": "object" }
+      },
+      "retrieval_metadata": { "type": "object" }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "savings_auto_transfer_candidates",
+      "arguments": {
+        "query": "적금 자동이체 설정 이탈 페이지",
+        "scenario_design_purpose": "자동이체 설정 전환율 개선",
+        "scenario_target_business_domain": "적금 상품",
+        "customer_behavior_classification": {
+          "large": "가입/전환",
+          "medium": "자동이체",
+          "small": "설정 이탈"
+        },
+        "top_k": 2
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "page_candidates": [
+          {
+            "page_id": "svc-savings-auto-transfer-setup",
+            "service_id": "savings",
+            "page_name": "적금 자동이체 설정",
+            "score": 0.94
+          }
+        ],
+        "retrieval_metadata": {
+          "query_id": "rag-page-demo-001",
+          "corpus": "synthetic-page-catalog-v1"
+        }
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_query",
+      "arguments": {
+        "query": ""
+      },
+      "isError": true,
+      "message": "query is required"
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"page_candidates\":2}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "page_candidates": [
+        {
+          "page_id": "svc-savings-auto-transfer-setup",
+          "service_id": "savings",
+          "page_name": "적금 자동이체 설정",
+          "behavior_path": {
+            "large": "가입/전환",
+            "medium": "자동이체",
+            "small": "설정 이탈"
+          },
+          "score": 0.94,
+          "evidence": [
+            "synthetic-rag-page-catalog:autotransfer",
+            "behavior-taxonomy:auto-transfer-dropoff"
+          ]
+        },
+        {
+          "page_id": "svc-savings-product-detail",
+          "service_id": "savings",
+          "page_name": "적금 상품 상세",
+          "behavior_path": {
+            "large": "탐색/비교",
+            "medium": "상품 이해",
+            "small": "조건 확인"
+          },
+          "score": 0.78,
+          "evidence": [
+            "synthetic-rag-page-catalog:savings-detail"
+          ]
+        }
+      ],
+      "retrieval_metadata": {
+        "query_id": "rag-page-demo-001",
+        "corpus": "synthetic-page-catalog-v1",
+        "top_k": 2,
+        "effective_date": "2026-06-08"
+      }
+    },
+    "isError": false
+  }
+}

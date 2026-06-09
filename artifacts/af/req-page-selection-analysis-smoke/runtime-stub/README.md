@@ -1,6 +1,6 @@
-# req_loan_precheck_smoke_adk
+# req_page_selection_analysis_smoke_adk
 
-Runnable ADK 2.1 workflow generated from approved scaffold-plan.json for Synthetic loan precheck graph runtime handoff.
+Runnable ADK 2.1 workflow generated from approved scaffold-plan.json for Synthetic page selection and analysis workflow.
 
 ```bash
 python3 -m venv .venv
@@ -8,7 +8,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 mkdir -p ../../../../.agent-factory
 cp .env.example ../../../../.agent-factory/runtime.env
-python -m compileall req_loan_precheck_smoke_adk
+python -m compileall req_page_selection_analysis_smoke_adk
 python -m pytest -q
 ```
 
@@ -42,6 +42,6 @@ mock output and are listed under `runtime.unconnected_adapters` in
 
 ```bash
 adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
-curl -X POST http://127.0.0.1:8765/apps/req_loan_precheck_smoke_adk/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
+curl -X POST http://127.0.0.1:8765/apps/req_page_selection_analysis_smoke_adk/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
 curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
 ```

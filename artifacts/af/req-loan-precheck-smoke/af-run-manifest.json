@@ -66,6 +66,24 @@
         "runs/analyze/20260603T045337Z-analyze-2e46b5/proposed-artifacts/analysis-result.json"
       ],
       "last_error": null
+    },
+    "design": {
+      "latest_run_id": "20260604T042418Z-design-bb1304",
+      "status": "completed",
+      "started_at": "2026-06-04T04:24:18.866Z",
+      "finished_at": "2026-06-04T04:28:22.785Z",
+      "skill_name": "af-design-boundaries",
+      "model": "gpt-5.5",
+      "output_artifacts": [
+        "runs/design/20260604T042418Z-design-bb1304/proposed-artifacts/analysis-result.json",
+        "runs/design/20260604T042418Z-design-bb1304/proposed-artifacts/boundary-design.md"
+      ],
+      "last_error": null,
+      "codex": {
+        "backend": "sdk",
+        "thread_id": "019e90df-fd95-79d0-be0a-750cf2fe3238",
+        "event_count": 141
+      }
     }
   }
 }

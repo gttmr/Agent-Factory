@@ -65,13 +65,14 @@ export default function RunSandbox() {
   function handleStop() {
     setActionMessage(null);
     stopRuntime.mutate(undefined, {
-      onSuccess: () => setActionMessage("ADK runtime 중지 요청 완료"),
+      onSuccess: (result) => setActionMessage(result.ok ? "ADK runtime 중지 요청 완료" : result.message ?? "ADK runtime 중지 대상 없음"),
       onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK runtime 중지 실패")
     });
   }
 
   const serverStatus = status.data?.server.status ?? "stopped";
   const isRunning = serverStatus === "running";
+  const canStop = Boolean(status.data?.server.can_stop) || serverStatus === "failed";
   const webUrl = status.data?.web_url ?? null;
 
   return (
@@ -103,7 +104,10 @@ export default function RunSandbox() {
               <li>ADK dependency: {status.data?.installed ? "설치됨" : "미설치"}</li>
               <li>server: {serverStatus}</li>
               <li>port: {status.data?.port ?? 8765}</li>
+              {status.data?.server.pid ? <li>pid: {status.data.server.pid}</li> : null}
+              {!status.data?.server.pid && status.data?.server.port_owner_pid ? <li>port owner pid: {status.data.server.port_owner_pid}</li> : null}
             </ul>
+            {status.data?.server.message ? <p className="af-landing-error">{status.data.server.message}</p> : null}
             <div className="af-action-row">
               <Button type="button" variant="primary" disabled={installRuntime.isPending} onClick={handleInstall}>
                 {installRuntime.isPending ? "설치 중…" : "ADK dependency 설치"}
@@ -119,7 +123,7 @@ export default function RunSandbox() {
               <Button
                 type="button"
                 variant="ghost"
-                disabled={!isRunning || stopRuntime.isPending}
+                disabled={!canStop || stopRuntime.isPending}
                 onClick={handleStop}
               >
                 {stopRuntime.isPending ? "중지 중…" : "중지"}

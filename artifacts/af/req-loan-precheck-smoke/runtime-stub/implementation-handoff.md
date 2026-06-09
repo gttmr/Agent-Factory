@@ -11,7 +11,7 @@ Generated from reviewed scaffold-plan.json for Synthetic loan precheck graph run
 
 - Do not add private endpoints, credentials, customer data, or deployment scripts.
 - Keep adapter calls pointed at synthetic Mock Lab servers, not real systems.
-- Individualize via agents.config.yaml and .env, not by hard-coding secrets.
+- Individualize behavior via agents.config.yaml and shared secrets via .agent-factory/runtime.env, not by hard-coding secrets.
 
 ## Unconnected adapters (synthetic stub until a Mock Lab server is bound)
 

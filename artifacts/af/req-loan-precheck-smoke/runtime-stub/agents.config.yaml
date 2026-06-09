@@ -1,7 +1,7 @@
 # agents.config.yaml — per-node overrides for the runnable ADK bundle.
 # Edit model / instruction / mcp_url here. agent.py loads this at import and
 # applies the overrides, so editing this file actually changes behavior.
-# This file plus .env is how each developer individualizes the generated bundle.
+# Shared secrets live in <repo>/.agent-factory/runtime.env, not in this bundle.
 default_model: gemini-2.5-flash
 agents:
   - id: mod-loan-document-review

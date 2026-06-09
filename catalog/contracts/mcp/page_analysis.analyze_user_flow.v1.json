@@ -1,0 +1,103 @@
+{
+  "schema_ref": "catalog.page_analysis.analyze_user_flow.v1",
+  "server": "page-analysis-mcp",
+  "tool": "analyze_user_flow",
+  "title": "User-flow page analysis",
+  "description": "Synthetic contract for analyzing user-flow bottlenecks for a selected page id.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "scenario_design_purpose",
+      "scenario_target",
+      "business_domain",
+      "page_id"
+    ],
+    "properties": {
+      "scenario_design_purpose": { "type": "string" },
+      "scenario_target": { "type": "string" },
+      "business_domain": { "type": "string" },
+      "page_id": { "type": "string" },
+      "additional_required_information": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "synthetic",
+      "source",
+      "analysis_result",
+      "recommended_page_id"
+    ],
+    "properties": {
+      "synthetic": { "type": "boolean" },
+      "source": { "type": "string" },
+      "analysis_result": { "type": "object" },
+      "recommended_page_id": { "type": "string" }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "auto_transfer_flow_analysis",
+      "arguments": {
+        "scenario_design_purpose": "자동이체 설정 전환율 개선",
+        "scenario_target": "설정 이탈 감소",
+        "business_domain": "적금 상품",
+        "page_id": "svc-savings-auto-transfer-setup",
+        "additional_required_information": "최근 30일 synthetic funnel"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "analysis_result": {
+          "method": "user_flow_analysis",
+          "summary": "자동이체 금액 입력 이후 인증 진입 전 단계에서 synthetic 이탈이 높습니다."
+        },
+        "recommended_page_id": "svc-savings-auto-transfer-setup"
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_page_id",
+      "arguments": {
+        "page_id": ""
+      },
+      "isError": true,
+      "message": "page_id is required"
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"method\":\"user_flow_analysis\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "analysis_result": {
+        "method": "user_flow_analysis",
+        "page_id": "svc-savings-auto-transfer-setup",
+        "summary": "자동이체 금액 입력 이후 인증 진입 전 단계에서 synthetic 이탈이 높습니다.",
+        "findings": [
+          {
+            "step": "amount_input",
+            "signal": "hesitation",
+            "synthetic_dropoff_rate": 0.31
+          },
+          {
+            "step": "auth_entry",
+            "signal": "retry",
+            "synthetic_dropoff_rate": 0.18
+          }
+        ],
+        "recommended_action": "인증 전 예상 출금일/금액 확인 microcopy를 추가한 시나리오를 workflow2에 전달합니다."
+      },
+      "recommended_page_id": "svc-savings-auto-transfer-setup"
+    },
+    "isError": false
+  }
+}

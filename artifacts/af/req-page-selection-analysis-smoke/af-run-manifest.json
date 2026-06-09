@@ -1,0 +1,58 @@
+{
+  "requirement_id": "req-page-selection-analysis-smoke",
+  "artifact_root": "artifacts/af/req-page-selection-analysis-smoke",
+  "current_stage": "build",
+  "stages": {
+    "analyze": {
+      "status": "complete",
+      "outputs": [
+        "analysis-result.json",
+        "normalized-requirement.json",
+        "module-candidates.json",
+        "process-flow.json",
+        "analysis-summary.md"
+      ]
+    },
+    "design": {
+      "status": "complete",
+      "outputs": [
+        "boundary-design.md",
+        "commonization-notes.json",
+        "a2a-contracts.json",
+        "scaffold-plan.json"
+      ]
+    },
+    "build": {
+      "status": "complete",
+      "outputs": [
+        "runtime-stub/",
+        "runtime-stub/scaffold-plan.json",
+        "runtime-stub/implementation-handoff.md"
+      ]
+    },
+    "verify": {
+      "status": "complete",
+      "outputs": [
+        "validation-report.md",
+        "catalog-delta.yaml"
+      ]
+    }
+  },
+  "approvals": {
+    "analysis_reviewed": true,
+    "boundaries_approved": true,
+    "runtime_contracts_approved": true,
+    "stub_ready_for_followup": true
+  },
+  "validation": {
+    "commands": [
+      "node scripts/validate-artifacts.mjs artifacts/af/req-page-selection-analysis-smoke",
+      "node scripts/validate-artifacts.mjs catalog/contracts/mcp",
+      "cd packages/mock-lab && node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs -e \"import { readFile } from 'node:fs/promises'; import { validateMockSpec } from './server/schemaValidation.ts'; const spec = JSON.parse(await readFile('../../artifacts/mock-lab/page-analysis-mcp/mock-spec.json', 'utf8')); const result = validateMockSpec(spec); if (!result.ok) { console.error(JSON.stringify(result, null, 2)); process.exit(1); }\"",
+      "host node --input-type=module synthetic Mock Lab stdio smoke for tools/list and all four tools/call",
+      "python3 -m compileall runtime-stub/req_page_selection_analysis_smoke_adk",
+      "cd runtime-stub/ && python -m pytest -q"
+    ],
+    "last_result": "passed"
+  }
+}
