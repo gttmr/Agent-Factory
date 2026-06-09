@@ -45,7 +45,7 @@ export function buildScaffoldPlan({
       id: candidate.id,
       name: candidate.name,
       status: candidate.status,
-      reason: `status is ${candidate.status}; only approved modules are eligible for scaffold generation`
+      reason: `현재 상태가 ${candidate.status}입니다. scaffold generation에는 approved 모듈만 포함됩니다.`
     }));
   const blockers = collectBlockers(modules, moduleCandidates);
   const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
@@ -78,8 +78,8 @@ export function buildScaffoldPlan({
         module_id: module.id,
         module_name: module.name,
         reason: module.catalog_binding
-          ? "catalog binding is recorded; runtime wiring remains a reviewed TODO boundary"
-          : "no catalog binding was selected for this approved module",
+          ? "catalog binding은 기록되었으며 런타임 wiring은 검토된 TODO boundary로 남깁니다."
+          : "승인된 모듈에 선택된 카탈로그(catalog) binding이 없어 새 코드 TODO boundary로 생성합니다.",
         developer_todos: module.developer_todos
       }))
     },
@@ -165,17 +165,17 @@ function buildScaffoldModule(
  */
 function seedAgentInstruction(candidate: ModuleCandidate, catalogEntry: CatalogEntry | undefined): string {
   const responsibility = catalogEntry?.responsibility?.trim() || candidate.rationale?.trim() || candidate.name;
-  const inputNames = candidate.inputs.map((field) => field.name).filter(Boolean).join(", ") || "(none specified)";
-  const outputNames = candidate.outputs.map((field) => field.name).filter(Boolean).join(", ") || "(none specified)";
+  const inputNames = candidate.inputs.map((field) => field.name).filter(Boolean).join(", ") || "지정된 입력 없음";
+  const outputNames = candidate.outputs.map((field) => field.name).filter(Boolean).join(", ") || "지정된 출력 없음";
   const lines = [
-    `You are "${candidate.name}".`,
-    `Responsibility: ${responsibility}`,
-    `Inputs you receive: ${inputNames}.`,
-    `Outputs you must produce: ${outputNames}.`,
-    "Operate only on the synthetic inputs provided in session state. Never invent private data, real endpoints, or credentials."
+    `당신은 "${candidate.name}" Agent입니다.`,
+    `책임: ${responsibility}`,
+    `입력: ${inputNames}.`,
+    `출력: ${outputNames}.`,
+    "검토된 synthetic 입력과 session state 안의 데이터만 사용하세요. private data, 실제 endpoint, credential은 만들거나 추정하지 마세요."
   ];
   const sample = candidate.smoke_spec?.sample_user_message?.trim();
-  if (sample) lines.push(`Example user message: ${sample}`);
+  if (sample) lines.push(`예시 사용자 메시지: ${sample}`);
   return lines.join("\n");
 }
 
@@ -200,19 +200,19 @@ function developerTodosFor(
 ): string[] {
   if (catalogEntry) {
     return [
-      "Review the catalog runtime contract and configure its runtime binding before invocation.",
-      "Map reviewed inputs and outputs before wiring runtime behavior."
+      "catalog runtime 계약을 검토하고 호출 전에 런타임 binding 설정을 확인하세요.",
+      "검토된 입력과 출력을 매핑한 뒤 런타임 동작을 연결하세요."
     ];
   }
   if (candidate.module_category === "remote_a2a") {
     return [
-      "Fill the remote agent card or discovery contract.",
-      "Implement authentication, timeout, retry, fallback, audit, and data policy handling before runtime use."
+      "remote agent card 또는 discovery 계약을 검토 가능한 값으로 채우세요.",
+      "런타임 사용 전에 인증, timeout, retry, fallback, audit, data policy 처리를 구현하세요."
     ];
   }
   return [
-    "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
-    "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
+    "설계 승인 후 TODO_IMPLEMENT_HERE 경계 안에서만 이 모듈을 구현하세요.",
+    "검토된 입력을 매핑하고 출력을 검증하며 business credential은 생성 코드에 넣지 마세요."
   ];
 }
 
@@ -244,16 +244,16 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
     blockers.push(`정보 필요 후보 ${unresolvedCandidates}개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요.`);
   }
   if (!modules.length) {
-    blockers.push("approved module is required before ADK source generation");
+    blockers.push("ADK source generation 전에 approved 모듈이 필요합니다.");
     return blockers;
   }
   return [
     ...blockers,
     ...modules.flatMap((module) => {
       const moduleBlockers: string[] = [];
-      if (!module.inputs.length) moduleBlockers.push(`${module.name}: input contract is missing`);
-      if (!module.outputs.length) moduleBlockers.push(`${module.name}: output contract is missing`);
-      if (!module.developer_todos.length) moduleBlockers.push(`${module.name}: developer TODO boundary is missing`);
+      if (!module.inputs.length) moduleBlockers.push(`${module.name}: 입력 계약이 없습니다.`);
+      if (!module.outputs.length) moduleBlockers.push(`${module.name}: 출력 계약이 없습니다.`);
+      if (!module.developer_todos.length) moduleBlockers.push(`${module.name}: developer TODO boundary가 없습니다.`);
       return moduleBlockers;
     })
   ];
@@ -274,9 +274,9 @@ function collectWarnings(
 ): string[] {
   const moduleWarnings = modules.flatMap((module) => {
     if (module.catalog_binding) {
-      return [`${module.name}: catalog binding is emitted with a reviewed runtime-wiring TODO until configuration is approved`];
+      return [`${module.name}: catalog binding은 설정 승인 전까지 검토된 런타임 wiring TODO로 표시됩니다.`];
     }
-    return [`${module.name}: generated as new-code TODO boundary because no catalog binding is selected`];
+    return [`${module.name}: 선택된 catalog binding이 없어 새 코드 TODO boundary로 생성됩니다.`];
   });
   const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
   if (unresolvedCandidates > 0) {

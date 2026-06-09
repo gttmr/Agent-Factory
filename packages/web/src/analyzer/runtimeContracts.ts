@@ -127,22 +127,22 @@ export function buildRuntimeContractsForCandidate(
 export function runtimeContractReadinessIssues(contract: RuntimeContract): string[] {
   const issues: string[] = [];
   if (contract.contract_status !== "approved") {
-    issues.push("contract_status must be approved before ADK Runtime Handoff");
+    issues.push("ADK Runtime Handoff 전에 contract_status가 approved여야 합니다");
   }
   for (const field of contract.required_review_fields) {
     const value = readRuntimeContractField(contract, field);
     if (value === null || value === undefined || value === "" || value === "needs_info") {
-      issues.push(`${field} is still needs_info`);
+      issues.push(`${field} 값이 아직 needs_info입니다`);
     }
   }
   if (contract.operation.callback_expected && !contract.runtime_support.callback_broker_required) {
-    issues.push("callback_expected requires callback_broker_required");
+    issues.push("callback_expected에는 callback_broker_required가 필요합니다");
   }
   if (contract.operation.async_resume_required && !contract.runtime_support.context_manager_required) {
-    issues.push("async_resume_required requires context_manager_required");
+    issues.push("async_resume_required에는 context_manager_required가 필요합니다");
   }
   if (contract.runtime_support.human_approval_required && !contract.runtime_support.idempotency_required) {
-    issues.push("approval-gated work requires idempotency");
+    issues.push("승인 게이트가 있는 작업에는 idempotency가 필요합니다");
   }
   return issues;
 }
@@ -306,9 +306,9 @@ function buildLegacyAdapterContract(candidate: ModuleCandidate, requirement: Nor
     contract_id: runtimeContractId(candidate.id, mcp ? "mcp-legacy" : "eai-legacy"),
     contract_kind: mcp ? "mcp_legacy_adapter" : "eai_legacy_adapter",
     module_id: candidate.id,
-    title: `${candidate.name} ${mcp ? "MCP Legacy Adapter" : "EAI Legacy Adapter"}`,
+    title: `${candidate.name} ${mcp ? "MCP Legacy Adapter 런타임 계약" : "EAI Legacy Adapter 런타임 계약"}`,
     contract_status: "needs_info",
-    summary: `${candidate.name} runtime contract placeholder. 실제 endpoint나 credential 없이 reviewed adapter boundary만 기록한다.`,
+    summary: `${candidate.name} 런타임 계약 초안입니다. 실제 endpoint나 credential 없이 reviewed adapter boundary만 기록합니다.`,
     required_review_fields: [
       "policies.auth_policy",
       "policies.timeout_policy",
@@ -349,9 +349,9 @@ function buildLegacyAdapterContract(candidate: ModuleCandidate, requirement: Nor
       }
     ],
     developer_todos: [
-      "TODO: Implement EAI client through an approved MCP or adapter contract only.",
-      "TODO: Keep raw legacy payloads outside LLM context.",
-      "TODO: Add synthetic smoke contract before enabling runtime chat smoke."
+      "TODO: 승인된 MCP 또는 adapter 계약을 통해서만 EAI client를 구현하세요.",
+      "TODO: raw legacy payload는 LLM context 밖에 두세요.",
+      "TODO: runtime chat smoke를 켜기 전에 synthetic smoke 계약을 추가하세요."
     ]
   };
 }
@@ -361,7 +361,7 @@ function buildContextManagerContract(candidate: ModuleCandidate, _requirement: N
     contract_id: runtimeContractId(candidate.id, "context-manager"),
     contract_kind: "context_manager",
     module_id: candidate.id,
-    title: `${candidate.name} Context Manager`,
+    title: `${candidate.name} Context Manager 런타임 계약`,
     contract_status: "needs_info",
     summary: "WorkItem 상태, correlation, callback, approval, retry, timeout, audit 상태를 durable contract로 관리한다.",
     required_review_fields: [
@@ -402,9 +402,9 @@ function buildContextManagerContract(candidate: ModuleCandidate, _requirement: N
       }
     ],
     developer_todos: [
-      "TODO: Implement Context Manager client after approved runtime endpoint is provided.",
-      "TODO: Store masked/tokenized references only.",
-      "TODO: Map callback and approval state before resuming ADK workflow."
+      "TODO: 승인된 런타임 endpoint가 제공된 뒤 Context Manager client를 구현하세요.",
+      "TODO: masked/tokenized reference만 저장하세요.",
+      "TODO: ADK workflow를 재개하기 전에 callback과 approval state를 매핑하세요."
     ]
   };
 }
@@ -414,7 +414,7 @@ function buildCallbackBrokerContract(candidate: ModuleCandidate, _requirement: N
     contract_id: runtimeContractId(candidate.id, "callback-broker"),
     contract_kind: "callback_broker",
     module_id: candidate.id,
-    title: `${candidate.name} Callback Broker`,
+    title: `${candidate.name} Callback Broker 런타임 계약`,
     contract_status: "needs_info",
     summary: "EAI/Legacy callback을 agent가 직접 받지 않고 검증, 중복 제거, 상태 전이 요청만 수행한다.",
     required_review_fields: [
@@ -454,9 +454,9 @@ function buildCallbackBrokerContract(candidate: ModuleCandidate, _requirement: N
       }
     ],
     developer_todos: [
-      "TODO: Verify callback signature and reject replay before state transition.",
-      "TODO: Deduplicate callback_id and correlation_id.",
-      "TODO: Do not route raw callback payload to LLM."
+      "TODO: 상태 전이 전에 callback signature를 검증하고 replay를 거부하세요.",
+      "TODO: callback_id와 correlation_id를 중복 제거하세요.",
+      "TODO: raw callback payload를 LLM으로 전달하지 마세요."
     ]
   };
 }
@@ -466,7 +466,7 @@ function buildAdkCallbackContract(candidate: ModuleCandidate, _requirement: Norm
     contract_id: runtimeContractId(candidate.id, "adk-callback"),
     contract_kind: "adk_callback",
     module_id: candidate.id,
-    title: `${candidate.name} ADK Callback`,
+    title: `${candidate.name} ADK Callback 런타임 계약`,
     contract_status: "needs_info",
     summary: "ADK before/after callback에서 tool 입력 검증, 승인 확인, masking, audit summary, safe resume를 담당한다.",
     required_review_fields: ["policies.masking_policy", "policies.data_policy"],
@@ -499,8 +499,8 @@ function buildAdkCallbackContract(candidate: ModuleCandidate, _requirement: Norm
       }
     ],
     developer_todos: [
-      "TODO: Use exact ADK callback parameter names for the selected ADK version.",
-      "TODO: Keep skeleton TODO-only until runtime endpoint and approval contract are reviewed."
+      "TODO: 선택한 ADK version의 정확한 callback parameter 이름을 사용하세요.",
+      "TODO: 런타임 endpoint와 approval 계약이 검토될 때까지 skeleton은 TODO-only로 유지하세요."
     ]
   };
 }
@@ -510,7 +510,7 @@ function buildAsyncResumeContract(candidate: ModuleCandidate, _requirement: Norm
     contract_id: runtimeContractId(candidate.id, "async-resume"),
     contract_kind: "async_resume",
     module_id: candidate.id,
-    title: `${candidate.name} Async Resume`,
+    title: `${candidate.name} Async Resume 런타임 계약`,
     contract_status: "needs_info",
     summary: "EAI job_id 이후 callback 수신과 RESUME_REQUESTED 상태를 ADK Runtime Handoff가 읽도록 하는 계약이다.",
     required_review_fields: ["policies.timeout_policy", "policies.retry_policy", "policies.fallback_policy"],
@@ -544,8 +544,8 @@ function buildAsyncResumeContract(candidate: ModuleCandidate, _requirement: Norm
       }
     ],
     developer_todos: [
-      "TODO: Stop the initial agent run with a pending safe summary.",
-      "TODO: Resume only after Context Manager records CALLBACK_RECEIVED or RESUME_REQUESTED."
+      "TODO: 초기 agent run은 pending safe summary와 함께 멈추세요.",
+      "TODO: Context Manager가 CALLBACK_RECEIVED 또는 RESUME_REQUESTED를 기록한 뒤에만 재개하세요."
     ]
   };
 }

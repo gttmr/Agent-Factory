@@ -15,7 +15,7 @@ const generator = join(here, "generate-adk-source.mjs");
 // Minimal hermetic fixture: input -> agent -> adapter -> output.
 // ---------------------------------------------------------------------------
 
-function baseModules(runnable) {
+function baseModules(runnable, { connectedAdapter = false } = {}) {
   return [
     {
       id: "mod-gen-agent",
@@ -35,7 +35,7 @@ function baseModules(runnable) {
       required_review_fields: [],
       smoke_spec: { sample_user_message: "hello", synthetic_inputs: {}, expected_output_shape: {}, expected_event_markers: [], mock_sources: [], ready: true },
       runtime_mock: null,
-      instruction: runnable ? "You are gen_agent. Use only synthetic inputs." : null,
+      instruction: null,
       model: runnable ? "gemini-2.5-flash" : null,
       access_protocol: null,
       mcp_server: null,
@@ -63,17 +63,17 @@ function baseModules(runnable) {
       runtime_mock: { value: { demo: true } },
       instruction: null,
       model: null,
-      access_protocol: null,
-      mcp_server: null,
-      mcp_tool_name: null,
-      mcp_schema_ref: null,
-      mcp_auth_mode: null,
-      runtime_binding: null
+      access_protocol: connectedAdapter ? "mcp" : null,
+      mcp_server: connectedAdapter ? "test-mcp" : null,
+      mcp_tool_name: connectedAdapter ? "lookup_test_data" : null,
+      mcp_schema_ref: connectedAdapter ? "catalog/contracts/mcp/test.lookup.v1.json" : null,
+      mcp_auth_mode: connectedAdapter ? "none" : null,
+      runtime_binding: connectedAdapter ? "mcp" : null
     }
   ];
 }
 
-function writeFixture(dir, { runnable }) {
+function writeFixture(dir, { runnable, connectedAdapter = false }) {
   writeJson(join(dir, "normalized-requirement.json"), {
     id: "req-gen-test",
     title: "Generator test workflow",
@@ -107,7 +107,7 @@ function writeFixture(dir, { runnable }) {
     source: "approved_workbench_artifact",
     raw_requirement_to_code: false,
     output_mode: runnable ? "runnable" : "smoke",
-    modules: baseModules(runnable),
+    modules: baseModules(runnable, { connectedAdapter }),
     runtime_contracts: [],
     excluded_modules: [],
     manifest: { catalog_bound_modules: [], new_code_required: [] },
@@ -115,10 +115,10 @@ function writeFixture(dir, { runnable }) {
   });
 }
 
-function generate({ runnable }) {
+function generate({ runnable, connectedAdapter = false }) {
   const artifactRoot = mkdtempSync(join(tmpdir(), `af-gen-${runnable ? "runnable" : "smoke"}-`));
   try {
-    writeFixture(artifactRoot, { runnable });
+    writeFixture(artifactRoot, { runnable, connectedAdapter });
     const outputRoot = join(artifactRoot, "runtime-stub");
     execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
     return { artifactRoot, outputRoot };
@@ -177,6 +177,7 @@ function assertRunnableBundle(outputRoot) {
   const { packageName, manifest, agentSource } = readBundle(outputRoot);
   const envExample = readFileSync(join(outputRoot, ".env.example"), "utf8");
   const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
+  const agentsConfig = readFileSync(join(outputRoot, "agents.config.yaml"), "utf8");
   assertCommonBundle(outputRoot, manifest);
   assert.equal(manifest.output_mode, "runnable");
   assert.equal(manifest.guardrails.runnable_synthetic_wiring, true);
@@ -187,6 +188,8 @@ function assertRunnableBundle(outputRoot) {
   assert.match(agentSource, /from google\.adk\.agents import LlmAgent/);
   assert.match(agentSource, /root_agent = Workflow\(/);
   assert.match(agentSource, /mode="single_turn"/);
+  assert.match(agentSource, /당신은/);
+  assert.doesNotMatch(agentSource, /You are gen_agent/);
   assert.match(agentSource, /http:\/\/127\.0\.0\.1:5173\/api\/mock-lab\/mcp/);
   assert.match(agentSource, /AF_RUNTIME_ENV_FILE/);
   assert.match(agentSource, /\.agent-factory\/runtime\.env/);
@@ -206,9 +209,20 @@ function assertRunnableBundle(outputRoot) {
   assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
   assert.match(envExample, /AF_RUNTIME_ENV_FILE/);
   assert.match(envExample, /\.agent-factory\/runtime\.env/);
-  assert.match(readme, /Copy \.env\.example to \.agent-factory\/runtime\.env/);
+  assert.match(agentsConfig, /한글 우선/);
+  assert.match(readme, /repository root의 `\.agent-factory\/runtime\.env`로 복사/);
   assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
   return packageName;
+}
+
+function assertConnectedMcpRuntimeLabels(outputRoot) {
+  const { manifest, agentSource } = readBundle(outputRoot);
+  assert.equal(manifest.runtime.connected_adapters.length, 1);
+  assert.equal(manifest.runtime.connected_adapters[0].runtime_mcp_label, "런타임 MCP");
+  assert.match(manifest.runtime.connected_adapters[0].runtime_mcp_note, /실행 시점/);
+  assert.match(agentSource, /"runtime_mcp_label": "런타임 MCP"/);
+  assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
+  assert.match(agentSource, /"connection_status": "mcp_connected"/);
 }
 
 function assertManifestStageUpdated(artifactRoot) {
@@ -237,6 +251,16 @@ test("runnable mode emits an ADK Workflow graph and the editable bundle config",
   const { artifactRoot, outputRoot } = generate({ runnable: true });
   try {
     assertRunnableBundle(outputRoot);
+    assertManifestStageUpdated(artifactRoot);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable connected MCP adapters carry an explicit runtime MCP label", () => {
+  const { artifactRoot, outputRoot } = generate({ runnable: true, connectedAdapter: true });
+  try {
+    assertConnectedMcpRuntimeLabels(outputRoot);
     assertManifestStageUpdated(artifactRoot);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });

@@ -30,6 +30,8 @@ if (!Array.isArray(scaffoldPlan.modules) || scaffoldPlan.modules.length === 0) {
 const modules = scaffoldPlan.modules;
 const outputMode = scaffoldPlan.output_mode === "runnable" ? "runnable" : "smoke";
 const DEFAULT_MODEL = "gemini-2.5-flash";
+const RUNTIME_MCP_LABEL = "런타임 MCP";
+const RUNTIME_MCP_NOTE = "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다.";
 if (scaffoldPlan.validation?.can_generate_source === false) {
   throw new Error(`scaffold-plan.json has blockers: ${(scaffoldPlan.validation.blockers ?? []).join("; ")}`);
 }
@@ -53,7 +55,7 @@ console.log("  python3 -m venv .venv");
 console.log("  source .venv/bin/activate");
 console.log("  pip install -r requirements.txt");
 if (outputMode === "runnable") {
-  console.log("  # copy .env.example to <repo>/.agent-factory/runtime.env and set GOOGLE_API_KEY there");
+  console.log("  # .env.example을 <repo>/.agent-factory/runtime.env로 복사하고 GOOGLE_API_KEY를 그 파일에 설정하세요");
 }
 console.log(`  python -m compileall ${packageName}`);
 console.log("  python -m pytest -q");
@@ -385,8 +387,14 @@ def _collect_tool_inputs(
 ) -> dict:
     # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
     # input_map (tool_input -> state/output key), (2) a top-level session-state
-    # value, or (3) a matching field inside an upstream node's *_output payload.
+    # value, (3) a matching field inside an upstream node's *_output payload, or
+    # (4) the reviewed smoke_spec.synthetic_inputs seed for runnable synthetic
+    # Mock Lab calls. The fallback keeps runnable scaffolds executable without
+    # inventing private data or hard-coding business values in generated code.
     overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    contract = COMPONENT_CONTRACTS.get(module_id, {})
+    smoke_spec = contract.get("smoke_spec") if isinstance(contract, dict) else {}
+    synthetic_inputs = smoke_spec.get("synthetic_inputs", {}) if isinstance(smoke_spec, dict) else {}
     args: dict = {}
     for name in input_names:
         source_key = overrides.get(name, name)
@@ -399,6 +407,8 @@ def _collect_tool_inputs(
             if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
                 args[name] = value.get(source_key)
                 break
+        if name not in args and isinstance(synthetic_inputs, dict) and synthetic_inputs.get(source_key) is not None:
+            args[name] = synthetic_inputs.get(source_key)
     missing = [name for name in required_names if name not in args]
     if missing:
         raise RuntimeError(
@@ -425,7 +435,7 @@ root_agent = Workflow(
 
 function emitAgentNode(module) {
   const sym = nodeSymbol(module);
-  const instruction = module.instruction || `You are ${module.name}. Operate only on the synthetic inputs in session state.`;
+  const instruction = module.instruction || defaultAgentInstruction(module);
   return `${sym} = LlmAgent(
     name=${toPyStr(pyNodeName(module))},
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
@@ -436,6 +446,14 @@ function emitAgentNode(module) {
 )`;
 }
 
+function defaultAgentInstruction(module) {
+  return [
+    `당신은 "${module.name}" Agent입니다.`,
+    "검토된 synthetic 입력과 session state 안의 데이터만 사용하세요.",
+    "private data, 실제 endpoint, credential은 만들거나 추정하지 마세요."
+  ].join("\n");
+}
+
 function emitFunctionNodeDecl(module) {
   return `${nodeSymbol(module)} = FunctionNode(func=${funcName(module)}, name=${toPyStr(pyNodeName(module))})`;
 }
@@ -443,15 +461,15 @@ function emitFunctionNodeDecl(module) {
 function emitStubFunc(module) {
   const kindNote =
     module.module_category === "workflow"
-      ? "deterministic workflow coordinator placeholder"
+      ? "검토된 deterministic workflow coordinator placeholder"
       : adapterConnection(module) === "unconnected"
-        ? "unconnected adapter (no Mock Lab MCP server bound)"
-        : "reviewed TODO boundary";
+        ? "Mock Lab MCP 서버가 아직 연결되지 않은 adapter"
+        : "검토된 TODO boundary";
   const connectionStatus = module.module_category === "adapter" ? "unconnected" : "coordinator";
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """TODO_IMPLEMENT_HERE: ${escapePythonString(module.name)} — ${kindNote}.
 
-    Returns reviewed synthetic test-double output only; no real business logic.
+    검토된 synthetic test-double output만 반환합니다. 실제 business logic은 없습니다.
     """
     contract = COMPONENT_CONTRACTS[${toPyStr(module.id)}]
     payload = {
@@ -470,11 +488,10 @@ function emitConnectedAdapterFunc(module) {
   const inputNames = (module.inputs ?? []).map((field) => field.name).filter(Boolean);
   const requiredNames = (module.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
   return `async def ${funcName(module)}(ctx: Context) -> dict:
-    """Calls the live Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)} (synthetic Mock Lab only).
+    """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
 
-    Deterministic adapter: opens an MCP session and calls the named tool directly
-    so a real tools/call happens (verifiable in audit), instead of relying on a
-    model to choose the tool.
+    Deterministic adapter입니다. 모델이 tool을 고르게 하지 않고 MCP session을 열어
+    지정된 tool을 직접 호출하므로 audit에서 실제 tools/call을 확인할 수 있습니다.
     """
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
@@ -488,15 +505,28 @@ function emitConnectedAdapterFunc(module) {
             await session.initialize()
             tool_result = await session.call_tool(${toPyStr(module.mcp_tool_name)}, arguments=arguments)
     content = getattr(tool_result, "content", None) or []
+    structured_content = getattr(tool_result, "structuredContent", None)
+    if structured_content is None:
+        structured_content = getattr(tool_result, "structured_content", None)
+    if hasattr(structured_content, "model_dump"):
+        structured_content = structured_content.model_dump()
+    if not isinstance(structured_content, dict):
+        structured_content = {}
     payload = {
         "module_id": ${toPyStr(module.id)},
         "module_name": ${toPyStr(module.name)},
         "connection_status": "mcp_connected",
+        "runtime_mcp_label": ${toPyStr(RUNTIME_MCP_LABEL)},
+        "runtime_mcp_note": ${toPyStr(RUNTIME_MCP_NOTE)},
         "status": "mcp_tool_called",
         "mcp_server": ${toPyStr(module.mcp_server)},
         "mcp_tool": ${toPyStr(module.mcp_tool_name)},
+        "structured_content": structured_content,
         "result": [getattr(part, "text", str(part)) for part in content],
     }
+    for key, value in structured_content.items():
+        if key not in payload:
+            payload[key] = value
     ctx.state[${toPyStr(stateKey(module))}] = payload
     return payload`;
 }
@@ -507,10 +537,10 @@ function emitConnectedAdapterFunc(module) {
 
 function buildAgentsConfig() {
   const lines = [];
-  lines.push("# agents.config.yaml — per-node overrides for the runnable ADK bundle.");
-  lines.push("# Edit model / instruction / mcp_url here. agent.py loads this at import and");
-  lines.push("# applies the overrides, so editing this file actually changes behavior.");
-  lines.push("# Shared secrets live in <repo>/.agent-factory/runtime.env, not in this bundle.");
+  lines.push("# agents.config.yaml — runnable ADK bundle의 노드별 override 파일입니다.");
+  lines.push("# 한글 우선 instruction을 여기에서 검토/수정하세요. model / instruction / mcp_url 변경은");
+  lines.push("# agent.py import 시점에 반영되므로 다음 실행부터 실제 동작이 바뀝니다.");
+  lines.push("# 공유 secret은 이 bundle이 아니라 <repo>/.agent-factory/runtime.env에 둡니다.");
   lines.push(`default_model: ${DEFAULT_MODEL}`);
 
   const agents = modules.filter(isAgentModule);
@@ -521,7 +551,7 @@ function buildAgentsConfig() {
     lines.push(`    name: ${pyNodeName(module)}`);
     lines.push(`    model: ${module.model || DEFAULT_MODEL}`);
     lines.push("    instruction: |");
-    const instruction = module.instruction || `You are ${module.name}.`;
+    const instruction = module.instruction || defaultAgentInstruction(module);
     for (const line of String(instruction).split("\n")) lines.push(`      ${line}`);
   }
 
@@ -534,9 +564,13 @@ function buildAgentsConfig() {
     lines.push(`    connection: ${connected ? "mcp_connected" : "unconnected"}`);
     lines.push(`    mcp_server: ${module.mcp_server ? module.mcp_server : "null"}`);
     lines.push(`    mcp_tool: ${module.mcp_tool_name ? module.mcp_tool_name : "null"}`);
-    lines.push("    mcp_url: null  # default: $AF_MOCK_LAB_MCP_URL/<mcp_server>");
     if (connected) {
-      lines.push("    input_map: {}  # optional: {tool_input_name: state_or_upstream_output_key}");
+      lines.push(`    runtime_mcp_label: ${RUNTIME_MCP_LABEL}`);
+      lines.push(`    runtime_mcp_note: ${RUNTIME_MCP_NOTE}`);
+    }
+    lines.push("    mcp_url: null  # 기본값: $AF_MOCK_LAB_MCP_URL/<mcp_server>");
+    if (connected) {
+      lines.push("    input_map: {}  # 선택: {tool_input_name: state_or_upstream_output_key}");
     }
   }
 
@@ -545,16 +579,16 @@ function buildAgentsConfig() {
     lines.push("workflows:");
     for (const module of workflows) {
       lines.push(`  - id: ${module.id}`);
-      lines.push("    note: deterministic coordinator placeholder; expand into a sub-graph in a follow-up.");
+      lines.push("    note: 검토된 deterministic coordinator placeholder입니다. 후속 작업에서 sub-graph로 확장하세요.");
     }
   }
   return `${lines.join("\n")}\n`;
 }
 
 function buildEnvExample() {
-  return `# Shared Agent Factory runtime env template.
-# Copy this file to <repo>/.agent-factory/runtime.env, or set AF_RUNTIME_ENV_FILE.
-# Do not copy Gemini keys into each runtime-stub/.env.
+  return `# Agent Factory 공유 runtime env template입니다.
+# 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
+# Gemini key를 각 runtime-stub/.env에 반복해서 복사하지 마세요.
 #
 # GOOGLE_API_KEY=...
 # AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5173/api/mock-lab/mcp
@@ -614,6 +648,8 @@ function buildManifest() {
             connected_adapters: connectedAdapters.map((module) => ({
               module_id: module.id,
               module_name: module.name,
+              runtime_mcp_label: RUNTIME_MCP_LABEL,
+              runtime_mcp_note: RUNTIME_MCP_NOTE,
               mcp_server: module.mcp_server ?? null,
               mcp_tool_name: module.mcp_tool_name ?? null
             })),
@@ -732,7 +768,7 @@ function buildReadme() {
   if (outputMode === "runnable") {
     return `# ${packageName}
 
-Runnable ADK 2.1 workflow generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
+${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 runnable ADK 2.1 Workflow입니다.
 
 \`\`\`bash
 python3 -m venv .venv
@@ -744,31 +780,28 @@ python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
 
-## What this bundle is
+## 이 번들의 역할
 
-- \`root_agent\` is a \`google.adk.workflow.Workflow\` graph. Agent nodes are
-  \`LlmAgent\` instances that call Gemini; adapter nodes are deterministic
-  \`FunctionNode\`s. The graph runs over **synthetic inputs only** — no private
-  endpoints, credentials, or real customer data.
-- Generated from reviewed Agent Factory artifacts (\`raw_requirement_to_code=false\`).
+- \`root_agent\`는 \`google.adk.workflow.Workflow\` graph입니다. Agent node는 Gemini를 호출하는
+  \`LlmAgent\`이고, adapter node는 deterministic \`FunctionNode\`입니다.
+- graph는 **synthetic input만** 사용합니다. private endpoint, credential, 실제 고객 데이터는 포함하지 않습니다.
+- reviewed Agent Factory artifact에서만 생성되었습니다(\`raw_requirement_to_code=false\`).
 
-## Individualize it
+## 설정 변경
 
-Edit \`agents.config.yaml\` to override any node's \`model\` or \`instruction\`
-(and an adapter's \`mcp_url\`). \`agent.py\` loads this file at import, so changes
-take effect on the next run.
+\`agents.config.yaml\`에서 각 node의 \`model\`, \`instruction\`, adapter의 \`mcp_url\`을 검토/수정하세요.
+\`agent.py\`가 import 시점에 이 파일을 읽으므로 다음 실행부터 변경이 적용됩니다.
 
-Copy .env.example to .agent-factory/runtime.env at the repository root and
-put shared runtime secrets there. You can also point \`AF_RUNTIME_ENV_FILE\` at a
-different file. Do not repeat \`GOOGLE_API_KEY\` in every runtime-stub.
+\`.env.example\`을 repository root의 \`.agent-factory/runtime.env\`로 복사하고 공유 runtime secret은 그 파일에 둡니다.
+\`AF_RUNTIME_ENV_FILE\`로 다른 파일을 지정할 수도 있습니다. 각 \`runtime-stub\`마다 \`GOOGLE_API_KEY\`를 반복해서 넣지 마세요.
 
-## Adapters and the Mock Lab
+## Adapter와 Mock Lab
 
-Connected adapters call a live Mock Lab MCP tool over streamable-HTTP
-(\`AF_MOCK_LAB_MCP_URL\` base, default \`http://127.0.0.1:5173/api/mock-lab/mcp\`). Adapters with no
-bound/running Mock Lab server stay as TODO stubs returning reviewed synthetic
-mock output and are listed under \`runtime.unconnected_adapters\` in
-\`workflow_manifest.json\`.
+연결된 adapter는 streamable-HTTP로 실행 중인 Mock Lab MCP tool을 호출합니다
+(\`AF_MOCK_LAB_MCP_URL\` base, 기본값 \`http://127.0.0.1:5173/api/mock-lab/mcp\`).
+이 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload와 \`workflow_manifest.json\`에 기록됩니다.
+Mock Lab server가 binding/running 상태가 아닌 adapter는 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
+\`workflow_manifest.json\`의 \`runtime.unconnected_adapters\`에 표시됩니다.
 
 ## ADK runtime chat
 
@@ -781,7 +814,7 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
   }
   return `# ${packageName}
 
-Generated from approved scaffold-plan.json for ${normalizedRequirement.title}.
+${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 ADK smoke handoff입니다.
 
 \`\`\`bash
 python3 -m venv .venv
@@ -793,8 +826,8 @@ python -m pytest -q
 
 ## ADK runtime chat smoke
 
-This bundle supports local ADK API/Web UI smoke testing with reviewed synthetic test doubles only.
-It does not contain private endpoints, credentials, deployment scripts, or real business logic.
+이 bundle은 reviewed synthetic test double만 사용해 local ADK API/Web UI smoke test를 수행합니다.
+private endpoint, credential, deployment script, 실제 business logic은 포함하지 않습니다.
 
 \`\`\`bash
 adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
@@ -808,8 +841,8 @@ function buildRuntimeChatSmoke() {
   const sample = firstSmokeSample();
   const text =
     outputMode === "runnable"
-      ? sample || `Run the ${normalizedRequirement.title} workflow over synthetic sample inputs and summarize the result.`
-      : `Run a synthetic ADK chat smoke for ${normalizedRequirement.title}.`;
+      ? sample || `${normalizedRequirement.title} workflow를 synthetic sample input으로 실행하고 결과를 요약하세요.`
+      : `${normalizedRequirement.title}에 대한 synthetic ADK chat smoke를 실행하세요.`;
   return {
     host: "127.0.0.1",
     port: 8765,
@@ -836,44 +869,45 @@ function buildImplementationHandoff() {
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
   if (outputMode === "runnable") {
-    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: bind a Mock Lab MCP server or keep the synthetic stub.`);
-    return `# Implementation Handoff (runnable mode)
+    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: Mock Lab MCP server를 binding하거나 synthetic stub으로 유지하세요.`);
+    return `# 구현 Handoff (runnable mode)
 
-Generated from reviewed scaffold-plan.json for ${normalizedRequirement.title}.
+${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었습니다.
 
-## What runs today
+## 현재 실행되는 것
 
-- Agent nodes call Gemini; connected adapter nodes call live Mock Lab MCP tools.
-- Everything runs over synthetic inputs only.
+- Agent node는 Gemini를 호출하고, 연결된 adapter node는 live Mock Lab MCP tool을 호출합니다.
+- 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
+- 모든 실행은 synthetic input만 사용합니다.
 
-## Boundaries that still must hold
+## 반드시 유지할 경계
 
-- Do not add private endpoints, credentials, customer data, or deployment scripts.
-- Keep adapter calls pointed at synthetic Mock Lab servers, not real systems.
-- Individualize behavior via agents.config.yaml and shared secrets via .agent-factory/runtime.env, not by hard-coding secrets.
+- private endpoint, credential, customer data, deployment script를 추가하지 마세요.
+- adapter call은 real system이 아니라 synthetic Mock Lab server를 향해야 합니다.
+- 동작은 \`agents.config.yaml\`에서 조정하고 공유 secret은 \`.agent-factory/runtime.env\`에 둡니다. secret을 코드에 hard-code하지 마세요.
 
-## Unconnected adapters (synthetic stub until a Mock Lab server is bound)
+## 미연결 adapter
 
 ${unconnected.length ? unconnected.join("\n") : "- none"}
 
-## Reviewed TODO notes
+## 검토된 TODO
 
-${todoLines.length ? todoLines.join("\n") : "- Review generated nodes before production wiring."}
+${todoLines.length ? todoLines.join("\n") : "- production wiring 전에 generated node를 검토하세요."}
 `;
   }
-  return `# Implementation Handoff
+  return `# 구현 Handoff
 
-Generated from reviewed scaffold-plan.json for ${normalizedRequirement.title}.
+${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었습니다.
 
-## Non-goals
+## 하지 않는 일
 
-- Do not add runnable business logic in this generated bundle.
-- Do not add private endpoints, credentials, customer data, or deployment scripts.
-- Replace TODO boundaries only in a separate implementation task after runtime wiring is approved.
+- 이 generated bundle 안에 runnable business logic을 추가하지 않습니다.
+- private endpoint, credential, customer data, deployment script를 추가하지 않습니다.
+- Runtime wiring이 승인된 뒤 별도 구현 작업에서만 TODO boundary를 대체합니다.
 
 ## TODO Boundaries
 
-${todoLines.length ? todoLines.join("\n") : "- Review generated TODO_IMPLEMENT_HERE functions before implementation."}
+${todoLines.length ? todoLines.join("\n") : "- 구현 전에 generated TODO_IMPLEMENT_HERE function을 검토하세요."}
 `;
 }
 
@@ -886,7 +920,8 @@ function componentContracts() {
         inputs: module.inputs,
         outputs: module.outputs,
         risk_signals: module.risk_signals,
-        runtime_mock: module.runtime_mock ?? null
+        runtime_mock: module.runtime_mock ?? null,
+        smoke_spec: module.smoke_spec ?? null
       };
       if (outputMode !== "runnable") return [module.id, base];
       return [
@@ -899,6 +934,8 @@ function componentContracts() {
           access_protocol: module.access_protocol ?? null,
           mcp_server: module.mcp_server ?? null,
           mcp_tool_name: module.mcp_tool_name ?? null,
+          runtime_mcp_label: adapterConnection(module) === "mcp_connected" ? RUNTIME_MCP_LABEL : null,
+          runtime_mcp_note: adapterConnection(module) === "mcp_connected" ? RUNTIME_MCP_NOTE : null,
           connection_status: adapterConnection(module)
         }
       ];

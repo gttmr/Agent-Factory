@@ -8,8 +8,14 @@ __pycache__/
 .pytest_cache/
 generated/
 .playwright-cli/
+packages/mock-lab/.vite/
 generated/**/.venv/
 generated/**/.adk/
-artifacts/**/.venv/
-artifacts/**/.adk/
+# Workbench/skills outputs are local review artifacts. They include generated
+# runtime-stub bundles and per-run catalog-delta.yaml proposals.
+artifacts/
+# Keep canonical seed catalog files tracked; ignore local/generated catalog experiments.
+catalog/generated/
+catalog/local/
+catalog/**/*.local.*
 .agent-factory/runtime.env

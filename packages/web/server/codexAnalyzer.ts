@@ -1082,7 +1082,7 @@ function sanitizeCatalogFields(value: unknown): Array<{ name: string; type: stri
 
 function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEntry[], contextIndexPath: string): string {
   const sections: string[] = [
-    "You are the live requirement analyzer for the Agent Factory workbench.",
+    "You are the live requirement analyzer for the Agent Factory workbench. Human-visible prose must be Korean-first.",
     "Return only JSON matching schemas/analysis-draft.schema.json. No markdown, no commentary.",
     "The server will hydrate your compact draft into schemas/analysis-result.schema.json after you finish.",
     "Do not emit the full final AnalysisResult shape. Emit only the compact draft fields requested by the output schema.",
@@ -1112,7 +1112,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Number module ids sequentially as mod-001, mod-002, mod-003, ... with no gaps.",
     "- For catalog reuse, set reuse_candidate=true, set catalog_entry_id to the exact catalog id, and keep the catalog entry name verbatim. You may omit repeated catalog inputs/outputs when unchanged; the server hydrates them.",
     "- For new modules, include inputs/outputs when they are materially needed to explain the contract.",
-    "- Include concise Korean rationale and missing_information. Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
+    "- Include concise Korean rationale, missing_information, assumptions, developer_todos, smoke_spec.sample_user_message, processFlow labels/descriptions, and runtime contract summaries. Do not generate runnable business logic, credentials, private endpoints, deployment scripts, or real banking integration details.",
     "",
     "Process flow output — compact Graph IR draft (NOT a stage list):",
     "- processFlow MUST contain nodes, edges, containers, lanes, and validation because the Codex response_format schema requires all object keys. Use [] for containers/lanes when the default root graph container is enough; the server hydrates required Graph IR defaults.",
@@ -1130,7 +1130,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     "- Do NOT infer Remote A2A from local complexity. Multi-step local workflow alone is NOT enough to propose a remote_a2a node, edge, or container.",
     "- Module status must be one of needs_info, deferred, rejected; never approved.",
     "- a2aContracts must be present; use [] when there is no Remote A2A draft. The server hydrates placeholder A2A contracts for real remote_a2a candidates.",
-    "- runtimeContracts must be present; use [] unless the compact draft intentionally includes a minimal contract_id/contract_kind/contract_status record. The server derives Runtime contract review drafts for EAI/Legacy, MCP, Context Manager, Callback Broker, ADK callback, and async resume signals.",
+    "- runtimeContracts must be present; use [] unless the compact draft intentionally includes a minimal contract_id/contract_kind/contract_status record. The server derives Runtime contract review drafts for EAI/Legacy, MCP, Context Manager, Callback Broker, ADK callback, and async resume signals. If you emit any runtimeContracts text field yourself, write the reviewer-facing text in Korean-first prose.",
     "- adk_hints should be concise and grounded in adk-docs-mcp when relevant. Use only these keys: state_memory, callbacks, artifacts_events, mcp_a2a, streaming_grounding.",
     "",
     "Taxonomy guardrails:",
@@ -1162,7 +1162,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
       "- Copy the catalog inputs and outputs onto a reused candidate unless the requirement narrows them; explain any narrowing in rationale or missing_information.",
       "- For reused workflow entries, honor the registered composition list as the intended orchestration structure and mention any missing component in missing_information. If runtime_binding is \"remote_a2a\", explain that this is a catalog runtime binding for the workflow, not a new module_category: remote_a2a candidate by itself.",
       "- Adapters with access_protocol \"mcp\" reuse the registered mcp_server / mcp_tool_name / mcp_schema_ref / mcp_auth_mode; copy them onto the candidate exactly. Do not invent server or tool names.",
-      "- Catalog entries describe reusable reviewed runtime contracts. Preserve the catalog name on reused candidates so scaffold-plan generation can record the catalog binding and emit a reviewed wiring TODO when runtime configuration is still required.",
+      "- Catalog entries describe reusable reviewed runtime contracts. Preserve the catalog name on reused candidates so scaffold-plan generation can record the catalog binding and emit a Korean-first reviewed wiring TODO when runtime configuration is still required.",
       "- For partial matches, still emit a candidate but flag the gap in missing_information (e.g. owner mismatch, narrower scope).",
       "- Do not duplicate a catalog entry as a separate new candidate — collapse it into the matching reuse candidate.",
       "- Never fabricate catalog entries that are not in this list.",
