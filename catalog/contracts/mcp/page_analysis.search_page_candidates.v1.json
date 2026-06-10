@@ -2,23 +2,21 @@
   "schema_ref": "catalog.page_analysis.search_page_candidates.v1",
   "server": "page-analysis-mcp",
   "tool": "search_page_candidates",
-  "title": "Page candidate RAG retrieval",
-  "description": "Synthetic retrieval contract for selecting page candidates from user intent and customer behavior classification.",
+  "title": "런타임 MCP 페이지 후보 RAG 검색",
+  "description": "사용자 요청 query를 기반으로 CDP page 후보를 검색해 반환하는 런타임 MCP 계약입니다.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,
     "required": [
-      "query",
-      "scenario_design_purpose",
-      "scenario_target_business_domain",
-      "customer_behavior_classification"
+      "query"
     ],
     "properties": {
-      "query": { "type": "string" },
-      "scenario_design_purpose": { "type": "string" },
-      "scenario_target_business_domain": { "type": "string" },
-      "customer_behavior_classification": { "type": "object" },
-      "top_k": { "type": "integer" }
+      "query": {
+        "type": "string"
+      },
+      "top_k": {
+        "type": "integer"
+      }
     }
   },
   "outputSchema": {
@@ -31,27 +29,34 @@
       "retrieval_metadata"
     ],
     "properties": {
-      "synthetic": { "type": "boolean" },
-      "source": { "type": "string" },
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
       "page_candidates": {
         "type": "array",
-        "items": { "type": "object" }
+        "items": {
+          "type": "object"
+        }
       },
-      "retrieval_metadata": { "type": "object" }
+      "retrieval_metadata": {
+        "type": "object"
+      },
+      "runtime_mcp_label": {
+        "type": "string"
+      },
+      "runtime_mcp_note": {
+        "type": "string"
+      }
     }
   },
   "success_examples": [
     {
-      "name": "savings_auto_transfer_candidates",
+      "name": "query_based_page_candidates",
       "arguments": {
-        "query": "적금 자동이체 설정 이탈 페이지",
-        "scenario_design_purpose": "자동이체 설정 전환율 개선",
-        "scenario_target_business_domain": "적금 상품",
-        "customer_behavior_classification": {
-          "large": "가입/전환",
-          "medium": "자동이체",
-          "small": "설정 이탈"
-        },
+        "query": "적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘.",
         "top_k": 2
       },
       "structuredContent": {
@@ -62,13 +67,41 @@
             "page_id": "svc-savings-auto-transfer-setup",
             "service_id": "savings",
             "page_name": "적금 자동이체 설정",
-            "score": 0.94
+            "behavior_path": {
+              "large": "가입/전환",
+              "medium": "자동이체",
+              "small": "설정 이탈"
+            },
+            "score": 0.94,
+            "evidence": [
+              "synthetic-rag-page-catalog:autotransfer",
+              "behavior-taxonomy:auto-transfer-dropoff"
+            ]
+          },
+          {
+            "page_id": "svc-savings-product-detail",
+            "service_id": "savings",
+            "page_name": "적금 상품 상세",
+            "behavior_path": {
+              "large": "탐색/비교",
+              "medium": "상품 이해",
+              "small": "조건 확인"
+            },
+            "score": 0.78,
+            "evidence": [
+              "synthetic-rag-page-catalog:savings-detail"
+            ]
           }
         ],
         "retrieval_metadata": {
           "query_id": "rag-page-demo-001",
-          "corpus": "synthetic-page-catalog-v1"
-        }
+          "corpus": "synthetic-page-catalog-v1",
+          "top_k": 2,
+          "effective_date": "2026-06-08",
+          "query": "적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘."
+        },
+        "runtime_mcp_label": "런타임 MCP",
+        "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 search_page_candidates tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
       }
     }
   ],
@@ -79,14 +112,14 @@
         "query": ""
       },
       "isError": true,
-      "message": "query is required"
+      "message": "query 입력이 필요합니다."
     }
   ],
   "mock_response": {
     "content": [
       {
         "type": "text",
-        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"page_candidates\":2}"
+        "text": "{\"synthetic\":true,\"runtime_mcp_label\":\"런타임 MCP\",\"source\":\"agent-factory-mock-lab\",\"tool\":\"search_page_candidates\"}"
       }
     ],
     "structuredContent": {
@@ -127,8 +160,11 @@
         "query_id": "rag-page-demo-001",
         "corpus": "synthetic-page-catalog-v1",
         "top_k": 2,
-        "effective_date": "2026-06-08"
-      }
+        "effective_date": "2026-06-08",
+        "query": "적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘."
+      },
+      "runtime_mcp_label": "런타임 MCP",
+      "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 search_page_candidates tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
     },
     "isError": false
   }

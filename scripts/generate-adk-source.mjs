@@ -166,13 +166,13 @@ def _synthetic_module_outputs():
 def _build_smoke_text(user_text: str = ""):
     mock_count = sum(1 for contract in COMPONENT_CONTRACTS.values() if contract.get("runtime_mock") is not None)
     terminal_outputs = ", ".join(TERMINAL_OUTPUTS) if TERMINAL_OUTPUTS else "none"
-    user_note = f" Received message: {user_text[:160]}" if user_text else ""
+    user_note = f" 받은 메시지: {user_text[:160]}" if user_text else ""
     return (
-        "ADK runtime smoke for ${packageName}: "
-        f"{len(COMPONENT_CONTRACTS)} approved modules loaded, "
-        f"{mock_count} synthetic runtime mocks available. "
-        f"Terminal outputs: {terminal_outputs}. "
-        "This response uses reviewed synthetic test doubles only; it is not real business logic."
+        "${packageName} ADK 런타임 smoke: "
+        f"승인된 모듈 {len(COMPONENT_CONTRACTS)}개를 불러왔고, "
+        f"합성 런타임 mock {mock_count}개를 사용할 수 있습니다. "
+        f"최종 출력: {terminal_outputs}. "
+        "이 응답은 검토된 합성 테스트 더블만 사용하며 실제 업무 로직이 아닙니다."
         f"{user_note}"
     )
 
@@ -219,7 +219,7 @@ class SyntheticRuntimeSmokeAgent(BaseAgent):
 
 root_agent = SyntheticRuntimeSmokeAgent(
     name="${packageName}",
-    description="Synthetic ADK runtime smoke bridge for reviewed Agent Factory handoff artifacts.",
+    description="검토된 Agent Factory 인계 artifact를 확인하는 합성 ADK 런타임 smoke bridge입니다.",
 )
 `;
 }
@@ -246,7 +246,7 @@ function buildRunnableAgentPy() {
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.sym)})`);
   const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
-  const description = `Runnable ADK 2.1 workflow generated from reviewed Agent Factory artifacts for ${truncate(
+  const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.1 워크플로우입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
 
@@ -382,6 +382,13 @@ def _mcp_url(module_id: str, mcp_server: str) -> str:
     return f"{base}/{mcp_server}"
 
 
+def _user_text_from_context(ctx: Context) -> str:
+    content = getattr(ctx, "user_content", None)
+    parts = getattr(content, "parts", None) or []
+    text = "".join(getattr(part, "text", "") or "" for part in parts)
+    return text.strip()
+
+
 def _collect_tool_inputs(
     ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
 ) -> dict:
@@ -407,6 +414,10 @@ def _collect_tool_inputs(
             if key.endswith("_output") and isinstance(value, dict) and value.get(source_key) is not None:
                 args[name] = value.get(source_key)
                 break
+        if name not in args and source_key in {"query", "user_request"}:
+            user_text = _user_text_from_context(ctx)
+            if user_text:
+                args[name] = user_text
         if name not in args and isinstance(synthetic_inputs, dict) and synthetic_inputs.get(source_key) is not None:
             args[name] = synthetic_inputs.get(source_key)
     missing = [name for name in required_names if name not in args]
@@ -461,7 +472,7 @@ function emitFunctionNodeDecl(module) {
 function emitStubFunc(module) {
   const kindNote =
     module.module_category === "workflow"
-      ? "검토된 deterministic workflow coordinator placeholder"
+      ? "검토된 결정적 워크플로우 조정자 자리표시자"
       : adapterConnection(module) === "unconnected"
         ? "Mock Lab MCP 서버가 아직 연결되지 않은 adapter"
         : "검토된 TODO boundary";
@@ -469,7 +480,7 @@ function emitStubFunc(module) {
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """TODO_IMPLEMENT_HERE: ${escapePythonString(module.name)} — ${kindNote}.
 
-    검토된 synthetic test-double output만 반환합니다. 실제 business logic은 없습니다.
+    검토된 합성 테스트 더블 output만 반환합니다. 실제 업무 로직은 없습니다.
     """
     contract = COMPONENT_CONTRACTS[${toPyStr(module.id)}]
     payload = {
@@ -490,7 +501,7 @@ function emitConnectedAdapterFunc(module) {
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
 
-    Deterministic adapter입니다. 모델이 tool을 고르게 하지 않고 MCP session을 열어
+    결정적 Adapter입니다. 모델이 tool을 고르게 하지 않고 MCP session을 열어
     지정된 tool을 직접 호출하므로 audit에서 실제 tools/call을 확인할 수 있습니다.
     """
     from mcp import ClientSession
@@ -579,7 +590,7 @@ function buildAgentsConfig() {
     lines.push("workflows:");
     for (const module of workflows) {
       lines.push(`  - id: ${module.id}`);
-      lines.push("    note: 검토된 deterministic coordinator placeholder입니다. 후속 작업에서 sub-graph로 확장하세요.");
+      lines.push("    note: 검토된 결정적 조정자 자리표시자입니다. 후속 작업에서 하위 그래프로 확장하세요.");
     }
   }
   return `${lines.join("\n")}\n`;
@@ -826,8 +837,8 @@ python -m pytest -q
 
 ## ADK runtime chat smoke
 
-이 bundle은 reviewed synthetic test double만 사용해 local ADK API/Web UI smoke test를 수행합니다.
-private endpoint, credential, deployment script, 실제 business logic은 포함하지 않습니다.
+이 bundle은 검토된 합성 테스트 더블만 사용해 로컬 ADK API/Web UI smoke test를 수행합니다.
+비공개 endpoint, credential, 배포 script, 실제 업무 로직은 포함하지 않습니다.
 
 \`\`\`bash
 adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
@@ -841,8 +852,8 @@ function buildRuntimeChatSmoke() {
   const sample = firstSmokeSample();
   const text =
     outputMode === "runnable"
-      ? sample || `${normalizedRequirement.title} workflow를 synthetic sample input으로 실행하고 결과를 요약하세요.`
-      : `${normalizedRequirement.title}에 대한 synthetic ADK chat smoke를 실행하세요.`;
+      ? sample || `${normalizedRequirement.title} 워크플로우를 합성 sample input으로 실행하고 결과를 요약하세요.`
+      : `${normalizedRequirement.title}에 대한 합성 ADK chat smoke를 실행하세요.`;
   return {
     host: "127.0.0.1",
     port: 8765,
@@ -869,21 +880,21 @@ function buildImplementationHandoff() {
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
   if (outputMode === "runnable") {
-    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: Mock Lab MCP server를 binding하거나 synthetic stub으로 유지하세요.`);
+    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: Mock Lab MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
     return `# 구현 Handoff (runnable mode)
 
 ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었습니다.
 
 ## 현재 실행되는 것
 
-- Agent node는 Gemini를 호출하고, 연결된 adapter node는 live Mock Lab MCP tool을 호출합니다.
+- Agent node는 Gemini를 호출하고, 연결된 Adapter node는 실제 실행 시점에 Mock Lab MCP tool을 호출합니다.
 - 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
-- 모든 실행은 synthetic input만 사용합니다.
+- 모든 실행은 합성 input만 사용합니다.
 
 ## 반드시 유지할 경계
 
-- private endpoint, credential, customer data, deployment script를 추가하지 마세요.
-- adapter call은 real system이 아니라 synthetic Mock Lab server를 향해야 합니다.
+- 비공개 endpoint, credential, 고객 데이터, 배포 script를 추가하지 마세요.
+- Adapter 호출은 실제 운영 system이 아니라 합성 Mock Lab 서버를 향해야 합니다.
 - 동작은 \`agents.config.yaml\`에서 조정하고 공유 secret은 \`.agent-factory/runtime.env\`에 둡니다. secret을 코드에 hard-code하지 마세요.
 
 ## 미연결 adapter
@@ -892,7 +903,7 @@ ${unconnected.length ? unconnected.join("\n") : "- none"}
 
 ## 검토된 TODO
 
-${todoLines.length ? todoLines.join("\n") : "- production wiring 전에 generated node를 검토하세요."}
+${todoLines.length ? todoLines.join("\n") : "- 운영 wiring 전에 generated node를 검토하세요."}
 `;
   }
   return `# 구현 Handoff
@@ -901,9 +912,9 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 
 ## 하지 않는 일
 
-- 이 generated bundle 안에 runnable business logic을 추가하지 않습니다.
-- private endpoint, credential, customer data, deployment script를 추가하지 않습니다.
-- Runtime wiring이 승인된 뒤 별도 구현 작업에서만 TODO boundary를 대체합니다.
+- 이 generated bundle 안에 실행 가능한 업무 로직을 추가하지 않습니다.
+- 비공개 endpoint, credential, 고객 데이터, 배포 script를 추가하지 않습니다.
+- 런타임 wiring이 승인된 뒤 별도 구현 작업에서만 TODO boundary를 대체합니다.
 
 ## TODO Boundaries
 
@@ -1443,7 +1454,7 @@ function funcName(module) {
 }
 
 function pyNodeName(module) {
-  return toPythonIdentifier(module.id);
+  return toPythonIdentifier(module.name || module.id);
 }
 
 function stateKey(module) {
@@ -1459,8 +1470,11 @@ function todoFunctionName(module) {
 }
 
 function toPythonIdentifier(value) {
-  const identifier = String(value).toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
-  return /^[a-z_]/.test(identifier) ? identifier || "workflow" : `node_${identifier}`;
+  const identifier = String(value)
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}_]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+  return /^[\p{L}_]/u.test(identifier) ? identifier || "workflow" : `node_${identifier}`;
 }
 
 function toPythonLiteral(value, indent = 0) {

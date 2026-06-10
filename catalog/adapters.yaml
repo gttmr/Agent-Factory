@@ -309,15 +309,9 @@ adapters:
       - name: query
         type: text
         required: true
-      - name: scenario_design_purpose
-        type: text
-        required: true
-      - name: scenario_target_business_domain
-        type: string
-        required: true
-      - name: customer_behavior_classification
-        type: object
-        required: true
+      - name: top_k
+        type: number
+        required: false
     outputs:
       - name: page_candidates
         type: array<object>
@@ -329,6 +323,8 @@ adapters:
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
+      runtime_mcp_label: 런타임 MCP
+      runtime_mcp_note: page-analysis-mcp/search_page_candidates 호출 결과를 후속 Agent가 읽습니다.
       page_candidates:
         - page_id: svc-savings-auto-transfer-setup
           service_id: savings
@@ -344,8 +340,9 @@ adapters:
       retrieval_metadata:
         query_id: rag-page-demo-001
         corpus: synthetic-page-catalog-v1
+        query: 적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘.
         effective_date: "2026-06-08"
-    notes: 고객 행동 유형 분류와 사용자 쿼리를 받아 synthetic page 후보를 반환하는 RAG MCP mock Adapter다.
+    notes: 사용자 요청 query를 받아 합성 page 후보를 반환하는 런타임 MCP 목업 Adapter다.
 
   - name: user_flow_analysis_mock_adapter
     adapter_kind: computation
@@ -386,10 +383,12 @@ adapters:
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
+      runtime_mcp_label: 런타임 MCP
+      runtime_mcp_note: page-analysis-mcp/analyze_user_flow 호출 결과를 후속 Agent가 읽습니다.
       analysis_result:
         method: user_flow_analysis
         page_id: svc-savings-auto-transfer-setup
-        summary: 자동이체 금액 입력 이후 인증 진입 전 단계에서 synthetic 이탈이 높습니다.
+        summary: 자동이체 금액 입력 이후 인증 진입 전 단계에서 합성 이탈이 높습니다.
         findings:
           - step: amount_input
             signal: hesitation
@@ -398,7 +397,7 @@ adapters:
             signal: retry
             synthetic_dropoff_rate: 0.18
       recommended_page_id: svc-savings-auto-transfer-setup
-    notes: 선택된 page_id의 synthetic funnel 병목을 반환하는 유저플로우 분석 MCP mock Adapter다.
+    notes: 선택된 page_id의 합성 퍼널 병목을 반환하는 런타임 MCP 목업 Adapter다.
 
   - name: behavior_scenario_recommendation_mock_adapter
     adapter_kind: computation
@@ -441,22 +440,68 @@ adapters:
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
+      runtime_mcp_label: 런타임 MCP
+      runtime_mcp_note: page-analysis-mcp/recommend_behavior_scenarios 호출 결과를 후속 Agent가 읽습니다.
       analysis_result:
         method: behavior_scenario_recommendation
         behavior_path:
           large: 가입/전환
           medium: 자동이체
           small: 설정 이탈
-        summary: 자동이체 설정 이탈 사용자를 복귀시키는 synthetic scenario 후보를 추천합니다.
+        summary: 자동이체 설정 이탈 사용자를 복귀시키는 합성 시나리오 후보를 추천합니다.
       scenario_recommendations:
         - scenario_id: auto_transfer_setup_recovery
           title: 자동이체 설정 복귀 유도
           trigger: amount_input_abandonment
           expected_page_id: svc-savings-auto-transfer-setup
       recommended_page_id: svc-savings-auto-transfer-setup
-    notes: 행동 유형 분류와 page_id를 받아 synthetic scenario 추천을 반환하는 MCP mock Adapter다.
+    notes: 행동 유형 분류와 page_id를 받아 합성 시나리오 추천을 반환하는 런타임 MCP 목업 Adapter다.
 
-  - name: page_customer_sql_analysis_mock_adapter
+  - name: text_to_sql_solution_adapter
+    adapter_kind: external_service
+    owner_domain: 데이터분석
+    status: approved
+    access_protocol: mcp
+    mcp_server: page-analysis-mcp
+    mcp_tool_name: generate_text_to_sql
+    mcp_schema_ref: catalog.page_analysis.generate_text_to_sql.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: user_request
+        type: text
+        required: true
+      - name: candidate_selected_page_id
+        type: string
+        required: true
+      - name: recommendation_rationale
+        type: text
+        required: false
+    outputs:
+      - name: sql_text
+        type: text
+      - name: sql_generation_metadata
+        type: object
+    risk_signals:
+      - financial_data
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      runtime_mcp_label: 런타임 MCP
+      runtime_mcp_note: page-analysis-mcp/generate_text_to_sql 호출 결과를 후속 Agent가 읽습니다.
+      sql_text: SELECT page_id, COUNT(*) AS visits, AVG(completion_rate) AS completion_rate FROM synthetic_page_events WHERE page_id = 'svc-savings-auto-transfer-setup' GROUP BY page_id
+      sql_generation_metadata:
+        readonly: true
+        t2s_solution: synthetic-cdp-t2s-v1
+        selected_page_id: svc-savings-auto-transfer-setup
+        sql_hash: synthetic-generated-sql-hash-001
+    notes: 사용자 요청과 추천 page_id를 받아 워크플로우 내부에서 합성 읽기 전용 SQL을 생성하는 런타임 MCP 목업 Adapter다.
+
+  - name: page_customer_sql_execution_adapter
     adapter_kind: data_query
     owner_domain: 데이터분석
     status: approved
@@ -472,11 +517,16 @@ adapters:
       - name: sql_text
         type: text
         required: true
-    outputs:
-      - name: analysis_result
-        type: object
-      - name: recommended_page_id
+      - name: candidate_selected_page_id
         type: string
+        required: false
+    outputs:
+      - name: rows
+        type: array<object>
+      - name: row_count
+        type: number
+      - name: schema
+        type: array<object>
       - name: query_summary
         type: object
     risk_signals:
@@ -486,19 +536,29 @@ adapters:
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
-      analysis_result:
-        method: text_to_sql_analysis
-        summary: synthetic SQL aggregation에서 자동이체 설정 페이지의 재방문 대비 완료율이 낮게 나타납니다.
-        metrics:
-          - name: synthetic_visits
-            value: 1280
-          - name: synthetic_completion_rate
-            value: 0.42
-      recommended_page_id: svc-savings-auto-transfer-setup
+      runtime_mcp_label: 런타임 MCP
+      runtime_mcp_note: page-analysis-mcp/execute_page_customer_sql 호출 결과를 후속 Agent가 읽습니다.
+      rows:
+        - page_id: svc-savings-auto-transfer-setup
+          visits: 1280
+          completion_rate: 0.42
+          revisit_rate: 0.37
+          synthetic_segment: auto_transfer_setup_dropoff
+      row_count: 1
+      schema:
+        - name: page_id
+          type: string
+        - name: visits
+          type: integer
+        - name: completion_rate
+          type: number
+        - name: revisit_rate
+          type: number
+        - name: synthetic_segment
+          type: string
       query_summary:
         readonly: true
         tables:
           - synthetic_page_events
-        row_count: 3
         sql_hash: synthetic-sql-hash-001
-    notes: T2S 솔루션이 만든 reviewed SQL 전문을 소비하는 synthetic readonly page/customer 분석 MCP mock Adapter다.
+    notes: 워크플로우 내부 T2S 런타임 MCP Adapter가 만든 SQL 전문을 소비해 분석 요약이 아니라 합성 SQL 실행 rows를 반환하는 읽기 전용 목업 Adapter다.

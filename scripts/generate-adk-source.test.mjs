@@ -19,7 +19,7 @@ function baseModules(runnable, { connectedAdapter = false } = {}) {
   return [
     {
       id: "mod-gen-agent",
-      name: "gen_agent",
+      name: "응답_생성_Agent",
       module_category: "agent",
       agent_kind: "specialist",
       workflow_kind: null,
@@ -46,7 +46,7 @@ function baseModules(runnable, { connectedAdapter = false } = {}) {
     },
     {
       id: "mod-gen-adapter",
-      name: "gen_adapter",
+      name: "데이터_조회_Adapter",
       module_category: "adapter",
       agent_kind: null,
       workflow_kind: null,
@@ -190,6 +190,8 @@ function assertRunnableBundle(outputRoot) {
   assert.match(agentSource, /mode="single_turn"/);
   assert.match(agentSource, /당신은/);
   assert.doesNotMatch(agentSource, /You are gen_agent/);
+  assert.match(agentSource, /name="응답_생성_Agent"/);
+  assert.match(agentSource, /name="데이터_조회_Adapter"/);
   assert.match(agentSource, /http:\/\/127\.0\.0\.1:5173\/api\/mock-lab\/mcp/);
   assert.match(agentSource, /AF_RUNTIME_ENV_FILE/);
   assert.match(agentSource, /\.agent-factory\/runtime\.env/);
@@ -210,6 +212,7 @@ function assertRunnableBundle(outputRoot) {
   assert.match(envExample, /AF_RUNTIME_ENV_FILE/);
   assert.match(envExample, /\.agent-factory\/runtime\.env/);
   assert.match(agentsConfig, /한글 우선/);
+  assert.match(agentsConfig, /name: 응답_생성_Agent/);
   assert.match(readme, /repository root의 `\.agent-factory\/runtime\.env`로 복사/);
   assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
   return packageName;
@@ -223,6 +226,8 @@ function assertConnectedMcpRuntimeLabels(outputRoot) {
   assert.match(agentSource, /"runtime_mcp_label": "런타임 MCP"/);
   assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
   assert.match(agentSource, /"connection_status": "mcp_connected"/);
+  assert.match(agentSource, /def _user_text_from_context\(ctx: Context\) -> str:/);
+  assert.match(agentSource, /source_key in \{"query", "user_request"\}/);
 }
 
 function assertManifestStageUpdated(artifactRoot) {

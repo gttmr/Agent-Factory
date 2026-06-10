@@ -1,0 +1,124 @@
+{
+  "schema_ref": "catalog.page_analysis.generate_text_to_sql.v1",
+  "server": "page-analysis-mcp",
+  "tool": "generate_text_to_sql",
+  "title": "런타임 MCP Text-to-SQL 생성",
+  "description": "추천된 page_id와 사용자 요청 query를 읽기 전용 SQL로 변환하는 런타임 MCP 계약입니다.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "user_request",
+      "candidate_selected_page_id"
+    ],
+    "properties": {
+      "user_request": {
+        "type": "string"
+      },
+      "candidate_selected_page_id": {
+        "type": "string"
+      },
+      "recommendation_rationale": {
+        "type": "string"
+      },
+      "analysis_intent": {
+        "type": "string"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "synthetic",
+      "source",
+      "sql_text",
+      "sql_generation_metadata"
+    ],
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "sql_text": {
+        "type": "string"
+      },
+      "sql_generation_metadata": {
+        "type": "object"
+      },
+      "runtime_mcp_label": {
+        "type": "string"
+      },
+      "runtime_mcp_note": {
+        "type": "string"
+      }
+    }
+  },
+  "success_examples": [
+    {
+      "name": "recommended_page_sql",
+      "arguments": {
+        "user_request": "적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘.",
+        "candidate_selected_page_id": "svc-savings-auto-transfer-setup",
+        "recommendation_rationale": "자동이체 설정 전환율 개선 의도와 가장 직접적으로 연결된 페이지입니다."
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "sql_text": "SELECT page_id, COUNT(*) AS visits, AVG(completion_rate) AS completion_rate FROM synthetic_page_events WHERE page_id = 'svc-savings-auto-transfer-setup' GROUP BY page_id",
+        "sql_generation_metadata": {
+          "readonly": true,
+          "t2s_solution": "synthetic-cdp-t2s-v1",
+          "selected_page_id": "svc-savings-auto-transfer-setup",
+          "sql_hash": "synthetic-generated-sql-hash-001",
+          "generated_from": [
+            "user_request",
+            "candidate_selected_page_id",
+            "recommendation_rationale"
+          ]
+        },
+        "runtime_mcp_label": "런타임 MCP",
+        "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 generate_text_to_sql tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_selected_page",
+      "arguments": {
+        "user_request": "분석 페이지 추천"
+      },
+      "isError": true,
+      "message": "candidate_selected_page_id 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"runtime_mcp_label\":\"런타임 MCP\",\"source\":\"agent-factory-mock-lab\",\"tool\":\"generate_text_to_sql\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "sql_text": "SELECT page_id, COUNT(*) AS visits, AVG(completion_rate) AS completion_rate FROM synthetic_page_events WHERE page_id = 'svc-savings-auto-transfer-setup' GROUP BY page_id",
+      "sql_generation_metadata": {
+        "readonly": true,
+        "t2s_solution": "synthetic-cdp-t2s-v1",
+        "selected_page_id": "svc-savings-auto-transfer-setup",
+        "sql_hash": "synthetic-generated-sql-hash-001",
+        "generated_from": [
+          "user_request",
+          "candidate_selected_page_id",
+          "recommendation_rationale"
+        ]
+      },
+      "runtime_mcp_label": "런타임 MCP",
+      "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 generate_text_to_sql tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
+    },
+    "isError": false
+  }
+}

@@ -2,8 +2,8 @@
   "schema_ref": "catalog.page_analysis.recommend_behavior_scenarios.v1",
   "server": "page-analysis-mcp",
   "tool": "recommend_behavior_scenarios",
-  "title": "Behavior scenario recommendation",
-  "description": "Synthetic contract for recommending scenarios from behavior classification and a selected page id.",
+  "title": "런타임 MCP 행동 시나리오 추천",
+  "description": "고객 행동 유형 분류와 선택 page_id를 바탕으로 합성 시나리오 후보를 추천하는 런타임 MCP 계약입니다.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -14,11 +14,21 @@
       "page_id"
     ],
     "properties": {
-      "scenario_design_purpose": { "type": "string" },
-      "scenario_target": { "type": "string" },
-      "business_domain": { "type": "string" },
-      "page_id": { "type": "string" },
-      "additional_required_information": { "type": "string" }
+      "scenario_design_purpose": {
+        "type": "string"
+      },
+      "scenario_target": {
+        "type": "string"
+      },
+      "business_domain": {
+        "type": "string"
+      },
+      "page_id": {
+        "type": "string"
+      },
+      "additional_required_information": {
+        "type": "string"
+      }
     }
   },
   "outputSchema": {
@@ -32,14 +42,30 @@
       "recommended_page_id"
     ],
     "properties": {
-      "synthetic": { "type": "boolean" },
-      "source": { "type": "string" },
-      "analysis_result": { "type": "object" },
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "analysis_result": {
+        "type": "object"
+      },
       "scenario_recommendations": {
         "type": "array",
-        "items": { "type": "object" }
+        "items": {
+          "type": "object"
+        }
       },
-      "recommended_page_id": { "type": "string" }
+      "recommended_page_id": {
+        "type": "string"
+      },
+      "runtime_mcp_label": {
+        "type": "string"
+      },
+      "runtime_mcp_note": {
+        "type": "string"
+      }
     }
   },
   "success_examples": [
@@ -63,7 +89,9 @@
             "scenario_id": "auto_transfer_setup_recovery"
           }
         ],
-        "recommended_page_id": "svc-savings-auto-transfer-setup"
+        "recommended_page_id": "svc-savings-auto-transfer-setup",
+        "runtime_mcp_label": "런타임 MCP",
+        "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 recommend_behavior_scenarios tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
       }
     }
   ],
@@ -74,14 +102,14 @@
         "page_id": ""
       },
       "isError": true,
-      "message": "page_id is required"
+      "message": "page_id 입력이 필요합니다."
     }
   ],
   "mock_response": {
     "content": [
       {
         "type": "text",
-        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"scenario_recommendations\":1}"
+        "text": "{\"synthetic\":true,\"runtime_mcp_label\":\"런타임 MCP\",\"source\":\"agent-factory-mock-lab\",\"tool\":\"recommend_behavior_scenarios\"}"
       }
     ],
     "structuredContent": {
@@ -94,7 +122,7 @@
           "medium": "자동이체",
           "small": "설정 이탈"
         },
-        "summary": "자동이체 설정 이탈 사용자를 복귀시키는 synthetic scenario 후보를 추천합니다."
+        "summary": "자동이체 설정 이탈 사용자를 복귀시키는 합성 시나리오 후보를 추천합니다."
       },
       "scenario_recommendations": [
         {
@@ -104,7 +132,9 @@
           "expected_page_id": "svc-savings-auto-transfer-setup"
         }
       ],
-      "recommended_page_id": "svc-savings-auto-transfer-setup"
+      "recommended_page_id": "svc-savings-auto-transfer-setup",
+      "runtime_mcp_label": "런타임 MCP",
+      "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 recommend_behavior_scenarios tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
     },
     "isError": false
   }

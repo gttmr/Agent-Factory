@@ -2,8 +2,8 @@
   "schema_ref": "catalog.page_analysis.execute_page_customer_sql.v1",
   "server": "page-analysis-mcp",
   "tool": "execute_page_customer_sql",
-  "title": "Readonly page/customer SQL analysis",
-  "description": "Synthetic contract that consumes reviewed SQL text from a T2S solution and returns page/customer analysis results.",
+  "title": "런타임 MCP 읽기 전용 SQL 실행 rows 반환",
+  "description": "T2S가 만든 검토된 읽기 전용 SQL을 실행하고 분석 요약이 아니라 SQL 결과 rows를 반환하는 런타임 MCP 계약입니다.",
   "inputSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -11,7 +11,12 @@
       "sql_text"
     ],
     "properties": {
-      "sql_text": { "type": "string" }
+      "sql_text": {
+        "type": "string"
+      },
+      "candidate_selected_page_id": {
+        "type": "string"
+      }
     }
   },
   "outputSchema": {
@@ -20,80 +25,158 @@
     "required": [
       "synthetic",
       "source",
-      "analysis_result",
-      "recommended_page_id",
-      "query_summary"
+      "rows",
+      "row_count",
+      "schema"
     ],
     "properties": {
-      "synthetic": { "type": "boolean" },
-      "source": { "type": "string" },
-      "analysis_result": { "type": "object" },
-      "recommended_page_id": { "type": "string" },
-      "query_summary": { "type": "object" }
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "row_count": {
+        "type": "integer"
+      },
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "query_summary": {
+        "type": "object"
+      },
+      "runtime_mcp_label": {
+        "type": "string"
+      },
+      "runtime_mcp_note": {
+        "type": "string"
+      }
     }
   },
   "success_examples": [
     {
-      "name": "readonly_sql_page_analysis",
+      "name": "readonly_sql_rows",
       "arguments": {
-        "sql_text": "SELECT page_id, COUNT(*) AS visits FROM synthetic_page_events GROUP BY page_id"
+        "sql_text": "SELECT page_id, COUNT(*) AS visits, AVG(completion_rate) AS completion_rate FROM synthetic_page_events WHERE page_id = 'svc-savings-auto-transfer-setup' GROUP BY page_id",
+        "candidate_selected_page_id": "svc-savings-auto-transfer-setup"
       },
       "structuredContent": {
         "synthetic": true,
         "source": "agent-factory-mock-lab",
-        "analysis_result": {
-          "method": "text_to_sql_analysis"
-        },
-        "recommended_page_id": "svc-savings-auto-transfer-setup",
+        "rows": [
+          {
+            "page_id": "svc-savings-auto-transfer-setup",
+            "visits": 1280,
+            "completion_rate": 0.42,
+            "revisit_rate": 0.37,
+            "synthetic_segment": "auto_transfer_setup_dropoff"
+          }
+        ],
+        "row_count": 1,
+        "schema": [
+          {
+            "name": "page_id",
+            "type": "string"
+          },
+          {
+            "name": "visits",
+            "type": "integer"
+          },
+          {
+            "name": "completion_rate",
+            "type": "number"
+          },
+          {
+            "name": "revisit_rate",
+            "type": "number"
+          },
+          {
+            "name": "synthetic_segment",
+            "type": "string"
+          }
+        ],
         "query_summary": {
-          "readonly": true
-        }
+          "readonly": true,
+          "tables": [
+            "synthetic_page_events"
+          ],
+          "sql_hash": "synthetic-sql-hash-001"
+        },
+        "runtime_mcp_label": "런타임 MCP",
+        "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 execute_page_customer_sql tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
       }
     }
   ],
   "error_examples": [
     {
-      "name": "non_readonly_sql",
+      "name": "non_읽기 전용_sql",
       "arguments": {
         "sql_text": "DELETE FROM synthetic_page_events"
       },
       "isError": true,
-      "message": "Only reviewed readonly SQL is allowed"
+      "message": "검토된 읽기 전용 SQL만 허용됩니다."
     }
   ],
   "mock_response": {
     "content": [
       {
         "type": "text",
-        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"method\":\"text_to_sql_analysis\"}"
+        "text": "{\"synthetic\":true,\"runtime_mcp_label\":\"런타임 MCP\",\"source\":\"agent-factory-mock-lab\",\"tool\":\"execute_page_customer_sql\",\"result\":\"rows\"}"
       }
     ],
     "structuredContent": {
       "synthetic": true,
       "source": "agent-factory-mock-lab",
-      "analysis_result": {
-        "method": "text_to_sql_analysis",
-        "summary": "synthetic SQL aggregation에서 자동이체 설정 페이지의 재방문 대비 완료율이 낮게 나타납니다.",
-        "metrics": [
-          {
-            "name": "synthetic_visits",
-            "value": 1280
-          },
-          {
-            "name": "synthetic_completion_rate",
-            "value": 0.42
-          }
-        ]
-      },
-      "recommended_page_id": "svc-savings-auto-transfer-setup",
+      "rows": [
+        {
+          "page_id": "svc-savings-auto-transfer-setup",
+          "visits": 1280,
+          "completion_rate": 0.42,
+          "revisit_rate": 0.37,
+          "synthetic_segment": "auto_transfer_setup_dropoff"
+        }
+      ],
+      "row_count": 1,
+      "schema": [
+        {
+          "name": "page_id",
+          "type": "string"
+        },
+        {
+          "name": "visits",
+          "type": "integer"
+        },
+        {
+          "name": "completion_rate",
+          "type": "number"
+        },
+        {
+          "name": "revisit_rate",
+          "type": "number"
+        },
+        {
+          "name": "synthetic_segment",
+          "type": "string"
+        }
+      ],
       "query_summary": {
         "readonly": true,
         "tables": [
           "synthetic_page_events"
         ],
-        "row_count": 3,
         "sql_hash": "synthetic-sql-hash-001"
-      }
+      },
+      "runtime_mcp_label": "런타임 MCP",
+      "runtime_mcp_note": "이 데이터는 page-analysis-mcp 서버의 execute_page_customer_sql tool을 실제 런타임 MCP로 호출해 받은 structuredContent입니다."
     },
     "isError": false
   }
