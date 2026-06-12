@@ -9,6 +9,7 @@ import { GraphInspector } from "../components/GraphInspector";
 import type {
   AnalysisResult,
   GraphEdge,
+  GraphIR,
   GraphNode,
   ModuleCandidate,
   RuntimeContract
@@ -250,6 +251,22 @@ export default function DesignWorkbench() {
     );
   }
 
+  function handleSaveGraphIR(nextGraph: GraphIR) {
+    if (!analysis) return;
+    const nextAnalysis: AnalysisResult = {
+      ...analysis,
+      processFlow: nextGraph
+    };
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => setActionMessage("Graph IR 저장 완료"),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "Graph IR 저장 실패")
+      }
+    );
+  }
+
   function handleCreateComment(input: { stage: CommentStage; anchor: CommentAnchor; body_md: string }) {
     if (!authorName.trim()) return;
     createComment.mutate(
@@ -433,6 +450,9 @@ export default function DesignWorkbench() {
                   comments={comments}
                   highlights={highlights}
                   hideInspector
+                  editable
+                  saving={saveAnalysisMutation.isPending}
+                  onSaveGraph={handleSaveGraphIR}
                 />
               </Suspense>
             ) : (

@@ -25,6 +25,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - root에는 `requirement_id`, `graph_id`, `root_workflow_module_id`, `nodes`, `edges`, `containers`, `lanes`, `validation`이 있어야 한다.
 - node는 `node_kind`를 사용한다. legacy `type`과 `subtype`은 새 artifact에서 금지된다.
 - edge는 `edge_kind`, `execution_semantics`, `data_label`을 사용한다. legacy `edge_type`, `data`, `data_channel`은 새 artifact에서 금지된다.
+- node의 `position`은 optional이며 `{ x, y }` numeric object 또는 `null`만 허용한다. 누락된 기존 artifact는 유효하고, 저장된 finite position은 Graph IR canvas의 수동 배치 좌표로 해석한다.
 - `parallel_region`은 두 개 이상의 entry node와 join 경로가 있어야 한다.
 - `loop_region`은 `loop_back`과 `loop_exit` edge가 있어야 한다.
 - `human_input` node는 downstream edge가 있어야 한다.

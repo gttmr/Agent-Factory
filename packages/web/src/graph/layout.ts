@@ -91,6 +91,17 @@ function laneIndex(laneId: string | undefined): number {
   return idx === -1 ? 1 : idx;
 }
 
+function hasFinitePosition(node: GraphNode): node is GraphNode & { position: { x: number; y: number } } {
+  return (
+    node.position !== null &&
+    typeof node.position === "object" &&
+    typeof node.position.x === "number" &&
+    Number.isFinite(node.position.x) &&
+    typeof node.position.y === "number" &&
+    Number.isFinite(node.position.y)
+  );
+}
+
 function isWorkflowContainer(kind: GraphContainer["container_kind"]): boolean {
   return kind === "graph_workflow" || kind === "dynamic_workflow";
 }
@@ -146,17 +157,19 @@ export function layoutGraphIR(
   const containerRects: ContainerRect[] = [];
 
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
+  const autoNodes = allNodes.filter((n) => !hasFinitePosition(n));
+  const autoNodeIds = new Set(autoNodes.map((n) => n.id));
 
   const g = new dagre.graphlib.Graph({ multigraph: true });
   g.setGraph({ rankdir: "LR", nodesep: 28, ranksep: 56, marginx: 0, marginy: 0 });
   g.setDefaultEdgeLabel(() => ({}));
 
-  for (const n of allNodes) {
+  for (const n of autoNodes) {
     const { width, height } = nodeSize(n);
     g.setNode(n.id, { width, height });
   }
   for (const e of allEdges) {
-    if (nodeById.has(e.from) && nodeById.has(e.to)) {
+    if (autoNodeIds.has(e.from) && autoNodeIds.has(e.to)) {
       g.setEdge(e.from, e.to, {}, e.id ?? `${e.from}->${e.to}`);
     }
   }
@@ -171,6 +184,10 @@ export function layoutGraphIR(
   let fallbackY = 0;
   for (const n of allNodes) {
     const { width, height } = nodeSize(n);
+    if (hasFinitePosition(n)) {
+      positions.set(n.id, { x: n.position.x, y: n.position.y, width, height });
+      continue;
+    }
     const dn = g.node(n.id);
     let x: number;
     let y: number;
@@ -191,6 +208,8 @@ export function layoutGraphIR(
   const translateX = Number.isFinite(minGraphX) ? GRAPH_ORIGIN_X - minGraphX : GRAPH_ORIGIN_X;
   const translateY = Number.isFinite(minGraphY) ? GRAPH_ORIGIN_Y - minGraphY : GRAPH_ORIGIN_Y;
   for (const [id, p] of positions) {
+    const node = nodeById.get(id);
+    if (node && hasFinitePosition(node)) continue;
     positions.set(id, { ...p, x: p.x + translateX, y: p.y + translateY });
   }
 

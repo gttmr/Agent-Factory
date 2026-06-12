@@ -693,6 +693,7 @@ export interface GraphNode {
   output_ports: GraphPort[];
   schema_refs: string[];
   review_status: ModuleStatus | "n/a";
+  position?: { x: number; y: number } | null;
 }
 
 export interface GraphEdge {
