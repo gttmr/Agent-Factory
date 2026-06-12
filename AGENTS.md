@@ -31,6 +31,7 @@
 
 - Before starting any source-code change, explicitly check whether the change affects `docs/` Markdown: taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, or operating policy.
 - If the source change affects active docs, update the relevant `docs/` Markdown in the same change set.
+- If the change alters a design decision (interface, schema, gate, or UX contract), append an entry to `docs/decision-log.md` (date · PR · decision · rationale · impact) in the same change set.
 - If no doc update is needed, be prepared to state why in the finish report.
 - Do not update `docs/archive/**` for current behavior unless the task explicitly asks for archival or migration work.
 

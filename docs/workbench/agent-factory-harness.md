@@ -41,6 +41,8 @@ Update docs in the same change set when a change affects:
 - UI behavior that users or future agents rely on
 - operating policy in `AGENTS.md` or `CLAUDE.md`
 
+When a change alters a design decision (interface, schema, gate, or UX contract), also append an entry to `docs/decision-log.md` (date · PR · decision · rationale · impact). The decision log records history only; behavior specs stay in the active docs.
+
 Do not update `docs/archive/**` for current behavior unless the task explicitly asks for archival or migration work.
 
 ## Classification first
