@@ -33,7 +33,6 @@ export default function AnalyzeWorkbench() {
   const saveMutation = useSaveAnalysisArtifact(reqId);
   const approvalMutation = useApprovalGate(reqId);
 
-  const [acceptedMissing, setAcceptedMissing] = useState<string[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [requirementText, setRequirementText] = useState("");
@@ -58,6 +57,9 @@ export default function AnalyzeWorkbench() {
   };
 
   const missingInfo = analysis?.evidence?.missing_information ?? [];
+  // 수용 상태는 analysis-result.json(evidence.accepted_missing_information)에 영속화한다 —
+  // 컴포넌트 메모리에만 두면 리로드 시 초기화된다.
+  const acceptedMissing = analysis?.evidence?.accepted_missing_information ?? [];
   const needsInfoCount = analysis?.moduleCandidates.filter((candidate) => candidate.status === "needs_info").length ?? 0;
   const hasAnalysis = Boolean(analysis);
   const reviewReady = canToggleAnalysisReviewedGate({
@@ -72,8 +74,22 @@ export default function AnalyzeWorkbench() {
   const [activeStep, setActiveStep] = useStageStep(ANALYZE_STEP_IDS, defaultStep);
 
   function toggleAcceptedMissing(item: string) {
-    setAcceptedMissing((prev) =>
-      prev.includes(item) ? prev.filter((entry) => entry !== item) : [...prev, item]
+    if (!analysis || saveMutation.isPending) return;
+    const next = acceptedMissing.includes(item)
+      ? acceptedMissing.filter((entry) => entry !== item)
+      : [...acceptedMissing, item];
+    saveMutation.mutate(
+      {
+        analysis: {
+          ...analysis,
+          evidence: { ...analysis.evidence, accepted_missing_information: next }
+        },
+        etag: analysisEtag
+      },
+      {
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "수용 상태 저장 실패")
+      }
     );
   }
 

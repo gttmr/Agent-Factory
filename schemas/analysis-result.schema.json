@@ -336,6 +336,10 @@
         "assumptions": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "accepted_missing_information": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       }
     },
@@ -818,7 +822,19 @@
         "input_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
         "output_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
         "schema_refs": { "type": "array", "items": { "type": "string" } },
-        "review_status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected", "n/a"] }
+        "review_status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected", "n/a"] },
+        "position": {
+          "anyOf": [{ "$ref": "#/$defs/graphPosition" }, { "type": "null" }]
+        }
+      }
+    },
+    "graphPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
       }
     },
     "graphEdge": {

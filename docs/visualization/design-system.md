@@ -201,7 +201,15 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 - `parallel_region`, `loop_region`, `human_review_region`, `remote_boundary`는 `ContainerOverlay`의 점선 region으로 표시한다.
 - 새 marker를 추가할 때는 Graph IR 의미를 먼저 `process-flow.md`에 정의한 뒤 `containerOverlay.tsx`, `nodeTypes.tsx`, `edgeTypes.tsx`, CSS 색을 함께 갱신한다.
 - container overlay는 흐름의 실제 범위를 가려서는 안 된다. 점선 경계와 낮은 대비 배경으로 node/edge 읽기를 방해하지 않게 한다.
-- Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 포함 node의 bounding box를 감싸는 내부 region으로 표시한다.
+- Graph IR 화면의 container overlay는 노드를 재배치하지 않는다. 전체 workflow를 한 번 배치한 뒤 포함 node의 bounding box를 감싸는 내부 region으로 표시한다. Design 검토의 편집 모드에서는 드래그한 노드 좌표를 `node.position`으로 저장하며, 저장된 finite position은 dagre 재배치 대상에서 제외한다.
+
+**편집 모드**
+- `GraphCanvas`는 기본적으로 읽기 전용이다. `editable` prop이 전달된 Design 검토 스텝에서만 `편집 모드` 토글과 노드/엣지 추가, 선택 삭제, 드래그 이동, 저장/취소 컨트롤을 노출한다.
+- 편집 중에는 로컬 draft Graph IR만 바꾸고, `저장` 시 `analysis-result.json.processFlow`만 PUT 한다. `manifest.approvals.*` 게이트는 자동으로 바꾸지 않는다.
+- 편집 모드에서 선택된 노드/엣지는 좌측 정보 패널이 `GraphElementEditor`로 바뀌어 field-level 편집을 제공한다. 모듈 연결 picker는 `agent`/`workflow`/`adapter`/`remote_a2a` 노드에만 표시하고, `candidate.module_category === node.node_kind`인 후보만 연결한다. `input`/`output`/`function`/`tool`/`human_input` 등 synthetic 또는 비모듈 노드는 모듈 picker 대상에서 제외한다.
+- `node_kind`는 v1 편집 폼에서 바꾸지 않는다. 종류를 바꾸려면 기존 노드를 삭제하고 새 노드를 추가한다.
+- 새 노드는 `remote_a2a`가 아니면 parent 없는 첫 `graph_workflow`/`dynamic_workflow` 컨테이너에 기본 배치하고, 해당 컨테이너의 `contains_node_ids`에도 즉시 추가한다. `remote_a2a` 새 노드는 로컬 workflow 컨테이너에 자동 편입하지 않는다.
+- 엣지는 핸들 드래그와 순차 클릭 모드가 같은 생성 규칙을 쓴다. 자기 연결과 동일한 `from -> to` 중복은 UI에서 거부하고 한국어 notice로 표시한다.
 
 **노드 렌더링**
 - `input`/`output` pill은 변수명만 보여준다(`INPUT`/`OUTPUT` eyebrow 텍스트 없음). 입력/출력 구분은 lane 위치와 `--cat-input`/`--cat-output` 틴트로 한다. 긴 변수명이 박스 밖으로 흘러내리지 않도록 박스 안에서 clamp 한다.

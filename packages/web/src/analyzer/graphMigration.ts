@@ -27,6 +27,7 @@ import type {
 const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
 const EDGE_KIND_SET = new Set<string>(GRAPH_EDGE_KINDS);
 const LANE_ID_SET = new Set<string>(GRAPH_LANE_IDS);
+const MODULE_BOUND_NODE_KIND_SET = new Set<string>(["agent", "workflow", "adapter", "remote_a2a"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -49,6 +50,16 @@ function asString(value: unknown, fallback: string): string {
 
 function asNullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function normalizeNodePosition(value: unknown): GraphNode["position"] | undefined {
+  if (value === null) return null;
+  if (!isRecord(value)) return undefined;
+  const x = value.x;
+  const y = value.y;
+  return typeof x === "number" && Number.isFinite(x) && typeof y === "number" && Number.isFinite(y)
+    ? { x, y }
+    : undefined;
 }
 
 function laneForLegacyType(legacyType: string | undefined, nodeKind: NodeKind): LaneId {
@@ -141,7 +152,9 @@ function resolveContainerReference(value: unknown, idMap: Map<string, string>): 
 const SOFT_VALIDATION_CODES = new Set([
   "graph_not_object",
   "duplicate_node_id",
+  "node_missing_module_id",
   "invalid_lane_id",
+  "invalid_node_position",
   "duplicate_edge_id",
   "invalid_edge_id",
   "dangling_edge_endpoint",
@@ -451,6 +464,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
           : legacyType && NODE_KIND_SET.has(legacyType)
             ? (legacyType as NodeKind)
             : "function";
+      const position = normalizeNodePosition(nodeRecord.position);
       return {
         id: asString(node.id, "node-unknown"),
         label: asString(node.label, asString(node.id, "node")),
@@ -464,7 +478,8 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         input_ports: Array.isArray(node.input_ports) ? node.input_ports : [],
         output_ports: Array.isArray(node.output_ports) ? node.output_ports : [],
         schema_refs: Array.isArray(node.schema_refs) ? node.schema_refs : [],
-        review_status: node.review_status ?? "needs_info"
+        review_status: node.review_status ?? "needs_info",
+        ...(position !== undefined ? { position } : {})
       };
     }),
     edges: (graphIR.edges ?? []).map((edge, index) => {
@@ -540,6 +555,30 @@ export function validateGraphIRSoft(
       errors.push({
         code: "invalid_lane_id",
         message: `Node ${node.id} has invalid lane_id ${String(node.lane_id)}.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (
+      "position" in node &&
+      node.position !== null &&
+      (typeof node.position !== "object" ||
+        typeof node.position.x !== "number" ||
+        !Number.isFinite(node.position.x) ||
+        typeof node.position.y !== "number" ||
+        !Number.isFinite(node.position.y))
+    ) {
+      errors.push({
+        code: "invalid_node_position",
+        message: `Node ${node.id} has invalid position.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (MODULE_BOUND_NODE_KIND_SET.has(node.node_kind) && (typeof node.module_id !== "string" || !node.module_id.trim())) {
+      errors.push({
+        code: "node_missing_module_id",
+        message: `Node ${node.id} (${node.node_kind}) requires a module_id.`,
         target_kind: "node",
         target_id: node.id
       });

@@ -18,21 +18,16 @@ DesignWorkbench의 모듈 검토 패널은 두 작업면으로 나뉜다.
 카탈로그에서 온 항목은 기본적으로 수정 대상이 아니다.
 카탈로그 원본을 바꾸려면 Catalog review에서 별도로 처리하고, Module Review에서는 현재 분석 artifact 안의 override와 edge 연결만 저장한다.
 
-## Resolution Draft와 Stage Runner patch
+## 모듈 탭 검토 흐름
 
-`needs_info` 후보는 메모만으로 승인하지 않는다.
-현재 워크벤치에는 구 Inspector의 `해결 초안 생성` 버튼이 없다.
-개발 리더는 Design Stage Runner(`af-design-boundaries`) 또는 동일 schema를 emit하는 외부 producer가 제안한 Resolution Draft/patch를 보고, 다음 항목을 검토한다.
+`needs_info` 후보는 누락 항목을 해소하기 전에는 승인할 수 없다.
+DesignWorkbench의 하단 `모듈` 탭은 후보 목록과 선택 후보 상세를 함께 보여준다.
+개발 리더는 후보를 선택한 뒤 각 `missing_information` 항목마다 필요하면 한 줄 해소 메모를 남기고 `해소`를 눌러 현재 분석 artifact 안에서 항목을 `resolved_missing_information`으로 옮긴다.
 
-- 누락 항목별 답변과 근거
-- 입력/출력 object schema의 펼침 구조
-- 현재 분석 artifact에 반영될 patch preview
-- structural/runtime smoke에 사용할 `smoke_spec`
-
-Resolution Draft는 자동 적용되지 않는다.
-Stage Runner run은 proposed artifact와 diff summary를 먼저 남기며, 사용자가 `제안 적용`을 누를 때만 현재 분석의 `moduleCandidates`에 반영된다.
-이때 기존 `missing_information`은 `resolved_missing_information`으로 보존되고, `resolution_applied_at`, `schema_review_state: applied`, `smoke_spec`이 기록된다.
-그 뒤 `검토 승인` 또는 status select로 `approved` 상태를 선택한다.
+모든 누락 항목이 해소되면 `승인` 버튼이 활성화된다.
+승인은 서버의 `resolveCandidateForDesign`과 같은 필드 세트를 쓴다: `status: approved`, 비어 있지 않은 `missing_information_resolution`, `resolved_missing_information` 배열, 빈 `missing_information`, `resolution_applied_at`, `schema_review_state: applied`, `smoke_spec.ready: true`를 저장한다.
+`보류`와 `반려`는 후보 `status`만 각각 `deferred`, `rejected`로 바꾼다.
+상태 변경 액션은 같은 `module_id`를 가진 Graph IR 노드의 `review_status`도 같은 값으로 맞춘다.
 
 카탈로그 계약 후보도 같은 review state만 수정한다.
 카탈로그 원본 contract, registry, MCP/A2A binding은 Module Review에서 직접 변경하지 않는다.

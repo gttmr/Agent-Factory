@@ -1,16 +1,25 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { Button, EmptyState, Field, Panel, SectionHeader } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
-import type { Selection } from "../components/GraphCanvas";
+import type { GraphEditState, Selection } from "../components/GraphCanvas";
 import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
+import { GraphElementEditor } from "../components/GraphElementEditor";
 import { GraphInspector } from "../components/GraphInspector";
+import {
+  applyNodeReviewStatus,
+  approveCandidate,
+  resolveMissingItem,
+  setCandidateStatus
+} from "../analyzer/moduleReview";
 import type {
   AnalysisResult,
   GraphEdge,
+  GraphIR,
   GraphNode,
   ModuleCandidate,
+  ModuleStatus,
   RuntimeContract
 } from "../analyzer/types";
 import {
@@ -98,6 +107,8 @@ export default function DesignWorkbench() {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>("modules");
   const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
+  const [graphEditState, setGraphEditState] = useState<GraphEditState | null>(null);
+  const [selectedReviewModuleId, setSelectedReviewModuleId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [selectedA2AModuleId, setSelectedA2AModuleId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -122,11 +133,21 @@ export default function DesignWorkbench() {
   );
   const selectedA2ARow =
     a2aRows.find((row) => row.candidate.id === selectedA2AModuleId) ?? a2aRows[0] ?? null;
+  const selectedReviewCandidate =
+    (selectedReviewModuleId
+      ? analysis?.moduleCandidates.find((candidate) => candidate.id === selectedReviewModuleId) ?? null
+      : null) ??
+    analysis?.moduleCandidates[0] ??
+    null;
 
   const allCandidatesApproved = useMemo(() => {
     if (!analysis?.moduleCandidates?.length) return false;
     return analysis.moduleCandidates.every((candidate) => candidate.status === "approved");
   }, [analysis]);
+  const approvedCandidateCount = analysis
+    ? analysis.moduleCandidates.filter((candidate) => candidate.status === "approved").length
+    : 0;
+  const unapprovedCandidateCount = analysis ? analysis.moduleCandidates.length - approvedCandidateCount : 0;
 
   const boundariesGateEnabled =
     Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
@@ -250,6 +271,45 @@ export default function DesignWorkbench() {
     );
   }
 
+  function handleSaveGraphIR(nextGraph: GraphIR) {
+    if (!analysis) return;
+    const nextAnalysis: AnalysisResult = {
+      ...analysis,
+      processFlow: nextGraph
+    };
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => setActionMessage("Graph IR 저장 완료"),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "Graph IR 저장 실패")
+      }
+    );
+  }
+
+  function handleSaveCandidate(candidateId: string, nextCandidate: ModuleCandidate, syncStatus?: ModuleStatus) {
+    if (!analysis) return;
+    setSelectedReviewModuleId(candidateId);
+    const nextAnalysis: AnalysisResult = {
+      ...analysis,
+      moduleCandidates: analysis.moduleCandidates.map((candidate) =>
+        candidate.id === candidateId ? nextCandidate : candidate
+      ),
+      processFlow:
+        syncStatus && analysis.processFlow
+          ? applyNodeReviewStatus(analysis.processFlow, candidateId, syncStatus)
+          : analysis.processFlow
+    };
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => setActionMessage(`${nextCandidate.name} 모듈 검토 저장 완료`),
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "모듈 검토 저장 실패")
+      }
+    );
+  }
+
   function handleCreateComment(input: { stage: CommentStage; anchor: CommentAnchor; body_md: string }) {
     if (!authorName.trim()) return;
     createComment.mutate(
@@ -312,6 +372,12 @@ export default function DesignWorkbench() {
     hasGraph,
     reviewReady,
     bothApproved,
+    unapprovedCandidateCount,
+    errorCount,
+    runtimeContractsReady,
+    a2aContractsReady,
+    runtimeContractCount: runtimeContracts.length,
+    a2aContractCount: a2aRows.length,
     onAdvance: setActiveStep
   });
 
@@ -410,15 +476,24 @@ export default function DesignWorkbench() {
           <div className="af-design-split">
           <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
           <aside className="af-design-sidebar" aria-label="선택 노드/엣지 정보">
-            <GraphInspector
-              selectedNode={selectedNode}
-              selectedEdge={selectedEdge}
-              nodeLabel={nodeLabel}
-              candidate={selectedCandidate}
-              a2aContracts={a2aContracts}
-              onNavigateToA2AContracts={() => setActiveTab("a2a")}
-              onClose={() => setSelection({ nodeId: null, edgeId: null })}
-            />
+            {graphEditState?.editModeActive && (graphEditState.selectedNode || graphEditState.selectedEdge) ? (
+              <GraphElementEditor
+                editState={graphEditState}
+                moduleCandidates={analysis.moduleCandidates ?? []}
+                a2aContracts={a2aContracts}
+                onClose={() => setSelection({ nodeId: null, edgeId: null })}
+              />
+            ) : (
+              <GraphInspector
+                selectedNode={selectedNode}
+                selectedEdge={selectedEdge}
+                nodeLabel={nodeLabel}
+                candidate={selectedCandidate}
+                a2aContracts={a2aContracts}
+                onNavigateToA2AContracts={() => setActiveTab("a2a")}
+                onClose={() => setSelection({ nodeId: null, edgeId: null })}
+              />
+            )}
           </aside>
 
           <section className="af-design-canvas-pane" aria-label="Graph IR">
@@ -433,6 +508,10 @@ export default function DesignWorkbench() {
                   comments={comments}
                   highlights={highlights}
                   hideInspector
+                  editable
+                  saving={saveAnalysisMutation.isPending}
+                  onSaveGraph={handleSaveGraphIR}
+                  onEditStateChange={setGraphEditState}
                 />
               </Suspense>
             ) : (
@@ -506,16 +585,41 @@ export default function DesignWorkbench() {
             </nav>
             <div className="af-design-sidebar-body">
               {activeTab === "modules" ? (
-                <ModuleSidebar
-                  candidates={analysis.moduleCandidates}
-                  selection={selection}
-                  onSelectModule={(moduleId) => {
-                    if (!graphIR) return;
-                    const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
-                    setSelection({ nodeId: node?.id ?? null, edgeId: null });
-                    setActiveTab("graph");
-                  }}
-                />
+                <div className="af-module-review-layout">
+                  <ModuleSidebar
+                    candidates={analysis.moduleCandidates}
+                    selectedModuleId={selectedReviewCandidate?.id ?? null}
+                    onSelectModule={(moduleId) => {
+                      setSelectedReviewModuleId(moduleId);
+                      if (!graphIR) return;
+                      const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
+                      setSelection({ nodeId: node?.id ?? null, edgeId: null });
+                      setActiveTab("graph");
+                    }}
+                  />
+                  <ModuleReviewDetail
+                    key={selectedReviewCandidate?.id ?? "none"}
+                    candidate={selectedReviewCandidate}
+                    saving={saveAnalysisMutation.isPending}
+                    onResolveMissing={(candidate, item, note) =>
+                      handleSaveCandidate(candidate.id, resolveMissingItem(candidate, item, note))
+                    }
+                    onApprove={(candidate) => {
+                      const nextCandidate = approveCandidate(candidate);
+                      handleSaveCandidate(
+                        candidate.id,
+                        nextCandidate,
+                        nextCandidate.status === "approved" ? "approved" : undefined
+                      );
+                    }}
+                    onDefer={(candidate) =>
+                      handleSaveCandidate(candidate.id, setCandidateStatus(candidate, "deferred"), "deferred")
+                    }
+                    onReject={(candidate) =>
+                      handleSaveCandidate(candidate.id, setCandidateStatus(candidate, "rejected"), "rejected")
+                    }
+                  />
+                </div>
               ) : null}
               {activeTab === "graph" ? (
                 <GraphSidebar
@@ -596,7 +700,7 @@ export default function DesignWorkbench() {
               !manifest.approvals.analysis_reviewed
                 ? "먼저 Analyze 단계에서 analysis_reviewed 를 토글하세요."
                 : !allCandidatesApproved
-                  ? "모든 모듈 후보가 approved 상태여야 합니다. Legacy 워크벤치의 모듈 검토에서 status 를 갱신하세요."
+                  ? "모든 모듈 후보가 approved 상태여야 합니다. 하단 '모듈' 탭에서 후보를 선택해 누락 항목을 해소하고 승인하세요."
                   : errorCount > 0
                     ? `Graph IR 오류가 ${errorCount}건 있습니다. 검증 배너를 먼저 해소하세요.`
                     : "조건이 충족되었습니다. 게이트를 토글하여 Build 단계로 진행하세요."
@@ -637,7 +741,7 @@ export default function DesignWorkbench() {
                   ? "boundaries_approved 가 먼저 활성화되어야 합니다."
                   : runtimeContractsReady && a2aContractsReady
                     ? "모든 필수 Runtime/A2A 계약이 approved 입니다. 토글을 눌러 design 단계를 마무리하세요."
-                    : "Runtime 계약 또는 Remote A2A 탭에서 readiness issue 가 남은 계약을 approved 로 만들어 주세요."
+                    : "Stage Runner 재실행 또는 외부 편집으로 계약을 보완하세요."
             }
             action={
               <Button
@@ -705,6 +809,12 @@ function buildDesignNextAction({
   hasGraph,
   reviewReady,
   bothApproved,
+  unapprovedCandidateCount,
+  errorCount,
+  runtimeContractsReady,
+  a2aContractsReady,
+  runtimeContractCount,
+  a2aContractCount,
   onAdvance
 }: {
   activeStep: DesignStepId;
@@ -714,6 +824,12 @@ function buildDesignNextAction({
   hasGraph: boolean;
   reviewReady: boolean;
   bothApproved: boolean;
+  unapprovedCandidateCount: number;
+  errorCount: number;
+  runtimeContractsReady: boolean;
+  a2aContractsReady: boolean;
+  runtimeContractCount: number;
+  a2aContractCount: number;
   onAdvance: (id: DesignStepId) => void;
 }): StageNextAction {
   if (activeStep === "run") {
@@ -731,13 +847,22 @@ function buildDesignNextAction({
     };
   }
   if (activeStep === "review") {
+    const unmetConditions = buildReviewUnmetConditions({
+      hasGraph,
+      unapprovedCandidateCount,
+      errorCount,
+      runtimeContractsReady,
+      a2aContractsReady,
+      runtimeContractCount,
+      a2aContractCount
+    });
     return {
       label: "승인으로 →",
       onClick: () => onAdvance("approve"),
       disabled: !hasGraph,
       hint: reviewReady
         ? "모든 모듈 approved · Graph IR 오류 0 · Runtime/A2A 계약 준비 완료. ‘3. 승인’에서 게이트를 토글하세요."
-        : "모듈을 모두 approved 로, Graph IR 오류를 0 으로, Runtime/A2A 계약을 준비 상태로 만든 뒤 승인할 수 있습니다."
+        : unmetConditions.join(" · ")
     };
   }
   return {
@@ -750,13 +875,45 @@ function buildDesignNextAction({
   };
 }
 
+function buildReviewUnmetConditions({
+  hasGraph,
+  unapprovedCandidateCount,
+  errorCount,
+  runtimeContractsReady,
+  a2aContractsReady,
+  runtimeContractCount,
+  a2aContractCount
+}: {
+  hasGraph: boolean;
+  unapprovedCandidateCount: number;
+  errorCount: number;
+  runtimeContractsReady: boolean;
+  a2aContractsReady: boolean;
+  runtimeContractCount: number;
+  a2aContractCount: number;
+}): string[] {
+  const unmet: string[] = [];
+  if (!hasGraph) unmet.push("Graph IR 없음 — Design 실행 필요");
+  if (unapprovedCandidateCount > 0) {
+    unmet.push(`미승인 모듈 ${unapprovedCandidateCount}개 — 하단 모듈 탭에서 승인`);
+  }
+  if (errorCount > 0) {
+    unmet.push(`Graph IR 오류 ${errorCount}개 — 그래프 편집으로 해소`);
+  }
+  if (runtimeContractCount + a2aContractCount > 0) {
+    if (!runtimeContractsReady) unmet.push("Runtime 계약 준비 필요");
+    if (!a2aContractsReady) unmet.push("A2A 계약 준비 필요");
+  }
+  return unmet.length ? unmet : ["검토 조건을 다시 확인하세요."];
+}
+
 interface ModuleSidebarProps {
   candidates: ModuleCandidate[];
-  selection: Selection;
+  selectedModuleId: string | null;
   onSelectModule: (moduleId: string) => void;
 }
 
-function ModuleSidebar({ candidates, onSelectModule }: ModuleSidebarProps) {
+function ModuleSidebar({ candidates, selectedModuleId, onSelectModule }: ModuleSidebarProps) {
   if (!candidates.length) {
     return <p className="af-design-empty">모듈 후보가 없습니다.</p>;
   }
@@ -765,7 +922,7 @@ function ModuleSidebar({ candidates, onSelectModule }: ModuleSidebarProps) {
       {candidates.map((candidate) => (
         <li
           key={candidate.id}
-          className={`af-module-item af-module-item-${candidate.status}`}
+          className={`af-module-item af-module-item-${candidate.status}${selectedModuleId === candidate.id ? " af-module-item-active" : ""}`}
         >
           <button type="button" className="af-module-item-button" onClick={() => onSelectModule(candidate.id)}>
             <span className="af-module-item-header">
@@ -779,6 +936,138 @@ function ModuleSidebar({ candidates, onSelectModule }: ModuleSidebarProps) {
         </li>
       ))}
     </ul>
+  );
+}
+
+interface ModuleReviewDetailProps {
+  candidate: ModuleCandidate | null;
+  saving: boolean;
+  onResolveMissing: (candidate: ModuleCandidate, item: string, note: string) => void;
+  onApprove: (candidate: ModuleCandidate) => void;
+  onDefer: (candidate: ModuleCandidate) => void;
+  onReject: (candidate: ModuleCandidate) => void;
+}
+
+function ModuleReviewDetail({
+  candidate,
+  saving,
+  onResolveMissing,
+  onApprove,
+  onDefer,
+  onReject
+}: ModuleReviewDetailProps) {
+  const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
+
+  if (!candidate) {
+    return (
+      <section className="af-module-review-detail" aria-label="모듈 검토 상세">
+        <EmptyState title="선택한 모듈 없음" description="왼쪽 목록에서 검토할 모듈 후보를 선택하세요." />
+      </section>
+    );
+  }
+
+  const missingItems = candidate.missing_information ?? [];
+  const resolvedItems = candidate.resolved_missing_information ?? [];
+  const riskSignals = candidate.risk_signals ?? [];
+  const subtype = getSubtypeValue(candidate);
+  const approveDisabled = saving || missingItems.length > 0;
+
+  return (
+    <section className="af-module-review-detail" aria-label={`${candidate.name} 모듈 검토`}>
+      <header className="af-module-review-header">
+        <div>
+          <div className="af-module-review-badges">
+            <CategoryBadge category={candidate.module_category} />
+            {subtype ? <SubtypeBadge value={subtype} /> : null}
+          </div>
+          <h3>{candidate.name}</h3>
+        </div>
+        <span className={`af-module-review-status af-module-review-status-${candidate.status}`}>
+          {statusLabel(candidate.status)}
+        </span>
+      </header>
+
+      <div className="af-module-review-section">
+        <h4>검토 근거</h4>
+        <p>{candidate.rationale || "근거 설명이 없습니다."}</p>
+        <dl className="af-module-review-meta">
+          <div>
+            <dt>risk_level</dt>
+            <dd>{candidate.risk_level}</dd>
+          </div>
+          <div>
+            <dt>risk_signals</dt>
+            <dd>{riskSignals.length ? riskSignals.join(", ") : "없음"}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="af-module-review-section">
+        <h4>누락 항목</h4>
+        {missingItems.length ? (
+          <ul className="af-module-review-missing-list">
+            {missingItems.map((item) => (
+              <li key={item} className="af-module-review-missing-item">
+                <span>{item}</span>
+                <Field label="해소 메모">
+                  <input
+                    type="text"
+                    value={resolutionNotes[item] ?? ""}
+                    onChange={(event) =>
+                      setResolutionNotes((current) => ({ ...current, [item]: event.target.value }))
+                    }
+                    placeholder="선택 입력"
+                    disabled={saving}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={saving}
+                  onClick={() => {
+                    onResolveMissing(candidate, item, resolutionNotes[item] ?? "");
+                    setResolutionNotes((current) => ({ ...current, [item]: "" }));
+                  }}
+                >
+                  해소
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="af-module-review-empty">남은 누락 항목이 없습니다.</p>
+        )}
+      </div>
+
+      {resolvedItems.length ? (
+        <div className="af-module-review-section">
+          <h4>해소된 항목</h4>
+          <ul className="af-module-review-resolved-list">
+            {resolvedItems.map((item) => (
+              <li key={item}>
+                <span>{item}</span>
+                <small>해소됨</small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="af-action-row af-module-review-actions">
+        <Button type="button" variant="primary" disabled={approveDisabled} onClick={() => onApprove(candidate)}>
+          승인
+        </Button>
+        <Button type="button" variant="secondary" disabled={saving} onClick={() => onDefer(candidate)}>
+          보류
+        </Button>
+        <Button type="button" variant="secondary" disabled={saving} onClick={() => onReject(candidate)}>
+          반려
+        </Button>
+        {missingItems.length ? (
+          <small>누락 항목을 모두 해소해야 승인할 수 있습니다.</small>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

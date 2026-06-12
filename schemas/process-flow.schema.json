@@ -136,6 +136,15 @@
         "schema_ref": { "$ref": "#/$defs/nullableString" }
       }
     },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
     "node": {
       "type": "object",
       "additionalProperties": false,
@@ -169,7 +178,10 @@
         "input_ports": { "type": "array", "items": { "$ref": "#/$defs/port" } },
         "output_ports": { "type": "array", "items": { "$ref": "#/$defs/port" } },
         "schema_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "review_status": { "$ref": "#/$defs/reviewStatus" }
+        "review_status": { "$ref": "#/$defs/reviewStatus" },
+        "position": {
+          "anyOf": [{ "$ref": "#/$defs/position" }, { "type": "null" }]
+        }
       }
     },
     "edge": {

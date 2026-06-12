@@ -33,6 +33,108 @@
   font-weight: var(--fw-bold);
 }
 
+.graph-canvas-workspace {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.graph-edit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+}
+
+.graph-edit-toolbar > .graph-edit-group,
+.graph-edit-toolbar > .graph-edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.graph-edit-toggle {
+  font-weight: var(--fw-heavy);
+  color: var(--text-strong);
+}
+
+.graph-edit-toggle > input {
+  accent-color: var(--accent-strong, #1e7a4d);
+}
+
+.graph-edit-group > select,
+.graph-edit-group > input {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  padding: 0 var(--space-sm);
+}
+
+.graph-edit-group > input {
+  width: min(220px, 34vw);
+}
+
+.graph-edit-group > .is-active {
+  border-color: var(--accent-strong, #1e7a4d);
+  color: var(--accent-strong, #1e7a4d);
+  background: var(--success-soft);
+}
+
+.graph-edit-chip,
+.graph-edit-hint,
+.graph-edit-notice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  background: var(--surface-muted, #f0f1ec);
+}
+
+.graph-edit-chip.is-dirty {
+  color: var(--accent-strong, #1e7a4d);
+  border-color: var(--accent-strong, #1e7a4d);
+  background: var(--success-soft);
+}
+
+.graph-edit-chip.has-errors {
+  color: var(--danger-text);
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+}
+
+.graph-edit-chip.has-warnings {
+  color: var(--warning-text);
+  border-color: var(--warning-line);
+  background: var(--warning-soft);
+}
+
+.graph-edit-hint {
+  color: var(--accent-strong, #1e7a4d);
+  border-color: var(--accent-strong, #1e7a4d);
+  background: var(--success-soft);
+}
+
+.graph-edit-notice {
+  max-width: min(420px, 100%);
+  overflow-wrap: anywhere;
+}
+
+.graph-edit-save {
+  margin-left: auto;
+}
+
 .graph-canvas-stage {
   position: relative;
   height: min(72vh, 720px);

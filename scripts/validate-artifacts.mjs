@@ -679,6 +679,19 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     if (!graphLaneIds.has(node.lane_id)) {
       errors.push(`${label}.nodes[${index}] (${node.id}) has invalid lane_id.`);
     }
+    if (
+      Object.prototype.hasOwnProperty.call(node, "position") &&
+      node.position !== null &&
+      (!node.position ||
+        typeof node.position !== "object" ||
+        Array.isArray(node.position) ||
+        typeof node.position.x !== "number" ||
+        !Number.isFinite(node.position.x) ||
+        typeof node.position.y !== "number" ||
+        !Number.isFinite(node.position.y))
+    ) {
+      errors.push(`${label}.nodes[${index}] (${node.id}) has invalid position; expected {x:number,y:number} or null.`);
+    }
   });
 
   const containerById = new Map();
