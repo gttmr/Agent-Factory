@@ -67,6 +67,8 @@ Live analyzer draft가 축약형을 반환하더라도 workbench runtime은 저�
 병렬은 `parallel_region`, 반복은 `loop_region`, 사람 검토는 `human_review_region`, 원격 agent 경계는 `remote_boundary`다.
 시각화에서 container는 node를 다시 배치하는 독립 lane이 아니라, 전체 workflow 안에 있는 node bounds에서 파생되는 region overlay다.
 따라서 `parallel_region`, `human_review_region`, `remote_boundary`는 workflow 외부 슬롯으로 분리하지 않고 일반 흐름 위에 겹쳐 표시한다.
+Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/`dynamic_workflow` 컨테이너에 기본 배치된다.
+노드의 `container_id`를 폼에서 옮기면 기존 모든 container의 `contains_node_ids`, `entry_node_ids`, `exit_node_ids`에서 해당 node id를 제거한 뒤 새 container의 `contains_node_ids`에만 중복 없이 추가한다.
 
 ## Edge
 

@@ -114,6 +114,106 @@
   padding: 12px;
 }
 
+.af-design-sidebar > .graph-element-editor {
+  position: static;
+  border: 0;
+  border-radius: 0;
+  max-height: none;
+  overflow: visible;
+  background: transparent;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  font-size: var(--fs-sm);
+}
+
+.af-design-sidebar > .graph-element-editor.empty {
+  color: var(--text-muted);
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-sm);
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-head h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-tight);
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-head .ui-button {
+  flex: 0 0 auto;
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-meta code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.af-design-sidebar > .graph-element-editor .ui-field > span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+}
+
+.af-design-sidebar > .graph-element-editor input,
+.af-design-sidebar > .graph-element-editor select,
+.af-design-sidebar > .graph-element-editor textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+  line-height: var(--lh-normal);
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.af-design-sidebar > .graph-element-editor textarea {
+  resize: vertical;
+}
+
+.af-design-sidebar > .graph-element-editor input[readonly] {
+  color: var(--text-muted);
+  background: var(--surface-muted);
+}
+
+.af-design-sidebar > .graph-element-editor > .af-action-row {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-sm);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-warning {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+
 /* 하단 전체폭 패널: 모듈·Graph IR·계약 등 탭 목록을 담는다(상단 캔버스+좌측 패널 아래). */
 .af-design-bottom {
   background: var(--surface);

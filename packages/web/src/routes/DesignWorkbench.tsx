@@ -2,9 +2,10 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
-import type { Selection } from "../components/GraphCanvas";
+import type { GraphEditState, Selection } from "../components/GraphCanvas";
 import { StageRunnerPanel } from "../components/StageRunnerPanel";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "../components/CategoryBadge";
+import { GraphElementEditor } from "../components/GraphElementEditor";
 import { GraphInspector } from "../components/GraphInspector";
 import type {
   AnalysisResult,
@@ -99,6 +100,7 @@ export default function DesignWorkbench() {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>("modules");
   const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
+  const [graphEditState, setGraphEditState] = useState<GraphEditState | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [selectedA2AModuleId, setSelectedA2AModuleId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -427,15 +429,24 @@ export default function DesignWorkbench() {
           <div className="af-design-split">
           <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
           <aside className="af-design-sidebar" aria-label="선택 노드/엣지 정보">
-            <GraphInspector
-              selectedNode={selectedNode}
-              selectedEdge={selectedEdge}
-              nodeLabel={nodeLabel}
-              candidate={selectedCandidate}
-              a2aContracts={a2aContracts}
-              onNavigateToA2AContracts={() => setActiveTab("a2a")}
-              onClose={() => setSelection({ nodeId: null, edgeId: null })}
-            />
+            {graphEditState?.editModeActive && (graphEditState.selectedNode || graphEditState.selectedEdge) ? (
+              <GraphElementEditor
+                editState={graphEditState}
+                moduleCandidates={analysis.moduleCandidates ?? []}
+                a2aContracts={a2aContracts}
+                onClose={() => setSelection({ nodeId: null, edgeId: null })}
+              />
+            ) : (
+              <GraphInspector
+                selectedNode={selectedNode}
+                selectedEdge={selectedEdge}
+                nodeLabel={nodeLabel}
+                candidate={selectedCandidate}
+                a2aContracts={a2aContracts}
+                onNavigateToA2AContracts={() => setActiveTab("a2a")}
+                onClose={() => setSelection({ nodeId: null, edgeId: null })}
+              />
+            )}
           </aside>
 
           <section className="af-design-canvas-pane" aria-label="Graph IR">
@@ -453,6 +464,7 @@ export default function DesignWorkbench() {
                   editable
                   saving={saveAnalysisMutation.isPending}
                   onSaveGraph={handleSaveGraphIR}
+                  onEditStateChange={setGraphEditState}
                 />
               </Suspense>
             ) : (

@@ -50,12 +50,25 @@ interface GraphCanvasProps {
   highlights?: HighlightRecord[];
   editable?: boolean;
   onSaveGraph?: (next: GraphIR) => void;
+  onEditStateChange?: (state: GraphEditState | null) => void;
   saving?: boolean;
 }
 
 export interface Selection {
   nodeId: string | null;
   edgeId: string | null;
+}
+
+export type NodeFieldPatch = Partial<Pick<GraphNode, "label" | "lane_id" | "container_id" | "execution_kind" | "module_id" | "review_status">>;
+export type EdgeFieldPatch = Partial<Pick<GraphEdge, "edge_kind" | "execution_semantics" | "data_label" | "route_condition" | "state_key" | "artifact_key" | "schema_ref" | "a2a_contract_id" | "is_remote_boundary_crossing">>;
+
+export interface GraphEditState {
+  editModeActive: boolean;
+  draft: GraphIR;
+  selectedNode: GraphNode | null;
+  selectedEdge: GraphEdge | null;
+  updateNodeFields: (nodeId: string, patch: NodeFieldPatch) => void;
+  updateEdgeFields: (edgeId: string, patch: EdgeFieldPatch) => void;
 }
 
 export function GraphCanvas({
@@ -72,6 +85,7 @@ export function GraphCanvas({
   highlights = [],
   editable = false,
   onSaveGraph,
+  onEditStateChange,
   saving = false
 }: GraphCanvasProps) {
   const [internalSelection, setInternalSelection] = useState<Selection>({ nodeId: null, edgeId: null });
@@ -106,6 +120,20 @@ export function GraphCanvas({
     setDirty(true);
     pendingSaveRef.current = false;
   }, []);
+
+  const updateNodeFields = useCallback(
+    (nodeId: string, patch: NodeFieldPatch) => {
+      updateDraft((graph) => applyNodeFields(graph, nodeId, patch));
+    },
+    [updateDraft]
+  );
+
+  const updateEdgeFields = useCallback(
+    (edgeId: string, patch: EdgeFieldPatch) => {
+      updateDraft((graph) => applyEdgeFields(graph, edgeId, patch));
+    },
+    [updateDraft]
+  );
 
   const cancelConnectMode = useCallback(() => {
     setConnectMode(false);
@@ -233,11 +261,18 @@ export function GraphCanvas({
         return;
       }
       const nextPosition = position ?? nextNodeFallbackPosition(draftGraphIR, flowPositions);
-      const node = buildEditableNode(draftGraphIR, addKind, label, nextPosition);
-      updateDraft((graph) => ({
-        ...graph,
-        nodes: [...(graph.nodes ?? []), node]
-      }));
+      const containerId = addKind === "remote_a2a" ? null : rootWorkflowContainerId(draftGraphIR);
+      const node = buildEditableNode(draftGraphIR, addKind, label, nextPosition, containerId);
+      updateDraft((graph) => {
+        const containers = containerId
+          ? appendNodeToContainer(graph.containers ?? [], containerId, node.id)
+          : graph.containers ?? [];
+        return {
+          ...graph,
+          nodes: [...(graph.nodes ?? []), node],
+          containers
+        };
+      });
       setAddLabel("");
       setSelection({ nodeId: node.id, edgeId: null });
       setEditNotice(`${node.id} 노드를 추가했습니다.`);
@@ -366,6 +401,21 @@ export function GraphCanvas({
   const selectedEdge: GraphEdge | null = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
   const selectedCandidate: ModuleCandidate | null =
     selectedNode && selectedNode.module_id ? candidateByModuleId.get(selectedNode.module_id) ?? null : null;
+
+  useEffect(() => {
+    if (!editModeActive || !draftGraphIR) {
+      onEditStateChange?.(null);
+      return;
+    }
+    onEditStateChange?.({
+      editModeActive,
+      draft: draftGraphIR,
+      selectedNode: selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null,
+      selectedEdge: selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null,
+      updateNodeFields,
+      updateEdgeFields
+    });
+  }, [draftGraphIR, editModeActive, onEditStateChange, selection, updateEdgeFields, updateNodeFields]);
 
   const focusOn = (issue: GraphValidationIssue) => {
     if (!issue.target_id) return;
@@ -742,7 +792,13 @@ function projectStageCenter(reactFlow: unknown, stage: HTMLDivElement | null): X
   };
 }
 
-function buildEditableNode(graphIR: GraphIR, kind: NodeKind, label: string, position: XYPosition): GraphNode {
+function buildEditableNode(
+  graphIR: GraphIR,
+  kind: NodeKind,
+  label: string,
+  position: XYPosition,
+  containerId: string | null
+): GraphNode {
   return {
     id: nextNodeId(graphIR, kind),
     label,
@@ -751,7 +807,7 @@ function buildEditableNode(graphIR: GraphIR, kind: NodeKind, label: string, posi
     execution_kind: null,
     adk_node_role: null,
     owner_scope: kind === "remote_a2a" ? "remote" : "local",
-    container_id: null,
+    container_id: containerId,
     lane_id: laneForNodeKind(kind),
     input_ports: [],
     output_ports: [],
@@ -821,7 +877,7 @@ function buildEditableEdge(
     state_key: null,
     artifact_key: null,
     a2a_contract_id: null,
-    is_remote_boundary_crossing: sourceRemote !== targetRemote
+    is_remote_boundary_crossing: edgeKind === "remote_a2a"
   };
   return { edge, message: `${edge.id} 엣지를 추가했습니다.` };
 }
@@ -848,6 +904,94 @@ function deleteFromGraph(graphIR: GraphIR, selection: Selection): GraphIR {
     };
   }
   return graphIR;
+}
+
+function applyNodeFields(graphIR: GraphIR, nodeId: string, patch: NodeFieldPatch): GraphIR {
+  const current = (graphIR.nodes ?? []).find((node) => node.id === nodeId);
+  if (!current) return graphIR;
+
+  const hasContainerPatch = Object.prototype.hasOwnProperty.call(patch, "container_id");
+  const nextContainerId = hasContainerPatch ? patch.container_id ?? null : current.container_id;
+  const containerChanged = hasContainerPatch && current.container_id !== nextContainerId;
+  const nodes = (graphIR.nodes ?? []).map((node) =>
+    node.id === nodeId
+      ? {
+          ...node,
+          ...patch,
+          container_id: nextContainerId
+        }
+      : node
+  );
+
+  if (!containerChanged) {
+    return { ...graphIR, nodes };
+  }
+
+  return {
+    ...graphIR,
+    nodes,
+    containers: moveNodeToContainer(graphIR.containers ?? [], nodeId, nextContainerId)
+  };
+}
+
+function applyEdgeFields(graphIR: GraphIR, edgeId: string, patch: EdgeFieldPatch): GraphIR {
+  return {
+    ...graphIR,
+    edges: (graphIR.edges ?? []).map((edge, index) => {
+      if (edgeKey(edge, index) !== edgeId) return edge;
+      const next = { ...edge, ...patch };
+      if (next.edge_kind === "remote_a2a") {
+        return { ...next, is_remote_boundary_crossing: true };
+      }
+      return { ...next, is_remote_boundary_crossing: false, a2a_contract_id: null };
+    })
+  };
+}
+
+function rootWorkflowContainerId(graphIR: GraphIR): string | null {
+  const root = (graphIR.containers ?? []).find(
+    (container) =>
+      (container.container_kind === "graph_workflow" || container.container_kind === "dynamic_workflow") &&
+      container.parent_container_id === null
+  );
+  return root?.id ?? null;
+}
+
+function appendNodeToContainer(containers: GraphIR["containers"], containerId: string, nodeId: string): GraphIR["containers"] {
+  return containers.map((container) =>
+    container.id === containerId
+      ? {
+          ...container,
+          contains_node_ids: appendUnique(container.contains_node_ids, nodeId)
+        }
+      : container
+  );
+}
+
+function moveNodeToContainer(
+  containers: GraphIR["containers"],
+  nodeId: string,
+  nextContainerId: string | null
+): GraphIR["containers"] {
+  return containers.map((container) => {
+    const stripped = {
+      ...container,
+      contains_node_ids: container.contains_node_ids.filter((id) => id !== nodeId),
+      entry_node_ids: container.entry_node_ids.filter((id) => id !== nodeId),
+      exit_node_ids: container.exit_node_ids.filter((id) => id !== nodeId)
+    };
+    if (nextContainerId && container.id === nextContainerId) {
+      return {
+        ...stripped,
+        contains_node_ids: appendUnique(stripped.contains_node_ids, nodeId)
+      };
+    }
+    return stripped;
+  });
+}
+
+function appendUnique(values: string[], value: string): string[] {
+  return values.includes(value) ? values : [...values, value];
 }
 
 function applyCurrentPositions(graphIR: GraphIR, positions: Record<string, XYPosition>): GraphIR {

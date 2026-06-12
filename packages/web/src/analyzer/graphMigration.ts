@@ -27,6 +27,7 @@ import type {
 const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
 const EDGE_KIND_SET = new Set<string>(GRAPH_EDGE_KINDS);
 const LANE_ID_SET = new Set<string>(GRAPH_LANE_IDS);
+const MODULE_BOUND_NODE_KIND_SET = new Set<string>(["agent", "workflow", "adapter", "remote_a2a"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -151,6 +152,7 @@ function resolveContainerReference(value: unknown, idMap: Map<string, string>): 
 const SOFT_VALIDATION_CODES = new Set([
   "graph_not_object",
   "duplicate_node_id",
+  "node_missing_module_id",
   "invalid_lane_id",
   "invalid_node_position",
   "duplicate_edge_id",
@@ -569,6 +571,14 @@ export function validateGraphIRSoft(
       errors.push({
         code: "invalid_node_position",
         message: `Node ${node.id} has invalid position.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (MODULE_BOUND_NODE_KIND_SET.has(node.node_kind) && (typeof node.module_id !== "string" || !node.module_id.trim())) {
+      errors.push({
+        code: "node_missing_module_id",
+        message: `Node ${node.id} (${node.node_kind}) requires a module_id.`,
         target_kind: "node",
         target_id: node.id
       });
