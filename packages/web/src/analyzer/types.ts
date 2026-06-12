@@ -290,6 +290,9 @@ export interface EvidenceSummary {
   missing_information: string[];
   contradictions: string[];
   assumptions: string[];
+  // Reviewer attestation persisted by AnalyzeWorkbench — which missing_information
+  // items the reviewer has 수용 처리. Optional: analyzer output omits it.
+  accepted_missing_information?: string[];
 }
 
 export interface AdkHints {

@@ -84,7 +84,7 @@ PR6 마이그레이션 전에 제공하던 `Smoke 일괄 실행` 매크로와 in
 
 분석 후 발생하는 누락 정보는 요구사항 수준과 후보 수준에서 다르게 다룬다.
 
-- **Requirement-level (`evidence.missing_information`) — soft gate.** `/af/:reqId/analyze` (AnalyzeWorkbench)에서 항목별 "수용" 토글이 제공된다. 토글은 컴포넌트 내부 `acceptedMissing` state를 갱신하며 reviewer attestation으로만 사용하고 scaffold-plan 생성은 차단하지 않는다. `analysis_reviewed` 게이트는 모든 항목이 수용된 뒤에야 활성화된다.
+- **Requirement-level (`evidence.missing_information`) — soft gate.** `/af/:reqId/analyze` (AnalyzeWorkbench)에서 항목별 "수용" 토글이 제공된다. 토글은 `analysis-result.json`의 `evidence.accepted_missing_information`(optional string array)에 즉시 저장되어 리로드 후에도 유지되며, reviewer attestation으로만 사용하고 scaffold-plan 생성은 차단하지 않는다. `analysis_reviewed` 게이트는 모든 항목이 수용된 뒤에야 활성화된다.
 - **Candidate-level (`ModuleCandidate.missing_information`, unresolved `status === "needs_info"`) — hard gate.** 누락 항목이 남아 있거나 Resolution Draft가 적용되지 않은 후보는 `approved`로 전환할 수 없다. Resolution Draft 적용은 Design Stage Runner(`af-design-boundaries`) 또는 동일 형태를 emit하는 외부 producer가 먼저 `runs/design/<run-id>/proposed-artifacts/`에 제안하고, reviewer가 diff/preview 후 apply할 때 canonical `analysis-result.json`에 반영한다.
 - **Resolved review state.** 채워진 후보 record는 기존 누락 항목을 `resolved_missing_information`에 보존하고 `missing_information`을 비운다. 카탈로그 계약 후보도 동일 review state만 수정하며 카탈로그 원본 contract는 잠긴 상태로 유지된다.
 - **Scaffold-plan blocker.** `missing_information.length > 0`이거나 `status === "needs_info"`인 후보가 남아 있으면 `scaffoldPlan.collectBlockers`는 "정보 필요 후보 N개를 모듈 검토에서 Resolution Draft를 반영하고 승인하세요." blocker와 동일 개수의 "정보 필요 후보 N개 — 모듈 검토에서 Resolution Draft 반영 필요" warning을 emit한다. BuildWorkbench는 이 blocker가 남아 있으면 `runtime-stub/build` POST를 차단한다.

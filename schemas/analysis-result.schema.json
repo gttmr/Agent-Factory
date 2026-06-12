@@ -336,6 +336,10 @@
         "assumptions": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "accepted_missing_information": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       }
     },
