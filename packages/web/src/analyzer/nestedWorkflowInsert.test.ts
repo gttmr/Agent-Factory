@@ -135,6 +135,9 @@ assert.equal(candidate.risk_level, "low");
 assert.deepEqual(candidate.risk_signals, []);
 assert.equal(candidate.source_requirement_id, "req-round-b");
 assert.equal(candidate.confidence, 0.8);
+// 회귀 가드: adk_hints 를 빈 문자열로 채우면 서버 validateAnalysisResult 가
+// "비어 있지 않은 문자열 또는 null" 규칙으로 거부한다. 삽입 후보는 adk_hints 를 생략해야 한다.
+assert.equal(candidate.adk_hints, undefined);
 assert.equal(candidate.status, "needs_info");
 assert.deepEqual(candidate.missing_information, []);
 

@@ -31,13 +31,8 @@ export function insertCatalogWorkflowNode(
     legacy_recommended_type: "",
     confidence: 0.8,
     rationale: entry.responsibility?.trim() || "카탈로그 workflow 를 현재 설계 Graph IR 에 재사용 노드로 삽입합니다.",
-    adk_hints: {
-      state_memory: "",
-      callbacks: "",
-      artifacts_events: "",
-      mcp_a2a: "",
-      streaming_grounding: ""
-    },
+    // adk_hints 는 optional. 빈 문자열 hint 는 서버 validateAnalysisResult 의
+    // "비어 있지 않은 문자열 또는 null" 규칙을 위반하므로 아예 생략한다(undefined → 통과).
     inputs: copyFields(entry.inputs),
     outputs: copyFields(entry.outputs),
     reuse_candidate: true,
