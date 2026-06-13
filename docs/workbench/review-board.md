@@ -35,7 +35,9 @@ DesignWorkbench의 하단 `모듈` 탭은 후보 목록과 선택 후보 상세�
 ## Remote A2A 계약 검토
 
 DesignWorkbench의 `Remote A2A` 탭은 `module_category === "remote_a2a"` 후보와 `analysis-result.json.a2aContracts`의 1:1 매칭을 표로 보여준다.
-개발 리더는 후보별 계약을 선택해 Agent Card, message contract, task lifecycle, task capability, auth, retry, fallback, audit, data policy와 `contract_status`를 읽기 전용으로 검토한다. 계약 내용 수정은 Design Stage Runner 재실행(diff 적용) 또는 외부 편집으로 `analysis-result.json`에 반영한다 — 전용 인라인 계약 편집기는 `INSPECTOR_ENABLED=false`로 파킹되어 있다.
+개발 리더는 후보별 계약을 선택해 Agent Card, message contract, task lifecycle, task capability, auth, retry, fallback, audit, data policy와 `contract_status`를 하단 탭에서 직접 검토/저장할 수 있다.
+선택한 Remote A2A 후보에 매칭 계약이 없으면 `새 계약 생성`으로 placeholder `a2a-NNN` 계약을 만들고, 같은 저장에서 후보의 `a2a_contract_id`도 연결한다.
+우측 Inspector의 계약 편집기는 `INSPECTOR_ENABLED=false`로 계속 파킹되어 있으며, 현재 활성 편집 표면은 하단 `Remote A2A` 탭이다.
 Readiness issue가 남거나 매칭 계약이 없으면 `runtime_contracts_approved` 게이트를 새로 켤 수 없다.
 게이트는 자동으로 켜지지 않으며, Runtime 계약과 Remote A2A 계약이 모두 준비된 뒤 사용자가 직접 토글한다.
 

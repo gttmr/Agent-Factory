@@ -21,6 +21,10 @@
   overflow: hidden;
 }
 
+.af-catalog-workflow-modal {
+  width: min(760px, 92vw);
+}
+
 .af-modal-header,
 .af-drawer-header {
   display: flex;
@@ -102,6 +106,56 @@
   grid-column: 2;
   font-size: var(--fs-xs);
   color: var(--text-muted);
+}
+
+.af-catalog-workflow-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.af-catalog-workflow-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-lg);
+  align-items: center;
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+}
+
+.af-catalog-workflow-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.af-catalog-workflow-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.af-catalog-workflow-title span {
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: var(--space-3xs) var(--space-xs);
+  font-size: var(--fs-2xs);
+}
+
+.af-catalog-workflow-main small,
+.af-catalog-workflow-main p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
 }
 
 .af-drawer {

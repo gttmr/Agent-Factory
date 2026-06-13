@@ -153,6 +153,8 @@ const SOFT_VALIDATION_CODES = new Set([
   "graph_not_object",
   "duplicate_node_id",
   "node_missing_module_id",
+  "module_node_missing_incoming",
+  "module_node_missing_outgoing",
   "invalid_lane_id",
   "invalid_node_position",
   "duplicate_edge_id",
@@ -163,6 +165,7 @@ const SOFT_VALIDATION_CODES = new Set([
   "state_missing_key",
   "remote_missing_contract",
   "remote_boundary_flag_missing",
+  "remote_link_incoherent",
   "invalid_container_id",
   "parallel_region_needs_two_entries",
   "parallel_region_missing_join",
@@ -540,6 +543,7 @@ export function validateGraphIRSoft(
   const containers = Array.isArray(graphIR.containers) ? (graphIR.containers as GraphContainer[]) : [];
 
   const nodeIds = new Set<string>();
+  const nodeById = new Map<string, GraphNode>();
   for (const node of nodes) {
     if (!node || typeof node.id !== "string") continue;
     if (nodeIds.has(node.id)) {
@@ -551,6 +555,7 @@ export function validateGraphIRSoft(
       });
     }
     nodeIds.add(node.id);
+    nodeById.set(node.id, node);
     if (typeof node.lane_id !== "string" || !LANE_ID_SET.has(node.lane_id)) {
       errors.push({
         code: "invalid_lane_id",
@@ -659,6 +664,18 @@ export function validateGraphIRSoft(
         errors.push({
           code: "remote_missing_contract",
           message: `Remote edge ${edge.id ?? ""} requires a2a_contract_id.`,
+          target_kind: "edge",
+          target_id: edge.id ?? null
+        });
+      }
+      const fromNode = typeof edge.from === "string" ? nodeById.get(edge.from) : undefined;
+      const toNode = typeof edge.to === "string" ? nodeById.get(edge.to) : undefined;
+      const remoteNode =
+        fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
+      if (!remoteNode || typeof remoteNode.module_id !== "string" || !remoteNode.module_id.trim()) {
+        warnings.push({
+          code: "remote_link_incoherent",
+          message: `Remote edge ${edge.id ?? ""} should connect to a remote_a2a node with module_id.`,
           target_kind: "edge",
           target_id: edge.id ?? null
         });

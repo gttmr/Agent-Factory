@@ -22,6 +22,26 @@
 - **배경**: 기존 readers 는 name 기반으로 동작하므로 append-only publish 와 기존 seed 항목을 함께 유지하려면 명시적 version/status 모델이 필요했다.
 - **영향**: catalog YAML entry shape, Reuse Hub index hydration, `CatalogEntry` 타입.
 
+### Catalog workflow 중첩 삽입은 단일 노드 방식으로 채택
+- **결정**: Design 검토 화면의 `카탈로그 워크플로우 삽입`은 catalog workflow 내부 fragment를 펼치지 않고, 현재 Graph IR에 단일 `workflow` node와 matching `ModuleCandidate`를 추가한다.
+- **배경**: catalog workflow의 내부 Graph IR을 다른 root에 확장하면 ownership, edge namespace, approval state가 섞인다. Round B 범위는 재사용 boundary를 명시하는 삽입이다.
+- **영향**: `nestedWorkflowInsert` helper, DesignWorkbench picker, Graph IR 컨테이너 편입 규칙.
+
+### Catalog workflow 삽입은 편집 드래프트 밖 즉시 저장 경로로 결정
+- **결정**: 삽입 액션은 GraphCanvas 편집 모드의 `processFlow` draft 저장 버튼을 기다리지 않고 `analysis-result.json` 전체를 즉시 PUT 한다.
+- **배경**: 삽입은 module candidate와 Graph node를 동시에 추가하므로 `processFlow`만 저장하는 편집 드래프트와 섞으면 후보/노드 linkage가 깨질 수 있다.
+- **영향**: DesignWorkbench 저장 mutation, 모듈 탭 approval flow.
+
+### Remote A2A 편집기는 하단 탭에서 부활
+- **결정**: 우측 Inspector는 `INSPECTOR_ENABLED=false`로 계속 파킹하고, `Remote A2A` 하단 탭에 `A2AContractInspector`를 목록 아래에 배치한다. 매칭 계약이 없을 때는 `새 계약 생성`이 placeholder 계약과 후보 `a2a_contract_id`를 한 번에 저장한다.
+- **배경**: 그래프 폭을 유지하면서도 Remote A2A readiness를 Stage Runner 재실행이나 외부 편집 없이 해소할 필요가 있었다.
+- **영향**: DesignWorkbench bottom tab, A2A readiness gate.
+
+### Remote A2A linkage 검증 범위 확정
+- **결정**: export validator는 `remote_a2a` edge의 contract id가 실제 A2A contract를 가리키는지뿐 아니라 remote endpoint node `module_id`, `contract.remote_module_id`, `candidate.a2a_contract_id`의 상호 링크를 검증한다. soft validator는 remote endpoint가 없거나 module link가 없을 때 warning만 표시한다.
+- **배경**: Remote A2A는 아직 runtime codegen 경로가 아니지만, artifact handoff 전에 candidate/node/contract 링크 불일치를 잡아야 한다.
+- **영향**: `scripts/validate-artifacts.mjs`, `validateGraphIRSoft`, `docs/workbench/validation.md`. Runtime codegen 범위는 변경하지 않는다.
+
 ## 2026-06-12 · PR [#26](https://github.com/gttmr/Agent-Factory/pull/26) (merge `ea78ced`) — Design 검토 Graph IR 편집 + 모듈 승인 흐름
 
 ### Graph IR을 검토 화면에서 직접 편집할 수 있게 결정

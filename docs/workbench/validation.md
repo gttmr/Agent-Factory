@@ -30,8 +30,10 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - `loop_region`은 `loop_back`과 `loop_exit` edge가 있어야 한다.
 - `human_input` node는 downstream edge가 있어야 한다.
 - soft validation error `node_missing_module_id`는 export validator의 node kind 규칙을 미리 반영한다. `agent`, `workflow`, `adapter`, `remote_a2a` node는 `module_id`가 필요하고, `input`, `output`, `function`, `tool`, `human_input` 등 synthetic/lenient kind는 이 soft error에서 제외된다.
+- soft validation warning `remote_link_incoherent`는 `remote_a2a` edge가 `node_kind === "remote_a2a"` endpoint를 갖지 않거나, 그 remote endpoint node에 `module_id`가 없을 때 표시된다. 경고만 추가하며 기존 export error count를 대신하지 않는다.
 - module-bound node는 incoming edge와 outgoing edge를 각각 최소 1개 가져야 한다. 화면에 노드가 렌더링되더라도 고립 후보는 scaffold source가 될 수 없다.
 - `remote_a2a` edge는 remote boundary crossing과 A2A contract id를 요구한다.
+- export validator는 `remote_a2a` edge의 `a2a_contract_id`가 실제 A2A contract를 가리키는지 확인한 뒤, remote endpoint node가 있으면 `contract.remote_module_id === node.module_id`와 `candidate.a2a_contract_id === edge.a2a_contract_id`도 검사한다. 이 검증은 linkage 정합성만 다루며 runtime codegen을 허용하지 않는다.
 - 최종 Graph IR id는 canonical 형식이어야 한다. edge는 `edge-001` 같은 `edge-[0-9]+`, container는 `container-root` 같은 `container-[a-z0-9-]+`를 사용한다.
 - DesignWorkbench의 모듈 검토 저장 후 재생성된 Graph IR은 analyzer 재실행 결과가 아니라 사용자가 검토한 module candidate와 입력/출력 연결을 기준으로 만든 artifact다. 기존 Graph IR에 일부 edge만 남아 있으면 유효한 edge metadata는 보존하되, 누락된 후보 연결은 모듈 검토 순서의 fallback edge로 보강해 고립 노드를 만들지 않는다.
 
@@ -45,7 +47,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - Catalog reuse 후보는 반복되는 inputs/outputs/runtime metadata 대신 `catalog_entry_id`와 필요한 override만 담을 수 있다.
 - Draft Graph IR은 node/edge 중심의 compact shape를 허용하고, 서버가 containers, lanes, nullable/default fields를 hydrate한다.
 - Draft prompt와 schema는 canonical edge/container id 예시를 제공한다. 그래도 runtime은 `e-001`, `c-root` 같은 축약 id를 final artifact 저장/검증 전에 보정하는 방어선을 둔다.
-- Graph IR soft validation은 load/migration/client backstop에서 반복 실행될 수 있으므로 structural error를 누적 append하지 않고 현재 정규화 결과 기준으로 다시 계산한다. 이 목록에는 `node_missing_module_id`도 포함된다.
+- Graph IR soft validation은 load/migration/client backstop에서 반복 실행될 수 있으므로 structural error를 누적 append하지 않고 현재 정규화 결과 기준으로 다시 계산한다. 이 목록에는 `node_missing_module_id` error와 `remote_link_incoherent` warning도 포함된다.
 - Codex `--output-schema` response format 제약 때문에 draft schema의 모든 object는 `properties`의 모든 key를 `required`에 포함하고, 값이 없을 수 있는 필드는 nullable로 표현한다.
 - Hydrated 결과는 기존 `AnalysisResult` shape와 validator 기준을 통과해야 한다.
 - Draft schema 변경은 analyzer/server contract 변경이므로 `cd packages/web && npm run build` 검증 대상이다.
@@ -64,7 +66,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - generated `agents.config.yaml`, default agent instruction, README, handoff는 한국인 reviewer가 바로 이해할 수 있도록 한글 우선 문구를 사용한다. `Agent`, `Workflow`, `Adapter`, `MCP`, `Graph IR`, field name, enum 같은 기술 식별자는 그대로 유지한다.
 - runnable MCP adapter는 tool result의 `structuredContent`를 generated payload에 보존하고, 다음 adapter 입력이 upstream output/session state에 없을 때만 reviewed `smoke_spec.synthetic_inputs`를 synthetic fallback으로 사용한다. 이 fallback도 raw requirement가 아니라 승인된 artifact seed에서만 온다. 실행 중 MCP 서버를 통해 파악한 데이터는 payload와 `workflow_manifest.json`에 `runtime_mcp_label: "런타임 MCP"` 및 설명 note로 표시한다.
 - `runtime_contracts`는 MCP/EAI/Legacy Adapter, Context Manager, Callback Broker, ADK callback, async resume 계약의 reviewed handoff다. 필수 Runtime 계약이 `approved`가 아니거나 `needs_info` 정책을 남기면 source generation blocker가 된다.
-- `a2aContracts`는 Remote A2A 후보의 reviewed handoff다. DesignWorkbench의 `Remote A2A` 탭에서 모든 Remote A2A 후보가 매칭 계약을 갖고 `contract_status: approved`이며 readiness issue가 없어야 `runtime_contracts_approved` 게이트를 새로 켤 수 있다.
+- `a2aContracts`는 Remote A2A 후보의 reviewed handoff다. DesignWorkbench의 `Remote A2A` 탭에서 새 계약 placeholder를 생성하고 계약 본문을 저장할 수 있다. 모든 Remote A2A 후보가 매칭 계약을 갖고 `contract_status: approved`이며 readiness issue가 없어야 `runtime_contracts_approved` 게이트를 새로 켤 수 있다.
 - `output_mode`는 `smoke`(기본, 부재 시 smoke로 간주) 또는 `runnable`이다. validator는 `smoke`에서 모든 module이 `no_runnable_business_logic: true`와 category별 shell/stub `scaffold_output`을 갖도록, `runnable`에서는 `no_runnable_business_logic: false`와 `scaffold_output: "runnable"`을 갖도록 강제한다.
 - `source: approved_workbench_artifact`와 `raw_requirement_to_code: false`는 두 mode 모두에서 불변이다. runnable mode도 raw requirement가 아니라 승인된 artifact에서만 source를 생성한다.
 - adapter의 MCP 바인딩(`access_protocol: "mcp"` + `mcp_server` + `mcp_tool_name`)은 완전해야 하며 부분 바인딩은 validator가 거부한다. 바인딩이 없는 adapter는 unconnected로 표시되어 synthetic stub으로 생성된다. BuildWorkbench runnable mode에서는 `/api/mock-lab/mcp-discovery`로 확인한 running tool을 reviewer가 명시적으로 선택해 이 바인딩을 저장한다.
