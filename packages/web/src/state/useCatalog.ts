@@ -10,7 +10,9 @@ export interface CatalogIO {
 }
 
 export interface CatalogEntryRaw {
+  id?: string;
   name: string;
+  version?: number;
   agent_kind?: string;
   workflow_kind?: string;
   adapter_kind?: string;
@@ -20,13 +22,24 @@ export interface CatalogEntryRaw {
   component_source?: string;
   runtime_binding?: string;
   access_protocol?: string;
+  mcp_server?: string;
+  mcp_tool_name?: string;
+  mcp_schema_ref?: string;
+  mcp_auth_mode?: string;
   contract_status?: string;
   responsibility?: string;
   inputs?: CatalogIO[];
   outputs?: CatalogIO[];
   risk_signals?: string[];
   composition?: string[];
+  scaffold_output?: string;
   notes?: string;
+  provenance?: string;
+  published_at?: string;
+  published_from?: string;
+  source_candidate_id?: string;
+  runtime_mock?: Record<string, unknown> | null;
+  required_before_approval?: string[];
 }
 
 export interface CatalogHubEntry extends CatalogEntryRaw {
@@ -62,10 +75,27 @@ function hydrate(category: CatalogCategory, entry: CatalogEntryRaw): CatalogHubE
           : entry.remote_contract_kind;
   return {
     ...entry,
-    id: `${category}:${entry.name}`,
+    id: entry.id ?? `${category}:${entry.name}`,
     category,
     subtype: subtype ?? undefined
   };
+}
+
+function hydrateEntries(category: CatalogCategory, entries: CatalogEntryRaw[]): CatalogHubEntry[] {
+  const byName = new Map<string, CatalogHubEntry>();
+  for (const entry of entries) {
+    if (entry.status === "deprecated") continue;
+    const hydrated = hydrate(category, entry);
+    const current = byName.get(entry.name);
+    if (!current || entryVersion(hydrated) > entryVersion(current)) {
+      byName.set(entry.name, hydrated);
+    }
+  }
+  return Array.from(byName.values());
+}
+
+function entryVersion(entry: CatalogEntryRaw): number {
+  return typeof entry.version === "number" && Number.isFinite(entry.version) ? entry.version : 0;
 }
 
 export function useCatalog() {
@@ -76,10 +106,10 @@ export function useCatalog() {
       if (!response.ok) throw new AfApiError(response.status, "catalog 조회 실패");
       const body = (await response.json()) as Record<string, unknown>;
       return {
-        agents: readEntries(body.agents, "agents").map((entry) => hydrate("agent", entry)),
-        workflows: readEntries(body.workflows, "workflows").map((entry) => hydrate("workflow", entry)),
-        adapters: readEntries(body.adapters, "adapters").map((entry) => hydrate("adapter", entry)),
-        remoteA2A: readEntries(body.remoteA2A, "remote_a2a_contracts").map((entry) => hydrate("remote_a2a", entry)),
+        agents: hydrateEntries("agent", readEntries(body.agents, "agents")),
+        workflows: hydrateEntries("workflow", readEntries(body.workflows, "workflows")),
+        adapters: hydrateEntries("adapter", readEntries(body.adapters, "adapters")),
+        remoteA2A: hydrateEntries("remote_a2a", readEntries(body.remoteA2A, "remote_a2a_contracts")),
         domainOwners: body.domainOwners,
         riskGates: body.riskGates
       };

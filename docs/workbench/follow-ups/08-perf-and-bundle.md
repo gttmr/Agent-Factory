@@ -19,7 +19,7 @@ PR6 후 가장 큰 청크는 `DesignWorkbench-*.js` (275 kB) 와 `index-*.js` (2
   - `BuildWorkbench-*.js` 75.14 kB / gzip 24.28 kB
   - `AnalyzeWorkbench-*.js` 13.95 kB / gzip 5.28 kB
   - `VerifyWorkbench-*.js` 6.83 kB / gzip 2.77 kB
-- catalog seed는 BuildWorkbench에서 `useQuery`로 읽지만 `loadSeedCatalog` import 자체는 BuildWorkbench chunk에 남아 있다. Reuse Hub는 `/api/catalog` 경로를 사용한다.
+- BuildWorkbench와 Reuse Hub는 모두 `/api/catalog` hydrated catalog index를 사용한다. `loadSeedCatalog` 정적 import가 Build route chunk에 다시 들어오지 않도록 번들 회귀를 확인한다.
 
 ## 구현 결과
 

@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-06-13 · 작업 브랜치 `feat/workflow-a2a-registration` — Reuse Hub 등록 승인 publish 경로
+
+### 카탈로그 정책을 승인 게이트 publish API 단일 쓰기 경로로 개정
+- **결정**: `catalog/*.yaml` 직접 편집 금지를 유지하되, Reuse Hub `등록 승인` drawer 에서 검토자가 `catalog-delta.yaml` 제안을 항목별 승인하면 `POST /api/catalog/publish` 가 matching catalog YAML 에만 append 하는 app 쓰기 경로를 추가한다. publish 는 target YAML 을 `js-yaml` load→dump 로 canonical re-serialization 하므로 semantics 는 보존하지만 formatting 은 바뀔 수 있고, 최종 human PR 에서 git diff 로 검토한다. bulk/seed 변경은 여전히 human PR merge 로 처리한다.
+- **배경**: 기존 Reuse Hub 는 `catalog-delta.yaml` 제안만 남기고 app 안에서 catalog 반영을 할 수 없어, 단건 승인 흐름이 manual merge 에 묶여 있었다.
+- **영향**: `packages/web/server/afCatalogApi.ts`, Reuse Hub 등록 승인 UI, catalog governance 문서.
+
+### Versioned catalog entry 모델 채택
+- **결정**: publish 된 항목은 stable `id`, `version`, `status: published`, `provenance: catalog_published`, `published_at`, `published_from`, 선택적 `source_candidate_id` 를 포함한다. 같은 category/name 의 기존 항목은 `status: deprecated` 로 표시하고, catalog hydration 은 deprecated 를 제외한 최고 version 을 Reuse Hub 에 노출한다.
+- **배경**: 기존 readers 는 name 기반으로 동작하므로 append-only publish 와 기존 seed 항목을 함께 유지하려면 명시적 version/status 모델이 필요했다.
+- **영향**: catalog YAML entry shape, Reuse Hub index hydration, `CatalogEntry` 타입.
+
 ## 2026-06-12 · PR [#26](https://github.com/gttmr/Agent-Factory/pull/26) (merge `ea78ced`) — Design 검토 Graph IR 편집 + 모듈 승인 흐름
 
 ### Graph IR을 검토 화면에서 직접 편집할 수 있게 결정

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import { Button } from "../ui/primitives";
 import { AfApiError } from "../state/apiClient";
 
@@ -55,18 +56,15 @@ export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProp
     setError(null);
     setIsPending(true);
     try {
-      const proposal = [
-        `  - category: ${category}`,
-        `    name: ${escapeYaml(name.trim())}`,
-        owner.trim() ? `    owner_domain: ${escapeYaml(owner.trim())}` : null,
-        responsibility.trim() ? `    responsibility: ${escapeYaml(responsibility.trim())}` : null,
-        rationale.trim() ? `    rationale: ${escapeYaml(rationale.trim())}` : null,
-        `    proposed_by: reuse_hub`,
-        `    proposed_at: ${new Date().toISOString()}`
-      ]
-        .filter(Boolean)
-        .join("\n");
-
+      const proposal = {
+        category,
+        name: name.trim(),
+        ...(owner.trim() ? { owner_domain: owner.trim() } : {}),
+        ...(responsibility.trim() ? { responsibility: responsibility.trim() } : {}),
+        ...(rationale.trim() ? { rationale: rationale.trim() } : {}),
+        proposed_by: "reuse_hub",
+        proposed_at: new Date().toISOString()
+      };
       const next = appendProposal(existing.content, proposal);
       const headers: Record<string, string> = { "Content-Type": "text/plain; charset=utf-8" };
       if (existing.etag) headers["If-Match"] = existing.etag;
@@ -102,7 +100,7 @@ export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProp
       <div className="af-drawer-body">
         <p className="af-drawer-hint">
           catalog/*.yaml 은 직접 편집하지 않습니다. 이 제안은 활성 root 의 <code>catalog-delta.yaml</code> 에만 기록되며,
-          이후 별도 PR 로 검토자가 catalog 에 머지합니다.
+          이후 Reuse Hub 의 등록 승인 흐름에서 검토자가 versioned catalog entry 로 publish 합니다.
         </p>
         {error ? <p className="af-landing-error">{error}</p> : null}
         <label className="ui-field">
@@ -147,18 +145,27 @@ export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProp
   );
 }
 
-function escapeYaml(value: string): string {
-  if (/^[A-Za-z0-9_\-./가-힣]+$/.test(value)) return value;
-  return JSON.stringify(value);
+function appendProposal(existing: string, proposal: Record<string, unknown>): string {
+  let parsed: unknown = {};
+  if (existing.trim()) {
+    try {
+      parsed = parseYaml(existing);
+    } catch (error) {
+      throw new Error(`catalog-delta.yaml 파싱 실패: ${error instanceof Error ? error.message : "YAML 오류"}`);
+    }
+  }
+  if (parsed === null || parsed === undefined) parsed = {};
+  if (!isRecord(parsed)) {
+    throw new Error("catalog-delta.yaml 은 YAML 객체여야 합니다.");
+  }
+  const additions = parsed.proposed_additions;
+  if (additions !== undefined && !Array.isArray(additions)) {
+    throw new Error("proposed_additions 는 배열이어야 합니다.");
+  }
+  parsed.proposed_additions = [...(Array.isArray(additions) ? additions : []), proposal];
+  return dumpYaml(parsed, { lineWidth: -1, noRefs: true });
 }
 
-function appendProposal(existing: string, proposal: string): string {
-  const trimmed = existing.trim();
-  if (!trimmed) {
-    return ["proposed_additions:", proposal, ""].join("\n");
-  }
-  if (trimmed.includes("proposed_additions:")) {
-    return `${trimmed}\n${proposal}\n`;
-  }
-  return `${trimmed}\n\nproposed_additions:\n${proposal}\n`;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

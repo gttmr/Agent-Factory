@@ -64,7 +64,7 @@ Definitions:
 
 Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
 
-Catalog entries are runtime-oriented contracts. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
+Catalog entries are runtime-oriented contracts. `catalog/*.yaml` is never edited directly; the approval-gated `POST /api/catalog/publish` path in Reuse Hub `등록 승인` is the only app write path, publishing versioned entries from active-root `catalog-delta.yaml` proposals. Human PR merge remains valid for bulk or seed changes. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
 
 ADK taxonomy/Graph IR baseline: ADK 2.0 (ADK Python 2.0 GA as of May 19, 2026). This baseline governs classification only — `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`, and ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis. The runnable source generator targets the ADK 2.1 `google.adk.workflow.Workflow` runtime (a minor-version detail of the generated bundle, not a change to the classification baseline).
 

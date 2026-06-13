@@ -10,7 +10,7 @@ import type {
   WorkflowKind
 } from "../analyzer/types";
 
-export type CatalogProvenance = "seeded" | "session_added" | "session_edited" | "session_deleted";
+export type CatalogProvenance = "seeded" | "session_added" | "session_edited" | "session_deleted" | "catalog_published";
 
 export type RuntimeBinding = "unresolved" | "mcp" | "remote_a2a";
 
@@ -25,6 +25,7 @@ export type RuntimeMock = Record<string, unknown>;
 export interface CatalogEntry {
   id: string;
   name: string;
+  version?: number;
   module_category: ModuleCategory;
   agent_kind?: AgentKind | null;
   workflow_kind?: WorkflowKind | null;
@@ -39,6 +40,9 @@ export interface CatalogEntry {
   runtime_binding?: RuntimeBinding | null;
   owner_domain?: string;
   status?: string;
+  published_at?: string;
+  published_from?: string;
+  source_candidate_id?: string;
   responsibility?: string;
   inputs?: FieldSpec[];
   outputs?: FieldSpec[];
