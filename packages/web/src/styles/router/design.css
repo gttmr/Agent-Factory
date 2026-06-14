@@ -57,6 +57,14 @@
   min-width: 0;
 }
 
+.af-design-canvas-pane > .af-design-canvas-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--line);
+}
+
 .af-design-canvas-loading {
   min-height: 480px;
   display: grid;
@@ -229,6 +237,17 @@
   padding: 12px;
   flex: 1 1 auto;
   overflow-y: auto;
+}
+
+.af-design-bottom > .af-design-sidebar-body > .af-a2a-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.af-design-bottom > .af-design-sidebar-body > .af-a2a-tab-panel > .af-a2a-tab-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .af-design-empty {

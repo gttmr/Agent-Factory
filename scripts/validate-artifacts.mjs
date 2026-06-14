@@ -838,6 +838,15 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       }
     }
     if (edge.edge_kind === "remote_a2a") {
+      const fromNode = nodeById.get(edge.from);
+      const toNode = nodeById.get(edge.to);
+      const remoteNode =
+        fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
+      if (!remoteNode || typeof remoteNode.module_id !== "string" || !remoteNode.module_id.trim()) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}) remote_a2a edge must connect to a remote_a2a node with module_id.`
+        );
+      }
       if (edge.is_remote_boundary_crossing !== true) {
         errors.push(
           `${label}.edges[${index}] (${edge.id}) remote_a2a edge must set is_remote_boundary_crossing=true.`
@@ -849,6 +858,28 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         errors.push(
           `${label}.edges[${index}] (${edge.id}).a2a_contract_id ${edge.a2a_contract_id} does not match any A2A contract.`
         );
+      } else {
+        const contract = contractsById.get(edge.a2a_contract_id);
+        if (contract) {
+          if (remoteNode && typeof remoteNode.module_id === "string" && remoteNode.module_id.trim()) {
+            if (contract.remote_module_id !== remoteNode.module_id) {
+              errors.push(
+                `${label}.edges[${index}] (${edge.id}) remote endpoint node ${remoteNode.id} module_id ${remoteNode.module_id} does not match A2A contract ${edge.a2a_contract_id} remote_module_id ${contract.remote_module_id}.`
+              );
+            }
+            const candidate = candidatesById.get(remoteNode.module_id);
+            if (
+              candidate &&
+              typeof candidate.a2a_contract_id === "string" &&
+              candidate.a2a_contract_id.trim() &&
+              candidate.a2a_contract_id !== edge.a2a_contract_id
+            ) {
+              errors.push(
+                `${label}.edges[${index}] (${edge.id}) remote endpoint node ${remoteNode.id} module_id ${remoteNode.module_id} links candidate.a2a_contract_id ${candidate.a2a_contract_id}, not edge contract ${edge.a2a_contract_id}.`
+              );
+            }
+          }
+        }
       }
     } else {
       if (edge.is_remote_boundary_crossing !== false) {

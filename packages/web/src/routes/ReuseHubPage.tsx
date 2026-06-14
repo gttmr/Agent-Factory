@@ -3,8 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
 import { CatalogCard } from "../catalog-hub/CatalogCard";
 import { PinTargetDialog } from "../catalog-hub/PinTargetDialog";
+import { PublishApprovalDrawer } from "../catalog-hub/PublishApprovalDrawer";
 import { RegisterProposalDrawer } from "../catalog-hub/RegisterProposalDrawer";
-import { useCatalog, type CatalogCategory, type CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogCategory, CatalogHubEntry } from "../catalog/catalogIndex";
+import { useCatalog } from "../state/useCatalog";
 import { useArtifactRoots } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { buildMockLabRoute } from "../mock-lab/mockLabIntegration";
@@ -35,6 +37,7 @@ export default function ReuseHubPage() {
   const [ownerFilter, setOwnerFilter] = useState<string>("");
   const [pinTarget, setPinTarget] = useState<CatalogHubEntry | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [approvalDrawerOpen, setApprovalDrawerOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const bucket = useMemo<CatalogHubEntry[]>(() => {
@@ -76,7 +79,7 @@ export default function ReuseHubPage() {
         <SectionHeader
           eyebrow="Reuse Hub"
           title="공통 카탈로그 탐색"
-          description="등록된 Agent/Workflow/Adapter/Remote A2A 컴포넌트를 검색·재사용 핀으로 활성 root 에 바인딩하거나, 신규 등록 제안을 catalog-delta.yaml 에 기록합니다."
+          description="등록된 Agent/Workflow/Adapter/Remote A2A 컴포넌트를 검색·재사용 핀으로 활성 root 에 바인딩하고, 신규 등록 제안과 승인 publish 를 관리합니다."
           action={
             <div className="af-action-row">
               <label className="af-active-root-picker">
@@ -99,6 +102,9 @@ export default function ReuseHubPage() {
               </label>
               <Button type="button" variant="primary" onClick={() => setDrawerOpen(true)} disabled={!activeReqId}>
                 신규 등록 제안…
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setApprovalDrawerOpen(true)} disabled={!activeReqId}>
+                등록 승인
               </Button>
             </div>
           }
@@ -200,6 +206,13 @@ export default function ReuseHubPage() {
           reqId={activeReqId}
           onClose={() => setDrawerOpen(false)}
           onSaved={(msg) => setMessage(msg)}
+        />
+      ) : null}
+      {approvalDrawerOpen && activeReqId ? (
+        <PublishApprovalDrawer
+          reqId={activeReqId}
+          onClose={() => setApprovalDrawerOpen(false)}
+          onPublished={(msg) => setMessage(msg)}
         />
       ) : null}
     </div>

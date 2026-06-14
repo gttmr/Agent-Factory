@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import { createA2AContractForCandidate } from "./a2aNormalize.ts";
+import type { AnalysisResult, ModuleCandidate } from "./types.ts";
+
+const remoteCandidate: ModuleCandidate = {
+  id: "mod-remote",
+  source_requirement_id: "req-001",
+  name: "remote partner",
+  module_category: "remote_a2a",
+  agent_kind: null,
+  workflow_kind: null,
+  adapter_kind: null,
+  remote_contract_kind: "a2a",
+  legacy_recommended_type: "remote_a2a_contract",
+  confidence: 0.8,
+  rationale: "Remote boundary",
+  inputs: [],
+  outputs: [],
+  reuse_candidate: false,
+  risk_level: "high",
+  risk_signals: [],
+  status: "needs_info",
+  missing_information: [],
+  a2a_contract_id: null
+};
+
+const analysis: AnalysisResult = {
+  normalizedRequirement: {} as AnalysisResult["normalizedRequirement"],
+  evidence: {} as AnalysisResult["evidence"],
+  moduleCandidates: [
+    { ...remoteCandidate },
+    {
+      ...remoteCandidate,
+      id: "mod-existing",
+      a2a_contract_id: "a2a-001"
+    }
+  ],
+  a2aContracts: [
+    {
+      contract_id: "a2a-002",
+      remote_module_id: "mod-existing"
+    } as AnalysisResult["a2aContracts"][number]
+  ],
+  runtimeContracts: [],
+  processFlow: {} as AnalysisResult["processFlow"]
+};
+
+const next = createA2AContractForCandidate(analysis, "mod-remote");
+const updatedCandidate = next.moduleCandidates.find((candidate) => candidate.id === "mod-remote");
+
+assert.notEqual(next, analysis);
+assert.equal(updatedCandidate?.a2a_contract_id, "a2a-003");
+assert.equal(next.a2aContracts.length, 2);
+assert.equal(next.a2aContracts[1]?.contract_id, "a2a-003");
+assert.equal(next.a2aContracts[1]?.remote_module_id, "mod-remote");
+assert.equal(next.a2aContracts[1]?.target_agent_name, "needs_info");
+assert.equal(analysis.moduleCandidates[0]?.a2a_contract_id, null);

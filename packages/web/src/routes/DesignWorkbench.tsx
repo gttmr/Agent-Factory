@@ -13,6 +13,8 @@ import {
   resolveMissingItem,
   setCandidateStatus
 } from "../analyzer/moduleReview";
+import { createA2AContractForCandidate } from "../analyzer/a2aNormalize";
+import { insertCatalogWorkflowNode } from "../analyzer/nestedWorkflowInsert";
 import type {
   AnalysisResult,
   GraphEdge,
@@ -22,6 +24,7 @@ import type {
   ModuleStatus,
   RuntimeContract
 } from "../analyzer/types";
+import { CatalogWorkflowPicker } from "../design/CatalogWorkflowPicker";
 import {
   A2AContractInspector,
   A2AContractSidebar,
@@ -72,10 +75,10 @@ const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
 // 복원된다.
 //
 // 비활성 동안 함께 휴면 상태가 되는 것: Runtime 계약 / Remote A2A 탭의 *편집*
-// 인스펙터(RuntimeContractInspector / A2AContractInspector)와 노드/엣지 앵커
+// 우측 인스펙터(RuntimeContractInspector / A2AContractInspector)와 노드/엣지 앵커
 // 코멘트 *작성* 패널(SelectionHeader + 우측 CommentThread). 사이드바의 목록/선택과
-// Comments 탭의 읽기 표시는 그대로 동작한다. 관련 핸들러(handleSaveRuntimeContract,
-// handleSaveA2AContract, handleCreateComment)와 import 도 재활성화를 위해 보존한다.
+// Comments 탭의 읽기 표시는 그대로 동작한다. Remote A2A 편집은 하단 탭에서 제공한다.
+// 관련 핸들러(handleSaveRuntimeContract, handleSaveA2AContract, handleCreateComment)는 보존한다.
 // ──────────────────────────────────────────────────────────────────────────
 const INSPECTOR_ENABLED = false;
 
@@ -111,6 +114,7 @@ export default function DesignWorkbench() {
   const [selectedReviewModuleId, setSelectedReviewModuleId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [selectedA2AModuleId, setSelectedA2AModuleId] = useState<string | null>(null);
+  const [catalogWorkflowPickerOpen, setCatalogWorkflowPickerOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const manifest = manifestData?.manifest;
@@ -267,6 +271,48 @@ export default function DesignWorkbench() {
         onSuccess: () => setActionMessage(`${next.contract_id} 저장 완료`),
         onError: (error) =>
           setActionMessage(error instanceof Error ? error.message : "A2A contract 저장 실패")
+      }
+    );
+  }
+
+  function handleCreateA2AContract(candidate: ModuleCandidate) {
+    if (!analysis || candidate.module_category !== "remote_a2a") return;
+    const nextAnalysis = createA2AContractForCandidate(analysis, candidate.id);
+    const contractId = nextAnalysis.moduleCandidates.find((moduleCandidate) => moduleCandidate.id === candidate.id)?.a2a_contract_id;
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => {
+          setSelectedA2AModuleId(candidate.id);
+          setActionMessage(`${contractId} 새 계약 생성 완료`);
+        },
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "A2A contract 생성 실패")
+      }
+    );
+  }
+
+  function handleInsertCatalogWorkflow(entry: Parameters<typeof insertCatalogWorkflowNode>[1]) {
+    if (!analysis || !reqId) return;
+    const nextAnalysis = insertCatalogWorkflowNode(analysis, entry, reqId);
+    if (nextAnalysis === analysis) {
+      setActionMessage("processFlow 가 없어 노드를 추가하지 못했습니다.");
+      return;
+    }
+    const insertedCandidate = nextAnalysis.moduleCandidates[nextAnalysis.moduleCandidates.length - 1] ?? null;
+    saveAnalysisMutation.mutate(
+      { analysis: nextAnalysis, etag: analysisEtag },
+      {
+        onSuccess: () => {
+          if (insertedCandidate) {
+            setSelectedReviewModuleId(insertedCandidate.id);
+            setActiveTab("modules");
+          }
+          setCatalogWorkflowPickerOpen(false);
+          setActionMessage("노드가 추가되었습니다 — 엣지 연결과 모듈 승인이 필요합니다.");
+        },
+        onError: (error) =>
+          setActionMessage(error instanceof Error ? error.message : "카탈로그 workflow 삽입 실패")
       }
     );
   }
@@ -497,6 +543,16 @@ export default function DesignWorkbench() {
           </aside>
 
           <section className="af-design-canvas-pane" aria-label="Graph IR">
+            <div className="af-design-canvas-toolbar">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setCatalogWorkflowPickerOpen(true)}
+                disabled={saveAnalysisMutation.isPending || graphEditState?.editModeActive === true}
+              >
+                카탈로그 워크플로우 삽입
+              </Button>
+            </div>
             {graphIR ? (
               <Suspense fallback={<div className="af-design-canvas-loading">Graph IR 불러오는 중...</div>}>
                 <GraphCanvas
@@ -647,12 +703,34 @@ export default function DesignWorkbench() {
                 />
               ) : null}
               {activeTab === "a2a" ? (
-                <A2AContractSidebar
-                  candidates={analysis.moduleCandidates}
-                  contracts={a2aContracts}
-                  selectedModuleId={selectedA2ARow?.candidate.id ?? null}
-                  onSelect={(moduleId) => setSelectedA2AModuleId(moduleId)}
-                />
+                <div className="af-a2a-tab-panel">
+                  <div className="af-a2a-tab-actions">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!selectedA2ARow || Boolean(selectedA2ARow.contract) || saveAnalysisMutation.isPending}
+                      onClick={() => {
+                        if (selectedA2ARow) handleCreateA2AContract(selectedA2ARow.candidate);
+                      }}
+                    >
+                      새 계약 생성
+                    </Button>
+                  </div>
+                  <A2AContractSidebar
+                    candidates={analysis.moduleCandidates}
+                    contracts={a2aContracts}
+                    selectedModuleId={selectedA2ARow?.candidate.id ?? null}
+                    onSelect={(moduleId) => setSelectedA2AModuleId(moduleId)}
+                  />
+                  <A2AContractInspector
+                    key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
+                    candidate={selectedA2ARow?.candidate ?? null}
+                    contract={selectedA2ARow?.contract ?? null}
+                    saving={saveAnalysisMutation.isPending}
+                    onSave={handleSaveA2AContract}
+                    onCancel={() => setActionMessage(null)}
+                  />
+                </div>
               ) : null}
               {activeTab === "comments" ? (
                 <CommentThread
@@ -787,6 +865,13 @@ export default function DesignWorkbench() {
             <EmptyState title="manifest 없음" description="af-run-manifest.json 을 확인하세요." />
           </Panel>
         )
+      ) : null}
+      {catalogWorkflowPickerOpen ? (
+        <CatalogWorkflowPicker
+          inserting={saveAnalysisMutation.isPending}
+          onClose={() => setCatalogWorkflowPickerOpen(false)}
+          onInsert={handleInsertCatalogWorkflow}
+        />
       ) : null}
     </StageShell>
   );

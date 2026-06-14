@@ -42,6 +42,17 @@ Skill-led 실행은 검토 artifact를 `artifacts/af/<req-id>/` 아래에 둘 �
 공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
 이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
 
+### versioned catalog entry
+
+Reuse Hub `등록 승인`이 `POST /api/catalog/publish`로 추가하는 entry는 버전 메타데이터를 함께 가진다.
+
+- `id`: `<category>-<name>` 형태의 안정 식별자.
+- `version`: 같은 `(category, name)`에 대해 publish마다 1씩 증가하는 정수.
+- `status`: `published` 또는 `deprecated`. 새 버전을 publish하면 같은 이름의 이전 항목이 `deprecated`로 표시된다.
+- `provenance: catalog_published`와 출처 추적용 `published_at`, `published_from`(source req-id), 선택적 `source_candidate_id`.
+
+Catalog hydration(`useCatalog`)은 이름 기준으로 중복을 제거하면서 `deprecated`를 제외하고 최고 `version`만 Reuse Hub에 노출한다. 이 필드들은 additive이며, seed 항목(버전 메타데이터 없음)도 그대로 유효하다.
+
 ## runtimeContracts
 
 `AnalysisResult.runtimeContracts`는 callback과 runtime support 경계를 검토하는 별도 artifact다. 다음 항목은 top-level `module_category`를 새로 만들지 않아도 Runtime 계약으로 검토할 수 있다.

@@ -1,49 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { dedupeKeepLatestPublished } from "../catalog/catalogVersioning";
+import type { CatalogCategory, CatalogEntryRaw, CatalogHubEntry, CatalogIO, CatalogIndex } from "../catalog/catalogIndex";
 import { AfApiError } from "./apiClient";
 
-export type CatalogCategory = "agent" | "workflow" | "adapter" | "remote_a2a";
-
-export interface CatalogIO {
-  name: string;
-  type: string;
-  required?: boolean;
-}
-
-export interface CatalogEntryRaw {
-  name: string;
-  agent_kind?: string;
-  workflow_kind?: string;
-  adapter_kind?: string;
-  remote_contract_kind?: string;
-  owner_domain?: string;
-  status?: string;
-  component_source?: string;
-  runtime_binding?: string;
-  access_protocol?: string;
-  contract_status?: string;
-  responsibility?: string;
-  inputs?: CatalogIO[];
-  outputs?: CatalogIO[];
-  risk_signals?: string[];
-  composition?: string[];
-  notes?: string;
-}
-
-export interface CatalogHubEntry extends CatalogEntryRaw {
-  /** synthetic id stable per (category,name) for keys + pinning */
-  id: string;
-  category: CatalogCategory;
-  subtype?: string;
-}
-
-export interface CatalogIndex {
-  agents: CatalogHubEntry[];
-  workflows: CatalogHubEntry[];
-  adapters: CatalogHubEntry[];
-  remoteA2A: CatalogHubEntry[];
-  domainOwners: unknown;
-  riskGates: unknown;
-}
+export type { CatalogCategory, CatalogEntryRaw, CatalogHubEntry, CatalogIO, CatalogIndex } from "../catalog/catalogIndex";
 
 function readEntries(value: unknown, key: string): CatalogEntryRaw[] {
   if (!value || typeof value !== "object") return [];
@@ -62,10 +22,14 @@ function hydrate(category: CatalogCategory, entry: CatalogEntryRaw): CatalogHubE
           : entry.remote_contract_kind;
   return {
     ...entry,
-    id: `${category}:${entry.name}`,
+    id: entry.id ?? `${category}:${entry.name}`,
     category,
     subtype: subtype ?? undefined
   };
+}
+
+function hydrateEntries(category: CatalogCategory, entries: CatalogEntryRaw[]): CatalogHubEntry[] {
+  return dedupeKeepLatestPublished(entries).map((entry) => hydrate(category, entry));
 }
 
 export function useCatalog() {
@@ -76,10 +40,10 @@ export function useCatalog() {
       if (!response.ok) throw new AfApiError(response.status, "catalog 조회 실패");
       const body = (await response.json()) as Record<string, unknown>;
       return {
-        agents: readEntries(body.agents, "agents").map((entry) => hydrate("agent", entry)),
-        workflows: readEntries(body.workflows, "workflows").map((entry) => hydrate("workflow", entry)),
-        adapters: readEntries(body.adapters, "adapters").map((entry) => hydrate("adapter", entry)),
-        remoteA2A: readEntries(body.remoteA2A, "remote_a2a_contracts").map((entry) => hydrate("remote_a2a", entry)),
+        agents: hydrateEntries("agent", readEntries(body.agents, "agents")),
+        workflows: hydrateEntries("workflow", readEntries(body.workflows, "workflows")),
+        adapters: hydrateEntries("adapter", readEntries(body.adapters, "adapters")),
+        remoteA2A: hydrateEntries("remote_a2a", readEntries(body.remoteA2A, "remote_a2a_contracts")),
         domainOwners: body.domainOwners,
         riskGates: body.riskGates
       };

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { CategoryBadge, SubtypeBadge } from "../components/CategoryBadge";
 import { Button } from "../ui/primitives";
-import type { CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogHubEntry } from "../catalog/catalogIndex";
 
 interface CatalogCardProps {
   entry: CatalogHubEntry;

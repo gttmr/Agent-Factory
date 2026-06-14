@@ -25,5 +25,5 @@ npm run build
 
 - DesignWorkbench 초기 JS chunk 는 목표치인 300 kB / gzip 95 kB 이하를 충족한다.
 - ReactFlow 를 포함한 GraphCanvas 는 별도 child chunk 로 분리됐다.
-- `loadSeedCatalog` 는 BuildWorkbench route chunk 안에만 남고, 초기 shell/index chunk 에 포함되지 않는다.
+- BuildWorkbench는 `/api/catalog` hydrated catalog index를 사용한다. `loadSeedCatalog` 정적 import가 route chunk에 다시 포함되지 않는지 확인한다.
 - Lighthouse 는 이번 검증에서 별도로 실행하지 않았다. 이 브리프의 정량 기록은 Vite production build artifact 기준으로 남긴다.

@@ -29,6 +29,7 @@ import type {
 } from "../analyzer/types";
 import { GRAPH_NODE_KINDS, type NodeKind } from "../analyzer/types";
 import { ContainerOverlay } from "../graph/containerOverlay";
+import { appendNodeToContainer, moveNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
 import { edgeTypes } from "../graph/edgeTypes";
 import { layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "../graph/layout";
 import { nodeTypes } from "../graph/nodeTypes";
@@ -948,51 +949,6 @@ function applyEdgeFields(graphIR: GraphIR, edgeId: string, patch: EdgeFieldPatch
   };
 }
 
-function rootWorkflowContainerId(graphIR: GraphIR): string | null {
-  const root = (graphIR.containers ?? []).find(
-    (container) =>
-      (container.container_kind === "graph_workflow" || container.container_kind === "dynamic_workflow") &&
-      container.parent_container_id === null
-  );
-  return root?.id ?? null;
-}
-
-function appendNodeToContainer(containers: GraphIR["containers"], containerId: string, nodeId: string): GraphIR["containers"] {
-  return containers.map((container) =>
-    container.id === containerId
-      ? {
-          ...container,
-          contains_node_ids: appendUnique(container.contains_node_ids, nodeId)
-        }
-      : container
-  );
-}
-
-function moveNodeToContainer(
-  containers: GraphIR["containers"],
-  nodeId: string,
-  nextContainerId: string | null
-): GraphIR["containers"] {
-  return containers.map((container) => {
-    const stripped = {
-      ...container,
-      contains_node_ids: container.contains_node_ids.filter((id) => id !== nodeId),
-      entry_node_ids: container.entry_node_ids.filter((id) => id !== nodeId),
-      exit_node_ids: container.exit_node_ids.filter((id) => id !== nodeId)
-    };
-    if (nextContainerId && container.id === nextContainerId) {
-      return {
-        ...stripped,
-        contains_node_ids: appendUnique(stripped.contains_node_ids, nodeId)
-      };
-    }
-    return stripped;
-  });
-}
-
-function appendUnique(values: string[], value: string): string[] {
-  return values.includes(value) ? values : [...values, value];
-}
 
 function applyCurrentPositions(graphIR: GraphIR, positions: Record<string, XYPosition>): GraphIR {
   return {

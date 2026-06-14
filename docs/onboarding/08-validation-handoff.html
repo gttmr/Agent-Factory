@@ -60,7 +60,7 @@ npm run test:analyzer --prefix packages/web</pre>
         <ul>
           <li>stdout/stderr와 exit code는 <code>manifest.validation.last_result</code>에 기록된다.</li>
           <li><code>validation-report.md</code>는 reviewer가 남기는 검증 요약이다.</li>
-          <li><code>catalog-delta.yaml</code>은 catalog 등록/수정 제안이다. <code>catalog/*.yaml</code>은 UI가 직접 수정하지 않는다.</li>
+          <li><code>catalog-delta.yaml</code>은 catalog 등록/수정 제안이다. <code>catalog/*.yaml</code>은 직접 편집하지 않고 Reuse Hub <strong>등록 승인</strong> publish 경로 또는 human PR merge 로만 반영한다.</li>
         </ul>
       </section>
 
@@ -143,7 +143,7 @@ cd packages/web &amp;&amp; npm run build</pre>
             <button data-value="ignore">검증 보고서에 쓰지 않는다</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: catalog-delta.</strong> 실제 catalog YAML 반영은 별도 reviewer merge 작업이다.</p>
+            <p><strong>정답: catalog-delta.</strong> 실제 catalog YAML 반영은 Reuse Hub <strong>등록 승인</strong> publish 경로 또는 별도 reviewer merge 작업이다.</p>
           </div>
         </div>
       </section>

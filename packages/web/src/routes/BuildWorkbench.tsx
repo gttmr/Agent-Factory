@@ -18,8 +18,8 @@ import { useMockLabDiscovery, type MockLabDiscoveryPayload, type MockLabDiscover
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
 import { buildScaffoldPlan } from "../analyzer/scaffoldPlan";
 import type { ScaffoldOutputMode, ScaffoldPlan, ScaffoldPlanModule } from "../analyzer/types";
-import type { CatalogEntry } from "../catalog/types";
-import { loadSeedCatalog } from "../catalog/seed";
+import { catalogIndexToScaffoldCatalog } from "../catalog/scaffoldCatalog";
+import { useCatalog } from "../state/useCatalog";
 import type { ProcessStreamEvent } from "../state/useStreamingProcess";
 import {
   applyMockLabBinding,
@@ -69,11 +69,8 @@ export default function BuildWorkbench() {
   const analysis = analysisData?.data ?? null;
 
   // catalog for buildScaffoldPlan
-  const catalog = useQuery<CatalogEntry[]>({
-    queryKey: ["af", "catalog-seed"] as const,
-    queryFn: async () => loadSeedCatalog()
-  });
-  const catalogEntries = catalog.data ?? [];
+  const catalog = useCatalog();
+  const catalogEntries = useMemo(() => (catalog.data ? catalogIndexToScaffoldCatalog(catalog.data) : []), [catalog.data]);
   const mockLabDiscovery = useMockLabDiscovery(outputMode === "runnable");
 
   const generatedPlan = useMemo(() => {
