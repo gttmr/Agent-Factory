@@ -1,4 +1,4 @@
-import { load as parseYaml } from "js-yaml";
+import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import {
   adapterKinds,
   agentKinds,
@@ -49,6 +49,27 @@ export function parseCatalogDelta(yamlText: string): CatalogDeltaParseResult {
       error: error instanceof Error ? error.message : "catalog-delta.yaml 파싱 실패"
     };
   }
+}
+
+export function appendCatalogDeltaProposal(existing: string, proposal: Record<string, unknown>): string {
+  let parsed: unknown = {};
+  if (existing.trim()) {
+    try {
+      parsed = parseYaml(existing);
+    } catch (error) {
+      throw new Error(`catalog-delta.yaml 파싱 실패: ${error instanceof Error ? error.message : "YAML 오류"}`);
+    }
+  }
+  if (parsed === null || parsed === undefined) parsed = {};
+  if (!isRecord(parsed)) {
+    throw new Error("catalog-delta.yaml 은 YAML 객체여야 합니다.");
+  }
+  const additions = parsed.proposed_additions;
+  if (additions !== undefined && !Array.isArray(additions)) {
+    throw new Error("proposed_additions 는 배열이어야 합니다.");
+  }
+  parsed.proposed_additions = [...(Array.isArray(additions) ? additions : []), proposal];
+  return dumpYaml(parsed, { lineWidth: -1, noRefs: true });
 }
 
 function parseProposedAddition(entry: unknown): ProposedAddition[] {

@@ -12,7 +12,8 @@ import { putArtifactJson } from "../state/apiClient";
 import { parseAnalysisResultArtifact } from "../analyzer/analysisArtifactImport";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AnalyzeCatalogEntry } from "../state/useAnalyze";
-import { useCatalog, type CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogHubEntry } from "../catalog/catalogIndex";
+import { useCatalog } from "../state/useCatalog";
 import { resolveAnalyzeRawText } from "../analyzer/analyzeInput";
 import { canToggleAnalysisReviewed as canToggleAnalysisReviewedGate } from "../analyzer/analysisReviewGate";
 

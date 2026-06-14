@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { adapterKinds, agentKinds, remoteContractKinds, workflowKinds } from "../analyzer/types";
-import type { AdapterKind, AgentKind, RemoteContractKind, WorkflowKind } from "../analyzer/types";
+import { useMemo, useState } from "react";
+import { buildPublishProposal, getRequiredSubtype, subtypeOptions } from "../catalog/catalogPublishProposal";
+import { parseCatalogDelta, type ProposedAddition } from "../catalog/catalogDelta";
 import { CategoryBadge, SubtypeBadge, formatSubtypeLabel } from "../components/CategoryBadge";
 import { AfApiError } from "../state/apiClient";
-import { useCatalogPublish, type CatalogPublishProposal } from "../state/useCatalogPublish";
+import { useCatalogDelta } from "../state/useCatalogDelta";
+import { useCatalogPublish } from "../state/useCatalogPublish";
 import { Button } from "../ui/primitives";
-import { parseCatalogDelta, type ProposedAddition } from "./catalogDelta";
 
 interface PublishApprovalDrawerProps {
   reqId: string;
@@ -17,36 +17,17 @@ type RowFeedback = { tone: "success" | "error"; message: string };
 
 export function PublishApprovalDrawer({ reqId, onClose, onPublished }: PublishApprovalDrawerProps) {
   const publish = useCatalogPublish();
-  const [deltaText, setDeltaText] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const catalogDelta = useCatalogDelta(reqId);
   const [selectedSubtypes, setSelectedSubtypes] = useState<Record<string, string>>({});
   const [rowFeedback, setRowFeedback] = useState<Record<string, RowFeedback>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setDeltaText(null);
-    setLoadError(null);
-    fetch(`/api/af/${encodeURIComponent(reqId)}/catalog-delta.yaml`)
-      .then(async (response) => {
-        if (cancelled) return;
-        if (response.status === 404) {
-          setDeltaText("");
-          return;
-        }
-        if (!response.ok) {
-          throw new AfApiError(response.status, "catalog-delta 조회 실패");
-        }
-        setDeltaText(await response.text());
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "catalog-delta 조회 실패");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reqId]);
-
+  const deltaText = catalogDelta.data?.content ?? null;
+  const loadError = catalogDelta.error
+    ? catalogDelta.error instanceof Error
+      ? catalogDelta.error.message
+      : "catalog-delta 조회 실패"
+    : null;
   const parsedDelta = useMemo(() => parseCatalogDelta(deltaText ?? ""), [deltaText]);
   const proposals = parsedDelta.proposals;
   const parseError = parsedDelta.error;
@@ -57,7 +38,9 @@ export function PublishApprovalDrawer({ reqId, onClose, onPublished }: PublishAp
     setRowFeedback((current) => ({ ...current, [rowKey]: { tone: "success", message: "등록 승인 요청 중…" } }));
     try {
       const result = await publish.mutateAsync({ reqId, proposal: request });
-      const message = `${result.name} v${result.version} 을 ${result.file} 에 등록했습니다.`;
+      const message = result.already_published
+        ? `${result.name} v${result.version} 은 이미 ${result.file} 에 등록되어 있습니다.`
+        : `${result.name} v${result.version} 을 ${result.file} 에 등록했습니다.`;
       setRowFeedback((current) => ({ ...current, [rowKey]: { tone: "success", message } }));
       onPublished(message);
     } catch (err) {
@@ -154,41 +137,6 @@ export function PublishApprovalDrawer({ reqId, onClose, onPublished }: PublishAp
       </footer>
     </aside>
   );
-}
-
-function buildPublishProposal(proposal: ProposedAddition, selectedSubtype: string): CatalogPublishProposal {
-  const request: CatalogPublishProposal = {
-    category: proposal.module_category,
-    module_category: proposal.module_category,
-    name: proposal.name,
-    owner_domain: proposal.owner_domain,
-    responsibility: proposal.responsibility,
-    inputs: proposal.inputs,
-    outputs: proposal.outputs,
-    composition: proposal.composition,
-    notes: proposal.notes ?? proposal.rationale,
-    source_candidate_id: proposal.source_candidate_id
-  };
-  const subtype = getRequiredSubtype(proposal) ?? selectedSubtype;
-  if (proposal.module_category === "agent") request.agent_kind = subtype as AgentKind;
-  if (proposal.module_category === "workflow") request.workflow_kind = subtype as WorkflowKind;
-  if (proposal.module_category === "adapter") request.adapter_kind = subtype as AdapterKind;
-  if (proposal.module_category === "remote_a2a") request.remote_contract_kind = subtype as RemoteContractKind;
-  return request;
-}
-
-function getRequiredSubtype(proposal: ProposedAddition): string | null {
-  if (proposal.module_category === "agent") return proposal.agent_kind ?? null;
-  if (proposal.module_category === "workflow") return proposal.workflow_kind ?? null;
-  if (proposal.module_category === "adapter") return proposal.adapter_kind ?? null;
-  return proposal.remote_contract_kind ?? null;
-}
-
-function subtypeOptions(proposal: ProposedAddition): readonly string[] {
-  if (proposal.module_category === "agent") return agentKinds;
-  if (proposal.module_category === "workflow") return workflowKinds;
-  if (proposal.module_category === "adapter") return adapterKinds;
-  return remoteContractKinds;
 }
 
 function formatPublishError(error: unknown): string {

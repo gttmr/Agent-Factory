@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button, Field } from "../ui/primitives";
-import { useCatalog, type CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogHubEntry } from "../catalog/catalogIndex";
+import { useCatalog } from "../state/useCatalog";
 
 interface CatalogWorkflowPickerProps {
   inserting?: boolean;

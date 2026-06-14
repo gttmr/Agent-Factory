@@ -299,6 +299,26 @@ export function normalizeA2A(input: AnalysisResult | null | undefined): A2ANorma
   return { result: normalized, diagnostics };
 }
 
+export function createA2AContractForCandidate(analysis: AnalysisResult, candidateId: string): AnalysisResult {
+  const candidate = analysis.moduleCandidates.find((moduleCandidate) => moduleCandidate.id === candidateId);
+  if (!candidate || candidate.module_category !== "remote_a2a") return analysis;
+
+  const usedContractIds = new Set<string>();
+  for (const contract of analysis.a2aContracts ?? []) usedContractIds.add(contract.contract_id);
+  for (const moduleCandidate of analysis.moduleCandidates) {
+    if (typeof moduleCandidate.a2a_contract_id === "string") usedContractIds.add(moduleCandidate.a2a_contract_id);
+  }
+  const contractId = mintNextContractId(usedContractIds);
+  const contract = buildPlaceholderContract(contractId, candidate.id);
+  return {
+    ...analysis,
+    moduleCandidates: analysis.moduleCandidates.map((moduleCandidate) =>
+      moduleCandidate.id === candidate.id ? { ...moduleCandidate, a2a_contract_id: contractId } : moduleCandidate
+    ),
+    a2aContracts: [...(analysis.a2aContracts ?? []), contract]
+  };
+}
+
 /** Mint the next free `a2a-NNN` id given a set of used ids. */
 export function mintNextContractId(used: Set<string>): string {
   let n = 1;

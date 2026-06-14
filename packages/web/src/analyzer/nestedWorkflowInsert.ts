@@ -1,6 +1,6 @@
 import { appendNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
 import { workflowKinds, type AnalysisResult, type FieldSpec, type GraphNode, type ModuleCandidate, type WorkflowKind } from "./types";
-import type { CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogHubEntry } from "../catalog/catalogIndex";
 
 const REQUIREMENT_ID_PATTERN = /^req-[a-z0-9-]+$/;
 const WORKFLOW_KIND_SET = new Set<string>(workflowKinds);
@@ -46,9 +46,9 @@ export function insertCatalogWorkflowNode(
     citation_required: false,
     grounding_required: false,
     source_acl_required: false,
-    versioned: false,
+    versioned: typeof entry.version === "number",
     effective_date_required: false,
-    owner_domain: "",
+    owner_domain: entry.owner_domain ?? "",
     owner: "",
     agent_card: "",
     auth: "",

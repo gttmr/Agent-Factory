@@ -4,7 +4,8 @@ import { join, resolve, sep } from "node:path";
 import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import { REQ_ID_PATTERN } from "./artifactRootStore";
 import { adapterKinds, agentKinds, moduleCategories, remoteContractKinds, workflowKinds } from "../src/analyzer/types";
-import { parseCatalogDelta } from "../src/catalog-hub/catalogDelta";
+import { parseCatalogDelta } from "../src/catalog/catalogDelta";
+import { latestByName, nextVersionForName } from "../src/catalog/catalogVersioning";
 
 type MiddlewareNext = (error?: unknown) => void;
 type CatalogCategory = (typeof moduleCategories)[number];
@@ -114,7 +115,7 @@ async function handleCatalogPublish(
   const result = await withPublishLock(async () => {
     const latest = await readPublishCatalog(target.path, target.key);
     const name = (proposal.name as string).trim();
-    const current = latestPublishedEntryForName(latest.entries, name);
+    const current = latestByName(latest.entries, name);
     if (
       current &&
       current.status === "published" &&
@@ -127,7 +128,8 @@ async function handleCatalogPublish(
           already_published: true,
           id: current.id,
           name: current.name,
-          version: current.version
+          version: current.version,
+          file: target.relative
         }
       };
     }
@@ -192,25 +194,6 @@ function targetCatalogFile(catalogDir: string, category: CatalogCategory): { pat
     relative: "catalog/remote-a2a-contracts.yaml",
     key: "remote_a2a_contracts"
   };
-}
-
-function nextVersionForName(entries: unknown[], name: string): number {
-  const versions = entries
-    .filter((entry): entry is Record<string, unknown> => isRecord(entry) && entry.name === name)
-    .map((entry) => (typeof entry.version === "number" && Number.isInteger(entry.version) ? entry.version : null))
-    .filter((version): version is number => version !== null);
-  if (versions.length === 0) return 1;
-  return Math.max(...versions) + 1;
-}
-
-function latestPublishedEntryForName(entries: unknown[], name: string): Record<string, unknown> | null {
-  const named = entries.filter((entry): entry is Record<string, unknown> => isRecord(entry) && entry.name === name);
-  if (named.length === 0) return null;
-  return named.reduce((latest, entry) => (entryVersion(entry) > entryVersion(latest) ? entry : latest));
-}
-
-function entryVersion(entry: Record<string, unknown>): number {
-  return typeof entry.version === "number" && Number.isInteger(entry.version) ? entry.version : 0;
 }
 
 function buildPublishedEntry(proposal: PublishProposal, version: number, reqId: string): Record<string, unknown> {

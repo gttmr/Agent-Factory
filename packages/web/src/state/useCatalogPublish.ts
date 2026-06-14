@@ -1,24 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { AdapterKind, AgentKind, FieldSpec, RemoteContractKind, WorkflowKind } from "../analyzer/types";
+import type { CatalogPublishProposal } from "../catalog/catalogPublishProposal";
 import { AfApiError } from "./apiClient";
-import type { CatalogCategory } from "./useCatalog";
 
-export interface CatalogPublishProposal {
-  category: CatalogCategory;
-  name: string;
-  module_category?: CatalogCategory;
-  workflow_kind?: WorkflowKind;
-  agent_kind?: AgentKind;
-  adapter_kind?: AdapterKind;
-  remote_contract_kind?: RemoteContractKind;
-  owner_domain?: string;
-  responsibility?: string;
-  inputs?: FieldSpec[];
-  outputs?: FieldSpec[];
-  composition?: string[];
-  notes?: string;
-  source_candidate_id?: string;
-}
+export type { CatalogPublishProposal } from "../catalog/catalogPublishProposal";
 
 export interface CatalogPublishInput {
   reqId: string;
@@ -31,6 +15,7 @@ export interface CatalogPublishResult {
   name: string;
   version: number;
   file: string;
+  already_published?: true;
 }
 
 export function useCatalogPublish() {

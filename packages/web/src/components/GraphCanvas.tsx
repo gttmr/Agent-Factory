@@ -37,8 +37,6 @@ import { ValidationBanner } from "../graph/validationBanner";
 import { GraphInspector } from "./GraphInspector";
 import type { CommentRecord, HighlightRecord } from "../state/useCollaboration";
 
-export { appendNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
-
 interface GraphCanvasProps {
   graphIR: GraphIR;
   moduleCandidates: ModuleCandidate[];

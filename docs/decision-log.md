@@ -10,6 +10,20 @@
 
 ---
 
+## 2026-06-14 · 작업 브랜치 `feat/workflow-a2a-registration` — UI/엔진 레이어 경계 정리
+
+### 화면 ↔ 내부 엔진 경계를 명확히 하는 모듈 배치 규칙 채택
+- **결정**: de-facto 레이어를 명문화하고 그에 맞게 코드를 재배치한다 — UI(`src/routes`·`src/components`·`src/design`·`src/catalog-hub`), 데이터 접근(`src/state` react-query 훅), 순수 엔진(`src/analyzer`·`src/graph`·`src/catalog`), 서버(`server`). 컴포넌트/드로어에 있던 순수 로직을 엔진으로 이동: catalog-delta parse/append → `src/catalog/catalogDelta.ts`, catalog index DTO → `src/catalog/catalogIndex.ts`, catalog→scaffold 변환 → `src/catalog/scaffoldCatalog.ts`, publish proposal shaping → `src/catalog/catalogPublishProposal.ts`, version/deprecation 선택 규칙(client hydration+server 공유) → `src/catalog/catalogVersioning.ts`, A2A 계약 생성 mutation → `src/analyzer/a2aNormalize.ts`. 드로어는 raw fetch 대신 `src/state/useCatalogDelta.ts` 훅을 쓰고, 엔진 모듈은 UI/React/state 를 import 하지 않는다.
+- **배경**: 프론트/백엔드가 한 패키지에 있어 경계가 흐려지기 쉬웠다. 컴포넌트 안에 변환/검증/ID 생성 로직이 섞여 있어 새 기능에서 화면과 내부 엔진을 재사용·교체하기 어려웠다.
+- **영향**: `src/catalog/*`(신규 엔진 모듈), `src/state/useCatalogDelta.ts`, `routes/BuildWorkbench.tsx`·`routes/DesignWorkbench.tsx`·`catalog-hub/*` 드로어(로직 제거 후 엔진 호출), `components/GraphCanvas.tsx`(engine helper re-export 제거). behavior-preserving 이동이며 동작 변화 없음.
+
+### BuildWorkbench scaffold 입력을 hydrated `/api/catalog` 로 전환
+- **결정**: BuildWorkbench 의 scaffold-plan 파생 입력을 정적 seed import(`loadSeedCatalog`)에서 `useCatalog()` 의 hydrated `/api/catalog` index 로 바꾼다. 승인 게이트로 publish 된 versioned catalog entry 가 빌드 단계 scaffold 입력에 즉시 반영된다.
+- **배경**: 정적 import 는 publish 결과를 보지 못해, 등록 승인한 항목이 빌드 단계에 나타나지 않았다.
+- **영향**: `routes/BuildWorkbench.tsx`, `src/catalog/scaffoldCatalog.ts`, `state/useCatalogPublish.ts`(invalidation 키 정렬).
+
+---
+
 ## 2026-06-13 · 작업 브랜치 `feat/workflow-a2a-registration` — Reuse Hub 등록 승인 publish 경로
 
 ### 카탈로그 정책을 승인 게이트 publish API 단일 쓰기 경로로 개정

@@ -157,6 +157,15 @@ src/styles/
 **`categoryClass(category)`**
 `cat-agent` / `cat-workflow` / `cat-adapter` / `cat-remote` 중 하나의 CSS 클래스 이름을 반환. `remote_a2a` 는 `cat-remote` 로 매핑한다.
 
+## 모달 / 드로어 surface
+
+오버레이 UI 는 두 가지 공유 패턴만 쓴다. 스타일은 `packages/web/src/styles/router/modal-drawer.css`(router 레이어)에 모으고 backdrop `rgba(0,0,0,0.3)` + `--z-overlay` 를 따른다.
+
+- **모달** — 화면 중앙 카드. 마크업은 `af-modal-backdrop` > `af-modal`(크기 modifier 예: `af-catalog-workflow-modal`) > `af-modal-header` / `af-modal-body` / `af-modal-footer` + `af-modal-close`, `role="dialog" aria-modal="true"`. 예: 카탈로그 핀(`PinTargetDialog`), Design 검토의 `카탈로그 워크플로우 삽입`(`CatalogWorkflowPicker`).
+- **드로어** — 우측 슬라이드 패널. 마크업은 `af-drawer` > `af-drawer-header` / `af-drawer-body` / `af-drawer-footer` / `af-drawer-hint` + `af-modal-close`, 동일 ARIA. 예: Reuse Hub 의 `신규 등록 제안`(`RegisterProposalDrawer`)과 `등록 승인`(`PublishApprovalDrawer`).
+
+새 오버레이는 위 클래스 골격을 재사용하고, 카테고리/서브타입을 표시할 때는 raw `<span>` 대신 `CategoryBadge`/`SubtypeBadge` 를 쓴다.
+
 ## 행 stripe 와 cell-stack 패턴
 
 테이블과 리스트는 좌측에 5px 카테고리 색 stripe 를 둔다.

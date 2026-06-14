@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "../ui/primitives";
 import { CategoryBadge } from "../components/CategoryBadge";
 import { AfApiError, fetchArtifactJson, putArtifactJson } from "../state/apiClient";
-import type { CatalogHubEntry } from "../state/useCatalog";
+import type { CatalogHubEntry } from "../catalog/catalogIndex";
 import type { AnalysisResult } from "../analyzer/types";
 
 interface PinTargetDialogProps {

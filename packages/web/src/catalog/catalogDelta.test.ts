@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseCatalogDelta } from "./catalogDelta.ts";
+import { appendCatalogDeltaProposal, parseCatalogDelta } from "./catalogDelta.ts";
 
 const proposedByRegisterDrawer = [
   "proposed_additions:",
@@ -32,3 +32,19 @@ const malformed = parseCatalogDelta("not: [valid");
 assert.deepEqual(malformed.proposals, []);
 assert.equal(typeof malformed.error, "string");
 assert.ok(malformed.error);
+
+const appended = appendCatalogDeltaProposal("notes: keep\n", {
+  category: "workflow",
+  name: "published_workflow",
+  owner_domain: "여신"
+});
+assert.deepEqual(parseCatalogDelta(appended), {
+  proposals: [
+    {
+      module_category: "workflow",
+      name: "published_workflow",
+      owner_domain: "여신"
+    }
+  ],
+  error: null
+});

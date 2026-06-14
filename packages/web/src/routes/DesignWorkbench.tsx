@@ -13,7 +13,7 @@ import {
   resolveMissingItem,
   setCandidateStatus
 } from "../analyzer/moduleReview";
-import { buildPlaceholderContract, mintNextContractId } from "../analyzer/a2aNormalize";
+import { createA2AContractForCandidate } from "../analyzer/a2aNormalize";
 import { insertCatalogWorkflowNode } from "../analyzer/nestedWorkflowInsert";
 import type {
   AnalysisResult,
@@ -277,20 +277,8 @@ export default function DesignWorkbench() {
 
   function handleCreateA2AContract(candidate: ModuleCandidate) {
     if (!analysis || candidate.module_category !== "remote_a2a") return;
-    const usedContractIds = new Set<string>();
-    for (const contract of a2aContracts) usedContractIds.add(contract.contract_id);
-    for (const moduleCandidate of analysis.moduleCandidates) {
-      if (typeof moduleCandidate.a2a_contract_id === "string") usedContractIds.add(moduleCandidate.a2a_contract_id);
-    }
-    const contractId = mintNextContractId(usedContractIds);
-    const contract = buildPlaceholderContract(contractId, candidate.id);
-    const nextAnalysis: AnalysisResult = {
-      ...analysis,
-      moduleCandidates: analysis.moduleCandidates.map((moduleCandidate) =>
-        moduleCandidate.id === candidate.id ? { ...moduleCandidate, a2a_contract_id: contractId } : moduleCandidate
-      ),
-      a2aContracts: [...a2aContracts, contract]
-    };
+    const nextAnalysis = createA2AContractForCandidate(analysis, candidate.id);
+    const contractId = nextAnalysis.moduleCandidates.find((moduleCandidate) => moduleCandidate.id === candidate.id)?.a2a_contract_id;
     saveAnalysisMutation.mutate(
       { analysis: nextAnalysis, etag: analysisEtag },
       {

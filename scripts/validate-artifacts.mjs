@@ -838,6 +838,15 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       }
     }
     if (edge.edge_kind === "remote_a2a") {
+      const fromNode = nodeById.get(edge.from);
+      const toNode = nodeById.get(edge.to);
+      const remoteNode =
+        fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
+      if (!remoteNode || typeof remoteNode.module_id !== "string" || !remoteNode.module_id.trim()) {
+        errors.push(
+          `${label}.edges[${index}] (${edge.id}) remote_a2a edge must connect to a remote_a2a node with module_id.`
+        );
+      }
       if (edge.is_remote_boundary_crossing !== true) {
         errors.push(
           `${label}.edges[${index}] (${edge.id}) remote_a2a edge must set is_remote_boundary_crossing=true.`
@@ -852,10 +861,6 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       } else {
         const contract = contractsById.get(edge.a2a_contract_id);
         if (contract) {
-          const fromNode = nodeById.get(edge.from);
-          const toNode = nodeById.get(edge.to);
-          const remoteNode =
-            fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
           if (remoteNode && typeof remoteNode.module_id === "string" && remoteNode.module_id.trim()) {
             if (contract.remote_module_id !== remoteNode.module_id) {
               errors.push(

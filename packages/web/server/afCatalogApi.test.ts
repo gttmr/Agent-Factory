@@ -74,6 +74,7 @@ await withTempRepo(async (repoRoot) => {
   assert.equal(firstPublish.body.ok, true);
   assert.equal(firstPublish.body.name, validAdapterProposal.name);
   assert.equal(firstPublish.body.version, 1);
+  assert.equal(firstPublish.body.file, "catalog/adapters.yaml");
 
   const catalogPath = join(repoRoot, "catalog", "adapters.yaml");
   const afterFirstPublish = await readFile(catalogPath, "utf8");
@@ -86,6 +87,7 @@ await withTempRepo(async (repoRoot) => {
   assert.equal(secondPublish.status, 200);
   assert.equal(secondPublish.body.already_published, true);
   assert.equal(secondPublish.body.version, 1);
+  assert.equal(secondPublish.body.file, "catalog/adapters.yaml");
   assert.equal(await readFile(catalogPath, "utf8"), afterFirstPublish);
 });
 

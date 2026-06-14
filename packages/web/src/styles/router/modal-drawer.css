@@ -141,7 +141,7 @@
   gap: var(--space-xs);
 }
 
-.af-catalog-workflow-title span {
+.af-catalog-workflow-title > span {
   color: var(--text-muted);
   background: var(--surface-muted);
   border: 1px solid var(--line);
