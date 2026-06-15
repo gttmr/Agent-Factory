@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from "reactflow";
-import { CategoryBadge, SubtypeBadge } from "../components/CategoryBadge";
+import { CategoryBadge, SubtypeBadge } from "../CategoryBadge";
 import type { GraphNodeData } from "./layout";
-import type { ModuleCategory } from "../analyzer/types";
+import type { ModuleCategory } from "../../analyzer/types";
 
 function moduleCategoryFromKind(kind: string | undefined): ModuleCategory | null {
   if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") {

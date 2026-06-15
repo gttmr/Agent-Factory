@@ -28,9 +28,9 @@ PR3 commit 메시지 `676b140` 의 "Deferred" 섹션에서 명시적으로 이 �
 
 - 수정
   - `packages/web/src/components/GraphCanvas.tsx` — collaboration mark 계산, node/edge/container data 전달.
-  - `packages/web/src/graph/nodeTypes.tsx` — node comment/highlight badges.
-  - `packages/web/src/graph/edgeTypes.tsx` — edge highlight stroke + comment pin.
-  - `packages/web/src/graph/containerOverlay.tsx` — highlighted container state.
+  - `packages/web/src/components/graph/nodeTypes.tsx` — node comment/highlight badges.
+  - `packages/web/src/components/graph/edgeTypes.tsx` — edge highlight stroke + comment pin.
+  - `packages/web/src/components/graph/containerOverlay.tsx` — highlighted container state.
   - `packages/web/src/routes/DesignWorkbench.tsx` — `comments` / `highlights` 를 GraphCanvas 로 전달.
   - `packages/web/src/styles.css` — graph node/edge/container collaboration styles.
 

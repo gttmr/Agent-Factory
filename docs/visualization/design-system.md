@@ -203,7 +203,7 @@ LLM 초안은 바로 적용하지 않고, 누락 항목 답변, patch preview, `
 
 ## Process Flow 시각화
 
-`packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/graph/*` 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다.
+`packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/components/graph/*`(렌더링 레이어: layout·nodeTypes·edgeTypes·containerOverlay·validationBanner) 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다. `packages/web/src/graph/` 는 순수 graph-IR 엔진 헬퍼(`containerMembership.ts`)만 남는다.
 node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md`의 Graph IR 규칙을 따른다.
 
 **Marker / overlay 스타일**

@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-15 · 작업 브랜치 `refactor/graph-render-layer` — Graph 렌더링을 UI 레이어로 분리
+
+### Graph IR 렌더링(ReactFlow)을 `src/components/graph/`로 이동, `src/graph/`는 순수 엔진만 유지
+- **결정**: `src/graph/`의 ReactFlow 렌더 컴포넌트와 렌더 결합 layout(`layout.ts`·`nodeTypes.tsx`·`edgeTypes.tsx`·`containerOverlay.tsx`·`validationBanner.tsx`, +`layout.test.ts`)을 `src/components/graph/`로 옮긴다. `src/graph/`에는 순수 graph-IR 헬퍼 `containerMembership.ts`만 남겨 진짜 단방향 엔진으로 만든다. `analyzer/nestedWorkflowInsert`의 `../graph/containerMembership` import는 불변, `GraphCanvas`는 렌더 import만 `./graph/*`로 repoint.
+- **배경**: 2026-06-14 항목이 `src/graph`를 순수 엔진으로 명문화했지만 실제로는 ReactFlow 렌더 컴포넌트(UI·React import)를 품고 있어 라벨이 모순이었다(`nodeTypes.tsx`가 `components/CategoryBadge`를 import). 물리적 분리로 모순을 해소해 화면/엔진 경계를 코드 위치로 강제한다.
+- **영향**: `src/components/graph/*`(이동), `src/graph/containerMembership.ts`(잔류), `components/GraphCanvas.tsx`(렌더 import repoint), `packages/web/package.json`(layout.test 경로), `CLAUDE.md`·`docs/visualization/design-system.md`(렌더 경로 표기). behavior-preserving 이동이며 동작 변화 없음.
+
 ## 2026-06-14 · 작업 브랜치 `feat/workflow-a2a-registration` — UI/엔진 레이어 경계 정리
 
 ### 화면 ↔ 내부 엔진 경계를 명확히 하는 모듈 배치 규칙 채택

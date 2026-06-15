@@ -8,7 +8,7 @@ import type {
   GraphIR,
   GraphNode,
   LaneId
-} from "../analyzer/types";
+} from "../../analyzer/types";
 
 export interface GraphNodeData {
   graphNode: GraphNode;
