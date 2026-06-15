@@ -31,7 +31,7 @@ import { GRAPH_NODE_KINDS, type NodeKind } from "../analyzer/types";
 import { ContainerOverlay } from "./graph/containerOverlay";
 import { appendNodeToContainer, moveNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
 import { edgeTypes } from "./graph/edgeTypes";
-import { layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
+import { freezeGraphLayout, layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
 import { nodeTypes } from "./graph/nodeTypes";
 import { ValidationBanner } from "./graph/validationBanner";
 import { GraphInspector } from "./GraphInspector";
@@ -212,7 +212,7 @@ export function GraphCanvas({
     previousGraphIRRef.current = graphIR;
     if (!graphChanged || !pendingSaveRef.current || !editMode) return;
     pendingSaveRef.current = false;
-    setDraftGraphIR(cloneGraphIR(graphIR));
+    setDraftGraphIR(cloneGraphIR(freezeGraphLayout(graphIR)));
     setDirty(false);
   }, [editMode, graphIR]);
 
@@ -228,7 +228,9 @@ export function GraphCanvas({
   }, [cancelConnectMode, connectMode, editModeActive]);
 
   const enterEditMode = useCallback(() => {
-    const draft = cloneGraphIR(graphIR);
+    // Freeze all node positions on entry so dragging one node never re-lays the
+    // others (mixed finite/auto positions made dagre re-run + re-translate).
+    const draft = cloneGraphIR(freezeGraphLayout(graphIR));
     setDraftGraphIR(draft);
     setDirty(false);
     pendingSaveRef.current = false;
