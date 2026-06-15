@@ -28,12 +28,12 @@ import type {
   ModuleCandidate
 } from "../analyzer/types";
 import { GRAPH_NODE_KINDS, type NodeKind } from "../analyzer/types";
-import { ContainerOverlay } from "../graph/containerOverlay";
+import { ContainerOverlay } from "./graph/containerOverlay";
 import { appendNodeToContainer, moveNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
-import { edgeTypes } from "../graph/edgeTypes";
-import { layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "../graph/layout";
-import { nodeTypes } from "../graph/nodeTypes";
-import { ValidationBanner } from "../graph/validationBanner";
+import { edgeTypes } from "./graph/edgeTypes";
+import { layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
+import { nodeTypes } from "./graph/nodeTypes";
+import { ValidationBanner } from "./graph/validationBanner";
 import { GraphInspector } from "./GraphInspector";
 import type { CommentRecord, HighlightRecord } from "../state/useCollaboration";
 

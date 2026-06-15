@@ -1,4 +1,4 @@
-import type { GraphValidation, GraphValidationIssue } from "../analyzer/types";
+import type { GraphValidation, GraphValidationIssue } from "../../analyzer/types";
 
 interface ValidationBannerProps {
   validation: GraphValidation | undefined;

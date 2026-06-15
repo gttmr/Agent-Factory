@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { layoutGraphIR } from "./layout.ts";
-import type { GraphIR } from "../analyzer/types.ts";
+import type { GraphIR } from "../../analyzer/types.ts";
 
 const graph: GraphIR = {
   requirement_id: "req-layout-position",
