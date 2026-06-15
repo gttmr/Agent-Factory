@@ -144,6 +144,23 @@ function rectPriority(kind: GraphContainer["container_kind"]): number {
   return isWorkflowContainer(kind) ? 0 : 1;
 }
 
+// Pin every node to its current laid-out position so the whole graph has finite
+// `node.position`. Used when entering edit mode: once all nodes are positioned,
+// `layoutGraphIR` becomes a pass-through (no dagre, no origin re-translation), so
+// dragging one node never re-lays or shifts the others — the container overlay
+// then recomputes purely from each node's actual position.
+export function freezeGraphLayout(graphIR: GraphIR): GraphIR {
+  const layout = layoutGraphIR(graphIR, { nodeId: null, edgeId: null }, () => undefined);
+  const positionById = new Map(layout.nodes.map((node) => [node.id, node.position]));
+  return {
+    ...graphIR,
+    nodes: (graphIR.nodes ?? []).map((node) => {
+      const position = positionById.get(node.id);
+      return position ? { ...node, position: { x: position.x, y: position.y } } : node;
+    })
+  };
+}
+
 export function layoutGraphIR(
   graphIR: GraphIR,
   selection: { nodeId: string | null; edgeId: string | null },
