@@ -1251,8 +1251,12 @@ function buildRunnableGraph() {
   const joined = new Set();
   let joinIndex = 0;
   for (const [target, sources] of sourcesByTarget) {
-    const explicitJoinFeedsTarget = sources.some((source) => explicitJoinSymbols.has(source));
-    if (sources.length > 1 && !explicitJoinSymbols.has(target) && !explicitJoinFeedsTarget) {
+    // A target with >1 predecessor must fan in through a JoinNode so it waits for
+    // all of them. Suppress auto-join only when the target IS an explicit join
+    // node (it already is a JoinNode). An explicit join that feeds the target
+    // *alongside* other predecessors still needs an auto JoinNode wrapping every
+    // predecessor — otherwise the target could run without waiting for the others.
+    if (sources.length > 1 && !explicitJoinSymbols.has(target)) {
       const joinSym = `join_${++joinIndex}`;
       joins.push({ sym: joinSym, name: joinSym, target, explicit: false });
       for (const source of sources) finalEdges.push([source, joinSym]);
@@ -1266,6 +1270,31 @@ function buildRunnableGraph() {
 
   if (finalEdges.length === 0) {
     throw new Error("processFlow does not provide any usable Graph IR edges for runnable workflow generation.");
+  }
+
+  // Every emitted runtime node must be reachable from START. Synthetic nodes
+  // (human_input/join) get no START backfill, so a bare human_input/join with an
+  // outgoing edge but no incoming path would otherwise produce an orphan branch.
+  const adjacency = new Map();
+  for (const [from, to] of finalEdges) {
+    if (!adjacency.has(from)) adjacency.set(from, []);
+    adjacency.get(from).push(to);
+  }
+  const reachable = new Set(["START"]);
+  const queue = ["START"];
+  while (queue.length) {
+    for (const next of adjacency.get(queue.shift()) ?? []) {
+      if (!reachable.has(next)) {
+        reachable.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  const unreachable = [...new Set(finalEdges.flat())].filter((sym) => sym !== "START" && !reachable.has(sym));
+  if (unreachable.length > 0) {
+    throw new Error(
+      `runnable mode produced nodes unreachable from START: ${unreachable.join(", ")}. Ensure every node (incl. human_input/join) has an incoming path from an input node. Use smoke mode.`
+    );
   }
   assertAcyclic(finalEdges);
   return { edges: finalEdges, joins };
@@ -1349,6 +1378,12 @@ function assertRunnableGraphSupported() {
     }
     if (module) {
       if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
+      // Dynamic workflows need ADK 2.x dynamic-workflow codegen (loops/while via
+      // ctx.run_node), not the static-graph lowering — reject so they stay smoke-only
+      // rather than silently lowering as a stub coordinator.
+      else if (module.module_category === "workflow" && module.workflow_kind === "dynamic") {
+        badNodes.push(`${node.id} (dynamic workflow module)`);
+      }
       continue;
     }
     badNodes.push(`${node.id} (${node.node_kind})`);
@@ -1509,9 +1544,9 @@ function pyGraphNodeName(node) {
 }
 
 function humanInputPrompt(node) {
-  for (const value of [node.label, node.execution_kind]) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
+  // Only a reviewed, human-readable label is fit as the runtime prompt; do not
+  // fall back to execution_kind (technical, e.g. "request_input").
+  if (typeof node.label === "string" && node.label.trim()) return node.label.trim();
   return "사람의 입력이 필요합니다:";
 }
 
