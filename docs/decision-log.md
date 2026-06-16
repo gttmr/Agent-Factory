@@ -10,6 +10,23 @@
 
 ---
 
+## 2026-06-16 · 작업 브랜치 `worktree-adk-human-input` — runnable 제너레이터 human-in-the-loop 지원
+
+### runnable 모드가 human_input + 병렬/join DAG를 ADK 2.x 그래프 Workflow로 lower
+- **결정**: `scripts/generate-adk-source.mjs` runnable 모드가 `human_input` 노드(ADK 2.x `from google.adk.events import RequestInput` → `yield RequestInput(message=...)` + FunctionNode), 명시적 `join`(JoinNode), 병렬 fan-out을 lower하도록 확장한다. 가드는 `human_input`/`join` 노드와 `parallel_region`/`human_review_region` 컨테이너(런타임 객체 없는 시각 그룹)를 허용하고, `router`/`loop_control`·`route`/`loop_back`/`loop_exit`/`conditional`·`remote_a2a`·`dynamic_workflow`는 계속 거부한다.
+- **배경**: ADK에서 사람 입력을 받는 그래프를 dev UI로 테스트하려는 요구. 사전 실측으로 `RequestInput`이 런타임에서 long-running `adk_request_input` 호출로 pause 되고 동일 id `functionResponse`(`{response: ...}`)로 resume됨을 확인.
+- **영향**: `scripts/generate-adk-source.mjs`, `CLAUDE.md`·`agent-factory-harness.md`·`validation.md`. ADK 2.2.0 api_server E2E로 pause/resume 검증.
+
+### 루프는 static graph가 아니라 dynamic workflow 영역 — 별도 후속으로 분리
+- **결정**: ADK 2.x 문서(graphs/dynamic) 기준 반복 루프는 static 그래프 `Workflow`가 아니라 dynamic workflow(`@node` + `ctx.run_node` + `while`)로 표현한다. 따라서 scenario-d의 루프(`loop_control`/`loop_region`)는 runnable로 lower하지 않고, dynamic-workflow 코드젠은 별도 후속 작업으로 남긴다.
+- **배경**: scenario-d를 그대로 runnable로 만들려면 루프 lower가 필요한데, 핵심 목표(human-input 테스트)와 무관하고 위험이 크다. static-graph 라우터 백엣지 hack은 ADK 2.x 지침에 어긋난다.
+- **영향**: 루프 codegen 미구현(가드가 거부). scenario-d는 루프 보존 smoke/시각 픽스처로 유지.
+
+### runnable human-in-the-loop regression 픽스처 신설 (scenario-g)
+- **결정**: scenario-d에서 루프만 뺀 `templates/regression-scenarios/scenario-g-human-input-review`(input→병렬 adapter 2개→join→risk agent→human_review_gate stub→human_input→drafter agent→output)를 추가한다. round 1 능력만으로 runnable 생성·ADK 실행 가능.
+- **배경**: "루프는 smoke/시각 유지, 나머지(human-input 경로)는 runnable" 요구를 one-graph-one-mode 제약에서 충족하려면 루프 없는 파생 픽스처가 필요. scenario-d 원본은 손대지 않아 루프 검증 커버리지를 보존.
+- **영향**: 신규 픽스처(validate-artifacts 자동 포함). ADK dev UI 테스트 경로: 빌드(runnable)→`adk api_server --with_ui`→사람 입력 pause/resume.
+
 ## 2026-06-15 · 작업 브랜치 `refactor/graph-render-layer` — Graph 렌더링을 UI 레이어로 분리
 
 ### Graph IR 렌더링(ReactFlow)을 `src/components/graph/`로 이동, `src/graph/`는 순수 엔진만 유지
