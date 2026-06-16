@@ -227,8 +227,12 @@ root_agent = SyntheticRuntimeSmokeAgent(
 function buildRunnableAgentPy() {
   assertRunnableGraphSupported();
   const { edges, joins } = buildRunnableGraph();
+  const graph = graphIndexes();
   const orderedModules = orderedGraphModules();
-  assertNoSymbolCollisions(orderedModules);
+  const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
+  const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
+  const autoJoins = joins.filter((join) => join.explicit === false);
+  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...explicitJoinNodes, ...autoJoins]);
   const nodeBlocks = [];
   const funcBlocks = [];
 
@@ -244,7 +248,12 @@ function buildRunnableAgentPy() {
     }
   }
 
-  const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.sym)})`);
+  for (const node of humanInputNodes) {
+    funcBlocks.push(emitHumanInputFunc(node));
+    nodeBlocks.push(emitHumanInputNodeDecl(node));
+  }
+
+  const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
   const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.1 워크플로우입니다: ${truncate(
     normalizedRequirement.title || packageName
@@ -260,6 +269,7 @@ import yaml
 
 from google.adk import Context
 from google.adk.agents import LlmAgent
+from google.adk.events import RequestInput
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 
 
@@ -467,6 +477,15 @@ function defaultAgentInstruction(module) {
 
 function emitFunctionNodeDecl(module) {
   return `${nodeSymbol(module)} = FunctionNode(func=${funcName(module)}, name=${toPyStr(pyNodeName(module))})`;
+}
+
+function emitHumanInputFunc(node) {
+  return `def ${hitlFuncName(node)}(node_input=None):
+    yield RequestInput(message=${toPyStr(humanInputPrompt(node))})`;
+}
+
+function emitHumanInputNodeDecl(node) {
+  return `${syntheticNodeSymbol(node)} = FunctionNode(func=${hitlFuncName(node)}, name=${toPyStr(pyGraphNodeName(node))})`;
 }
 
 function emitStubFunc(module) {
@@ -1173,6 +1192,8 @@ function graphEndpoint(nodeId, side, graph) {
 
 function buildRunnableGraph() {
   const graph = graphIndexes();
+  const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
+  const explicitJoinSymbols = new Set(explicitJoinNodes.map((node) => syntheticNodeSymbol(node)));
   const resolve = (nodeId, side) => {
     const node = graph.nodesById.get(nodeId);
     if (!node) return null;
@@ -1180,6 +1201,7 @@ function buildRunnableGraph() {
       return nodeSymbol(graph.moduleById.get(node.module_id));
     }
     if (side === "from" && node.node_kind === "input") return "START";
+    if (node.node_kind === "human_input" || node.node_kind === "join") return syntheticNodeSymbol(node);
     return null; // output nodes (terminal markers) and unknowns are dropped
   };
 
@@ -1219,14 +1241,20 @@ function buildRunnableGraph() {
     if (!sourcesByTarget.has(to)) sourcesByTarget.set(to, []);
     sourcesByTarget.get(to).push(from);
   }
-  const joins = [];
+  const joins = explicitJoinNodes.map((node) => ({
+    sym: syntheticNodeSymbol(node),
+    name: pyGraphNodeName(node),
+    nodeId: node.id,
+    explicit: true
+  }));
   const finalEdges = [];
   const joined = new Set();
   let joinIndex = 0;
   for (const [target, sources] of sourcesByTarget) {
-    if (sources.length > 1) {
+    const explicitJoinFeedsTarget = sources.some((source) => explicitJoinSymbols.has(source));
+    if (sources.length > 1 && !explicitJoinSymbols.has(target) && !explicitJoinFeedsTarget) {
       const joinSym = `join_${++joinIndex}`;
-      joins.push({ sym: joinSym, target });
+      joins.push({ sym: joinSym, name: joinSym, target, explicit: false });
       for (const source of sources) finalEdges.push([source, joinSym]);
       finalEdges.push([joinSym, target]);
       joined.add(target);
@@ -1280,43 +1308,38 @@ function assertAcyclic(edges) {
   }
 }
 
-// Runnable v1 lowers a DAG with fan-out/fan-in only. Conditional routing, loops,
-// human-input, and remote boundary crossing are NOT lowered yet — emitting them
-// as plain edges would silently produce a wrong graph, so reject them up front
-// rather than mis-generate. (Sets are declared inside the function to avoid a
-// temporal-dead-zone with the top-level buildFiles() call.)
+// Runnable lowering supports strict DAG Graph workflows: START fan-out, explicit
+// and auto fan-in joins, module-bound agent/adapter/workflow nodes, and
+// synthetic human-input nodes. Conditional routing, loops, and remote boundary
+// crossing are still rejected up front rather than mis-generated. (Sets are
+// declared inside the function to avoid a temporal-dead-zone with the top-level
+// buildFiles() call.)
 function assertRunnableGraphSupported() {
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
   const unsupportedEdgeKinds = new Set(["route", "remote_a2a"]);
-  const unsupportedContainerKinds = new Set([
-    "dynamic_workflow",
-    "loop_region",
-    "human_review_region",
-    "remote_boundary"
-  ]);
+  const unsupportedContainerKinds = new Set(["dynamic_workflow", "loop_region", "remote_boundary"]);
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
   const graph = graphIndexes();
   // Allowlist: lowering can represent input/output (→ START/terminal) and
-  // module-bound agent/adapter/workflow nodes. ANY other node — control nodes
-  // (router/loop_control/human_input/join) or module_id-null function/tool
-  // intermediaries — is silently dropped by resolve(), which would break graph
-  // connectivity, so reject it. remote_a2a is a real remote boundary, not a safe
-  // synthetic stub, so it is rejected even when module-bound.
-  const allowedBareKinds = new Set(["input", "output"]);
-  // Control / human / remote node kinds are NOT lowerable even if they happen to
-  // carry a module_id (the validator binds human_input leniently), so deny them
-  // by kind before the module-bound check — otherwise a module-bound human_input
-  // would mis-lower as an ordinary LlmAgent/FunctionNode.
-  const unlowerableNodeKinds = new Set(["router", "loop_control", "human_input", "join", "remote_a2a"]);
+  // synthetic human_input/join nodes, plus module-bound agent/adapter/workflow
+  // nodes. ANY other module_id-null node would be silently dropped by resolve(),
+  // which would break graph connectivity, so reject it. remote_a2a is a real
+  // remote boundary, not a safe synthetic stub, so it is rejected even when
+  // module-bound.
+  const allowedBareKinds = new Set(["input", "output", "human_input", "join"]);
+  // Router, loop-control, and remote node kinds are NOT lowerable even if they
+  // happen to carry a module_id, so deny them by kind before the module-bound
+  // check.
+  const unlowerableNodeKinds = new Set(["router", "loop_control", "remote_a2a"]);
   const badNodes = [];
   for (const node of nodes) {
     if (!node) continue;
     const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) : null;
     if (allowedBareKinds.has(node.node_kind)) {
-      // input/output are synthetic and must have module_id null. If one is
-      // module-bound, resolve() (which checks module_id before node_kind) would
-      // lower it as a module symbol instead of START/terminal — reject it so the
-      // guard matches resolve()'s precedence exactly.
+      // These are synthetic and must have module_id null. If one is
+      // module-bound, resolve() (which checks module_id before node_kind) could
+      // lower it as a module symbol instead of its synthetic runtime node —
+      // reject it so the guard matches resolve()'s precedence exactly.
       if (module) badNodes.push(`${node.id} (${node.node_kind} bound to a module)`);
       continue;
     }
@@ -1332,7 +1355,7 @@ function assertRunnableGraphSupported() {
   }
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Only input/output and module-bound agent/adapter/workflow nodes are supported (no router/loop/human-input/join/remote or module_id-null intermediary nodes). Use smoke mode.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow nodes (no router/loop-control/remote or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
   // Containers are a separate top-level array in Graph IR, not a node field.
@@ -1342,7 +1365,7 @@ function assertRunnableGraphSupported() {
     .map((container) => `${container.id} (${container.container_kind})`);
   if (badContainers.length > 0) {
     throw new Error(
-      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. Use smoke mode or wait for loop/human-review/remote/dynamic lowering.`
+      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. parallel_region and human_review_region are visual groupings only; use smoke mode or wait for loop/remote/dynamic lowering.`
     );
   }
   const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
@@ -1367,8 +1390,8 @@ function assertRunnableGraphSupported() {
       if (!fromNode || !toNode) return true;
       // Reversed polarity (output as source / input as target) and a direct
       // input->output passthrough all resolve to a dropped endpoint. After this,
-      // every surviving edge is input->module, module->module, or the intentional
-      // module->output terminal drop — guard and lowering agree exactly.
+      // every surviving edge keeps lowerable runtime endpoints, except the
+      // intentional output terminal drop — guard and lowering agree exactly.
       return (
         fromNode.node_kind === "output" ||
         toNode.node_kind === "input" ||
@@ -1378,7 +1401,7 @@ function assertRunnableGraphSupported() {
     .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
   if (badEdges.length > 0) {
     throw new Error(
-      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Use smoke mode or wait for route/loop/remote lowering.`
+      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Supported DAG edges include normal fan-out/fan-in transitions; use smoke mode or wait for route/loop/remote lowering.`
     );
   }
 }
@@ -1386,21 +1409,36 @@ function assertRunnableGraphSupported() {
 // Defense-in-depth: module ids are pattern-constrained (^mod-[a-z0-9-]+$) so
 // sanitization should not collide, but a collision would silently overwrite a
 // node/function — fail loudly instead.
-function assertNoSymbolCollisions(orderedModules) {
+function assertNoSymbolCollisions(orderedModules, syntheticNodes = []) {
   const seen = new Map();
+  const check = (owner, symbols) => {
+    for (const [kind, value] of symbols) {
+      const key = `${kind}::${value}`;
+      if (seen.has(key)) {
+        throw new Error(`runnable codegen ${kind} collision "${value}" between ${seen.get(key)} and ${owner}.`);
+      }
+      seen.set(key, owner);
+    }
+  };
   for (const module of orderedModules) {
-    const symbols = [
+    check(module.id, [
       ["node symbol", nodeSymbol(module)],
       ["function name", funcName(module)],
       ["node name", pyNodeName(module)],
       ["state key", stateKey(module)]
-    ];
-    for (const [kind, value] of symbols) {
-      const key = `${kind}::${value}`;
-      if (seen.has(key)) {
-        throw new Error(`runnable codegen ${kind} collision "${value}" between ${seen.get(key)} and ${module.id}.`);
-      }
-      seen.set(key, module.id);
+    ]);
+  }
+  for (const node of syntheticNodes) {
+    if (!node || node.explicit === false) {
+      check(node.sym, [["node symbol", node.sym], ["node name", node.name]]);
+    } else if (node.node_kind === "human_input") {
+      check(node.id, [
+        ["node symbol", syntheticNodeSymbol(node)],
+        ["function name", hitlFuncName(node)],
+        ["node name", pyGraphNodeName(node)]
+      ]);
+    } else if (node.node_kind === "join" || node.explicit === true) {
+      check(node.id, [["node symbol", syntheticNodeSymbol(node)], ["node name", pyGraphNodeName(node)]]);
     }
   }
 }
@@ -1428,7 +1466,7 @@ function graphIndexes() {
   const moduleNodes = nodes.filter(
     (node) => node && typeof node.module_id === "string" && moduleById.has(node.module_id)
   );
-  return { moduleById, moduleNodes, nodesById };
+  return { moduleById, moduleNodes, nodes, nodesById };
 }
 
 // ---------------------------------------------------------------------------
@@ -1455,6 +1493,26 @@ function funcName(module) {
 
 function pyNodeName(module) {
   return toPythonIdentifier(module.name || module.id);
+}
+
+function syntheticNodeSymbol(node) {
+  const prefix = node.node_kind === "join" ? "join" : "node";
+  return `${prefix}_${toPythonIdentifier(node.id)}`;
+}
+
+function hitlFuncName(node) {
+  return `_hitl_${toPythonIdentifier(node.id)}`;
+}
+
+function pyGraphNodeName(node) {
+  return toPythonIdentifier(node.id);
+}
+
+function humanInputPrompt(node) {
+  for (const value of [node.label, node.execution_kind]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "사람의 입력이 필요합니다:";
 }
 
 function stateKey(module) {
