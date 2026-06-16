@@ -30,27 +30,44 @@ export interface BuildScaffoldPlanInput {
 export function buildScaffoldPlan({
   normalizedRequirement,
   moduleCandidates,
-  processFlow: _processFlow,
+  processFlow,
   catalogEntries,
   runtimeContracts = [],
   outputMode = "smoke"
 }: BuildScaffoldPlanInput): ScaffoldPlan {
   const activeCatalog = catalogEntries.filter((entry) => entry.provenance !== "session_deleted");
-  const modules = moduleCandidates
+  // The root workflow candidate (`root_workflow_module_id`) maps to the generated
+  // `Workflow` itself — its Graph IR home is the root container, not a node — so it is
+  // not a deployable scaffold module. Excluding it keeps scaffold modules 1:1 with graph
+  // nodes (so the generator's graph-coverage check passes) and prevents it from being
+  // counted as an unresolved/needs-info blocker.
+  const rootWorkflowModuleId = processFlow?.root_workflow_module_id ?? null;
+  const isRootWorkflowCandidate = (candidate: ModuleCandidate): boolean =>
+    rootWorkflowModuleId !== null && candidate.id === rootWorkflowModuleId;
+  const deployableCandidates = moduleCandidates.filter((candidate) => !isRootWorkflowCandidate(candidate));
+  const modules = deployableCandidates
     .filter((candidate) => candidate.status === "approved")
     .map((candidate) => buildScaffoldModule(candidate, activeCatalog, outputMode));
-  const excludedModules = moduleCandidates
-    .filter((candidate) => candidate.status !== "approved")
-    .map((candidate) => ({
+  const excludedModules = [
+    ...moduleCandidates.filter(isRootWorkflowCandidate).map((candidate) => ({
       id: candidate.id,
       name: candidate.name,
       status: candidate.status,
-      reason: `현재 상태가 ${candidate.status}입니다. scaffold generation에는 approved 모듈만 포함됩니다.`
-    }));
-  const blockers = collectBlockers(modules, moduleCandidates);
+      reason: "루트 graph workflow는 생성되는 ADK Workflow 자체이므로 개별 scaffold 모듈로 포함하지 않습니다."
+    })),
+    ...deployableCandidates
+      .filter((candidate) => candidate.status !== "approved")
+      .map((candidate) => ({
+        id: candidate.id,
+        name: candidate.name,
+        status: candidate.status,
+        reason: `현재 상태가 ${candidate.status}입니다. scaffold generation에는 approved 모듈만 포함됩니다.`
+      }))
+  ];
+  const blockers = collectBlockers(modules, deployableCandidates);
   const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
   blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
-  const warnings = collectWarnings(modules, moduleCandidates, runtimeContracts);
+  const warnings = collectWarnings(modules, deployableCandidates, runtimeContracts);
 
   return {
     requirement_id: normalizedRequirement.id,

@@ -110,3 +110,32 @@ const catalogPlan = buildScaffoldPlan({
 assert.ok(catalogPlan.modules[0].instruction?.includes("검토된 CDP 신호"));
 assert.ok(catalogPlan.modules[0].developer_todos.every((todo) => /catalog|런타임|입력|출력/.test(todo)));
 assert.ok(catalogPlan.validation.warnings.every((warning) => !/generated as|runtime-wiring TODO/.test(warning)));
+
+// --- root workflow candidate exclusion ---
+// The root workflow (root_workflow_module_id) maps to the generated Workflow itself
+// (no graph node), so it must not become a scaffold module or a needs-info blocker.
+const rootFlow: ProcessFlow = { ...flow, root_workflow_module_id: "mod-root" };
+const rootWorkflowCandidate = candidate({
+  id: "mod-root",
+  name: "case_graph_workflow",
+  module_category: "workflow",
+  agent_kind: null,
+  workflow_kind: "graph",
+  status: "needs_info",
+  missing_information: ["루프 정책 확정"]
+});
+const childCandidate = candidate({ id: "mod-002", name: "child_agent" });
+const rootPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [rootWorkflowCandidate, childCandidate],
+  processFlow: rootFlow,
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.deepEqual(rootPlan.modules.map((m) => m.id), ["mod-002"], "root workflow candidate must be excluded from scaffold modules");
+assert.ok(rootPlan.excluded_modules.some((m) => m.id === "mod-root"), "root workflow candidate should be listed in excluded_modules");
+assert.ok(
+  rootPlan.validation.blockers.every((b) => !b.includes("정보 필요 후보")),
+  "root workflow's needs_info must not produce a scaffold blocker"
+);
+assert.equal(rootPlan.validation.can_generate_source, true, "plan with the root excluded and an approved child should be generatable");
