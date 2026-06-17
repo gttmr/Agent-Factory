@@ -105,7 +105,15 @@ function buildFiles() {
 // ---------------------------------------------------------------------------
 
 function buildAgentPy() {
-  return outputMode === "runnable" ? buildRunnableAgentPy() : buildSmokeAgentPy();
+  // agent.py builders keyed by output mode. A future runtime form (e.g. an ADK
+  // dynamic-workflow bundle) plugs in as one entry here plus its builder, rather
+  // than another branch. Declared inside the function so the top-level
+  // buildFiles() driver does not hit a temporal-dead-zone on these consts.
+  const AGENT_PY_BUILDERS = {
+    smoke: buildSmokeAgentPy,
+    runnable: buildRunnableAgentPy
+  };
+  return (AGENT_PY_BUILDERS[outputMode] ?? buildSmokeAgentPy)();
 }
 
 function buildSmokeAgentPy() {
@@ -236,22 +244,30 @@ function buildRunnableAgentPy() {
   const nodeBlocks = [];
   const funcBlocks = [];
 
-  for (const module of orderedModules) {
-    if (isAgentModule(module)) {
-      nodeBlocks.push(emitAgentNode(module));
-    } else if (adapterConnection(module) === "mcp_connected") {
-      funcBlocks.push(emitConnectedAdapterFunc(module));
-      nodeBlocks.push(emitFunctionNodeDecl(module));
-    } else {
-      funcBlocks.push(emitStubFunc(module));
-      nodeBlocks.push(emitFunctionNodeDecl(module));
-    }
-  }
+  // Node lowering registry: maps a node's lowering role to its function/
+  // declaration emitters, replacing the per-role if/elif chain. Adding a node
+  // kind (e.g. a future remote_a2a or dynamic node) adds a registry entry here —
+  // though it may also need import, guard (assertRunnableGraphSupported), and
+  // graph-resolution support, so this is the emission seam, not the whole story.
+  // emitFunc returns null when the node needs no standalone function (LlmAgent
+  // agents are declared inline). Emission order — module nodes in graph order,
+  // then human-input nodes — is preserved.
+  const NODE_LOWERING = {
+    agent: { emitFunc: () => null, emitDecl: emitAgentNode },
+    connected_adapter: { emitFunc: emitConnectedAdapterFunc, emitDecl: emitFunctionNodeDecl },
+    stub_function: { emitFunc: emitStubFunc, emitDecl: emitFunctionNodeDecl },
+    human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl }
+  };
+  const emitNode = (role, target) => {
+    const handler = NODE_LOWERING[role];
+    if (!handler) throw new Error(`runnable codegen: no node-lowering handler for role "${role}".`);
+    const func = handler.emitFunc(target);
+    if (func) funcBlocks.push(func);
+    nodeBlocks.push(handler.emitDecl(target));
+  };
 
-  for (const node of humanInputNodes) {
-    funcBlocks.push(emitHumanInputFunc(node));
-    nodeBlocks.push(emitHumanInputNodeDecl(node));
-  }
+  for (const module of orderedModules) emitNode(moduleLoweringRole(module), module);
+  for (const node of humanInputNodes) emitNode("human_input", node);
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
@@ -1510,6 +1526,15 @@ function graphIndexes() {
 
 function isAgentModule(module) {
   return module.module_category === "agent";
+}
+
+// Lowering role for a module-bound node, used as the key into the runnable
+// NODE_LOWERING registry. New module-backed node kinds add a role here + a
+// registry entry, not another branch in the emit loop.
+function moduleLoweringRole(module) {
+  if (isAgentModule(module)) return "agent";
+  if (adapterConnection(module) === "mcp_connected") return "connected_adapter";
+  return "stub_function";
 }
 
 function adapterConnection(module) {
