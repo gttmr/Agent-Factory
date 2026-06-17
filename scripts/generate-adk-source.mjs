@@ -276,10 +276,16 @@ function buildRunnableAgentPy() {
     normalizedRequirement.title || packageName
   )}.`;
 
+  // Artifact channels need json (serialize the payload) + google.genai.types
+  // (wrap as a Part). Gated so non-artifact bundles keep an unchanged import block.
+  const usesArtifacts = usesArtifactChannels();
+  const artifactStdlibImport = usesArtifacts ? "import json\n" : "";
+  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+
   return `from __future__ import annotations
 
 import os
-from pathlib import Path
+${artifactStdlibImport}from pathlib import Path
 from typing import Any
 
 import yaml
@@ -288,7 +294,7 @@ from google.adk import Context
 from google.adk.agents import LlmAgent
 from google.adk.events import RequestInput
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
-
+${artifactGenaiImport}
 
 # Reviewed contract data for each approved module (synthetic test doubles only).
 COMPONENT_CONTRACTS: dict[str, dict] = ${toPythonLiteral(componentContracts())}
@@ -418,7 +424,7 @@ def _user_text_from_context(ctx: Context) -> str:
 
 def _collect_tool_inputs(
     ctx: Context, module_id: str, input_names: list[str], required_names: list[str],
-    channel_keys: list[str] | None = None,
+    channel_keys: list[str] | None = None, extra_payloads: list[dict] | None = None,
 ) -> dict:
     # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
     # input_map (tool_input -> state/output key), (2) a named incoming data
@@ -437,6 +443,7 @@ def _collect_tool_inputs(
         for channel_key in (channel_keys or [])
         if isinstance(ctx.state.get(channel_key), dict)
     ]
+    channel_payloads.extend(payload for payload in (extra_payloads or []) if isinstance(payload, dict))
     args: dict = {}
     for name in input_names:
         source_key = overrides.get(name, name)
@@ -543,7 +550,7 @@ function emitStubFunc(module) {
         "developer_todos": contract.get("developer_todos", []),
     }
     ctx.state[${toPyStr(stateKey(module))}] = payload
-${emitOutgoingStateChannelWrites(module.id)}    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}${emitOutgoingArtifactChannelWrites(module.id)}    return payload`;
 }
 
 function emitConnectedAdapterFunc(module) {
@@ -551,6 +558,8 @@ function emitConnectedAdapterFunc(module) {
   const requiredNames = (module.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
   const channelKeys = incomingStateChannelKeys(module.id);
   const channelArg = channelKeys.length ? `,\n        ${toPythonLiteral(channelKeys, 2)}` : "";
+  const artifactLoad = emitIncomingArtifactLoad(module.id);
+  const artifactArg = incomingArtifactChannelKeys(module.id).length ? ",\n        extra_payloads=_artifact_payloads" : "";
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
 
@@ -561,8 +570,8 @@ function emitConnectedAdapterFunc(module) {
     from mcp.client.streamable_http import streamablehttp_client
 
     url = _mcp_url(${toPyStr(module.id)}, ${toPyStr(module.mcp_server)})
-    arguments = _collect_tool_inputs(
-        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}${channelArg}
+${artifactLoad}    arguments = _collect_tool_inputs(
+        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}${channelArg}${artifactArg}
     )
     async with streamablehttp_client(url) as (read_stream, write_stream, _close):
         async with ClientSession(read_stream, write_stream) as session:
@@ -592,7 +601,7 @@ function emitConnectedAdapterFunc(module) {
         if key not in payload:
             payload[key] = value
     ctx.state[${toPyStr(stateKey(module))}] = payload
-${emitOutgoingStateChannelWrites(module.id)}    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}${emitOutgoingArtifactChannelWrites(module.id)}    return payload`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1643,17 +1652,86 @@ function emitOutgoingStateChannelWrites(moduleId, indent = "    ") {
     .join("");
 }
 
-// Reject runnable graphs whose agent nodes declare conflicting data channels.
+function outgoingArtifactChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().outgoing.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "artifact")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+function incomingArtifactChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().incoming.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "artifact")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+// True when any module-to-module edge in the graph uses an artifact channel.
+// Gates the extra json / google.genai.types imports so non-artifact bundles stay
+// byte-identical.
+function usesArtifactChannels() {
+  return modules.some(
+    (module) => outgoingArtifactChannelKeys(module.id).length || incomingArtifactChannelKeys(module.id).length
+  );
+}
+
+// Python lines for a function node to also persist its payload as each named
+// outgoing artifact (JSON in a text Part). "" when none. Emitted inside an
+// `async def` function node so `await` is valid.
+function emitOutgoingArtifactChannelWrites(moduleId, indent = "    ") {
+  return outgoingArtifactChannelKeys(moduleId)
+    .map(
+      (key) =>
+        `${indent}await ctx.save_artifact(${toPyStr(key)}, types.Part(text=json.dumps(payload, ensure_ascii=False)))\n`
+    )
+    .join("");
+}
+
+// Python block for a (connected adapter) consumer to load each incoming artifact
+// channel into _artifact_payloads (a list of dicts) before _collect_tool_inputs.
+// "" when none, keeping non-artifact consumers byte-identical.
+function emitIncomingArtifactLoad(moduleId, indent = "    ") {
+  const keys = incomingArtifactChannelKeys(moduleId);
+  if (!keys.length) return "";
+  return `${indent}_artifact_payloads = []
+${indent}for _artifact_key in ${JSON.stringify(keys)}:
+${indent}    _loaded = await ctx.load_artifact(_artifact_key)
+${indent}    _text = getattr(_loaded, "text", None) if _loaded is not None else None
+${indent}    if _text:
+${indent}        try:
+${indent}            _value = json.loads(_text)
+${indent}        except Exception:
+${indent}            _value = None
+${indent}        if isinstance(_value, dict):
+${indent}            _artifact_payloads.append(_value)
+`;
+}
+
+// Reject runnable graphs whose agent nodes declare data channels we cannot lower.
 function assertDataChannelsSupported() {
   const conflicts = [];
+  const agentArtifacts = [];
   for (const module of modules) {
     if (!isAgentModule(module)) continue;
     const keys = outgoingStateChannelKeys(module.id);
     if (keys.length > 1) conflicts.push(`${module.id} (${keys.join(", ")})`);
+    const artifactKeys = outgoingArtifactChannelKeys(module.id);
+    if (artifactKeys.length) agentArtifacts.push(`${module.id} (${artifactKeys.join(", ")})`);
   }
   if (conflicts.length > 0) {
     throw new Error(
       `runnable mode cannot lower an agent node with multiple distinct outgoing state channels (LlmAgent has a single output_key): ${conflicts.join("; ")}. Use one state_key per agent output, route extra fan-out through a function node, or use smoke mode.`
+    );
+  }
+  if (agentArtifacts.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower an artifact channel produced by an agent node (LlmAgent emits text, not artifacts): ${agentArtifacts.join("; ")}. Produce the artifact from a function/adapter node, or use a state channel.`
     );
   }
 }

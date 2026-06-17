@@ -405,6 +405,79 @@ test("runnable rejects an agent with conflicting outgoing state channels", () =>
   }
 });
 
+test("runnable lowers an artifact channel (function save_artifact, consumer load_artifact)", () => {
+  const { agentBase, unconnectedAdapter, connectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "분류_Agent" },
+    { ...unconnectedAdapter, id: "mod-b", name: "증거_Adapter" },
+    { ...connectedAdapter, id: "mod-c", name: "조회_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-artifact-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "b" },
+        { from: "b", to: "c", edge_kind: "artifact", artifact_key: "evidence_blob.json" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /^import json$/m, "artifact bundle imports json");
+    assert.match(source, /from google\.genai import types/, "artifact bundle imports genai types");
+    assert.match(
+      source,
+      /await ctx\.save_artifact\("evidence_blob\.json", types\.Part\(text=json\.dumps\(payload/,
+      "function producer saves the artifact"
+    );
+    assert.match(source, /await ctx\.load_artifact\(_artifact_key\)/, "consumer loads incoming artifacts");
+    assert.match(source, /extra_payloads=_artifact_payloads/, "consumer passes loaded artifacts to input resolution");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects an artifact channel produced by an agent node", () => {
+  const { agentBase, connectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "초안_Agent" },
+    { ...connectedAdapter, id: "mod-c", name: "조회_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-artifact-agent-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "c", edge_kind: "artifact", artifact_key: "blob.json" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /artifact channel produced by an agent node/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------
