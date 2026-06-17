@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-06-17 · 작업 브랜치 `worktree-adk-generator-structure` — 엣지별 데이터 전달 방식 선택 + 제너레이터 구조화
+
+### 제너레이터를 node-kind/output-mode dispatch로 구조화 (동작 불변)
+- **결정**: `scripts/generate-adk-source.mjs`의 runnable 노드 emission을 `NODE_LOWERING` 레지스트리(role→{emitFunc,emitDecl})로, agent.py 빌더를 `AGENT_PY_BUILDERS`(output-mode) 맵으로 정리한다. 새 node-kind/output-mode는 핸들러·엔트리 추가로 끝난다(`emitNode`는 미등록 role을 명시적으로 거부).
+- **배경**: 곧 dynamic-workflow 제너레이터 대규모 개편이 예정되어 있고, 직후 이 엣지 lowering·remote_a2a 추가가 얹힌다. if/elif 증식 대신 확장점을 먼저 마련한다.
+- **영향**: `generate-adk-source.mjs`. 5-fixture 스냅샷 생성물 byte-identical + `node --test scripts/generate-adk-source.test.mjs`로 동작 불변 증명. Codex 리뷰 통과.
+
+### 엣지 `edge_kind`를 "데이터 전달 방식"으로 선택 → 생성 코드에 반영 (내부: state 채널)
+- **결정**: Design 편집 모드 EdgeForm의 edge_kind를 그룹형 "데이터 전달 방식" 피커로 노출하고(내부 event/state×4/artifact · 제어 route/control · 원격 A2A, 옵션별 설명·필수필드 인라인), runnable 제너레이터가 **session/temp/user/app state 채널**을 실제로 lower한다. 모델은 "명시 매핑 우선 + 기존 `{id}_output` 컨벤션 fallback": 엣지 `state_key`(+스코프 prefix)를 producer가 기록(agent는 단일 채널이면 `output_key`, function 노드는 `ctx.state[키]`에 미러)하고 connected adapter consumer는 `_collect_tool_inputs`의 명명 채널에서 우선 읽는다. agent의 상이한 다중 out-state 키는 거부한다(LlmAgent output_key 단일 제약).
+- **배경**: "각 엣지가 내부 코드에서 데이터를 어떻게 주고받을지 화면에서 선택" 요구. 기존엔 피커·데이터모델은 있으나 제너레이터가 전부 무시해 선택이 장식적이었다. ADK 2.x 문서(state prefix·output_key·`{key}` instruction 템플릿·graphs/data-handling)로 시맨틱을 확인.
+- **영향**: `GraphElementEditor.tsx`(피커), `generate-adk-source.mjs`(채널 lowering), `generate-adk-source.test.mjs`(회귀 2건), `docs/workbench/validation.md`·`CLAUDE.md`. 채널을 쓰지 않는 엣지는 런타임 동작 불변(하위호환). **후속**: artifact 채널 lowering(현재 `edgeDataChannel`이 분류만)과 agent-consumer 명명 읽기는 미구현, remote_a2a runnable lowering은 다음 작업(PR-B), route/loop는 dynamic 후속으로 계속 거부.
+
 ## 2026-06-16 · 작업 브랜치 `worktree-adk-human-input` — runnable 제너레이터 human-in-the-loop 지원
 
 ### runnable 모드가 human_input + 병렬/join DAG를 ADK 2.x 그래프 Workflow로 lower

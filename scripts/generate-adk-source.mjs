@@ -234,6 +234,7 @@ root_agent = SyntheticRuntimeSmokeAgent(
 
 function buildRunnableAgentPy() {
   assertRunnableGraphSupported();
+  assertDataChannelsSupported();
   const { edges, joins } = buildRunnableGraph();
   const graph = graphIndexes();
   const orderedModules = orderedGraphModules();
@@ -416,23 +417,38 @@ def _user_text_from_context(ctx: Context) -> str:
 
 
 def _collect_tool_inputs(
-    ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str],
+    channel_keys: list[str] | None = None,
 ) -> dict:
     # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
-    # input_map (tool_input -> state/output key), (2) a top-level session-state
-    # value, (3) a matching field inside an upstream node's *_output payload, or
-    # (4) the reviewed smoke_spec.synthetic_inputs seed for runnable synthetic
-    # Mock Lab calls. The fallback keeps runnable scaffolds executable without
-    # inventing private data or hard-coding business values in generated code.
+    # input_map (tool_input -> state/output key), (2) a named incoming data
+    # channel (a reviewed edge's session/temp/user/app state key), (3) a
+    # top-level session-state value, (4) a matching field inside an upstream
+    # node's *_output payload, or (5) the reviewed smoke_spec.synthetic_inputs
+    # seed for runnable synthetic Mock Lab calls. The fallback keeps runnable
+    # scaffolds executable without inventing private data or hard-coding business
+    # values in generated code.
     overrides = _adapter_cfg(module_id, "input_map", {}) or {}
     contract = COMPONENT_CONTRACTS.get(module_id, {})
     smoke_spec = contract.get("smoke_spec") if isinstance(contract, dict) else {}
     synthetic_inputs = smoke_spec.get("synthetic_inputs", {}) if isinstance(smoke_spec, dict) else {}
+    channel_payloads = [
+        ctx.state.get(channel_key)
+        for channel_key in (channel_keys or [])
+        if isinstance(ctx.state.get(channel_key), dict)
+    ]
     args: dict = {}
     for name in input_names:
         source_key = overrides.get(name, name)
         if ctx.state.get(source_key) is not None:
             args[name] = ctx.state.get(source_key)
+            continue
+        # Prefer a field named source_key from an explicitly-named incoming data channel.
+        for payload in channel_payloads:
+            if payload.get(source_key) is not None:
+                args[name] = payload.get(source_key)
+                break
+        if name in args:
             continue
         # Fall back to a field named source_key inside any upstream *_output dict.
         # ADK's State object is not a dict (no .items()); to_dict() merges base + delta.
@@ -478,7 +494,7 @@ function emitAgentNode(module) {
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
     instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
     description=${toPyStr(truncate(module.name))},
-    output_key=${toPyStr(stateKey(module))},
+    output_key=${toPyStr(agentOutputStateKey(module))},
     mode="single_turn",
 )`;
 }
@@ -527,12 +543,14 @@ function emitStubFunc(module) {
         "developer_todos": contract.get("developer_todos", []),
     }
     ctx.state[${toPyStr(stateKey(module))}] = payload
-    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}    return payload`;
 }
 
 function emitConnectedAdapterFunc(module) {
   const inputNames = (module.inputs ?? []).map((field) => field.name).filter(Boolean);
   const requiredNames = (module.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
+  const channelKeys = incomingStateChannelKeys(module.id);
+  const channelArg = channelKeys.length ? `,\n        ${toPythonLiteral(channelKeys, 2)}` : "";
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
 
@@ -544,7 +562,7 @@ function emitConnectedAdapterFunc(module) {
 
     url = _mcp_url(${toPyStr(module.id)}, ${toPyStr(module.mcp_server)})
     arguments = _collect_tool_inputs(
-        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}
+        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}${channelArg}
     )
     async with streamablehttp_client(url) as (read_stream, write_stream, _close):
         async with ClientSession(read_stream, write_stream) as session:
@@ -574,7 +592,7 @@ function emitConnectedAdapterFunc(module) {
         if key not in payload:
             payload[key] = value
     ctx.state[${toPyStr(stateKey(module))}] = payload
-    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}    return payload`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1518,6 +1536,126 @@ function graphIndexes() {
     (node) => node && typeof node.module_id === "string" && moduleById.has(node.module_id)
   );
   return { moduleById, moduleNodes, nodes, nodesById };
+}
+
+// ---------------------------------------------------------------------------
+// Per-edge data-passing lowering (runnable): an edge may name an explicit data
+// channel — a scoped session-state key (session/temp/user/app) or an artifact —
+// that the producer writes and the consumer reads. Edges without a channel fall
+// back to the existing {module_id}_output convention, so graphs that don't use
+// the picker keep their current runtime behavior. (Artifact lowering lands in a
+// follow-up; edgeDataChannel already classifies it.)
+// ---------------------------------------------------------------------------
+
+function edgeDataChannel(edge) {
+  if (!edge) return null;
+  // Declared inside the function to avoid a temporal-dead-zone with the
+  // top-level buildFiles() call (same constraint as assertRunnableGraphSupported).
+  const STATE_EDGE_SCOPE = {
+    session_state: "",
+    temp_state: "temp:",
+    user_state: "user:",
+    app_state: "app:"
+  };
+  const scopePrefix = STATE_EDGE_SCOPE[edge.edge_kind];
+  if (scopePrefix !== undefined) {
+    let key = typeof edge.state_key === "string" ? edge.state_key.trim() : "";
+    if (!key) return null;
+    // The bare key is authored in the picker; the scope prefix comes from
+    // edge_kind. Strip any leading scope prefix so a manually-prefixed key is
+    // not double-scoped (e.g. "temp:foo" on a temp_state edge).
+    key = key.replace(/^(?:temp:|user:|app:)/, "");
+    return key ? { kind: "state", key: `${scopePrefix}${key}` } : null;
+  }
+  if (edge.edge_kind === "artifact") {
+    const key = typeof edge.artifact_key === "string" ? edge.artifact_key.trim() : "";
+    return key ? { kind: "artifact", key } : null;
+  }
+  return null;
+}
+
+// Build per-module incoming/outgoing data channels by resolving Graph IR edge
+// endpoints to their bound modules. Deduplicated by (kind,key).
+function moduleDataChannels() {
+  const graph = graphIndexes();
+  const moduleIdOf = (nodeId) => {
+    const node = graph.nodesById.get(nodeId);
+    return node && typeof node.module_id === "string" && graph.moduleById.has(node.module_id)
+      ? node.module_id
+      : null;
+  };
+  const outgoing = new Map();
+  const incoming = new Map();
+  const pushUnique = (map, id, channel) => {
+    if (!map.has(id)) map.set(id, []);
+    const list = map.get(id);
+    if (!list.some((existing) => existing.kind === channel.kind && existing.key === channel.key)) {
+      list.push(channel);
+    }
+  };
+  for (const edge of Array.isArray(processFlow.edges) ? processFlow.edges : []) {
+    const channel = edgeDataChannel(edge);
+    if (!channel) continue;
+    const fromId = moduleIdOf(edge.from);
+    const toId = moduleIdOf(edge.to);
+    if (fromId) pushUnique(outgoing, fromId, channel);
+    if (toId) pushUnique(incoming, toId, channel);
+  }
+  return { outgoing, incoming };
+}
+
+function outgoingStateChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().outgoing.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "state")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+function incomingStateChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().incoming.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "state")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+// An agent's single named outgoing state channel becomes its output_key so a
+// downstream consumer reads from that exact key; otherwise the canonical
+// {id}_output. Multiple distinct outgoing state keys are rejected up front
+// (assertDataChannelsSupported) because an LlmAgent has only one output_key.
+function agentOutputStateKey(module) {
+  const keys = outgoingStateChannelKeys(module.id);
+  return keys.length === 1 ? keys[0] : stateKey(module);
+}
+
+// Python lines for a function node to mirror its payload into each named
+// outgoing state channel (in addition to the canonical {id}_output). Returns ""
+// when the node has no outgoing state channel, keeping non-picker graphs byte-identical.
+function emitOutgoingStateChannelWrites(moduleId, indent = "    ") {
+  return outgoingStateChannelKeys(moduleId)
+    .filter((key) => key !== stateKey({ id: moduleId }))
+    .map((key) => `${indent}ctx.state[${toPyStr(key)}] = payload\n`)
+    .join("");
+}
+
+// Reject runnable graphs whose agent nodes declare conflicting data channels.
+function assertDataChannelsSupported() {
+  const conflicts = [];
+  for (const module of modules) {
+    if (!isAgentModule(module)) continue;
+    const keys = outgoingStateChannelKeys(module.id);
+    if (keys.length > 1) conflicts.push(`${module.id} (${keys.join(", ")})`);
+  }
+  if (conflicts.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower an agent node with multiple distinct outgoing state channels (LlmAgent has a single output_key): ${conflicts.join("; ")}. Use one state_key per agent output, route extra fan-out through a function node, or use smoke mode.`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
