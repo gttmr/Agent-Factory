@@ -478,6 +478,41 @@ test("runnable rejects an artifact channel produced by an agent node", () => {
   }
 });
 
+test("runnable rejects a state channel written by multiple producers (same state_key)", () => {
+  const { unconnectedAdapter, connectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-b", name: "B_Adapter" },
+    { ...unconnectedAdapter, id: "mod-c", name: "C_Adapter" },
+    { ...connectedAdapter, id: "mod-d", name: "D_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-state-collide-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "d", node_kind: "adapter", module_id: "mod-d" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "b" },
+        { from: "in1", to: "c" },
+        { from: "b", to: "d", edge_kind: "session_state", state_key: "shared" },
+        { from: "c", to: "d", edge_kind: "session_state", state_key: "shared" },
+        { from: "d", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /state channel written by multiple producers/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------

@@ -1734,6 +1734,24 @@ function assertDataChannelsSupported() {
       `runnable mode cannot lower an artifact channel produced by an agent node (LlmAgent emits text, not artifacts): ${agentArtifacts.join("; ")}. Produce the artifact from a function/adapter node, or use a state channel.`
     );
   }
+  // A named state channel must have a single producer: every producer writes the
+  // same ctx.state[key], so two distinct producers would silently collapse into
+  // one slot (last/parallel write wins). Reject rather than lose data.
+  const producersByStateKey = new Map();
+  for (const module of modules) {
+    for (const key of outgoingStateChannelKeys(module.id)) {
+      if (!producersByStateKey.has(key)) producersByStateKey.set(key, new Set());
+      producersByStateKey.get(key).add(module.id);
+    }
+  }
+  const collisions = [...producersByStateKey.entries()]
+    .filter(([, producers]) => producers.size > 1)
+    .map(([key, producers]) => `${key} <- ${[...producers].join(", ")}`);
+  if (collisions.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower a state channel written by multiple producers (writes collapse into one ctx.state slot): ${collisions.join("; ")}. Give each producer a distinct state_key, or merge upstream before the channel.`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

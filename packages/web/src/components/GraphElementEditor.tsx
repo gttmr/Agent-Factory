@@ -321,7 +321,7 @@ function EdgeForm({
         ) : null}
 
         {isStateEdge ? (
-          <Field label="state_key" hint="이 채널의 state 키 — 바로 입력하세요. 스코프 prefix(temp:/user:/app:)는 전달 방식에 따라 자동 적용됩니다.">
+          <Field label="state_key" hint="이 채널의 state 키 — 바로 입력하세요(스코프 prefix는 전달 방식에 따라 자동). producer가 이 키에 기록하며, 소비 노드가 connected MCP adapter일 때 자동으로 읽힙니다.">
             <input
               value={edge.state_key ?? ""}
               onChange={(event) => editState.updateEdgeFields(edgeId, { state_key: nullableString(event.target.value) })}
@@ -330,7 +330,8 @@ function EdgeForm({
         ) : null}
 
         {edge.edge_kind === "artifact" ? (
-          <Field label="artifact_key" hint="아티팩트 파일명/키 (producer가 저장하고 consumer가 불러옵니다)">
+          <Field label="artifact_key" hint="아티팩트 파일명/키 — function 노드 producer가 save_artifact로 저장하고, connected MCP adapter consumer가 load_artifact로 읽습니다.">
+
             <input
               value={edge.artifact_key ?? ""}
               onChange={(event) => editState.updateEdgeFields(edgeId, { artifact_key: nullableString(event.target.value) })}

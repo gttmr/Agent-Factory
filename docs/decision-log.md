@@ -22,6 +22,11 @@
 - **배경**: "각 엣지가 내부 코드에서 데이터를 어떻게 주고받을지 화면에서 선택" 요구. 기존엔 피커·데이터모델은 있으나 제너레이터가 전부 무시해 선택이 장식적이었다. ADK 2.x 문서(state prefix·output_key·`{key}` instruction 템플릿·graphs/data-handling)로 시맨틱을 확인.
 - **영향**: `GraphElementEditor.tsx`(피커), `generate-adk-source.mjs`(채널 lowering), `generate-adk-source.test.mjs`(회귀 2건), `docs/workbench/validation.md`·`CLAUDE.md`. 채널을 쓰지 않는 엣지는 런타임 동작 불변(하위호환). `artifact` 채널도 lower된다 — function 노드가 payload를 JSON `types.Part`로 `save_artifact`하고 connected adapter consumer가 `load_artifact`로 읽어 `_collect_tool_inputs`의 `extra_payloads`로 합류시킨다(`json`/`google.genai.types` import는 artifact 사용 시에만 추가해 비-artifact 번들은 byte-identical 유지). agent가 만든 artifact 출력은 거부한다. **후속/미지원**: agent-consumer 명명 읽기(현재 connected adapter consumer만 명명 채널을 읽음), remote_a2a runnable lowering은 다음 작업(PR-B), route/loop는 dynamic 후속으로 계속 거부.
 
+### Codex 리뷰 반영 (계약/가드 변경)
+- **결정**: (1) `state_key`의 정본 형식을 **bare key**로 확정한다 — 스코프는 `edge_kind`가 결정하므로 저장 키에 prefix를 요구하지 않는다. `scripts/validate-artifacts.mjs`의 "temp_state는 `temp:`로 시작해야 함" 류 규칙을 완화해 bare 키를 허용하되, `edge_kind`와 **불일치하는** 스코프 prefix(예: temp_state 엣지에 `app:` 키)는 거부한다. UI 힌트도 bare 입력으로 안내. (2) **동일 `state_key`를 둘 이상의 producer가 쓰는** 경우 거부한다(모두 같은 `ctx.state[key]`에 써서 한 슬롯으로 collapse → 데이터 유실). (3) 명명 채널의 **소비측 자동 읽기는 connected MCP adapter consumer에서만** 발생함을 명확히 한다(state·artifact 공통) — 다른 소비 노드는 producer가 state 기록/artifact 저장만 하고 자동으로 읽지 않는다(UI 힌트·문서 명시).
+- **배경**: PR-A에 대한 Codex 리뷰 REQUEST-CHANGES 3건 — UI(bare 안내) ↔ validator(prefix 강제) 계약 모순, 다중-producer 같은-키 collision, 비-connected consumer의 채널 무읽기.
+- **영향**: `scripts/validate-artifacts.mjs`(state_key prefix 규칙 완화+불일치 거부), `generate-adk-source.mjs`(다중-producer 거부 가드), `generate-adk-source.test.mjs`(회귀 1건), `GraphElementEditor.tsx`(힌트), `validation.md`·`CLAUDE.md`.
+
 ## 2026-06-16 · 작업 브랜치 `worktree-adk-human-input` — runnable 제너레이터 human-in-the-loop 지원
 
 ### runnable 모드가 human_input + 병렬/join DAG를 ADK 2.x 그래프 Workflow로 lower
