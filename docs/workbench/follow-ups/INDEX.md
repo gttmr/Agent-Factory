@@ -23,10 +23,15 @@
 | 07 | `07-onboarding-html-refresh.md` | 완료 | 정적 onboarding HTML과 새 screenshot asset이 route shell + Stage Runner 모델로 갱신됨. |
 | 08 | `08-perf-and-bundle.md` | 완료 | GraphCanvas child lazy split과 Vite build 정량 기록이 완료됨. `_perf-notes.md` 참고. |
 | 09 | `09-skill-runner-workbench.md` | 완료 | Analyze + Design Stage Runner, run evidence, diff/apply, gate 분리 구현됨. Build/Verify runner는 후속 제외 범위. |
+| 10 | `10-dynamic-workflow-lowering.md` | 미구현 | route/loop/dynamic 을 ADK 2.x dynamic workflow 로 lower. generator 대규모 개편(현재 거부). |
+| 11 | `11-agent-consumer-channel-reads.md` | 미구현(부분) | 내부 state/artifact 채널의 agent·비-connected consumer 자동 읽기. 현재 connected MCP adapter consumer만 읽음. |
+| 12 | `12-a2a-contract-policy-mapping.md` | 미구현(부분) | `RemoteA2aAgent` 에 계약 auth/timeout/retry/fallback 을 `A2aRemoteAgentConfig`/interceptor 로 매핑. |
+| 13 | `13-scaffold-plan-warning-accuracy.md` | 미구현 | `collectWarnings` 의 "catalog binding 없음 → TODO" 문구를 카테고리/모드 인식형으로(remote_a2a·runnable agent 오해 제거). |
+| 14 | `14-runtime-stub-runtime-ux.md` | 미구현 | 실행(RunSandbox)/Build UX — output_mode 변경 시 venv 재설치, 재생성 후 stale 로드, adapter 없는 시나리오 Mock Lab 패널 숨김. |
 
 `09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프이자 brief 09 구현 기록이다. Analyze + Design Stage Runner는 구현됐고, Build/Verify runner는 여전히 별도 후속 범위다. 기존 05의 `verify/run` / `runtime-stub/build` SSE 전환은 완료되어 BuildWorkbench/VerifyWorkbench live log 로 제공된다.
 
-현재 남은 구현 브리프는 없다. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
+브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 미구현 후속이다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
 
 ## 공통 작업 자세
 
