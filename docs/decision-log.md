@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-18 · 작업 브랜치 `worktree-adk-generator-structure` — remote_a2a runnable lowering (PR-B)
+
+### `remote_a2a` 노드를 ADK `RemoteA2aAgent` 그래프 노드로 lower
+- **결정**: module-bound `remote_a2a` 노드를 `RemoteA2aAgent(name, description, agent_card=<승인된 A2A 계약의 agent_card.agent_card_url>, use_legacy=False)`로 생성한다(`NODE_LOWERING`에 remote_a2a 핸들러 추가, `moduleLoweringRole`이 remote_a2a 반환). 계약은 `analysisResult.a2aContracts`에서 `remote_module_id`(그다음 `a2a_contract_id`)로 조회한다. `assertRunnableGraphSupported`를 완화해 module-bound remote 노드와 `remote_a2a` 엣지(`boundary_crossing`/`is_remote_boundary_crossing`)를 허용하되, 그 값들은 **remote 엣지에서만** 허용한다(비-remote 엣지는 계속 거부). `assertRemoteA2aSupported`가 계약·`agent_card_url` 없는 remote 노드를 거부하고, 계약 승인은 기존 `validateRunInputs`가 강제한다. `[a2a]` extra와 `RemoteA2aAgent` import는 remote 노드가 있을 때만 추가(없으면 번들 불변).
+- **배경**: "엣지가 A2A로 데이터를 주고받을지 화면에서 선택 → 코드 반영"의 원격 절반. spike로 `RemoteA2aAgent`가 그래프 `Workflow` 노드로 직접 동작함을 실측(BaseAgent 하위, Workflow가 노드로 수용 — 래핑 불필요). ADK 문서의 sub_agent 용례만으로는 불확실했던 부분을 해소.
+- **영향**: `scripts/generate-adk-source.mjs`(remote lowering + 게이트 완화), `generate-adk-source.test.mjs`(remote 회귀 2건), `templates/regression-scenarios/scenario-i-remote-a2a/`(신규 시나리오 + 로컬 mock A2A 서버 `mock_remote/serve_app.py`), `CLAUDE.md`·`validation.md`. 검증: node:test 11/11, 비-remote 번들 불변, 실 `google-adk[a2a]` 2.2.0에서 생성 번들 import/구성 + **라이브 A2A 라운드트립**(생성된 RemoteA2aAgent → 로컬 mock 서버 → `{"analysis":"MOCK_REMOTE_OK"}` 수신, Gemini 불필요). route/loop/dynamic은 계속 후속.
+
 ## 2026-06-17 · 작업 브랜치 `worktree-adk-generator-structure` — 엣지별 데이터 전달 방식 선택 + 제너레이터 구조화
 
 ### 제너레이터를 node-kind/output-mode dispatch로 구조화 (동작 불변)
