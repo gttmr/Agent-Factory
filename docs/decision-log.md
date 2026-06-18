@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-06-18 · 작업 브랜치 `codex/mock-lab-prompt-spec` — Mock Lab 실행 기준을 saved `MockSpec`으로 전환
+
+### Codex는 Prompt-to-Spec 초안 보조로 한정
+- **결정**: Mock Lab의 기본 흐름을 `Draft → Edit → Save → Run → Test`로 재정렬하고, 기존 `Codex Run`/generated project apply 경로를 폐기한다. Codex는 `POST /api/mock-lab/:mockId/drafts`로 자연어 prompt에서 `MockSpec` 초안을 만들 뿐이며, 성공한 초안은 `artifacts/mock-lab/<mock-id>/drafts/<draft-id>/draft-spec.json`에 저장된다. 초안은 검증 통과 후에만 editor로 불러올 수 있고, canonical `mock-spec.json`은 `Save spec`에서만 변경된다.
+- **배경**: 기존 UI가 Codex 실행을 mock server 생성의 필수 단계처럼 보이게 해 사용자가 저장된 spec 기반 실행 경로를 이해하기 어려웠다.
+- **영향**: `packages/mock-lab` API/React UI/types/tests, `docs/mock-lab/local-mcp-mock-lab.md`, `docs/workbench/agent-factory-harness.md`. `/generate`, `/runs`, `/runs/:id/apply`는 Mock Lab API에서 제거된다.
+
+### 서버 실행은 saved `mock-spec.json` 기반 generic stdio runtime으로 수행
+- **결정**: `Run saved spec`은 `generated/package.json` 없이 저장된 `artifacts/mock-lab/<mock-id>/mock-spec.json`만 읽어 package-owned generic MCP stdio runtime을 실행한다. Runtime은 `tools/list`, `tools/call`, input schema validation, `successResponse`, basic `errorScenarios`, latency, audit log를 처리하며 network MCP bridge는 같은 process registry를 재사용한다.
+- **배경**: Mock Lab의 본래 목적은 저장된 `MockSpec`으로 synthetic MCP mock server를 빠르게 실행·검증하는 것이며, 별도 server project export는 기본 경로에 불필요한 비용과 혼선을 만들었다.
+- **영향**: `MockProcessRegistry`, `mockSpecRuntime.ts`, `mcpNetworkBridge.test.ts`, `mockLabCore.test.ts`. Fresh worktree에서도 ignored `artifacts/mock-lab/*/generated` fixture 없이 테스트 가능하다.
+
 ## 2026-06-18 · 작업 브랜치 `worktree-adk-generator-structure` — remote_a2a runnable lowering (PR-B)
 
 ### `remote_a2a` 노드를 ADK `RemoteA2aAgent` 그래프 노드로 lower

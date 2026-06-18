@@ -1,4 +1,4 @@
-import type { CatalogPrefillPayload, MockGenerateSummary, MockRunDetail, MockServerStatus, MockSpec } from "../types/mockSpec";
+import type { CatalogPrefillPayload, MockDraftDetail, MockDraftSummary, MockServerStatus, MockSpec } from "../types/mockSpec";
 
 const API_ROOT = "/api/mock-lab";
 
@@ -32,27 +32,23 @@ export async function fetchCatalogPrefill(): Promise<CatalogPrefillPayload> {
   return request("/catalog-prefill");
 }
 
-export async function generateMock(mockId: string, model: string): Promise<MockGenerateSummary> {
-  return request(`/${encodeURIComponent(mockId)}/generate`, {
+export async function draftMockSpec(mockId: string, prompt: string, model: string): Promise<MockDraftSummary> {
+  return request(`/${encodeURIComponent(mockId)}/drafts`, {
     method: "POST",
-    body: JSON.stringify({ model })
+    body: JSON.stringify({ prompt, model })
   });
 }
 
-export async function listRuns(mockId: string): Promise<MockGenerateSummary[]> {
-  return request(`/${encodeURIComponent(mockId)}/runs`);
+export async function listDrafts(mockId: string): Promise<MockDraftSummary[]> {
+  return request(`/${encodeURIComponent(mockId)}/drafts`);
 }
 
-export async function readRun(mockId: string, runId: string): Promise<MockRunDetail> {
-  return request(`/${encodeURIComponent(mockId)}/runs/${encodeURIComponent(runId)}`);
+export async function readDraft(mockId: string, draftId: string): Promise<MockDraftDetail> {
+  return request(`/${encodeURIComponent(mockId)}/drafts/${encodeURIComponent(draftId)}`);
 }
 
-export async function applyRun(mockId: string, runId: string): Promise<unknown> {
-  return request(`/${encodeURIComponent(mockId)}/runs/${encodeURIComponent(runId)}/apply`, { method: "POST" });
-}
-
-export async function cancelRun(mockId: string, runId: string): Promise<MockGenerateSummary> {
-  return request(`/${encodeURIComponent(mockId)}/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" });
+export async function cancelDraft(mockId: string, draftId: string): Promise<MockDraftSummary> {
+  return request(`/${encodeURIComponent(mockId)}/drafts/${encodeURIComponent(draftId)}/cancel`, { method: "POST" });
 }
 
 export async function startServer(mockId: string): Promise<MockServerStatus> {

@@ -1,17 +1,18 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
 import { type AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createMockLabMiddleware } from "./mockLabApi";
+import { MockSpecStore } from "./mockSpecStore";
 
-const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 const MOCK_ID = "mocklab-smoke-ocr";
 
-function startHarness(): Promise<{ base: string; server: HttpServer }> {
+function startHarness(repoRoot: string): Promise<{ base: string; server: HttpServer }> {
   const middleware = createMockLabMiddleware(repoRoot);
   const server = createServer((req, res) => {
     // Strip the /api/mock-lab mount prefix exactly like the vite plugin does.
@@ -27,6 +28,62 @@ function startHarness(): Promise<{ base: string; server: HttpServer }> {
       resolveHarness({ base: `http://127.0.0.1:${port}/api/mock-lab`, server });
     });
   });
+}
+
+async function createFixtureRepo(): Promise<{ repoRoot: string; cleanup: () => Promise<void> }> {
+  const testRoot = await mkdtemp(join(tmpdir(), "af-mock-lab-bridge-"));
+  const repoRoot = join(testRoot, "repo");
+  await mkdir(join(repoRoot, "catalog"), { recursive: true });
+  await writeFile(join(repoRoot, "catalog", "adapters.yaml"), "adapters: []\n", "utf8");
+  const store = new MockSpecStore({ repoRoot });
+  await store.writeSpec(MOCK_ID, {
+    mock_id: MOCK_ID,
+    server_name: "mocklab-smoke-ocr-mcp",
+    protocol: "mcp_stdio",
+    description: "Self-contained bridge test spec.",
+    tools: [
+      {
+        name: "synthetic_ocr_tool",
+        description: "Synthetic OCR bridge test tool.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            document_uri: { type: "string" }
+          },
+          required: ["document_uri"],
+          additionalProperties: false
+        },
+        outputSchema: {
+          type: "object",
+          properties: {
+            ocr_text: { type: "string" }
+          },
+          required: ["ocr_text"],
+          additionalProperties: false
+        },
+        successResponse: {
+          ocr_text: "[SYNTHETIC] bridge OCR text"
+        },
+        errorScenarios: [],
+        latencyMs: 0,
+        riskSignals: [],
+        auditRequired: true
+      }
+    ],
+    guardrails: {
+      synthetic_only: true,
+      no_private_data: true,
+      no_private_endpoint: true,
+      no_credentials: true,
+      no_production_business_logic: true
+    }
+  });
+  return {
+    repoRoot,
+    cleanup: async () => {
+      await rm(testRoot, { recursive: true, force: true });
+    }
+  };
 }
 
 function sampleArgs(schema: unknown): Record<string, unknown> {
@@ -51,10 +108,12 @@ function sampleArgs(schema: unknown): Record<string, unknown> {
 }
 
 test("network MCP bridge proxies a running Mock Lab child over Streamable HTTP", async (t) => {
-  const { base, server } = await startHarness();
+  const fixture = await createFixtureRepo();
+  const { base, server } = await startHarness(fixture.repoRoot);
   t.after(async () => {
     await fetch(`${base}/${MOCK_ID}/server/stop`, { method: "POST" }).catch(() => undefined);
     await new Promise<void>((done) => server.close(() => done()));
+    await fixture.cleanup();
   });
 
   const startResponse = await fetch(`${base}/${MOCK_ID}/server/start`, { method: "POST" });
@@ -84,9 +143,11 @@ test("network MCP bridge proxies a running Mock Lab child over Streamable HTTP",
 });
 
 test("discovery reports an unknown server as not connected", async (t) => {
-  const { base, server } = await startHarness();
+  const fixture = await createFixtureRepo();
+  const { base, server } = await startHarness(fixture.repoRoot);
   t.after(async () => {
     await new Promise<void>((done) => server.close(() => done()));
+    await fixture.cleanup();
   });
   const discovery = await (await fetch(`${base}/mcp-discovery?server=does-not-exist`)).json();
   assert.equal(discovery.mock_id, null);

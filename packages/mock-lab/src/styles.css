@@ -60,6 +60,76 @@ textarea {
   padding: 20px 24px;
 }
 
+.header-subcopy {
+  color: var(--afml-steel);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.workflow-steps {
+  display: flex;
+  gap: 10px;
+  margin: 0 auto 16px;
+  max-width: 1480px;
+}
+
+.workflow-step {
+  align-items: center;
+  background: var(--afml-canvas);
+  border: 1px solid var(--afml-hairline);
+  border-radius: var(--afml-radius-button);
+  display: flex;
+  flex: 1 1 0;
+  gap: 10px;
+  min-height: 54px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.workflow-step.active {
+  border-color: var(--afml-primary);
+  box-shadow: inset 0 0 0 1px rgba(86, 69, 212, 0.16);
+}
+
+.workflow-index {
+  align-items: center;
+  background: var(--afml-surface);
+  border: 1px solid var(--afml-hairline);
+  border-radius: var(--afml-radius-pill);
+  color: var(--afml-steel);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.workflow-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workflow-copy strong {
+  color: var(--afml-ink);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.workflow-copy span {
+  color: var(--afml-steel);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.workflow-step .status-badge {
+  margin-left: auto;
+}
+
 .eyebrow {
   color: var(--afml-steel);
   font-size: 12px;
@@ -102,7 +172,7 @@ p {
   gap: 16px;
   grid-template-columns: minmax(260px, 0.75fr) minmax(520px, 1.55fr) minmax(320px, 0.9fr);
   grid-template-areas:
-    "catalog editor generate"
+    "catalog editor draft"
     "catalog editor server"
     "smoke smoke smoke";
   margin: 0 auto;
@@ -124,8 +194,8 @@ p {
   grid-area: editor;
 }
 
-.generate-pane {
-  grid-area: generate;
+.draft-pane {
+  grid-area: draft;
 }
 
 .server-pane {
@@ -203,6 +273,7 @@ p {
 }
 
 .field input,
+.field textarea,
 .field select,
 .json-editor textarea {
   background: var(--afml-canvas);
@@ -215,6 +286,12 @@ p {
   width: 100%;
 }
 
+.field textarea.prompt-box {
+  line-height: 1.45;
+  min-height: 118px;
+  resize: vertical;
+}
+
 .json-editor textarea {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
@@ -223,9 +300,19 @@ p {
 }
 
 .field input:focus,
+.field textarea:focus,
 .field select:focus,
 .json-editor textarea:focus {
   border-color: var(--afml-primary);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--afml-primary);
+  outline-offset: 2px;
 }
 
 .checkbox-field {
@@ -475,6 +562,13 @@ p {
   gap: 6px;
 }
 
+.validation-list.compact {
+  background: var(--afml-surface-soft);
+  border: 1px solid var(--afml-hairline);
+  border-radius: var(--afml-radius-button);
+  padding: 10px;
+}
+
 .error-line,
 .warning-line,
 .field-error {
@@ -704,6 +798,31 @@ p {
   padding: 12px;
 }
 
+.details-box {
+  background: var(--afml-canvas);
+  border: 1px solid var(--afml-hairline);
+  border-radius: var(--afml-radius-button);
+  overflow: hidden;
+}
+
+.details-box summary {
+  color: var(--afml-slate);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  list-style-position: inside;
+  padding: 10px 12px;
+}
+
+.details-box pre {
+  border: 0;
+  border-top: 1px solid var(--afml-hairline);
+  border-radius: 0;
+  max-height: 300px;
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
 .result-grid {
   display: grid;
   gap: 12px;
@@ -776,12 +895,27 @@ p {
 }
 
 @media (max-width: 1120px) {
+  .workflow-steps {
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .workflow-step {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .workflow-step .status-badge {
+    display: none;
+  }
+
   .afml-grid {
     grid-template-columns: 1fr;
     grid-template-areas:
       "catalog"
       "editor"
-      "generate"
+      "draft"
       "server"
       "smoke";
   }

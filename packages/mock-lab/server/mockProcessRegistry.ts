@@ -1,8 +1,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { JsonRpcEnvelope, MockServerStatus } from "../src/types/mockSpec";
-import { MockLabError, MockSpecStore, readJson, writeJsonFile } from "./mockSpecStore";
+import { MockLabError, MockSpecStore, writeJsonFile } from "./mockSpecStore";
 
 interface PendingRequest {
   resolve: (value: JsonRpcEnvelope & { result?: any }) => void;
@@ -21,6 +22,10 @@ interface ProcessEntry {
   nextId: number;
 }
 
+const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const runtimePath = fileURLToPath(new URL("./mockSpecRuntime.ts", import.meta.url));
+const loaderPath = fileURLToPath(new URL("../scripts/ts-extension-loader.mjs", import.meta.url));
+
 export class MockProcessRegistry {
   private readonly processes = new Map<string, ProcessEntry>();
   private readonly options: {
@@ -35,27 +40,14 @@ export class MockProcessRegistry {
   async start(mockId: string): Promise<MockServerStatus> {
     if (this.processes.has(mockId)) throw new MockLabError(409, `mock server already running: ${mockId}`);
     await this.options.store.readSpec(mockId);
-    const generatedDir = this.options.store.resolveGeneratedDir(mockId);
-    const packagePath = join(generatedDir, "package.json");
-    const packageStat = await stat(packagePath).catch(() => null);
-    if (!packageStat?.isFile()) {
-      throw new MockLabError(409, "generated/package.json 이 없어서 start 할 수 없습니다.");
-    }
-    const pkg = await readJson<Record<string, unknown>>(packagePath);
-    const scripts = isRecord(pkg.scripts) ? pkg.scripts : {};
-    if (typeof scripts.start !== "string") {
-      throw new MockLabError(422, "generated/package.json scripts.start 가 필요합니다.");
-    }
 
     const startedAt = new Date().toISOString();
-    const command = scripts.start;
-    const startCommand = buildStartCommand(command);
-    const child = spawn(startCommand.command, startCommand.args, {
-      cwd: generatedDir,
+    const command = "saved mock spec runtime";
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--loader", loaderPath, runtimePath], {
+      cwd: packageRoot,
       stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
-        PATH: `${join(generatedDir, "node_modules", ".bin")}:${process.env.PATH ?? ""}`,
         AFML_MOCK_ID: mockId,
         AFML_MOCK_SPEC: join(this.options.store.resolveMockDir(mockId), "mock-spec.json"),
         AFML_AUDIT_LOG: this.options.store.resolveAuditLog(mockId),
@@ -69,7 +61,7 @@ export class MockProcessRegistry {
       pid: child.pid ?? null,
       started_at: startedAt,
       command,
-      cwd: generatedDir,
+      cwd: packageRoot,
       stdout_tail: [],
       stderr_tail: []
     };
@@ -242,16 +234,4 @@ function appendTail(tail: string[], text: string): void {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function buildStartCommand(script: string): { command: string; args: string[] } {
-  const parts = script.trim().split(/\s+/);
-  if (parts[0] === "node") {
-    return { command: process.execPath, args: parts.slice(1) };
-  }
-  return { command: "sh", args: ["-c", script] };
 }

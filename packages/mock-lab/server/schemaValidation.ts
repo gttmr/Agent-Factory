@@ -57,6 +57,26 @@ export function validateMockSpec(value: unknown): ValidationResult {
       }
       if (tool.errorScenarios !== undefined && !Array.isArray(tool.errorScenarios)) {
         errors.push({ path: `${path}.errorScenarios`, message: "errorScenarios must be an array" });
+      } else if (Array.isArray(tool.errorScenarios)) {
+        tool.errorScenarios.forEach((scenario, scenarioIndex) => {
+          const scenarioPath = `${path}.errorScenarios[${scenarioIndex}]`;
+          if (!isRecord(scenario)) {
+            errors.push({ path: scenarioPath, message: "error scenario must be an object" });
+            return;
+          }
+          if (typeof scenario.name !== "string" || scenario.name.trim().length === 0) {
+            errors.push({ path: `${scenarioPath}.name`, message: "error scenario name is required" });
+          }
+          if (scenario.when !== undefined && !isRecord(scenario.when)) {
+            errors.push({ path: `${scenarioPath}.when`, message: "error scenario when must be an object" });
+          }
+          if (typeof scenario.errorCode !== "string" || scenario.errorCode.trim().length === 0) {
+            errors.push({ path: `${scenarioPath}.errorCode`, message: "error scenario errorCode is required" });
+          }
+          if (typeof scenario.message !== "string" || scenario.message.trim().length === 0) {
+            errors.push({ path: `${scenarioPath}.message`, message: "error scenario message is required" });
+          }
+        });
       }
       const latencyMs = tool.latencyMs;
       if (

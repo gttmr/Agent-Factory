@@ -7,12 +7,14 @@ export default function MockSpecEditor({
   catalog,
   spec,
   validation,
+  saveBlockedReason,
   onChange,
   onSave
 }: {
   catalog: CatalogPrefillPayload;
   spec: MockSpec;
   validation: ValidationResult;
+  saveBlockedReason?: string;
   onChange: (spec: MockSpec) => void;
   onSave: () => void;
 }) {
@@ -107,10 +109,11 @@ export default function MockSpecEditor({
         <div className="button-row">
           <StatusBadge tone={validation.ok ? "success" : "error"}>{validation.ok ? "valid" : "blocked"}</StatusBadge>
           <button className="button primary" type="button" disabled={!validation.ok} onClick={onSave}>
-            저장
+            Save spec
           </button>
         </div>
       </div>
+      {saveBlockedReason ? <p className="warning-line">{saveBlockedReason}</p> : null}
 
       <div className="form-grid three">
         <label className="field">

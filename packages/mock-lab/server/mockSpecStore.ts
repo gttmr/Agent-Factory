@@ -1,10 +1,10 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile, cp } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
-import type { GeneratedFileInfo, MockSpec } from "../src/types/mockSpec";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
+import type { MockDraftSummary, MockSpec } from "../src/types/mockSpec";
 import { assertValidMockSpec } from "./schemaValidation";
 
 export const MOCK_ID_PATTERN = /^[a-zA-Z0-9_-]{3,80}$/;
-export const RUN_ID_PATTERN = /^\d{8}T\d{6}Z-generate-[a-f0-9]{6}$/;
+export const DRAFT_ID_PATTERN = /^\d{8}T\d{6}Z-draft-[a-f0-9]{6}$/;
 
 export class MockLabError extends Error {
   readonly statusCode: number;
@@ -49,7 +49,7 @@ export class MockSpecStore {
   async readSpec(mockId: string): Promise<MockSpec> {
     const content = await readFile(join(this.resolveMockDir(mockId), "mock-spec.json"), "utf8").catch((error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        throw new MockLabError(404, `Mock spec is not saved: ${mockId}. Save the spec before generating or running smoke tests.`);
+        throw new MockLabError(404, `Mock spec is not saved: ${mockId}. Save the spec before running the mock server or smoke tests.`);
       }
       throw error;
     });
@@ -90,20 +90,16 @@ export class MockSpecStore {
     return abs;
   }
 
-  resolveRunDir(mockId: string, runId: string): string {
-    assertRunId(runId);
-    const runsRoot = resolve(this.resolveMockDir(mockId), "runs");
-    const abs = resolve(runsRoot, runId);
-    assertInside(runsRoot, abs);
+  resolveDraftDir(mockId: string, draftId: string): string {
+    assertDraftId(draftId);
+    const draftsRoot = resolve(this.resolveMockDir(mockId), "drafts");
+    const abs = resolve(draftsRoot, draftId);
+    assertInside(draftsRoot, abs);
     return abs;
   }
 
-  resolveRunProposedDir(mockId: string, runId: string): string {
-    return join(this.resolveRunDir(mockId, runId), "proposed-files");
-  }
-
-  resolveGeneratedDir(mockId: string): string {
-    return join(this.resolveMockDir(mockId), "generated");
+  resolveDraftSpec(mockId: string, draftId: string): string {
+    return join(this.resolveDraftDir(mockId, draftId), "draft-spec.json");
   }
 
   resolveAuditLog(mockId: string): string {
@@ -114,79 +110,71 @@ export class MockSpecStore {
     return join(this.resolveMockDir(mockId), "server-state.json");
   }
 
-  async applyGeneratedFiles(mockId: string, runId: string): Promise<{ ok: true; files: GeneratedFileInfo[] }> {
-    const proposedDir = this.resolveRunProposedDir(mockId, runId);
-    const files = await this.validateProposedFiles(mockId, runId);
-    const generatedDir = this.resolveGeneratedDir(mockId);
-    await rm(generatedDir, { recursive: true, force: true });
-    await mkdir(generatedDir, { recursive: true });
-    await cp(proposedDir, generatedDir, {
-      recursive: true,
-      filter: (source) => {
-        const rel = relative(proposedDir, source).split(sep).join("/");
-        return rel === "" || (!rel.includes("node_modules") && !rel.includes(".git"));
-      }
-    });
-    await appendJsonl(this.resolveAuditLog(mockId), {
-      at: new Date().toISOString(),
-      event: "generated_files_applied",
-      mock_id: mockId,
-      run_id: runId,
-      files: files.map((file) => file.path),
-      synthetic: true
-    });
-    return { ok: true, files };
+  async writeDraftSpec(mockId: string, draftId: string, spec: unknown): Promise<{ ok: true; bytes: number }> {
+    assertMockId(mockId);
+    assertDraftId(draftId);
+    assertValidMockSpec(spec);
+    if (spec.mock_id !== mockId) {
+      throw new MockLabError(422, "draft spec mock_id must match the selected mock");
+    }
+    const path = this.resolveDraftSpec(mockId, draftId);
+    const content = `${JSON.stringify(spec, null, 2)}\n`;
+    await mkdir(path.slice(0, path.lastIndexOf(sep)), { recursive: true });
+    await writeFile(path, content, "utf8");
+    return { ok: true, bytes: Buffer.byteLength(content, "utf8") };
   }
 
-  async validateProposedFiles(mockId: string, runId: string): Promise<GeneratedFileInfo[]> {
-    const proposedDir = this.resolveRunProposedDir(mockId, runId);
-    const files = await collectFiles(proposedDir, proposedDir);
-    validateGeneratedFiles(files, proposedDir);
-    return files;
+  async readDraftSpec(mockId: string, draftId: string): Promise<MockSpec> {
+    const parsed = JSON.parse(await readFile(this.resolveDraftSpec(mockId, draftId), "utf8")) as unknown;
+    assertValidMockSpec(parsed);
+    if (parsed.mock_id !== mockId) {
+      throw new MockLabError(422, "draft spec mock_id must match the selected mock");
+    }
+    return parsed;
   }
 
-  async listRuns(mockId: string): Promise<unknown[]> {
-    const runsRoot = join(this.resolveMockDir(mockId), "runs");
-    const entries = await readdir(runsRoot, { withFileTypes: true }).catch((error) => {
+  async listDrafts(mockId: string): Promise<MockDraftSummary[]> {
+    const draftsRoot = join(this.resolveMockDir(mockId), "drafts");
+    const entries = await readdir(draftsRoot, { withFileTypes: true }).catch((error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw error;
     });
-    const runs: unknown[] = [];
+    const drafts: MockDraftSummary[] = [];
     for (const entry of entries) {
-      if (!entry.isDirectory() || !RUN_ID_PATTERN.test(entry.name)) continue;
-      const runDir = join(runsRoot, entry.name);
-      const summary = await readJson(join(runDir, "result-summary.json")).catch(() => null);
+      if (!entry.isDirectory() || !DRAFT_ID_PATTERN.test(entry.name)) continue;
+      const draftDir = join(draftsRoot, entry.name);
+      const summary = await readJson<MockDraftSummary>(join(draftDir, "result-summary.json")).catch(() => null);
       if (summary) {
-        runs.push(summary);
+        drafts.push(summary);
         continue;
       }
-      const request = await readJson<Record<string, any>>(join(runDir, "request.json")).catch(() => null);
+      const request = await readJson<Record<string, any>>(join(draftDir, "request.json")).catch(() => null);
       if (request) {
-        runs.push({
-          run_id: entry.name,
+        drafts.push({
+          draft_id: entry.name,
           mock_id: mockId,
           status: "failed",
           model: typeof request.model === "string" ? request.model : "gpt-5.5",
-          started_at: inferRunStartedAt(entry.name) ?? new Date(0).toISOString(),
+          started_at: inferDraftStartedAt(entry.name) ?? new Date(0).toISOString(),
           finished_at: null,
           elapsed_ms: 0,
           pid: null,
           command: null,
-          proposed_files: [],
           validation: {
             ok: false,
-            errors: ["result-summary.json is missing; generation may have been interrupted before status was recorded."]
+            errors: ["result-summary.json is missing; draft may have been interrupted before status was recorded."],
+            warnings: []
           },
-          last_error: "result-summary.json is missing; generation may have been interrupted before status was recorded."
+          last_error: "result-summary.json is missing; draft may have been interrupted before status was recorded."
         });
       }
     }
-    runs.sort((a, b) => {
+    drafts.sort((a, b) => {
       const left = isRecord(a) && typeof a.started_at === "string" ? a.started_at : "";
       const right = isRecord(b) && typeof b.started_at === "string" ? b.started_at : "";
       return right.localeCompare(left);
     });
-    return runs;
+    return drafts;
   }
 }
 
@@ -205,51 +193,12 @@ export async function appendJsonl(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${existing}${JSON.stringify(value)}\n`, "utf8");
 }
 
-export async function collectFiles(root: string, current: string): Promise<GeneratedFileInfo[]> {
-  const entries = await readdir(current, { withFileTypes: true });
-  const files: GeneratedFileInfo[] = [];
-  for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name === ".git") continue;
-    const abs = join(current, entry.name);
-    if (entry.isSymbolicLink()) {
-      throw new MockLabError(422, `symlink is not allowed in generated files: ${entry.name}`);
-    }
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(root, abs)));
-    } else if (entry.isFile()) {
-      const info = await stat(abs);
-      const rel = relative(root, abs).split(sep).join("/");
-      if (rel.startsWith("../") || rel.includes("/../") || rel.startsWith("/")) {
-        throw new MockLabError(403, `unsafe generated file path: ${rel}`);
-      }
-      files.push({ path: rel, bytes: info.size });
-    }
-  }
-  files.sort((a, b) => a.path.localeCompare(b.path));
-  return files;
-}
-
-function validateGeneratedFiles(files: GeneratedFileInfo[], proposedDir: string): void {
-  const paths = new Set(files.map((file) => file.path));
-  if (!paths.has("package.json")) {
-    throw new MockLabError(422, "generated package.json is required");
-  }
-  if (!paths.has("src/server.ts") && !paths.has("server.mjs") && !paths.has("server.js")) {
-    throw new MockLabError(422, "generated server entry is required");
-  }
-  for (const file of files) {
-    if (file.bytes > 1_000_000) throw new MockLabError(422, `${file.path} exceeds 1MB`);
-    const abs = resolve(proposedDir, file.path);
-    assertInside(proposedDir, abs);
-  }
-}
-
 export function assertMockId(value: string): void {
   if (!MOCK_ID_PATTERN.test(value)) throw new MockLabError(400, "mock_id 형식이 올바르지 않습니다.");
 }
 
-function assertRunId(value: string): void {
-  if (!RUN_ID_PATTERN.test(value)) throw new MockLabError(400, "run_id 형식이 올바르지 않습니다.");
+function assertDraftId(value: string): void {
+  if (!DRAFT_ID_PATTERN.test(value)) throw new MockLabError(400, "draft_id 형식이 올바르지 않습니다.");
 }
 
 function assertInside(root: string, target: string): void {
@@ -258,8 +207,8 @@ function assertInside(root: string, target: string): void {
   }
 }
 
-function inferRunStartedAt(runId: string): string | null {
-  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-generate-[a-f0-9]{6}$/.exec(runId);
+function inferDraftStartedAt(draftId: string): string | null {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-draft-[a-f0-9]{6}$/.exec(draftId);
   if (!match) return null;
   return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`;
 }

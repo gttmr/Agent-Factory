@@ -71,7 +71,7 @@ export interface CatalogPrefillEntry {
   outputs: Array<Record<string, unknown>>;
   risk_signals: string[];
   has_runtime_mock: boolean;
-  notes: string;
+  notes: string | null;
   prefill: MockSpec;
 }
 
@@ -92,36 +92,31 @@ export interface ValidationResult {
   warnings: ValidationIssue[];
 }
 
-export interface GeneratedFileInfo {
-  path: string;
-  bytes: number;
-}
+export type MockDraftStatus = "running" | "completed" | "failed" | "cancelled";
 
-export type MockGenerateStatus = "running" | "completed" | "failed" | "cancelled";
-
-export interface MockGenerateSummary {
-  run_id: string;
+export interface MockDraftSummary {
+  draft_id: string;
   mock_id: string;
-  status: MockGenerateStatus;
+  status: MockDraftStatus;
   model: string;
   started_at: string;
   finished_at: string | null;
   elapsed_ms: number;
   pid: number | null;
   command: string | null;
-  proposed_files: GeneratedFileInfo[];
   validation: {
     ok: boolean;
     errors: string[];
+    warnings: string[];
   };
   last_error: string | null;
 }
 
-export interface MockRunDetail {
+export interface MockDraftDetail {
   request: unknown;
-  summary: MockGenerateSummary;
+  summary: MockDraftSummary;
   events: unknown[];
-  proposed_files: Array<GeneratedFileInfo & { preview: string }>;
+  draft_spec: MockSpec | null;
   stdout: string;
   stderr: string;
 }
@@ -143,7 +138,7 @@ export interface MockServerStatus {
 
 export interface JsonRpcEnvelope {
   jsonrpc: "2.0";
-  id: number | string;
+  id: number | string | null;
   result?: unknown;
   error?: {
     code: number;
