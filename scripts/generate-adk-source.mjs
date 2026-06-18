@@ -1462,21 +1462,26 @@ function assertRunnableGraphSupported() {
   const badEdges = edges
     .filter((edge) => {
       if (!edge) return false;
-      // remote_a2a edges legitimately carry boundary_crossing / is_remote_boundary_crossing;
-      // their remote endpoint is validated separately (assertRemoteA2aSupported).
+      const fromNode = graph.nodesById.get(edge.from);
+      const toNode = graph.nodesById.get(edge.to);
+      // A dangling endpoint (node id not in the graph) also resolves to null and
+      // is silently dropped — reject it (don't rely only on processFlow.validation).
+      if (!fromNode || !toNode) return true;
+      // A remote_a2a edge must genuinely connect a remote_a2a node. Only such an
+      // edge gets the boundary_crossing / is_remote_boundary_crossing relaxation;
+      // a "remote_a2a"-tagged edge between two local nodes is mislabeled and would
+      // otherwise bypass the boundary gate — reject it.
+      const touchesRemote = fromNode.node_kind === "remote_a2a" || toNode.node_kind === "remote_a2a";
+      if (edge.edge_kind === "remote_a2a" && !touchesRemote) return true;
+      const isGenuineRemoteEdge = edge.edge_kind === "remote_a2a" && touchesRemote;
       if (
-        edge.edge_kind !== "remote_a2a" &&
+        !isGenuineRemoteEdge &&
         (unsupportedExecSemantics.has(edge.execution_semantics) ||
           unsupportedEdgeKinds.has(edge.edge_kind) ||
           edge.is_remote_boundary_crossing === true)
       ) {
         return true;
       }
-      const fromNode = graph.nodesById.get(edge.from);
-      const toNode = graph.nodesById.get(edge.to);
-      // A dangling endpoint (node id not in the graph) also resolves to null and
-      // is silently dropped — reject it (don't rely only on processFlow.validation).
-      if (!fromNode || !toNode) return true;
       // Reversed polarity (output as source / input as target) and a direct
       // input->output passthrough all resolve to a dropped endpoint. After this,
       // every surviving edge keeps lowerable runtime endpoints, except the

@@ -609,6 +609,42 @@ test("runnable rejects a remote_a2a node whose contract has no agent_card_url", 
   }
 });
 
+test("runnable rejects a mislabeled remote_a2a edge between two local nodes", () => {
+  // Two LOCAL nodes joined by a remote_a2a edge with boundary crossing — must be
+  // rejected (it would otherwise bypass the boundary-crossing gate). There is no
+  // remote_a2a module, so assertRemoteA2aSupported passes; the edge gate must catch it.
+  const [agentBase] = baseModules(true);
+  const unconnectedAdapter = baseModules(true)[1];
+  const modules = [{ ...agentBase, id: "mod-a", name: "A_agent" }, { ...unconnectedAdapter, id: "mod-b", name: "B_adapter" }];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-mislabeled-"));
+  try {
+    writeRemoteFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a", edge_kind: "event_output", execution_semantics: "normal_transition" },
+        { from: "a", to: "b", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true },
+        { from: "b", to: "out1", edge_kind: "event_output", execution_semantics: "normal_transition" }
+      ],
+      a2aContracts: [{
+        contract_id: "a2a-001", remote_module_id: "mod-x", target_agent_name: "X", contract_status: "approved",
+        agent_card: { discovery_method: "wk", agent_card_url: "http://localhost:8001/.well-known/agent-card.json", version: "1.0.0", notes: "" }
+      }]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /does not support these edges/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------
