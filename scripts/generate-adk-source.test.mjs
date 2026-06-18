@@ -514,6 +514,138 @@ test("runnable rejects a state channel written by multiple producers (same state
 });
 
 // ---------------------------------------------------------------------------
+// remote_a2a (A2A) lowering.
+// ---------------------------------------------------------------------------
+
+function remoteModule(overrides = {}) {
+  return {
+    id: "mod-r", name: "remote_partner_agent", module_category: "remote_a2a",
+    agent_kind: null, workflow_kind: null, adapter_kind: null, remote_contract_kind: "a2a",
+    scaffold_output: "runnable", no_runnable_business_logic: false, catalog_binding: null,
+    developer_todos: ["review"], inputs: [], outputs: [{ name: "result", type: "object" }],
+    risk_signals: [], required_review_fields: [],
+    runtime_mock: null, instruction: null, model: null,
+    access_protocol: "remote_a2a", mcp_server: null, mcp_tool_name: null, mcp_schema_ref: null,
+    mcp_auth_mode: null, runtime_binding: "remote_a2a", a2a_contract_id: "a2a-001",
+    smoke_spec: { sample_user_message: "go", synthetic_inputs: {}, expected_output_shape: {}, expected_event_markers: [], mock_sources: [], ready: true },
+    ...overrides
+  };
+}
+
+function writeRemoteFixture(dir, { modules, nodes, edges, a2aContracts }) {
+  writeJson(join(dir, "normalized-requirement.json"), { id: "req-remote", title: "Remote A2A", status: "approved" });
+  writeJson(join(dir, "process-flow.json"), { nodes, edges, validation: { errors: [] } });
+  writeJson(join(dir, "module-candidates.json"), modules.map((m) => ({ id: m.id, status: "approved", missing_information: [] })));
+  writeJson(join(dir, "analysis-result.json"), { a2aContracts });
+  writeJson(join(dir, "af-run-manifest.json"), {
+    requirement_id: "req-remote",
+    approvals: { analysis_reviewed: true, boundaries_approved: true, runtime_contracts_approved: true },
+    stages: { design: { status: "complete" } }
+  });
+  writeJson(join(dir, "scaffold-plan.json"), {
+    requirement_id: "req-remote", source: "approved_workbench_artifact", raw_requirement_to_code: false,
+    output_mode: "runnable", modules, runtime_contracts: [], excluded_modules: [],
+    manifest: { catalog_bound_modules: [], new_code_required: [] },
+    validation: { can_generate_source: true, blockers: [], warnings: [] }
+  });
+}
+
+const remoteGraph = {
+  nodes: [
+    { id: "in1", node_kind: "input" },
+    { id: "a", node_kind: "agent", module_id: "mod-a" },
+    { id: "r", node_kind: "remote_a2a", module_id: "mod-r", owner_scope: "remote" },
+    { id: "out1", node_kind: "output" }
+  ],
+  edges: [
+    { from: "in1", to: "a", edge_kind: "event_output", execution_semantics: "normal_transition" },
+    { from: "a", to: "r", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true },
+    { from: "r", to: "out1", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true }
+  ]
+};
+
+test("runnable lowers a remote_a2a node to RemoteA2aAgent from its A2A contract", () => {
+  const [agentBase] = baseModules(true);
+  const modules = [{ ...agentBase, id: "mod-a", name: "local_dispatcher_agent" }, remoteModule()];
+  const a2aContracts = [{
+    contract_id: "a2a-001", remote_module_id: "mod-r", target_agent_name: "Partner Prime Agent",
+    contract_status: "approved",
+    agent_card: { discovery_method: "well-known", agent_card_url: "http://localhost:8001/a2a/test_agent/.well-known/agent-card.json", version: "1.0.0", notes: "" }
+  }];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-"));
+  try {
+    writeRemoteFixture(artifactRoot, { modules, nodes: remoteGraph.nodes, edges: remoteGraph.edges, a2aContracts });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_remote_adk", "agent.py"), "utf8");
+    assert.match(source, /from google\.adk\.agents\.remote_a2a_agent import RemoteA2aAgent/, "imports RemoteA2aAgent");
+    assert.match(source, /= RemoteA2aAgent\(/, "emits a RemoteA2aAgent node");
+    assert.match(source, /agent_card="http:\/\/localhost:8001\/a2a\/test_agent\/\.well-known\/agent-card\.json"/, "agent_card from the contract");
+    assert.match(source, /use_legacy=False/);
+    const reqs = readFileSync(join(outputRoot, "requirements.txt"), "utf8");
+    assert.match(reqs, /google-adk\[a2a\]/, "requirements include the a2a extra");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects a remote_a2a node whose contract has no agent_card_url", () => {
+  const [agentBase] = baseModules(true);
+  const modules = [{ ...agentBase, id: "mod-a", name: "local_agent" }, remoteModule()];
+  const a2aContracts = [{
+    contract_id: "a2a-001", remote_module_id: "mod-r", target_agent_name: "Partner",
+    contract_status: "approved",
+    agent_card: { discovery_method: "tbd", agent_card_url: "", version: "", notes: "" }
+  }];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-nocard-"));
+  try {
+    writeRemoteFixture(artifactRoot, { modules, nodes: remoteGraph.nodes, edges: remoteGraph.edges, a2aContracts });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /agent_card\.agent_card_url/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects a mislabeled remote_a2a edge between two local nodes", () => {
+  // Two LOCAL nodes joined by a remote_a2a edge with boundary crossing — must be
+  // rejected (it would otherwise bypass the boundary-crossing gate). There is no
+  // remote_a2a module, so assertRemoteA2aSupported passes; the edge gate must catch it.
+  const [agentBase] = baseModules(true);
+  const unconnectedAdapter = baseModules(true)[1];
+  const modules = [{ ...agentBase, id: "mod-a", name: "A_agent" }, { ...unconnectedAdapter, id: "mod-b", name: "B_adapter" }];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-mislabeled-"));
+  try {
+    writeRemoteFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a", edge_kind: "event_output", execution_semantics: "normal_transition" },
+        { from: "a", to: "b", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true },
+        { from: "b", to: "out1", edge_kind: "event_output", execution_semantics: "normal_transition" }
+      ],
+      a2aContracts: [{
+        contract_id: "a2a-001", remote_module_id: "mod-x", target_agent_name: "X", contract_status: "approved",
+        agent_card: { discovery_method: "wk", agent_card_url: "http://localhost:8001/.well-known/agent-card.json", version: "1.0.0", notes: "" }
+      }]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /does not support these edges/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------
 
