@@ -235,6 +235,7 @@ root_agent = SyntheticRuntimeSmokeAgent(
 function buildRunnableAgentPy() {
   assertRunnableGraphSupported();
   assertDataChannelsSupported();
+  assertRemoteA2aSupported();
   const { edges, joins } = buildRunnableGraph();
   const graph = graphIndexes();
   const orderedModules = orderedGraphModules();
@@ -257,7 +258,8 @@ function buildRunnableAgentPy() {
     agent: { emitFunc: () => null, emitDecl: emitAgentNode },
     connected_adapter: { emitFunc: emitConnectedAdapterFunc, emitDecl: emitFunctionNodeDecl },
     stub_function: { emitFunc: emitStubFunc, emitDecl: emitFunctionNodeDecl },
-    human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl }
+    human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl },
+    remote_a2a: { emitFunc: () => null, emitDecl: emitRemoteA2aNode }
   };
   const emitNode = (role, target) => {
     const handler = NODE_LOWERING[role];
@@ -277,10 +279,14 @@ function buildRunnableAgentPy() {
   )}.`;
 
   // Artifact channels need json (serialize the payload) + google.genai.types
-  // (wrap as a Part). Gated so non-artifact bundles keep an unchanged import block.
+  // (wrap as a Part); remote_a2a nodes need RemoteA2aAgent. Gated so bundles
+  // without those features keep an unchanged import block.
   const usesArtifacts = usesArtifactChannels();
   const artifactStdlibImport = usesArtifacts ? "import json\n" : "";
   const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+  const remoteImport = usesRemoteA2a()
+    ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
+    : "";
 
   return `from __future__ import annotations
 
@@ -292,7 +298,7 @@ import yaml
 
 from google.adk import Context
 from google.adk.agents import LlmAgent
-from google.adk.events import RequestInput
+${remoteImport}from google.adk.events import RequestInput
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 ${artifactGenaiImport}
 
@@ -757,7 +763,10 @@ function buildManifest() {
 
 function buildRequirements() {
   if (outputMode === "runnable") {
-    const adk = connectedAdapters.length ? "google-adk[mcp]>=2.1.0" : "google-adk>=2.1.0";
+    const extras = [];
+    if (connectedAdapters.length) extras.push("mcp");
+    if (usesRemoteA2a()) extras.push("a2a");
+    const adk = extras.length ? `google-adk[${extras.join(",")}]>=2.1.0` : "google-adk>=2.1.0";
     return `${[adk, "google-genai>=1.0.0", "pyyaml>=6.0", "pytest"].join("\n")}\n`;
   }
   return `${["google-adk>=2.0.0", "pytest"].join("\n")}\n`;
@@ -1388,21 +1397,21 @@ function assertAcyclic(edges) {
 // buildFiles() call.)
 function assertRunnableGraphSupported() {
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
-  const unsupportedEdgeKinds = new Set(["route", "remote_a2a"]);
-  const unsupportedContainerKinds = new Set(["dynamic_workflow", "loop_region", "remote_boundary"]);
+  // remote_a2a is now lowered (RemoteA2aAgent node, gated per-edge + contract check);
+  // remote_boundary is a visual grouping like parallel_region.
+  const unsupportedEdgeKinds = new Set(["route"]);
+  const unsupportedContainerKinds = new Set(["dynamic_workflow", "loop_region"]);
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
   const graph = graphIndexes();
   // Allowlist: lowering can represent input/output (→ START/terminal) and
-  // synthetic human_input/join nodes, plus module-bound agent/adapter/workflow
-  // nodes. ANY other module_id-null node would be silently dropped by resolve(),
-  // which would break graph connectivity, so reject it. remote_a2a is a real
-  // remote boundary, not a safe synthetic stub, so it is rejected even when
-  // module-bound.
+  // synthetic human_input/join nodes, plus module-bound agent/adapter/workflow/
+  // remote_a2a nodes. ANY other module_id-null node would be silently dropped by
+  // resolve(), which would break graph connectivity, so reject it.
   const allowedBareKinds = new Set(["input", "output", "human_input", "join"]);
-  // Router, loop-control, and remote node kinds are NOT lowerable even if they
-  // happen to carry a module_id, so deny them by kind before the module-bound
-  // check.
-  const unlowerableNodeKinds = new Set(["router", "loop_control", "remote_a2a"]);
+  // Router and loop-control nodes are NOT lowerable even if they carry a module_id,
+  // so deny them by kind before the module-bound check. (remote_a2a IS lowerable
+  // when module-bound — handled in the module branch + assertRemoteA2aSupported.)
+  const unlowerableNodeKinds = new Set(["router", "loop_control"]);
   const badNodes = [];
   for (const node of nodes) {
     if (!node) continue;
@@ -1420,11 +1429,10 @@ function assertRunnableGraphSupported() {
       continue;
     }
     if (module) {
-      if (module.module_category === "remote_a2a") badNodes.push(`${node.id} (remote_a2a module)`);
       // Dynamic workflows need ADK 2.x dynamic-workflow codegen (loops/while via
       // ctx.run_node), not the static-graph lowering — reject so they stay smoke-only
       // rather than silently lowering as a stub coordinator.
-      else if (module.module_category === "workflow" && module.workflow_kind === "dynamic") {
+      if (module.module_category === "workflow" && module.workflow_kind === "dynamic") {
         badNodes.push(`${node.id} (dynamic workflow module)`);
       }
       continue;
@@ -1433,7 +1441,7 @@ function assertRunnableGraphSupported() {
   }
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow nodes (no router/loop-control/remote or module_id-null intermediary nodes). Use smoke mode.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow/remote_a2a nodes (no router/loop-control or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
   // Containers are a separate top-level array in Graph IR, not a node field.
@@ -1454,10 +1462,13 @@ function assertRunnableGraphSupported() {
   const badEdges = edges
     .filter((edge) => {
       if (!edge) return false;
+      // remote_a2a edges legitimately carry boundary_crossing / is_remote_boundary_crossing;
+      // their remote endpoint is validated separately (assertRemoteA2aSupported).
       if (
-        unsupportedExecSemantics.has(edge.execution_semantics) ||
-        unsupportedEdgeKinds.has(edge.edge_kind) ||
-        edge.is_remote_boundary_crossing === true
+        edge.edge_kind !== "remote_a2a" &&
+        (unsupportedExecSemantics.has(edge.execution_semantics) ||
+          unsupportedEdgeKinds.has(edge.edge_kind) ||
+          edge.is_remote_boundary_crossing === true)
       ) {
         return true;
       }
@@ -1766,9 +1777,67 @@ function isAgentModule(module) {
 // NODE_LOWERING registry. New module-backed node kinds add a role here + a
 // registry entry, not another branch in the emit loop.
 function moduleLoweringRole(module) {
+  if (module.module_category === "remote_a2a") return "remote_a2a";
   if (isAgentModule(module)) return "agent";
   if (adapterConnection(module) === "mcp_connected") return "connected_adapter";
   return "stub_function";
+}
+
+// ---------------------------------------------------------------------------
+// remote_a2a (A2A) lowering — a remote node calls a partner agent over the A2A
+// protocol via RemoteA2aAgent; the agent card URL comes from the reviewed A2A
+// contract (analysisResult.a2aContracts). Contract approval is enforced by
+// validateRunInputs; here we only resolve the card + reject unresolvable nodes.
+// ---------------------------------------------------------------------------
+
+function a2aContractForModule(module) {
+  const contracts = Array.isArray(analysisResult?.a2aContracts) ? analysisResult.a2aContracts : [];
+  return (
+    contracts.find((contract) => contract && contract.remote_module_id === module.id) ??
+    (module.a2a_contract_id
+      ? contracts.find((contract) => contract && contract.contract_id === module.a2a_contract_id)
+      : null) ??
+    null
+  );
+}
+
+function a2aAgentCardUrl(contract) {
+  const url = contract?.agent_card?.agent_card_url;
+  return typeof url === "string" && url.trim() ? url.trim() : null;
+}
+
+function usesRemoteA2a() {
+  return modules.some((module) => module.module_category === "remote_a2a");
+}
+
+function emitRemoteA2aNode(module) {
+  const contract = a2aContractForModule(module);
+  const url = a2aAgentCardUrl(contract);
+  const description = (contract && contract.target_agent_name) || module.name;
+  return `${nodeSymbol(module)} = RemoteA2aAgent(
+    name=${toPyStr(pyNodeName(module))},
+    description=${toPyStr(truncate(description))},
+    agent_card=${toPyStr(url)},
+    use_legacy=False,
+)`;
+}
+
+// Each remote_a2a node needs a resolvable A2A contract with an agent card URL.
+function assertRemoteA2aSupported() {
+  const bad = [];
+  for (const module of modules) {
+    if (module.module_category !== "remote_a2a") continue;
+    const contract = a2aContractForModule(module);
+    if (!contract) bad.push(`${module.id} (no A2A contract)`);
+    else if (!a2aAgentCardUrl(contract)) {
+      bad.push(`${module.id} (contract ${contract.contract_id} has no agent_card.agent_card_url)`);
+    }
+  }
+  if (bad.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower these remote_a2a nodes: ${bad.join("; ")}. Each needs an approved A2A contract with agent_card.agent_card_url.`
+    );
+  }
 }
 
 function adapterConnection(module) {
