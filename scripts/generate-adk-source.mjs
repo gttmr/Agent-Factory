@@ -105,7 +105,15 @@ function buildFiles() {
 // ---------------------------------------------------------------------------
 
 function buildAgentPy() {
-  return outputMode === "runnable" ? buildRunnableAgentPy() : buildSmokeAgentPy();
+  // agent.py builders keyed by output mode. A future runtime form (e.g. an ADK
+  // dynamic-workflow bundle) plugs in as one entry here plus its builder, rather
+  // than another branch. Declared inside the function so the top-level
+  // buildFiles() driver does not hit a temporal-dead-zone on these consts.
+  const AGENT_PY_BUILDERS = {
+    smoke: buildSmokeAgentPy,
+    runnable: buildRunnableAgentPy
+  };
+  return (AGENT_PY_BUILDERS[outputMode] ?? buildSmokeAgentPy)();
 }
 
 function buildSmokeAgentPy() {
@@ -226,6 +234,7 @@ root_agent = SyntheticRuntimeSmokeAgent(
 
 function buildRunnableAgentPy() {
   assertRunnableGraphSupported();
+  assertDataChannelsSupported();
   const { edges, joins } = buildRunnableGraph();
   const graph = graphIndexes();
   const orderedModules = orderedGraphModules();
@@ -236,22 +245,30 @@ function buildRunnableAgentPy() {
   const nodeBlocks = [];
   const funcBlocks = [];
 
-  for (const module of orderedModules) {
-    if (isAgentModule(module)) {
-      nodeBlocks.push(emitAgentNode(module));
-    } else if (adapterConnection(module) === "mcp_connected") {
-      funcBlocks.push(emitConnectedAdapterFunc(module));
-      nodeBlocks.push(emitFunctionNodeDecl(module));
-    } else {
-      funcBlocks.push(emitStubFunc(module));
-      nodeBlocks.push(emitFunctionNodeDecl(module));
-    }
-  }
+  // Node lowering registry: maps a node's lowering role to its function/
+  // declaration emitters, replacing the per-role if/elif chain. Adding a node
+  // kind (e.g. a future remote_a2a or dynamic node) adds a registry entry here —
+  // though it may also need import, guard (assertRunnableGraphSupported), and
+  // graph-resolution support, so this is the emission seam, not the whole story.
+  // emitFunc returns null when the node needs no standalone function (LlmAgent
+  // agents are declared inline). Emission order — module nodes in graph order,
+  // then human-input nodes — is preserved.
+  const NODE_LOWERING = {
+    agent: { emitFunc: () => null, emitDecl: emitAgentNode },
+    connected_adapter: { emitFunc: emitConnectedAdapterFunc, emitDecl: emitFunctionNodeDecl },
+    stub_function: { emitFunc: emitStubFunc, emitDecl: emitFunctionNodeDecl },
+    human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl }
+  };
+  const emitNode = (role, target) => {
+    const handler = NODE_LOWERING[role];
+    if (!handler) throw new Error(`runnable codegen: no node-lowering handler for role "${role}".`);
+    const func = handler.emitFunc(target);
+    if (func) funcBlocks.push(func);
+    nodeBlocks.push(handler.emitDecl(target));
+  };
 
-  for (const node of humanInputNodes) {
-    funcBlocks.push(emitHumanInputFunc(node));
-    nodeBlocks.push(emitHumanInputNodeDecl(node));
-  }
+  for (const module of orderedModules) emitNode(moduleLoweringRole(module), module);
+  for (const node of humanInputNodes) emitNode("human_input", node);
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
@@ -259,10 +276,16 @@ function buildRunnableAgentPy() {
     normalizedRequirement.title || packageName
   )}.`;
 
+  // Artifact channels need json (serialize the payload) + google.genai.types
+  // (wrap as a Part). Gated so non-artifact bundles keep an unchanged import block.
+  const usesArtifacts = usesArtifactChannels();
+  const artifactStdlibImport = usesArtifacts ? "import json\n" : "";
+  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+
   return `from __future__ import annotations
 
 import os
-from pathlib import Path
+${artifactStdlibImport}from pathlib import Path
 from typing import Any
 
 import yaml
@@ -271,7 +294,7 @@ from google.adk import Context
 from google.adk.agents import LlmAgent
 from google.adk.events import RequestInput
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
-
+${artifactGenaiImport}
 
 # Reviewed contract data for each approved module (synthetic test doubles only).
 COMPONENT_CONTRACTS: dict[str, dict] = ${toPythonLiteral(componentContracts())}
@@ -400,23 +423,39 @@ def _user_text_from_context(ctx: Context) -> str:
 
 
 def _collect_tool_inputs(
-    ctx: Context, module_id: str, input_names: list[str], required_names: list[str]
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str],
+    channel_keys: list[str] | None = None, extra_payloads: list[dict] | None = None,
 ) -> dict:
     # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
-    # input_map (tool_input -> state/output key), (2) a top-level session-state
-    # value, (3) a matching field inside an upstream node's *_output payload, or
-    # (4) the reviewed smoke_spec.synthetic_inputs seed for runnable synthetic
-    # Mock Lab calls. The fallback keeps runnable scaffolds executable without
-    # inventing private data or hard-coding business values in generated code.
+    # input_map (tool_input -> state/output key), (2) a named incoming data
+    # channel (a reviewed edge's session/temp/user/app state key), (3) a
+    # top-level session-state value, (4) a matching field inside an upstream
+    # node's *_output payload, or (5) the reviewed smoke_spec.synthetic_inputs
+    # seed for runnable synthetic Mock Lab calls. The fallback keeps runnable
+    # scaffolds executable without inventing private data or hard-coding business
+    # values in generated code.
     overrides = _adapter_cfg(module_id, "input_map", {}) or {}
     contract = COMPONENT_CONTRACTS.get(module_id, {})
     smoke_spec = contract.get("smoke_spec") if isinstance(contract, dict) else {}
     synthetic_inputs = smoke_spec.get("synthetic_inputs", {}) if isinstance(smoke_spec, dict) else {}
+    channel_payloads = [
+        ctx.state.get(channel_key)
+        for channel_key in (channel_keys or [])
+        if isinstance(ctx.state.get(channel_key), dict)
+    ]
+    channel_payloads.extend(payload for payload in (extra_payloads or []) if isinstance(payload, dict))
     args: dict = {}
     for name in input_names:
         source_key = overrides.get(name, name)
         if ctx.state.get(source_key) is not None:
             args[name] = ctx.state.get(source_key)
+            continue
+        # Prefer a field named source_key from an explicitly-named incoming data channel.
+        for payload in channel_payloads:
+            if payload.get(source_key) is not None:
+                args[name] = payload.get(source_key)
+                break
+        if name in args:
             continue
         # Fall back to a field named source_key inside any upstream *_output dict.
         # ADK's State object is not a dict (no .items()); to_dict() merges base + delta.
@@ -462,7 +501,7 @@ function emitAgentNode(module) {
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
     instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
     description=${toPyStr(truncate(module.name))},
-    output_key=${toPyStr(stateKey(module))},
+    output_key=${toPyStr(agentOutputStateKey(module))},
     mode="single_turn",
 )`;
 }
@@ -511,12 +550,16 @@ function emitStubFunc(module) {
         "developer_todos": contract.get("developer_todos", []),
     }
     ctx.state[${toPyStr(stateKey(module))}] = payload
-    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}${emitOutgoingArtifactChannelWrites(module.id)}    return payload`;
 }
 
 function emitConnectedAdapterFunc(module) {
   const inputNames = (module.inputs ?? []).map((field) => field.name).filter(Boolean);
   const requiredNames = (module.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
+  const channelKeys = incomingStateChannelKeys(module.id);
+  const channelArg = channelKeys.length ? `,\n        ${toPythonLiteral(channelKeys, 2)}` : "";
+  const artifactLoad = emitIncomingArtifactLoad(module.id);
+  const artifactArg = incomingArtifactChannelKeys(module.id).length ? ",\n        extra_payloads=_artifact_payloads" : "";
   return `async def ${funcName(module)}(ctx: Context) -> dict:
     """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
 
@@ -527,8 +570,8 @@ function emitConnectedAdapterFunc(module) {
     from mcp.client.streamable_http import streamablehttp_client
 
     url = _mcp_url(${toPyStr(module.id)}, ${toPyStr(module.mcp_server)})
-    arguments = _collect_tool_inputs(
-        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}
+${artifactLoad}    arguments = _collect_tool_inputs(
+        ctx, ${toPyStr(module.id)}, ${toPythonLiteral(inputNames)}, ${toPythonLiteral(requiredNames)}${channelArg}${artifactArg}
     )
     async with streamablehttp_client(url) as (read_stream, write_stream, _close):
         async with ClientSession(read_stream, write_stream) as session:
@@ -558,7 +601,7 @@ function emitConnectedAdapterFunc(module) {
         if key not in payload:
             payload[key] = value
     ctx.state[${toPyStr(stateKey(module))}] = payload
-    return payload`;
+${emitOutgoingStateChannelWrites(module.id)}${emitOutgoingArtifactChannelWrites(module.id)}    return payload`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1505,11 +1548,227 @@ function graphIndexes() {
 }
 
 // ---------------------------------------------------------------------------
+// Per-edge data-passing lowering (runnable): an edge may name an explicit data
+// channel — a scoped session-state key (session/temp/user/app) or an artifact —
+// that the producer writes and the consumer reads. Edges without a channel fall
+// back to the existing {module_id}_output convention, so graphs that don't use
+// the picker keep their current runtime behavior. (Artifact lowering lands in a
+// follow-up; edgeDataChannel already classifies it.)
+// ---------------------------------------------------------------------------
+
+function edgeDataChannel(edge) {
+  if (!edge) return null;
+  // Declared inside the function to avoid a temporal-dead-zone with the
+  // top-level buildFiles() call (same constraint as assertRunnableGraphSupported).
+  const STATE_EDGE_SCOPE = {
+    session_state: "",
+    temp_state: "temp:",
+    user_state: "user:",
+    app_state: "app:"
+  };
+  const scopePrefix = STATE_EDGE_SCOPE[edge.edge_kind];
+  if (scopePrefix !== undefined) {
+    let key = typeof edge.state_key === "string" ? edge.state_key.trim() : "";
+    if (!key) return null;
+    // The bare key is authored in the picker; the scope prefix comes from
+    // edge_kind. Strip any leading scope prefix so a manually-prefixed key is
+    // not double-scoped (e.g. "temp:foo" on a temp_state edge).
+    key = key.replace(/^(?:temp:|user:|app:)/, "");
+    return key ? { kind: "state", key: `${scopePrefix}${key}` } : null;
+  }
+  if (edge.edge_kind === "artifact") {
+    const key = typeof edge.artifact_key === "string" ? edge.artifact_key.trim() : "";
+    return key ? { kind: "artifact", key } : null;
+  }
+  return null;
+}
+
+// Build per-module incoming/outgoing data channels by resolving Graph IR edge
+// endpoints to their bound modules. Deduplicated by (kind,key).
+function moduleDataChannels() {
+  const graph = graphIndexes();
+  const moduleIdOf = (nodeId) => {
+    const node = graph.nodesById.get(nodeId);
+    return node && typeof node.module_id === "string" && graph.moduleById.has(node.module_id)
+      ? node.module_id
+      : null;
+  };
+  const outgoing = new Map();
+  const incoming = new Map();
+  const pushUnique = (map, id, channel) => {
+    if (!map.has(id)) map.set(id, []);
+    const list = map.get(id);
+    if (!list.some((existing) => existing.kind === channel.kind && existing.key === channel.key)) {
+      list.push(channel);
+    }
+  };
+  for (const edge of Array.isArray(processFlow.edges) ? processFlow.edges : []) {
+    const channel = edgeDataChannel(edge);
+    if (!channel) continue;
+    const fromId = moduleIdOf(edge.from);
+    const toId = moduleIdOf(edge.to);
+    if (fromId) pushUnique(outgoing, fromId, channel);
+    if (toId) pushUnique(incoming, toId, channel);
+  }
+  return { outgoing, incoming };
+}
+
+function outgoingStateChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().outgoing.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "state")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+function incomingStateChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().incoming.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "state")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+// An agent's single named outgoing state channel becomes its output_key so a
+// downstream consumer reads from that exact key; otherwise the canonical
+// {id}_output. Multiple distinct outgoing state keys are rejected up front
+// (assertDataChannelsSupported) because an LlmAgent has only one output_key.
+function agentOutputStateKey(module) {
+  const keys = outgoingStateChannelKeys(module.id);
+  return keys.length === 1 ? keys[0] : stateKey(module);
+}
+
+// Python lines for a function node to mirror its payload into each named
+// outgoing state channel (in addition to the canonical {id}_output). Returns ""
+// when the node has no outgoing state channel, keeping non-picker graphs byte-identical.
+function emitOutgoingStateChannelWrites(moduleId, indent = "    ") {
+  return outgoingStateChannelKeys(moduleId)
+    .filter((key) => key !== stateKey({ id: moduleId }))
+    .map((key) => `${indent}ctx.state[${toPyStr(key)}] = payload\n`)
+    .join("");
+}
+
+function outgoingArtifactChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().outgoing.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "artifact")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+function incomingArtifactChannelKeys(moduleId) {
+  return [
+    ...new Set(
+      (moduleDataChannels().incoming.get(moduleId) ?? [])
+        .filter((channel) => channel.kind === "artifact")
+        .map((channel) => channel.key)
+    )
+  ];
+}
+
+// True when any module-to-module edge in the graph uses an artifact channel.
+// Gates the extra json / google.genai.types imports so non-artifact bundles stay
+// byte-identical.
+function usesArtifactChannels() {
+  return modules.some(
+    (module) => outgoingArtifactChannelKeys(module.id).length || incomingArtifactChannelKeys(module.id).length
+  );
+}
+
+// Python lines for a function node to also persist its payload as each named
+// outgoing artifact (JSON in a text Part). "" when none. Emitted inside an
+// `async def` function node so `await` is valid.
+function emitOutgoingArtifactChannelWrites(moduleId, indent = "    ") {
+  return outgoingArtifactChannelKeys(moduleId)
+    .map(
+      (key) =>
+        `${indent}await ctx.save_artifact(${toPyStr(key)}, types.Part(text=json.dumps(payload, ensure_ascii=False)))\n`
+    )
+    .join("");
+}
+
+// Python block for a (connected adapter) consumer to load each incoming artifact
+// channel into _artifact_payloads (a list of dicts) before _collect_tool_inputs.
+// "" when none, keeping non-artifact consumers byte-identical.
+function emitIncomingArtifactLoad(moduleId, indent = "    ") {
+  const keys = incomingArtifactChannelKeys(moduleId);
+  if (!keys.length) return "";
+  return `${indent}_artifact_payloads = []
+${indent}for _artifact_key in ${JSON.stringify(keys)}:
+${indent}    _loaded = await ctx.load_artifact(_artifact_key)
+${indent}    _text = getattr(_loaded, "text", None) if _loaded is not None else None
+${indent}    if _text:
+${indent}        try:
+${indent}            _value = json.loads(_text)
+${indent}        except Exception:
+${indent}            _value = None
+${indent}        if isinstance(_value, dict):
+${indent}            _artifact_payloads.append(_value)
+`;
+}
+
+// Reject runnable graphs whose agent nodes declare data channels we cannot lower.
+function assertDataChannelsSupported() {
+  const conflicts = [];
+  const agentArtifacts = [];
+  for (const module of modules) {
+    if (!isAgentModule(module)) continue;
+    const keys = outgoingStateChannelKeys(module.id);
+    if (keys.length > 1) conflicts.push(`${module.id} (${keys.join(", ")})`);
+    const artifactKeys = outgoingArtifactChannelKeys(module.id);
+    if (artifactKeys.length) agentArtifacts.push(`${module.id} (${artifactKeys.join(", ")})`);
+  }
+  if (conflicts.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower an agent node with multiple distinct outgoing state channels (LlmAgent has a single output_key): ${conflicts.join("; ")}. Use one state_key per agent output, route extra fan-out through a function node, or use smoke mode.`
+    );
+  }
+  if (agentArtifacts.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower an artifact channel produced by an agent node (LlmAgent emits text, not artifacts): ${agentArtifacts.join("; ")}. Produce the artifact from a function/adapter node, or use a state channel.`
+    );
+  }
+  // A named state channel must have a single producer: every producer writes the
+  // same ctx.state[key], so two distinct producers would silently collapse into
+  // one slot (last/parallel write wins). Reject rather than lose data.
+  const producersByStateKey = new Map();
+  for (const module of modules) {
+    for (const key of outgoingStateChannelKeys(module.id)) {
+      if (!producersByStateKey.has(key)) producersByStateKey.set(key, new Set());
+      producersByStateKey.get(key).add(module.id);
+    }
+  }
+  const collisions = [...producersByStateKey.entries()]
+    .filter(([, producers]) => producers.size > 1)
+    .map(([key, producers]) => `${key} <- ${[...producers].join(", ")}`);
+  if (collisions.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower a state channel written by multiple producers (writes collapse into one ctx.state slot): ${collisions.join("; ")}. Give each producer a distinct state_key, or merge upstream before the channel.`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Module classification + symbol naming
 // ---------------------------------------------------------------------------
 
 function isAgentModule(module) {
   return module.module_category === "agent";
+}
+
+// Lowering role for a module-bound node, used as the key into the runnable
+// NODE_LOWERING registry. New module-backed node kinds add a role here + a
+// registry entry, not another branch in the emit loop.
+function moduleLoweringRole(module) {
+  if (isAgentModule(module)) return "agent";
+  if (adapterConnection(module) === "mcp_connected") return "connected_adapter";
+  return "stub_function";
 }
 
 function adapterConnection(module) {

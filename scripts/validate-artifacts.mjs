@@ -826,14 +826,17 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       if (typeof edge.state_key !== "string" || !edge.state_key.trim()) {
         errors.push(`${label}.edges[${index}] (${edge.id}) ${edge.edge_kind} edge requires non-empty state_key.`);
       } else {
-        if (edge.edge_kind === "temp_state" && !edge.state_key.startsWith("temp:")) {
-          errors.push(`${label}.edges[${index}] (${edge.id}) temp_state state_key must start with "temp:".`);
-        }
-        if (edge.edge_kind === "user_state" && !edge.state_key.startsWith("user:")) {
-          errors.push(`${label}.edges[${index}] (${edge.id}) user_state state_key must start with "user:".`);
-        }
-        if (edge.edge_kind === "app_state" && !edge.state_key.startsWith("app:")) {
-          errors.push(`${label}.edges[${index}] (${edge.id}) app_state state_key must start with "app:".`);
+        // Scope is carried by edge_kind; the stored state_key is the bare channel
+        // name. A leading scope prefix is allowed only when it matches edge_kind,
+        // so a wrong-scope prefix is caught instead of being silently re-scoped by
+        // the generator. (Bare keys are the canonical form the picker authors.)
+        const scopePrefixByKind = { temp_state: "temp:", user_state: "user:", app_state: "app:" };
+        const expected = scopePrefixByKind[edge.edge_kind] ?? null; // null for session_state
+        const present = (edge.state_key.match(/^(temp:|user:|app:)/) || [])[1] ?? null;
+        if (present && present !== expected) {
+          errors.push(
+            `${label}.edges[${index}] (${edge.id}) ${edge.edge_kind} state_key has scope prefix "${present}" that does not match the edge kind; use a bare key (scope comes from the data-passing method)${expected ? ` or the "${expected}" prefix` : ""}.`
+          );
         }
       }
     }

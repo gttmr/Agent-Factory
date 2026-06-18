@@ -1,0 +1,854 @@
+{
+  "normalizedRequirement": {
+    "id": "req-008-edge-channels",
+    "title": "Graph workflow with parallel evidence lookup and human review (데이터 전달 채널 예시)",
+    "raw_text": "We need a graph-shaped workflow that takes intake, runs evidence lookups in parallel, scores risk on the merged evidence, sends high-risk cases to a human reviewer, and finally drafts the response. Low-risk cases skip the reviewer step. The workflow is local; there is no independent remote agent in the picture.",
+    "domain": "customer-service",
+    "requester": {
+      "team": "support-operations",
+      "role": "business-user"
+    },
+    "business_goal": "Run intake, parallel evidence lookup, risk scoring, optional human review, and response drafting as one orchestrated graph.",
+    "current_process": [
+      "Receive the intake request",
+      "Run evidence lookups in parallel",
+      "Merge the parallel evidence",
+      "Score the risk on merged evidence",
+      "Route high-risk cases to a human reviewer",
+      "Draft the final response"
+    ],
+    "inputs": [
+      {
+        "name": "intake_request",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "drafted_response",
+        "type": "text",
+        "required": true
+      }
+    ],
+    "systems": [
+      {
+        "name": "evidence_source_a",
+        "access": "read"
+      },
+      {
+        "name": "evidence_source_b",
+        "access": "read"
+      }
+    ],
+    "risk_signals": [
+      "customer_impact",
+      "human_approval_required",
+      "audit_required"
+    ],
+    "missing_information": [
+      "risk threshold for human review",
+      "merge policy for parallel evidence"
+    ],
+    "contradictions": [],
+    "status": "draft"
+  },
+  "evidence": {
+    "requested_goal": "Orchestrate intake, parallel evidence lookup, risk scoring, human review, and response drafting.",
+    "business_domain_hint": "customer-service",
+    "user_role": "business-user",
+    "input_data": [
+      "intake_request"
+    ],
+    "output_data": [
+      "drafted_response"
+    ],
+    "systems_mentioned": [
+      "evidence_source_a",
+      "evidence_source_b"
+    ],
+    "decisions_implied": [
+      "score risk",
+      "route to human review on high risk"
+    ],
+    "risk_signals": [
+      "customer_impact",
+      "human_approval_required",
+      "audit_required"
+    ],
+    "missing_information": [
+      "risk threshold for human review",
+      "merge policy for parallel evidence"
+    ],
+    "contradictions": [],
+    "assumptions": [
+      "all nodes run inside one local graph; no independent remote owner"
+    ]
+  },
+  "moduleCandidates": [
+    {
+      "id": "mod-001",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "case_graph_workflow",
+      "module_category": "workflow",
+      "agent_kind": null,
+      "workflow_kind": "graph",
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "internal_workflow",
+      "confidence": 0.83,
+      "rationale": "Parallel evidence lookups, a merge, conditional human review, and response drafting form a graph, not a strict sequential or single parallel workflow.",
+      "adk_hints": {
+        "state_memory": "session_state holds intake_request and accumulated evidence",
+        "callbacks": null,
+        "artifacts_events": "graph nodes emit event_output on completion",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "intake_request",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "drafted_response",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "human_approval_required",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "risk threshold for human review",
+        "merge policy for parallel evidence"
+      ],
+      "side_effect": "read",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-002",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "evidence_lookup_a",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "data_query",
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "tool_adapter",
+      "confidence": 0.78,
+      "rationale": "Reading from evidence_source_a is a deterministic data query.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "returns evidence_a payload as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "intake_request",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "evidence_a",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "low",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "evidence_source_a contract"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-003",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "evidence_lookup_b",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "data_query",
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "tool_adapter",
+      "confidence": 0.78,
+      "rationale": "Reading from evidence_source_b is a deterministic data query and runs in parallel with evidence_lookup_a.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": "returns evidence_b payload as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "intake_request",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "evidence_b",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "reuse_candidate": true,
+      "risk_level": "low",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "evidence_source_b contract"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-004",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "risk_scoring_specialist",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.8,
+      "rationale": "Scoring risk on merged evidence is a reasoning responsibility.",
+      "adk_hints": {
+        "state_memory": "reads merged evidence from session_state",
+        "callbacks": null,
+        "artifacts_events": "emits risk_score as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "merged_evidence",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "risk_score",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "risk scoring rubric"
+      ],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-005",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "human_review_gate",
+      "module_category": "workflow",
+      "agent_kind": null,
+      "workflow_kind": "graph",
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "internal_workflow",
+      "confidence": 0.82,
+      "rationale": "High-risk cases require an explicit human reviewer node before drafting.",
+      "adk_hints": {
+        "state_memory": "session_state holds the case under review",
+        "callbacks": "human-input callback resumes the graph",
+        "artifacts_events": "emits a reviewer decision artifact",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "risk_score",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "reviewer_decision",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "high",
+      "risk_signals": [
+        "human_approval_required",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "reviewer queue policy",
+        "SLA for review"
+      ],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    },
+    {
+      "id": "mod-006",
+      "source_requirement_id": "req-008-edge-channels",
+      "name": "response_drafter",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.8,
+      "rationale": "Drafting the final response from merged evidence and reviewer decision is a focused reasoning responsibility.",
+      "adk_hints": {
+        "state_memory": "reads merged_evidence and reviewer_decision from session_state",
+        "callbacks": null,
+        "artifacts_events": "emits drafted_response as event_output",
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "merged_evidence",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "reviewer_decision",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "drafted_response",
+          "type": "text",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "needs_info",
+      "missing_information": [
+        "draft tone policy"
+      ],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "customer-service",
+      "owner": null,
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": null,
+      "retry": null,
+      "fallback": null,
+      "audit": null,
+      "data_policy": null,
+      "a2a_contract_id": null
+    }
+  ],
+  "a2aContracts": [],
+  "runtimeContracts": [],
+  "processFlow": {
+    "requirement_id": "req-008-edge-channels",
+    "graph_id": "graph-008",
+    "root_workflow_module_id": "mod-001",
+    "nodes": [
+      {
+        "id": "intake_request",
+        "module_id": null,
+        "label": "intake_request",
+        "node_kind": "input",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-002",
+        "module_id": "mod-002",
+        "label": "evidence_lookup_a",
+        "node_kind": "adapter",
+        "execution_kind": "deterministic",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-parallel",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "mod-003",
+        "module_id": "mod-003",
+        "label": "evidence_lookup_b",
+        "node_kind": "adapter",
+        "execution_kind": "deterministic",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-parallel",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "join-001",
+        "module_id": null,
+        "label": "join_evidence",
+        "node_kind": "join",
+        "execution_kind": null,
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-004",
+        "module_id": "mod-004",
+        "label": "risk_scoring_specialist",
+        "node_kind": "agent",
+        "execution_kind": "llm_agent",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "mod-005",
+        "module_id": "mod-005",
+        "label": "human_review_gate",
+        "node_kind": "workflow",
+        "execution_kind": "human_review",
+        "adk_node_role": "container_root",
+        "owner_scope": "local",
+        "container_id": "container-human",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "human_input_001",
+        "module_id": null,
+        "label": "검토 결과를 승인하시겠습니까? (승인 또는 반려 사유 입력)",
+        "node_kind": "human_input",
+        "execution_kind": "request_input",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-human",
+        "lane_id": "human_input",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      },
+      {
+        "id": "mod-006",
+        "module_id": "mod-006",
+        "label": "response_drafter",
+        "node_kind": "agent",
+        "execution_kind": "llm_agent",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "needs_info"
+      },
+      {
+        "id": "drafted_response",
+        "module_id": null,
+        "label": "drafted_response",
+        "node_kind": "output",
+        "execution_kind": "io",
+        "adk_node_role": "synthetic",
+        "owner_scope": "local",
+        "container_id": "container-root",
+        "lane_id": "output",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [],
+        "review_status": "approved"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-001",
+        "from": "intake_request",
+        "to": "mod-002",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_out",
+        "data_label": "evidence query A",
+        "schema_ref": "EvidenceQuery",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-002",
+        "from": "intake_request",
+        "to": "mod-003",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_out",
+        "data_label": "evidence query B",
+        "schema_ref": "EvidenceQuery",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-003",
+        "from": "mod-002",
+        "to": "join-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_in",
+        "data_label": "evidence A",
+        "schema_ref": "EvidenceA",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-004",
+        "from": "mod-003",
+        "to": "join-001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_in",
+        "data_label": "evidence B",
+        "schema_ref": "EvidenceB",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-005",
+        "from": "join-001",
+        "to": "mod-004",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "merged evidence",
+        "schema_ref": "EvidenceBundle",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-006",
+        "from": "mod-004",
+        "to": "mod-005",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "session_state",
+        "execution_semantics": "normal_transition",
+        "data_label": "risk assessment",
+        "schema_ref": "RiskScore",
+        "route_condition": null,
+        "state_key": "risk_assessment",
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-007",
+        "from": "mod-005",
+        "to": "human_input_001",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_message",
+        "execution_semantics": "normal_transition",
+        "data_label": "ask reviewer",
+        "schema_ref": "ReviewerPrompt",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "id": "edge-008",
+        "from": "human_input_001",
+        "to": "mod-006",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "reviewer decision",
+        "schema_ref": "ReviewerDecision",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      },
+      {
+        "from": "mod-006",
+        "to": "drafted_response",
+        "id": "edge-009",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "drafted response",
+        "schema_ref": null,
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false
+      }
+    ],
+    "containers": [
+      {
+        "id": "container-root",
+        "module_id": "mod-001",
+        "label": "case_graph_workflow",
+        "container_kind": "graph_workflow",
+        "adk_mapping": "GraphWorkflow",
+        "contains_node_ids": [
+          "intake_request",
+          "join-001",
+          "drafted_response",
+          "mod-004",
+          "mod-006"
+        ],
+        "entry_node_ids": [
+          "intake_request"
+        ],
+        "exit_node_ids": [
+          "drafted_response"
+        ],
+        "layout_policy": "dag_with_routes",
+        "parent_container_id": null
+      },
+      {
+        "id": "container-parallel",
+        "module_id": null,
+        "label": "Parallel evidence",
+        "container_kind": "parallel_region",
+        "adk_mapping": "ParallelRegion",
+        "contains_node_ids": [
+          "mod-002",
+          "mod-003"
+        ],
+        "entry_node_ids": [
+          "mod-002",
+          "mod-003"
+        ],
+        "exit_node_ids": [
+          "join-001"
+        ],
+        "layout_policy": "fan_out_fan_in",
+        "parent_container_id": "container-root"
+      },
+      {
+        "id": "container-human",
+        "module_id": "mod-005",
+        "label": "Human review",
+        "container_kind": "human_review_region",
+        "adk_mapping": "HumanReviewRegion",
+        "contains_node_ids": [
+          "mod-005",
+          "human_input_001"
+        ],
+        "entry_node_ids": [
+          "mod-005"
+        ],
+        "exit_node_ids": [
+          "human_input_001"
+        ],
+        "layout_policy": "linear",
+        "parent_container_id": "container-root"
+      }
+    ],
+    "lanes": [
+      {
+        "id": "input",
+        "label": "input"
+      },
+      {
+        "id": "local_graph",
+        "label": "local_graph"
+      },
+      {
+        "id": "adapter",
+        "label": "adapter"
+      },
+      {
+        "id": "human_input",
+        "label": "human_input"
+      },
+      {
+        "id": "output",
+        "label": "output"
+      }
+    ],
+    "validation": {
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  }
+}

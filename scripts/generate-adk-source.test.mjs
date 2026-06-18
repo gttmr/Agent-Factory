@@ -306,6 +306,214 @@ test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/f
 });
 
 // ---------------------------------------------------------------------------
+// Per-edge data-passing channels (state).
+// ---------------------------------------------------------------------------
+
+function writeChannelFixture(dir, { modules, nodes, edges }) {
+  writeJson(join(dir, "normalized-requirement.json"), { id: "req-ch", title: "Channel workflow", status: "approved" });
+  writeJson(join(dir, "process-flow.json"), { nodes, edges, validation: { errors: [] } });
+  writeJson(join(dir, "module-candidates.json"), modules.map((m) => ({ id: m.id, status: "approved", missing_information: [] })));
+  writeJson(join(dir, "af-run-manifest.json"), {
+    requirement_id: "req-ch",
+    approvals: { analysis_reviewed: true, boundaries_approved: true, runtime_contracts_approved: true },
+    stages: { design: { status: "complete" } }
+  });
+  writeJson(join(dir, "scaffold-plan.json"), {
+    requirement_id: "req-ch", source: "approved_workbench_artifact", raw_requirement_to_code: false,
+    output_mode: "runnable", modules, runtime_contracts: [], excluded_modules: [],
+    manifest: { catalog_bound_modules: [], new_code_required: [] },
+    validation: { can_generate_source: true, blockers: [], warnings: [] }
+  });
+}
+
+function channelModules() {
+  const [agentBase] = baseModules(true);
+  const unconnectedAdapter = baseModules(true)[1];
+  const connectedAdapter = baseModules(true, { connectedAdapter: true })[1];
+  return { agentBase, unconnectedAdapter, connectedAdapter };
+}
+
+test("runnable lowers per-edge state channels (agent output_key, function mirror, consumer read)", () => {
+  const { agentBase, unconnectedAdapter, connectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "요약_Agent" },
+    { ...unconnectedAdapter, id: "mod-b", name: "전처리_Adapter" },
+    { ...connectedAdapter, id: "mod-c", name: "조회_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-channel-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "b", edge_kind: "session_state", state_key: "agent_summary" },
+        { from: "b", to: "c", edge_kind: "temp_state", state_key: "lookup_payload" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /output_key="agent_summary"/, "agent's sole outgoing state channel becomes output_key");
+    assert.match(source, /ctx\.state\["temp:lookup_payload"\] = payload/, "function producer mirrors payload to the scoped temp channel");
+    assert.match(source, /"temp:lookup_payload"/, "connected consumer receives the incoming channel key");
+    assert.doesNotMatch(source, /output_key="mod_a_output"/, "named channel replaces the canonical agent output key");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects an agent with conflicting outgoing state channels", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "분기_Agent" },
+    { ...unconnectedAdapter, id: "mod-b", name: "B_Adapter" },
+    { ...unconnectedAdapter, id: "mod-c", name: "C_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-channel-conflict-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "b", edge_kind: "session_state", state_key: "k1" },
+        { from: "a", to: "c", edge_kind: "session_state", state_key: "k2" },
+        { from: "b", to: "out1" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /multiple distinct outgoing state channels/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable lowers an artifact channel (function save_artifact, consumer load_artifact)", () => {
+  const { agentBase, unconnectedAdapter, connectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "분류_Agent" },
+    { ...unconnectedAdapter, id: "mod-b", name: "증거_Adapter" },
+    { ...connectedAdapter, id: "mod-c", name: "조회_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-artifact-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "b" },
+        { from: "b", to: "c", edge_kind: "artifact", artifact_key: "evidence_blob.json" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /^import json$/m, "artifact bundle imports json");
+    assert.match(source, /from google\.genai import types/, "artifact bundle imports genai types");
+    assert.match(
+      source,
+      /await ctx\.save_artifact\("evidence_blob\.json", types\.Part\(text=json\.dumps\(payload/,
+      "function producer saves the artifact"
+    );
+    assert.match(source, /await ctx\.load_artifact\(_artifact_key\)/, "consumer loads incoming artifacts");
+    assert.match(source, /extra_payloads=_artifact_payloads/, "consumer passes loaded artifacts to input resolution");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects an artifact channel produced by an agent node", () => {
+  const { agentBase, connectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "초안_Agent" },
+    { ...connectedAdapter, id: "mod-c", name: "조회_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-artifact-agent-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "c", edge_kind: "artifact", artifact_key: "blob.json" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /artifact channel produced by an agent node/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects a state channel written by multiple producers (same state_key)", () => {
+  const { unconnectedAdapter, connectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-b", name: "B_Adapter" },
+    { ...unconnectedAdapter, id: "mod-c", name: "C_Adapter" },
+    { ...connectedAdapter, id: "mod-d", name: "D_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-state-collide-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "d", node_kind: "adapter", module_id: "mod-d" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "b" },
+        { from: "in1", to: "c" },
+        { from: "b", to: "d", edge_kind: "session_state", state_key: "shared" },
+        { from: "c", to: "d", edge_kind: "session_state", state_key: "shared" },
+        { from: "d", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /state channel written by multiple producers/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Optional: validate a pre-generated bundle passed on the CLI (mode-aware).
 // ---------------------------------------------------------------------------
 
