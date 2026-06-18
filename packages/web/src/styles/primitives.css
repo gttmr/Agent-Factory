@@ -103,6 +103,17 @@
     color var(--transition-fast);
 }
 
+/* Disabled state for every variant. The primitives layer overrides base's
+   button:disabled, so without this a disabled .ui-button-primary keeps its accent
+   background and looks clickable (e.g. gated approval buttons appear enabled but
+   do nothing). Higher specificity than the variant rules, so it wins within-layer. */
+.ui-button:disabled {
+  cursor: not-allowed;
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--text-subtle);
+}
+
 .ui-button-primary {
   background: var(--accent);
   border-color: var(--accent);
