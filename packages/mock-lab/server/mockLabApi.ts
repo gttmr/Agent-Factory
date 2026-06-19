@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadCatalogPrefill } from "./catalogPrefillLoader";
 import { createMcpNetworkBridge } from "./mcpNetworkBridge";
-import { MockGenerationRegistry, readRunDetail } from "./mockRunner";
+import { MockDraftRegistry, readDraftDetail } from "./mockDraftRunner";
 import { MockProcessRegistry } from "./mockProcessRegistry";
 import { MockLabError, MockSpecStore } from "./mockSpecStore";
 import { sampleValueFromSchema, validateMockSpec, validateValueAgainstSchema } from "./schemaValidation";
@@ -14,7 +14,7 @@ type MiddlewareNext = (error?: unknown) => void;
 export function createMockLabMiddleware(repoRoot: string) {
   const store = new MockSpecStore({ repoRoot });
   const registry = new MockProcessRegistry({ repoRoot, store });
-  const generationRegistry = new MockGenerationRegistry({ repoRoot, store });
+  const draftRegistry = new MockDraftRegistry({ repoRoot, store });
   const mcpBridge = createMcpNetworkBridge(registry, store);
 
   return async function mockLabMiddleware(req: IncomingMessage, res: ServerResponse, next: MiddlewareNext): Promise<void> {
@@ -69,38 +69,26 @@ export function createMockLabMiddleware(repoRoot: string) {
         return sendJson(res, 200, await store.writeSpec(mockId, body));
       }
 
-      if (sub === "generate") {
-        if (req.method !== "POST") return sendJson(res, 405, { error: "POST 요청만 지원합니다." });
+      if (sub === "drafts") {
+        if (req.method === "GET") return sendJson(res, 200, await store.listDrafts(mockId));
+        if (req.method !== "POST") return sendJson(res, 405, { error: "GET 또는 POST 요청만 지원합니다." });
         const body = await readJsonBody(req).catch(() => ({}));
-        const summary = await generationRegistry.start({
+        const summary = await draftRegistry.start({
           mockId,
+          prompt: isRecord(body) ? body.prompt : undefined,
           model: isRecord(body) ? body.model : undefined
         });
         return sendJson(res, summary.status === "running" ? 202 : 200, summary);
       }
 
-      if (sub === "runs") {
+      if (rest[0] === "drafts" && rest[1] && !rest[2]) {
         if (req.method !== "GET") return sendJson(res, 405, { error: "GET 요청만 지원합니다." });
-        return sendJson(res, 200, await store.listRuns(mockId));
+        return sendJson(res, 200, await readDraftDetail(store, mockId, rest[1]));
       }
 
-      if (rest[0] === "runs" && rest[1] && !rest[2]) {
-        if (req.method !== "GET") return sendJson(res, 405, { error: "GET 요청만 지원합니다." });
-        return sendJson(res, 200, await readRunDetail(store, mockId, rest[1]));
-      }
-
-      if (rest[0] === "runs" && rest[1] && rest[2] === "cancel") {
+      if (rest[0] === "drafts" && rest[1] && rest[2] === "cancel") {
         if (req.method !== "POST") return sendJson(res, 405, { error: "POST 요청만 지원합니다." });
-        return sendJson(res, 200, await generationRegistry.cancel(mockId, rest[1]));
-      }
-
-      if (rest[0] === "runs" && rest[1] && rest[2] === "apply") {
-        if (req.method !== "POST") return sendJson(res, 405, { error: "POST 요청만 지원합니다." });
-        const detail = await readRunDetail(store, mockId, rest[1]);
-        if (detail.summary.status !== "completed" || !detail.summary.validation.ok) {
-          return sendJson(res, 409, { error: "completed generation run 이 아니어서 apply 할 수 없습니다." });
-        }
-        return sendJson(res, 200, await store.applyGeneratedFiles(mockId, rest[1]));
+        return sendJson(res, 200, await draftRegistry.cancel(mockId, rest[1]));
       }
 
       if (sub === "server/start") {

@@ -2,17 +2,19 @@ import type { ReactNode } from "react";
 
 export default function AppShell({
   header,
+  workflow,
   catalog,
   editor,
-  generate,
+  draft,
   server,
   smoke,
   footer
 }: {
   header: ReactNode;
+  workflow: ReactNode;
   catalog: ReactNode;
   editor: ReactNode;
-  generate: ReactNode;
+  draft: ReactNode;
   server: ReactNode;
   smoke: ReactNode;
   footer: ReactNode;
@@ -20,10 +22,11 @@ export default function AppShell({
   return (
     <div className="afml-shell">
       {header}
+      {workflow}
       <main className="afml-grid">
         <aside className="pane catalog-pane">{catalog}</aside>
         <section className="pane editor-pane">{editor}</section>
-        <section className="pane generate-pane">{generate}</section>
+        <section className="pane draft-pane">{draft}</section>
         <section className="pane server-pane">{server}</section>
         <section className="pane smoke-pane">{smoke}</section>
       </main>

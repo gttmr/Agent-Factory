@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { deleteMock, fetchCatalogPrefill, fetchMockDetail, listMocks, createMock, saveMockSpec } from "./api/mockLabClient";
 import AppShell from "./components/AppShell";
-import CodexGeneratePanel from "./components/CodexGeneratePanel";
 import MockServerPanel from "./components/MockServerPanel";
 import MockSpecEditor from "./components/MockSpecEditor";
 import SavedMocksPanel from "./components/SavedMocksPanel";
 import SmokeTestPanel from "./components/SmokeTestPanel";
+import SpecDraftPanel from "./components/SpecDraftPanel";
 import StatusBadge from "./components/StatusBadge";
+import WorkflowSteps, { type WorkflowStepId } from "./components/WorkflowSteps";
 import { resolveCatalogPrefillSpec } from "./catalogPrefillSelection";
 import { createEmptyMockSpec, type CatalogPrefillPayload, type MockServerStatus, type MockSpec } from "./types/mockSpec";
 import { validateMockSpec } from "../server/schemaValidation";
@@ -29,6 +30,17 @@ export default function App() {
   const validation = useMemo(() => validateMockSpec(spec), [spec]);
   const specFingerprint = useMemo(() => fingerprintMockSpec(spec), [spec]);
   const specDirty = savedSpecFingerprint !== specFingerprint;
+  const serverRunning = serverStatus?.status === "running";
+  const canRunSavedSpec = validation.ok && !specDirty && !serverRunning;
+  const runBlockedReason = !validation.ok
+    ? "Spec invalid 상태입니다. validation 오류를 먼저 수정하세요."
+    : specDirty
+      ? "Save spec 후 저장된 MockSpec으로 실행할 수 있습니다."
+      : serverRunning
+        ? "이미 실행 중입니다. 필요하면 Stop 후 다시 실행하세요."
+        : undefined;
+  const smokeBlockedReason = serverRunning ? undefined : "Run saved spec으로 서버를 먼저 실행하세요.";
+  const activeStep = resolveActiveStep({ validationOk: validation.ok, specDirty, serverRunning });
 
   useEffect(() => {
     void refreshInitial();
@@ -46,7 +58,7 @@ export default function App() {
           (mock) => mock.mock_id === requestedPrefill.mock_id || mock.server_name === requestedPrefill.server_name
         );
         if (existing) {
-          await loadMock(existing.mock_id);
+          await loadMock(existing.mock_id, { force: true });
         } else {
           setSpec(requestedPrefill);
           setServerStatus(null);
@@ -55,7 +67,7 @@ export default function App() {
         }
         return;
       }
-      if (nextMocks[0]) await loadMock(nextMocks[0].mock_id);
+      if (nextMocks[0]) await loadMock(nextMocks[0].mock_id, { force: true });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "초기 데이터를 불러오지 못했습니다.");
     } finally {
@@ -63,7 +75,8 @@ export default function App() {
     }
   }
 
-  async function loadMock(mockId: string) {
+  async function loadMock(mockId: string, options: { force?: boolean } = {}) {
+    if (!options.force && specDirty && !window.confirm("저장되지 않은 변경이 있습니다. 다른 Mock으로 전환할까요?")) return;
     const detail = await fetchMockDetail(mockId);
     setSpec(detail.spec);
     setServerStatus(detail.server_status);
@@ -85,6 +98,7 @@ export default function App() {
   }
 
   async function handleCreate() {
+    if (specDirty && !window.confirm("저장되지 않은 변경이 있습니다. 새 Mock을 만들까요?")) return;
     const mockId = `mock-${Date.now().toString(36)}`;
     const created = await createMock(mockId);
     setSpec(created.spec);
@@ -118,6 +132,19 @@ export default function App() {
     }
   }
 
+  function handleSpecChange(nextSpec: MockSpec) {
+    setSpec(nextSpec);
+    if (serverRunning) {
+      setMessage("실행 중인 서버는 저장된 spec 기준입니다. 변경사항은 Save spec 후 Stop/Run으로 반영됩니다.");
+    }
+  }
+
+  function handleUseDraft(draftSpec: MockSpec) {
+    setSpec(draftSpec);
+    setServerStatus(null);
+    setSavedSpecFingerprint(null);
+  }
+
   return (
     <AppShell
       header={
@@ -125,6 +152,7 @@ export default function App() {
           <div>
             <p className="eyebrow">Agent Factory</p>
             <h1>Mock Lab</h1>
+            <p className="header-subcopy">Saved MockSpec 기반으로 로컬 MCP mock server를 실행하고 검증합니다.</p>
           </div>
           <div className="header-actions">
             <StatusBadge tone={loading ? "warning" : validation.ok && specDirty ? "warning" : validation.ok ? "success" : "error"}>
@@ -136,6 +164,7 @@ export default function App() {
           </div>
         </div>
       }
+      workflow={<WorkflowSteps activeStep={activeStep} />}
       catalog={
         <SavedMocksPanel
           mocks={mocks}
@@ -144,12 +173,20 @@ export default function App() {
           onDeleteMock={(mockId) => void handleDeleteMock(mockId)}
         />
       }
-      editor={<MockSpecEditor catalog={catalog} spec={spec} validation={validation} onChange={setSpec} onSave={() => void handleSave()} />}
-      generate={
-        <CodexGeneratePanel
+      editor={
+        <MockSpecEditor
+          catalog={catalog}
+          spec={spec}
+          validation={validation}
+          saveBlockedReason={!validation.ok ? "Spec invalid 상태에서는 저장할 수 없습니다." : undefined}
+          onChange={handleSpecChange}
+          onSave={() => void handleSave()}
+        />
+      }
+      draft={
+        <SpecDraftPanel
           mockId={spec.mock_id}
-          specValid={validation.ok && !specDirty}
-          blockedReason={validation.ok && specDirty ? "저장되지 않은 draft입니다. Mock spec 저장 후 생성할 수 있습니다." : undefined}
+          onUseDraft={handleUseDraft}
           onMessage={setMessage}
         />
       }
@@ -157,11 +194,13 @@ export default function App() {
         <MockServerPanel
           mockId={spec.mock_id}
           status={serverStatus}
+          canRun={canRunSavedSpec}
+          blockedReason={runBlockedReason}
           onStatus={setServerStatus}
           onMessage={setMessage}
         />
       }
-      smoke={<SmokeTestPanel mockId={spec.mock_id} onMessage={setMessage} />}
+      smoke={<SmokeTestPanel mockId={spec.mock_id} canTest={serverRunning} blockedReason={smokeBlockedReason} onMessage={setMessage} />}
       footer={
         message ? (
           <div className="toast" role="status">
@@ -174,6 +213,21 @@ export default function App() {
       }
     />
   );
+}
+
+function resolveActiveStep({
+  validationOk,
+  specDirty,
+  serverRunning
+}: {
+  validationOk: boolean;
+  specDirty: boolean;
+  serverRunning: boolean;
+}): WorkflowStepId {
+  if (!validationOk) return "edit";
+  if (specDirty) return "save";
+  if (serverRunning) return "test";
+  return "run";
 }
 
 function fingerprintMockSpec(spec: MockSpec): string {

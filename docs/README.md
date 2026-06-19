@@ -25,7 +25,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 - [Decision log](./decision-log.md)
   코드 의사결정이 변경된 시점·내용·배경의 이력. 인터페이스/스키마/게이트/UX 계약을 바꾸는 PR마다 머지 시점에 항목을 추가한다. 동작 명세의 기준은 여전히 각 활성 문서다.
 - [Local MCP Mock Lab](./mock-lab/local-mcp-mock-lab.md)
-  `catalog/adapters.yaml`을 read-only prefill 소스로 사용해 Mock Lab에서 MCP stdio mock server를 생성, 실행, smoke test 하고, 실행 중인 mock을 network MCP(`/api/mock-lab/mcp/<key>` + `/api/mock-lab/mcp-discovery`)로 노출해 runnable ADK 번들이 호출할 수 있게 하는 흐름이다. 기본 사용자 경로는 5173 workbench의 `/mock-lab`이며, `packages/mock-lab`의 5176 standalone 앱은 개발/과도기용으로 유지한다.
+  `catalog/adapters.yaml`을 read-only prefill 소스로 사용해 Mock Lab에서 `MockSpec`을 편집·저장하고, 선택적으로 Codex가 자연어 prompt에서 `MockSpec` 초안을 만들게 한 뒤, 저장된 spec만으로 MCP stdio mock server를 실행·smoke test 하는 흐름이다. 실행 중인 mock은 network MCP(`/api/mock-lab/mcp/<key>` + `/api/mock-lab/mcp-discovery`)로 노출되어 runnable ADK 번들이 호출할 수 있다. 기본 사용자 경로는 5173 workbench의 `/mock-lab`이며, `packages/mock-lab`의 5176 standalone 앱은 개발/과도기용으로 유지한다.
 - [Agent Factory DLC skills](../.agents/skills)
   `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, `af-verify-feedback`가 schema-first artifact 생산, 경계 승인, TODO runtime stub, 검증 feedback을 담당한다.
 - [Target agent architecture](./reference/target-agent-architecture/README.md)

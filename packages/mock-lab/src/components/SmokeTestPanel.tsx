@@ -2,7 +2,17 @@ import { useState } from "react";
 import { fetchAuditLog, smokeToolsCall, smokeToolsList } from "../api/mockLabClient";
 import StatusBadge from "./StatusBadge";
 
-export default function SmokeTestPanel({ mockId, onMessage }: { mockId: string; onMessage: (message: string) => void }) {
+export default function SmokeTestPanel({
+  mockId,
+  canTest,
+  blockedReason,
+  onMessage
+}: {
+  mockId: string;
+  canTest: boolean;
+  blockedReason?: string;
+  onMessage: (message: string) => void;
+}) {
   const [toolsListResult, setToolsListResult] = useState<unknown>(null);
   const [toolsCallResult, setToolsCallResult] = useState<unknown>(null);
   const [auditResult, setAuditResult] = useState<unknown>(null);
@@ -17,6 +27,23 @@ export default function SmokeTestPanel({ mockId, onMessage }: { mockId: string; 
       onMessage(`${kind} smoke 완료`);
     } catch (error) {
       onMessage(error instanceof Error ? error.message : `${kind} smoke 실패`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runSmokeSuite() {
+    setBusy(true);
+    try {
+      const list = await smokeToolsList(mockId);
+      setToolsListResult(list);
+      const call = await smokeToolsCall(mockId);
+      setToolsCallResult(call);
+      const audit = await fetchAuditLog(mockId);
+      setAuditResult(audit);
+      onMessage("Run smoke test 완료");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "Run smoke test 실패");
     } finally {
       setBusy(false);
     }
@@ -38,16 +65,20 @@ export default function SmokeTestPanel({ mockId, onMessage }: { mockId: string; 
         </div>
       </div>
       <div className="button-row">
-        <button className="button primary" type="button" disabled={busy} onClick={() => void runSmoke("list")}>
+        <button className="button primary" type="button" disabled={busy || !canTest} onClick={() => void runSmokeSuite()}>
+          Run smoke test
+        </button>
+        <button className="button secondary" type="button" disabled={busy || !canTest} onClick={() => void runSmoke("list")}>
           tools/list
         </button>
-        <button className="button primary" type="button" disabled={busy} onClick={() => void runSmoke("call")}>
+        <button className="button secondary" type="button" disabled={busy || !canTest} onClick={() => void runSmoke("call")}>
           tools/call
         </button>
         <button className="button secondary" type="button" disabled={busy} onClick={() => void runSmoke("audit")}>
           audit-log
         </button>
       </div>
+      {blockedReason ? <p className="warning-line">Next action: {blockedReason}</p> : null}
       <div className="result-grid">
         <ResultBlock title="tools/list" value={toolsListResult} />
         <ResultBlock title="tools/call" value={toolsCallResult} />
@@ -61,7 +92,10 @@ function ResultBlock({ title, value }: { title: string; value: unknown }) {
   return (
     <div className={`result-block ${isOk(value) ? "ok" : ""}`}>
       <strong>{title}</strong>
-      <pre>{value ? JSON.stringify(value, null, 2) : "not run"}</pre>
+      <details className="details-box">
+        <summary>{value ? "Result JSON" : "not run"}</summary>
+        <pre>{value ? JSON.stringify(value, null, 2) : "not run"}</pre>
+      </details>
     </div>
   );
 }
