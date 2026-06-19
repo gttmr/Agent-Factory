@@ -9,7 +9,8 @@ import {
   GRAPH_EXECUTION_SEMANTICS,
   GRAPH_LANE_IDS,
   GRAPH_LAYOUT_POLICIES,
-  GRAPH_NODE_KINDS
+  GRAPH_NODE_KINDS,
+  AGENT_EXECUTION_MODES
 } from "../src/analyzer/types";
 import { normalizeA2A } from "../src/analyzer/a2aNormalize";
 import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
@@ -61,6 +62,7 @@ const graphEdgeKinds: ReadonlySet<string> = new Set(GRAPH_EDGE_KINDS);
 const graphLaneIds: ReadonlySet<string> = new Set(GRAPH_LANE_IDS);
 const graphLayoutPolicies: ReadonlySet<string> = new Set(GRAPH_LAYOUT_POLICIES);
 const graphExecutionSemantics: ReadonlySet<string> = new Set(GRAPH_EXECUTION_SEMANTICS);
+const agentExecutionModes: ReadonlySet<string> = new Set(AGENT_EXECUTION_MODES);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -631,6 +633,7 @@ function hydrateGraphNodes(value: unknown, moduleCandidates: Record<string, unkn
       label: stringOr(node.label, stringOr(moduleById.get(String(moduleId))?.name, `node-${index + 1}`)),
       node_kind: nodeKind,
       execution_kind: stringOr(node.execution_kind, null),
+      agent_execution_mode: nodeKind === "agent" ? enumOr(node.agent_execution_mode, agentExecutionModes, "single_turn") : null,
       adk_node_role: enumOr(
         node.adk_node_role,
         new Set(["workflow_node", "container_root", "boundary", "synthetic"]),
@@ -1124,6 +1127,7 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
     `- Allowed node_kind: ${GRAPH_NODE_KINDS.join(", ")}.`,
     `- Allowed edge_kind: ${GRAPH_EDGE_KINDS.join(", ")}.`,
     `- Allowed container_kind: ${GRAPH_CONTAINER_KINDS.join(", ")}.`,
+    "- For processFlow.nodes, set agent_execution_mode to \"single_turn\" or \"chat\" only for node_kind \"agent\". Use \"single_turn\" by default. Use null for every non-agent node. Do not emit \"task\".",
     "- Routes need an explicit router node; loops need a loop_region container; parallel needs a parallel_region and join node when the requirement actually implies those structures.",
     "- Human input must be modeled as node_kind: \"human_input\" (NOT an LLM agent in disguise). Its outbound edge to a router or downstream node is typically event_message or route.",
     "- Module-bound node kinds (agent, workflow, adapter, remote_a2a) should set module_id to the matching candidate id. Synthetic node kinds should use null or omit module_id.",

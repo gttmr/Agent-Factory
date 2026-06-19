@@ -51,6 +51,7 @@ Live analyzer draft가 축약형을 반환하더라도 workbench runtime은 저�
 `agent`, `workflow`, `adapter`, `remote_a2a`는 matching module candidate와 연결한다.
 사람 승인이나 보완 요청은 workflow subtype이 아니라 `node_kind: human_input`으로 둔다.
 `position`은 선택 필드이며 `{ x: number, y: number }` 또는 `null`이다. 값이 없으면 UI가 dagre로 자동 배치하고, finite position이 있으면 GraphCanvas가 그 좌표를 그대로 사용해 수동 배치를 보존한다.
+`agent_execution_mode`는 `agent` 노드에서만 선택적으로 사용하며 허용값은 `single_turn`, `chat`, `null`이다. 값이 없으면 `single_turn`으로 해석한다. `task`는 static Graph IR node 선택값으로 열지 않고, 별도 workflow reuse나 delegation topology 설계로 다룬다.
 
 ## Container
 

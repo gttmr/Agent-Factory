@@ -111,6 +111,22 @@ assert.equal(lenientResult.errors.filter((issue) => issue.code === "node_missing
 const linkedModule = validateGraphIRSoft(graphWithNodes([node({ module_id: "mod-agent" })]));
 assert.equal(linkedModule.errors.filter((issue) => issue.code === "node_missing_module_id").length, 0);
 
+const chatAgentMode = validateGraphIRSoft(
+  graphWithNodes([node({ module_id: "mod-agent", agent_execution_mode: "chat" })])
+);
+assert.equal(chatAgentMode.errors.filter((issue) => issue.code === "invalid_agent_execution_mode").length, 0);
+assert.equal(chatAgentMode.errors.filter((issue) => issue.code === "agent_execution_mode_on_non_agent").length, 0);
+
+const taskAgentMode = validateGraphIRSoft(
+  graphWithNodes([node({ module_id: "mod-agent", agent_execution_mode: "task" as never })])
+);
+assert.equal(taskAgentMode.errors.filter((issue) => issue.code === "invalid_agent_execution_mode").length, 1);
+
+const nonAgentMode = validateGraphIRSoft(
+  graphWithNodes([node({ id: "node-input", node_kind: "input", lane_id: "input", agent_execution_mode: "chat" })])
+);
+assert.equal(nonAgentMode.errors.filter((issue) => issue.code === "agent_execution_mode_on_non_agent").length, 1);
+
 function graphWithRemoteEdge(nodes: GraphNode[], edges: GraphEdge[]): GraphIR {
   return {
     requirement_id: "req-remote-link",

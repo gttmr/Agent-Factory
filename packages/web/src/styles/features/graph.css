@@ -332,6 +332,24 @@
   color: var(--text-muted);
 }
 
+.graph-node-mode {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-heavy);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.graph-node-mode.is-chat {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--accent-strong);
+}
+
 .graph-node-review {
   border-radius: var(--radius-pill);
   padding: 1px 7px;

@@ -223,6 +223,9 @@
         "model": {
           "anyOf": [{ "type": "string" }, { "type": "null" }]
         },
+        "agent_execution_mode": {
+          "anyOf": [{ "type": "string", "enum": ["single_turn", "chat"] }, { "type": "null" }]
+        },
         "access_protocol": {
           "anyOf": [
             { "type": "string", "enum": ["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"] },

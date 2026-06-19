@@ -52,6 +52,7 @@ const graphNodeKinds = new Set([
   "router",
   "loop_control"
 ]);
+const agentExecutionModes = new Set(["single_turn", "chat"]);
 const graphContainerKinds = new Set([
   "graph_workflow",
   "dynamic_workflow",
@@ -692,6 +693,18 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     ) {
       errors.push(`${label}.nodes[${index}] (${node.id}) has invalid position; expected {x:number,y:number} or null.`);
     }
+    if (node.agent_execution_mode !== undefined && node.agent_execution_mode !== null) {
+      if (!agentExecutionModes.has(node.agent_execution_mode)) {
+        errors.push(
+          `${label}.nodes[${index}] (${node.id}) has invalid agent_execution_mode ${node.agent_execution_mode}; expected single_turn or chat.`
+        );
+      }
+      if (node.node_kind !== "agent") {
+        errors.push(
+          `${label}.nodes[${index}] (${node.id}) has agent_execution_mode but node_kind is ${node.node_kind}; only agent nodes may set it.`
+        );
+      }
+    }
   });
 
   const containerById = new Map();
@@ -1048,6 +1061,14 @@ function validateScaffoldPlan(dir = root) {
       const expected = smokeScaffoldOutputs[module.module_category];
       if (expected && module.scaffold_output !== expected) {
         errors.push(`${label} ${module.module_category} scaffold output must be ${expected}.`);
+      }
+    }
+    if (module.agent_execution_mode !== undefined && module.agent_execution_mode !== null) {
+      if (!agentExecutionModes.has(module.agent_execution_mode)) {
+        errors.push(`${label} has invalid agent_execution_mode "${module.agent_execution_mode}".`);
+      }
+      if (module.module_category !== "agent") {
+        errors.push(`${label} has agent_execution_mode but module_category is ${module.module_category}; only agent modules may set it.`);
       }
     }
     validateScaffoldMcpBinding(module, label);

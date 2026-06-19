@@ -15,7 +15,7 @@ const generator = join(here, "generate-adk-source.mjs");
 // Minimal hermetic fixture: input -> agent -> adapter -> output.
 // ---------------------------------------------------------------------------
 
-function baseModules(runnable, { connectedAdapter = false } = {}) {
+function baseModules(runnable, { connectedAdapter = false, agentExecutionMode = null } = {}) {
   return [
     {
       id: "mod-gen-agent",
@@ -37,6 +37,7 @@ function baseModules(runnable, { connectedAdapter = false } = {}) {
       runtime_mock: null,
       instruction: null,
       model: runnable ? "gemini-2.5-flash" : null,
+      agent_execution_mode: agentExecutionMode,
       access_protocol: null,
       mcp_server: null,
       mcp_tool_name: null,
@@ -73,7 +74,7 @@ function baseModules(runnable, { connectedAdapter = false } = {}) {
   ];
 }
 
-function writeFixture(dir, { runnable, connectedAdapter = false }) {
+function writeFixture(dir, { runnable, connectedAdapter = false, agentExecutionMode = null }) {
   writeJson(join(dir, "normalized-requirement.json"), {
     id: "req-gen-test",
     title: "Generator test workflow",
@@ -82,7 +83,12 @@ function writeFixture(dir, { runnable, connectedAdapter = false }) {
   writeJson(join(dir, "process-flow.json"), {
     nodes: [
       { id: "in1", node_kind: "input" },
-      { id: "mod-gen-agent", node_kind: "agent", module_id: "mod-gen-agent" },
+      {
+        id: "mod-gen-agent",
+        node_kind: "agent",
+        module_id: "mod-gen-agent",
+        ...(agentExecutionMode ? { agent_execution_mode: agentExecutionMode } : {})
+      },
       { id: "mod-gen-adapter", node_kind: "adapter", module_id: "mod-gen-adapter" },
       { id: "out1", node_kind: "output" }
     ],
@@ -107,7 +113,7 @@ function writeFixture(dir, { runnable, connectedAdapter = false }) {
     source: "approved_workbench_artifact",
     raw_requirement_to_code: false,
     output_mode: runnable ? "runnable" : "smoke",
-    modules: baseModules(runnable, { connectedAdapter }),
+    modules: baseModules(runnable, { connectedAdapter, agentExecutionMode }),
     runtime_contracts: [],
     excluded_modules: [],
     manifest: { catalog_bound_modules: [], new_code_required: [] },
@@ -115,10 +121,10 @@ function writeFixture(dir, { runnable, connectedAdapter = false }) {
   });
 }
 
-function generate({ runnable, connectedAdapter = false }) {
+function generate({ runnable, connectedAdapter = false, agentExecutionMode = null }) {
   const artifactRoot = mkdtempSync(join(tmpdir(), `af-gen-${runnable ? "runnable" : "smoke"}-`));
   try {
-    writeFixture(artifactRoot, { runnable, connectedAdapter });
+    writeFixture(artifactRoot, { runnable, connectedAdapter, agentExecutionMode });
     const outputRoot = join(artifactRoot, "runtime-stub");
     execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
     return { artifactRoot, outputRoot };
@@ -256,6 +262,18 @@ test("runnable mode emits an ADK Workflow graph and the editable bundle config",
   const { artifactRoot, outputRoot } = generate({ runnable: true });
   try {
     assertRunnableBundle(outputRoot);
+    assertManifestStageUpdated(artifactRoot);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable mode lowers chat agent execution mode", () => {
+  const { artifactRoot, outputRoot } = generate({ runnable: true, agentExecutionMode: "chat" });
+  try {
+    const { agentSource } = readBundle(outputRoot);
+    assert.match(agentSource, /mode="chat"/);
+    assert.doesNotMatch(agentSource, /mode="single_turn"/);
     assertManifestStageUpdated(artifactRoot);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });

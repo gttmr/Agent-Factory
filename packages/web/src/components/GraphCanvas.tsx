@@ -60,7 +60,12 @@ export interface Selection {
   edgeId: string | null;
 }
 
-export type NodeFieldPatch = Partial<Pick<GraphNode, "label" | "lane_id" | "container_id" | "execution_kind" | "module_id" | "review_status">>;
+export type NodeFieldPatch = Partial<
+  Pick<
+    GraphNode,
+    "label" | "lane_id" | "container_id" | "execution_kind" | "agent_execution_mode" | "module_id" | "review_status"
+  >
+>;
 export type EdgeFieldPatch = Partial<Pick<GraphEdge, "edge_kind" | "execution_semantics" | "data_label" | "route_condition" | "state_key" | "artifact_key" | "schema_ref" | "a2a_contract_id" | "is_remote_boundary_crossing">>;
 
 export interface GraphEditState {
@@ -808,6 +813,7 @@ function buildEditableNode(
     module_id: null,
     node_kind: kind,
     execution_kind: null,
+    agent_execution_mode: kind === "agent" ? "single_turn" : null,
     adk_node_role: null,
     owner_scope: kind === "remote_a2a" ? "remote" : "local",
     container_id: containerId,

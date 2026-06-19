@@ -23,6 +23,16 @@ function reviewChip(status: string | undefined) {
   return <span className={cls}>{status}</span>;
 }
 
+function agentModeChip(graphNode: GraphNodeData["graphNode"], kind: "agent" | "workflow" | "adapter" | "remote_a2a") {
+  if (kind !== "agent") return null;
+  const mode = graphNode.agent_execution_mode === "chat" ? "chat" : "single_turn";
+  return (
+    <span className={`graph-node-mode ${mode === "chat" ? "is-chat" : ""}`}>
+      {mode === "chat" ? "chat · history" : "single turn"}
+    </span>
+  );
+}
+
 function CollaborationBadges({ data }: { data: GraphNodeData }) {
   const commentCount = data.commentCount ?? 0;
   const highlightCount = data.highlightCount ?? 0;
@@ -47,7 +57,7 @@ function HandleStrip() {
 function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" | "workflow" | "adapter" | "remote_a2a" }) {
   const { graphNode, selected, onSelect } = data;
   const cat = moduleCategoryFromKind(kind);
-  const sub = graphNode.execution_kind ?? null;
+  const sub = graphNode.execution_kind && graphNode.execution_kind !== kind ? graphNode.execution_kind : null;
   return (
     <div
       className={`graph-node graph-node-card cat-${cat ?? "agent"} ${selected ? "is-selected" : ""} ${
@@ -60,6 +70,7 @@ function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" |
       <div className="graph-node-head">
         {cat ? <CategoryBadge category={cat} /> : null}
         {sub ? <SubtypeBadge value={sub} /> : null}
+        {agentModeChip(graphNode, kind)}
       </div>
       <strong className="graph-node-label">{graphNode.label}</strong>
       <div className="graph-node-meta">

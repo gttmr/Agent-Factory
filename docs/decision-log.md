@@ -22,6 +22,13 @@
 - **배경**: Mock Lab의 본래 목적은 저장된 `MockSpec`으로 synthetic MCP mock server를 빠르게 실행·검증하는 것이며, 별도 server project export는 기본 경로에 불필요한 비용과 혼선을 만들었다.
 - **영향**: `MockProcessRegistry`, `mockSpecRuntime.ts`, `mcpNetworkBridge.test.ts`, `mockLabCore.test.ts`. Fresh worktree에서도 ignored `artifacts/mock-lab/*/generated` fixture 없이 테스트 가능하다.
 
+## 2026-06-20 · 작업 브랜치 `codex/agent-execution-mode-ui` — agent execution mode 선택 UI
+
+### `agent_execution_mode`를 `single_turn`/`chat` 전용 Graph IR 필드로 추가
+- **결정**: `GraphNode.agent_execution_mode`를 추가하고 Design 편집 UI에서는 `agent` 노드에만 `Single turn`/`Chat` 세그먼트 컨트롤을 노출한다. `task`는 static Graph node 선택지로 열지 않는다. Runnable ADK generator는 값이 `chat`이면 `LlmAgent(mode="chat")`, 없거나 `single_turn`이면 `mode="single_turn"`을 생성한다.
+- **배경**: `execution_kind`는 기존 카테고리/기술 라벨 성격으로 이미 쓰이고 있어 ADK LLM context contract 저장소로 재사용하면 충돌한다. `task`는 작은 workflow reuse나 coordinator/sub-agent topology와 구분해야 하므로 일반 노드 mode 선택값에서 제외한다.
+- **영향**: `GraphNode`/process-flow schema, `scaffold-plan` module schema, `GraphElementEditor`/`GraphInspector`/GraphCanvas badge, `generate-adk-source.mjs`, `validate-artifacts.mjs`, active docs. 기존 artifact는 필드 누락 시 `single_turn`으로 해석한다.
+
 ## 2026-06-18 · 작업 브랜치 `worktree-adk-generator-structure` — remote_a2a runnable lowering (PR-B)
 
 ### `remote_a2a` 노드를 ADK `RemoteA2aAgent` 그래프 노드로 lower
