@@ -209,6 +209,42 @@
   background: var(--surface-muted);
 }
 
+.af-design-sidebar > .graph-element-editor .graph-agent-mode-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-agent-mode-segment button {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.af-design-sidebar > .graph-element-editor .graph-agent-mode-segment button:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-agent-mode-segment button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.af-design-sidebar > .graph-element-editor .graph-agent-mode-segment button.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent-strong);
+}
+
 .af-design-sidebar > .graph-element-editor > .af-action-row {
   justify-content: flex-end;
   border-top: 1px solid var(--line);

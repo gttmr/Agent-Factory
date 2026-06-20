@@ -46,6 +46,11 @@ export function GraphInspector(props: GraphInspectorProps) {
 
   if (selectedNode) {
     const cat = moduleCatFromKind(selectedNode.node_kind);
+    const agentMode = selectedNode.node_kind === "agent"
+      ? selectedNode.agent_execution_mode === "chat"
+        ? "chat"
+        : "single_turn"
+      : null;
     return (
       <aside className="graph-inspector">
         <header className="graph-inspector-head">
@@ -74,6 +79,14 @@ export function GraphInspector(props: GraphInspectorProps) {
         <Row label="module_id">{selectedNode.module_id ?? "—"}</Row>
         {selectedNode.execution_kind ? (
           <Row label="execution">{selectedNode.execution_kind}</Row>
+        ) : null}
+        {agentMode ? (
+          <>
+            <Row label="agent mode">{agentMode}</Row>
+            <Row label="context">
+              {agentMode === "chat" ? "session history implicit input" : "current input only"}
+            </Row>
+          </>
         ) : null}
         {selectedNode.adk_node_role ? (
           <Row label="adk_role">{selectedNode.adk_node_role}</Row>

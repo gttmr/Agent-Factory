@@ -475,6 +475,8 @@ export interface CatalogBinding {
  * raw requirements never drive code generation.
  */
 export type ScaffoldOutputMode = "smoke" | "runnable";
+export const AGENT_EXECUTION_MODES = ["single_turn", "chat"] as const;
+export type AgentExecutionMode = (typeof AGENT_EXECUTION_MODES)[number];
 
 export interface ScaffoldPlanModule {
   id: string;
@@ -504,6 +506,7 @@ export interface ScaffoldPlanModule {
    */
   instruction?: string | null;
   model?: string | null;
+  agent_execution_mode?: AgentExecutionMode | null;
   access_protocol?: AccessProtocol | null;
   mcp_server?: string | null;
   mcp_tool_name?: string | null;
@@ -688,6 +691,7 @@ export interface GraphNode {
   module_id: string | null;
   node_kind: NodeKind;
   execution_kind: string | null;
+  agent_execution_mode?: AgentExecutionMode | null;
   adk_node_role: "workflow_node" | "container_root" | "boundary" | "synthetic" | null;
   owner_scope: OwnerScope;
   container_id: string | null;

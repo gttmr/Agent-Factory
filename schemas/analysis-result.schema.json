@@ -35,6 +35,9 @@
     "nullableString": {
       "anyOf": [{ "type": "string" }, { "type": "null" }]
     },
+    "agentExecutionMode": {
+      "anyOf": [{ "type": "string", "enum": ["single_turn", "chat"] }, { "type": "null" }]
+    },
     "nullableBoolean": {
       "anyOf": [{ "type": "boolean" }, { "type": "null" }]
     },
@@ -805,6 +808,7 @@
           ]
         },
         "execution_kind": { "$ref": "#/$defs/nullableString" },
+        "agent_execution_mode": { "$ref": "#/$defs/agentExecutionMode" },
         "adk_node_role": {
           "anyOf": [
             { "type": "string", "enum": ["workflow_node", "container_root", "boundary", "synthetic"] },

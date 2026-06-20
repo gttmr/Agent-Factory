@@ -1,9 +1,11 @@
 // Controlled by GraphEditState.draft: field changes update the live draft immediately.
 // The canvas toolbar owns whole-graph save/cancel, so this form keeps no mirror state.
 import {
+  AGENT_EXECUTION_MODES,
   GRAPH_EDGE_KINDS,
   GRAPH_EXECUTION_SEMANTICS,
   GRAPH_LANE_IDS,
+  type AgentExecutionMode,
   type A2AContract,
   type EdgeKind,
   type ExecutionSemantics,
@@ -26,6 +28,14 @@ interface GraphElementEditorProps {
 
 const MODULE_NODE_KINDS = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
 const STATE_EDGE_KINDS = new Set(["session_state", "temp_state", "user_state", "app_state"]);
+const AGENT_EXECUTION_MODE_LABEL: Record<AgentExecutionMode, string> = {
+  single_turn: "Single turn",
+  chat: "Chat"
+};
+const AGENT_EXECUTION_MODE_HELP: Record<AgentExecutionMode, string> = {
+  single_turn: "현재 입력과 연결된 edge 데이터만 사용합니다. 반복 실행과 검증에 적합합니다.",
+  chat: "같은 ADK session의 이전 대화 흐름을 함께 봅니다. replay와 cache 가정이 약해집니다."
+};
 
 // "데이터 전달 방식" picker metadata. edge_kind is how a connected edge passes
 // data in the generated ADK code: an in-process channel (event/state/artifact),
@@ -112,6 +122,7 @@ function NodeForm({
   const matchingCandidates = canLinkModule
     ? moduleCandidates.filter((candidate) => candidate.module_category === node.node_kind)
     : [];
+  const agentExecutionMode: AgentExecutionMode = node.agent_execution_mode === "chat" ? "chat" : "single_turn";
 
   return (
     <aside className="graph-element-editor">
@@ -165,14 +176,25 @@ function NodeForm({
           ))}
         </SelectField>
 
-        <Field label="실행 종류 execution_kind">
-          <input
-            value={node.execution_kind ?? ""}
-            onChange={(event) =>
-              editState.updateNodeFields(node.id, { execution_kind: nullableString(event.target.value) })
-            }
-          />
-        </Field>
+        {node.node_kind === "agent" ? (
+          <div className="ui-field graph-agent-mode-field">
+            <span>실행 컨텍스트</span>
+            <div className="graph-agent-mode-segment" role="group" aria-label="Agent 실행 컨텍스트">
+              {AGENT_EXECUTION_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={mode === agentExecutionMode ? "is-selected" : ""}
+                  aria-pressed={mode === agentExecutionMode}
+                  onClick={() => editState.updateNodeFields(node.id, { agent_execution_mode: mode })}
+                >
+                  {AGENT_EXECUTION_MODE_LABEL[mode]}
+                </button>
+              ))}
+            </div>
+            <small>{AGENT_EXECUTION_MODE_HELP[agentExecutionMode]}</small>
+          </div>
+        ) : null}
 
         {canLinkModule ? (
           <>
@@ -185,6 +207,7 @@ function NodeForm({
                   editState.updateNodeFields(node.id, {
                     module_id: null,
                     execution_kind: null,
+                    agent_execution_mode: node.node_kind === "agent" ? "single_turn" : null,
                     review_status: "n/a"
                   });
                   return;
@@ -194,6 +217,7 @@ function NodeForm({
                 editState.updateNodeFields(node.id, {
                   module_id: candidate.id,
                   execution_kind: candidate.module_category,
+                  agent_execution_mode: node.node_kind === "agent" ? agentExecutionMode : null,
                   review_status: candidate.status
                 });
               }}

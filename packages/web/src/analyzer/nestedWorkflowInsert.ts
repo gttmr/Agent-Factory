@@ -67,6 +67,7 @@ export function insertCatalogWorkflowNode(
     module_id: candidateId,
     node_kind: "workflow",
     execution_kind: "workflow",
+    agent_execution_mode: null,
     adk_node_role: "workflow_node",
     owner_scope: "local",
     container_id: rootContainerId,

@@ -1,5 +1,6 @@
 import type { CatalogEntry } from "../catalog/types";
 import type {
+  AgentExecutionMode,
   CatalogBinding,
   ComponentSource,
   FieldSpec,
@@ -42,12 +43,13 @@ export function buildScaffoldPlan({
   // nodes (so the generator's graph-coverage check passes) and prevents it from being
   // counted as an unresolved/needs-info blocker.
   const rootWorkflowModuleId = processFlow?.root_workflow_module_id ?? null;
+  const agentExecutionModes = agentExecutionModeByModuleId(processFlow);
   const isRootWorkflowCandidate = (candidate: ModuleCandidate): boolean =>
     rootWorkflowModuleId !== null && candidate.id === rootWorkflowModuleId;
   const deployableCandidates = moduleCandidates.filter((candidate) => !isRootWorkflowCandidate(candidate));
   const modules = deployableCandidates
     .filter((candidate) => candidate.status === "approved")
-    .map((candidate) => buildScaffoldModule(candidate, activeCatalog, outputMode));
+    .map((candidate) => buildScaffoldModule(candidate, activeCatalog, outputMode, agentExecutionModes.get(candidate.id) ?? null));
   const excludedModules = [
     ...moduleCandidates.filter(isRootWorkflowCandidate).map((candidate) => ({
       id: candidate.id,
@@ -115,7 +117,8 @@ export function approvedScaffoldModuleIds(scaffoldPlan: ScaffoldPlan): Set<strin
 function buildScaffoldModule(
   candidate: ModuleCandidate,
   catalogEntries: CatalogEntry[],
-  outputMode: ScaffoldOutputMode
+  outputMode: ScaffoldOutputMode,
+  agentExecutionMode: AgentExecutionMode | null
 ): ScaffoldPlanModule {
   const catalogEntry = findCatalogBinding(candidate, catalogEntries);
   const componentSource = componentSourceFor(catalogEntry);
@@ -161,6 +164,7 @@ function buildScaffoldModule(
     // (everything null) so its output stays identical to the legacy stub plan.
     instruction: runnable && isAgent ? seedAgentInstruction(candidate, catalogEntry) : null,
     model: runnable && isAgent ? DEFAULT_RUNNABLE_MODEL : null,
+    agent_execution_mode: runnable && isAgent ? agentExecutionMode ?? "single_turn" : null,
     access_protocol: runnable ? accessProtocol : null,
     mcp_server: runnable ? mcpServer : null,
     mcp_tool_name: runnable ? mcpToolName : null,
@@ -168,6 +172,15 @@ function buildScaffoldModule(
     mcp_auth_mode: runnable ? mcpAuthMode : null,
     runtime_binding: runnable ? runtimeBinding : null
   };
+}
+
+function agentExecutionModeByModuleId(processFlow: ProcessFlow): Map<string, AgentExecutionMode> {
+  const modes = new Map<string, AgentExecutionMode>();
+  for (const node of processFlow?.nodes ?? []) {
+    if (node.node_kind !== "agent" || typeof node.module_id !== "string") continue;
+    modes.set(node.module_id, node.agent_execution_mode === "chat" ? "chat" : "single_turn");
+  }
+  return modes;
 }
 
 /**

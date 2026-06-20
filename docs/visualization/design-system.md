@@ -217,6 +217,7 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 - 편집 중에는 로컬 draft Graph IR만 바꾸고, `저장` 시 `analysis-result.json.processFlow`만 PUT 한다. `manifest.approvals.*` 게이트는 자동으로 바꾸지 않는다.
 - `카탈로그 워크플로우 삽입` 버튼은 편집 모드 draft와 별개다. picker modal은 `/api/catalog`의 workflow 항목을 이름, owner domain, version/status, responsibility로 보여주고, 선택 시 단일 `workflow` 노드와 matching `ModuleCandidate`를 `analysis-result.json`에 즉시 저장한다. 이 기능은 catalog workflow fragment를 확장하지 않고 재사용 workflow를 하나의 Graph IR node로 추가한다.
 - 편집 모드에서 선택된 노드/엣지는 좌측 정보 패널이 `GraphElementEditor`로 바뀌어 field-level 편집을 제공한다. 모듈 연결 picker는 `agent`/`workflow`/`adapter`/`remote_a2a` 노드에만 표시하고, `candidate.module_category === node.node_kind`인 후보만 연결한다. `input`/`output`/`function`/`tool`/`human_input` 등 synthetic 또는 비모듈 노드는 모듈 picker 대상에서 제외한다.
+- `agent` 노드 편집 폼은 `agent_execution_mode`를 `Single turn`/`Chat` 세그먼트 컨트롤로 노출한다. `task`는 선택지로 노출하지 않는다. `Chat`은 같은 ADK session history를 암묵 입력으로 쓰므로 helper copy와 inspector context row에 stateful warning을 유지한다.
 - `node_kind`는 v1 편집 폼에서 바꾸지 않는다. 종류를 바꾸려면 기존 노드를 삭제하고 새 노드를 추가한다.
 - 새 노드는 `remote_a2a`가 아니면 parent 없는 첫 `graph_workflow`/`dynamic_workflow` 컨테이너에 기본 배치하고, 해당 컨테이너의 `contains_node_ids`에도 즉시 추가한다. `remote_a2a` 새 노드는 로컬 workflow 컨테이너에 자동 편입하지 않는다.
 - 엣지는 핸들 드래그와 순차 클릭 모드가 같은 생성 규칙을 쓴다. 자기 연결과 동일한 `from -> to` 중복은 UI에서 거부하고 한국어 notice로 표시한다.
@@ -224,12 +225,22 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 **노드 렌더링**
 - `input`/`output` pill은 변수명만 보여준다(`INPUT`/`OUTPUT` eyebrow 텍스트 없음). 입력/출력 구분은 lane 위치와 `--cat-input`/`--cat-output` 틴트로 한다. 긴 변수명이 박스 밖으로 흘러내리지 않도록 박스 안에서 clamp 한다.
 - `join` 노드는 박스를 dot(원) 크기에 맞춰(`JOIN_DOT_BOX`) dot 중심이 좌/우 edge 핸들과 같은 높이에 오게 한다. join 라벨은 박스 아래 absolute caption으로 깔아 dot 중심을 밀지 않는다.
+- Graph node header는 의미별 visual owner가 하나여야 한다. 같은 의미를 category badge, subtype badge, mode badge, meta text에 중복 표시하지 않는다. 새 badge/chip을 추가하기 전에는 기존 `execution_kind`, subtype, status, module id, inspector row와 의미가 겹치는지 확인한다.
+- `agent_execution_mode`의 visual owner는 agent mode badge와 편집 segmented control이다. `execution_kind`가 `llm_single_turn`, `single_turn`, `chat`, `task`처럼 mode 의미를 담는 legacy/technical label이면 agent node header의 subtype badge로 반복 표시하지 않는다.
+- `single_turn`은 agent 기본 실행 컨텍스트이므로 그래프 전체 스캔에서 과도한 반복을 만들지 않아야 한다. Canvas에서는 기본 mode보다 예외인 `chat · history`를 우선 강조하고, 정확한 기본값 확인은 선택된 Inspector/Editor에서 제공한다.
+- `agent` 노드에서 `chat` badge는 accent 색으로 session-history dependency를 스캔 가능하게 한다.
 
 **Graph Inspector** *(노드/엣지를 선택하면 **상단 좌측 정보 패널**에 `GraphInspector`가 렌더된다 — 위 "화면 골격" 참고. 우측 Inspector 패널 자리(`INSPECTOR_ENABLED=true` 재활성)에서도 같은 명세를 쓴다.)*
-- 노드 선택 시 `node_kind`, `module_id`, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
+- 노드 선택 시 `node_kind`, `module_id`, agent mode/context, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
+- Inspector도 같은 de-duplication 규칙을 따른다. agent mode는 `agent_execution_mode` 기반의 한 row로 표시하고, mode와 충돌하거나 같은 뜻인 raw `execution_kind`는 주 정보 영역에 반복 표시하지 않는다.
 - 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
 - 선택된 edge는 label 유무와 관계없이 선 자체를 굵게 표시하고 다른 edge보다 위에 렌더링해 선택 상태를 즉시 알 수 있어야 한다.
 - `remote_a2a` edge는 Remote A2A 계약 검토 화면으로 이동할 수 있어야 한다.
+
+**Graph UI 변경 검증**
+- Graph UI에 badge/chip/row를 추가하거나 의미 매핑을 바꾸는 PR은 실제 artifact 화면을 한 번 이상 열고, 같은 node card 안에서 같은 의미가 두 번 보이지 않는지 확인한다.
+- 검증 대상은 최소 세 가지다: Canvas node card, 선택된 Inspector, 편집 모드 Editor. 특히 legacy artifact의 `execution_kind`와 새 semantic field가 동시에 존재하는 경우를 포함한다.
+- 스크린샷 검토에서는 "새 정보가 보이는가"뿐 아니라 "기존 정보와 합쳐져도 한 문장으로 읽히는가"를 확인한다. 같은 의미가 반복되거나 서로 모순되면 새 visual owner를 정하고 나머지는 숨긴다.
 
 **Remote A2A 하단 탭**
 - `Remote A2A` 탭은 후보/계약 목록 아래에 `A2AContractInspector` 편집 surface를 둔다.

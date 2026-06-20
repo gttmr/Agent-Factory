@@ -3,34 +3,47 @@
 이 파일 하나만 보면 어디까지 했고 무엇이 남았는지 알 수 있도록 정리한 진입점이다.
 브리프 목록 자체는 `INDEX.md`, 마이그레이션 전체 설계는 `/home/ilmaswsl/.claude/plans/agent-factory-synthetic-hummingbird.md`.
 
-마지막 갱신: 2026-05-27 (KST 기준).
+마지막 갱신: 2026-06-18 (KST 기준).
 
 ## 현재 브랜치 상태
 
-- 브랜치: `codex/runtime-contract-review`
-- origin 대비 1 commit ahead (아직 push 하지 않음)
-- 마지막 commit: `d547aca`
-- 현재 작업 트리: brief 01/02/04/05/08 구현 및 문서 최신화가 uncommitted 상태로 존재함.
-
-```text
-d547aca feat: brief 09 skill runner workbench
-2395012 refactor(web): prune dead CSS rules from styles.css  ← origin/codex/runtime-contract-review
-d4ba044 refactor(web): split styles-router.css into per-feature partials
-ecaf1da docs: add STATUS.md follow-up entry point
-e1e2c1f feat: brief 06 — restore in-workbench Codex CLI rerun on /analyze
-69edb6c feat: brief 03 — Runtime contract review surface in DesignWorkbench
-a3ed7df docs: brief 00 — align stale surface references after PR6 router-shell migration
-4c1a109 docs: post-migration follow-up briefs + stale-reference cleanup
-```
+- 로컬 `main` = `origin/main` (`8ed9f42`). 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)이 모두 머지·동기화됨.
+- 작업 트리 clean (단, `docs/workbench/reports/` 는 세션 이전부터 있던 untracked — 본 작업과 무관).
+- 머지된 PR:
+  - #30 — runnable human-in-the-loop(`RequestInput`) + `scenario-g`
+  - #31 (PR-A) — 엣지별 "데이터 전달 방식" 피커 + 제너레이터 node/output dispatch 구조화 + session/temp/user/app **state 채널** + **artifact 채널** lowering + `scenario-h` + Codex 리뷰 반영
+  - #32 (PR-B) — **remote_a2a → RemoteA2aAgent** runnable lowering + `scenario-i` + 로컬 mock A2A 서버 + Codex 리뷰 반영(mislabeled remote 엣지 거부)
+  - #33 — `.ui-button:disabled` 스타일 수정(게이트 버튼이 비활성인데 클릭 가능처럼 보이던 버그)
 
 새 세션 시작 시 첫 명령:
 
 ```bash
 cd /home/ilmaswsl/work/Agent-Factory
-git fetch origin
-git status
-git log --oneline origin/codex/runtime-contract-review..HEAD
+git fetch origin && git status
+git log --oneline -8
 ```
+
+## 2026-06 — 엣지 데이터 전달 / A2A 작업 요약
+
+`scripts/generate-adk-source.mjs` runnable 모드가 그래프 엣지의 "데이터 전달 방식" 선택을 실제 ADK 2.x 코드로 lower 한다. 상세 결정은 `docs/decision-log.md` 2026-06-17 / 2026-06-18 항목, 동작 명세는 `CLAUDE.md` build 불릿 + `docs/workbench/validation.md`.
+
+- **완료(내부 채널)**: `session/temp/user/app_state`(scope prefix 자동, bare 키 정본) + `artifact`(function `save_artifact` / connected consumer `load_artifact`). producer 쓰기 + connected MCP adapter consumer 읽기. agent 단일 채널 → `output_key`. 다중-producer 같은-키 / agent-artifact 거부.
+- **완료(원격)**: `remote_a2a` 노드 → `RemoteA2aAgent(agent_card=<승인 계약 url>, use_legacy=False)`. 게이트 완화는 remote 엣지에 한정. `[a2a]` extra·import 는 remote 노드 있을 때만.
+- **완료(구조)**: `NODE_LOWERING` 레지스트리 + `AGENT_PY_BUILDERS` — 장차 dynamic 개편이 "핸들러 추가"로 끝나게.
+- **검증 자산**: 시나리오 `scenario-g`(human-input)·`scenario-h`(state 채널)·`scenario-i`(remote a2a + `mock_remote/serve_app.py`). generator 회귀 `scripts/generate-adk-source.test.mjs`(12 tests). 실 `google-adk[a2a]` 2.2.0 로 라이브 A2A round-trip 확인(`scenario-i` mock, `MOCK_REMOTE_OK`).
+  - A2A 테스트용 venv(`google-adk[a2a]` + `a2a-sdk[http-server]` + `uvicorn`)는 `/tmp/a2a-spike/.venv` 에 만들어 두었음(세션 휘발 가능 — 없으면 `python3 -m venv` 후 동일 패키지 설치). mock 기동: `cd templates/regression-scenarios/scenario-i-remote-a2a/mock_remote && uvicorn serve_app:a2a_app --host localhost --port 8001`.
+
+### 남은 후속 (브리프 10–14, 미구현)
+
+| 번호 | 요약 | 규모 |
+|---|---|---|
+| 10 | dynamic-workflow lowering (route/loop/dynamic) — generator 대규모 개편 | 大 |
+| 11 | agent/비-connected consumer 의 명명 채널 읽기 | 中 |
+| 12 | A2A 계약 정책(auth/timeout/retry/fallback) → `RemoteA2aAgent` config 매핑 | 中 |
+| 13 | scaffold-plan 워닝 문구 카테고리/모드 인식화 | 小 |
+| 14 | 실행(RunSandbox)/Build 런타임 UX(venv 재설치·stale 로드·adapter 없는 Mock Lab 패널) | 中 |
+
+권장 순서: **13(작고 빠름) → 14 → 11 → 12 → 10(가장 큼).** 13/11 은 PR-A 연장, 12 는 PR-B 연장, 10(dynamic)은 독립 큰 작업.
 
 ## 운영 정책 결정 기록
 

@@ -5,11 +5,13 @@
 // Both Vite (browser) and Node consume this module. Do NOT add `node:` imports.
 
 import {
+  AGENT_EXECUTION_MODES,
   GRAPH_EDGE_KINDS,
   GRAPH_LANE_IDS,
   GRAPH_NODE_KINDS
 } from "./types";
 import type {
+  AgentExecutionMode,
   EdgeKind,
   ExecutionSemantics,
   GraphContainer,
@@ -27,6 +29,7 @@ import type {
 const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
 const EDGE_KIND_SET = new Set<string>(GRAPH_EDGE_KINDS);
 const LANE_ID_SET = new Set<string>(GRAPH_LANE_IDS);
+const AGENT_EXECUTION_MODE_SET = new Set<string>(AGENT_EXECUTION_MODES);
 const MODULE_BOUND_NODE_KIND_SET = new Set<string>(["agent", "workflow", "adapter", "remote_a2a"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,6 +53,11 @@ function asString(value: unknown, fallback: string): string {
 
 function asNullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function asAgentExecutionMode(value: unknown, nodeKind: NodeKind): AgentExecutionMode | null {
+  if (nodeKind !== "agent") return null;
+  return typeof value === "string" && AGENT_EXECUTION_MODE_SET.has(value) ? (value as AgentExecutionMode) : null;
 }
 
 function normalizeNodePosition(value: unknown): GraphNode["position"] | undefined {
@@ -336,6 +344,7 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
       module_id: moduleBound ? moduleId : null,
       node_kind: candidateKind,
       execution_kind: null,
+      agent_execution_mode: asAgentExecutionMode(raw.agent_execution_mode, candidateKind),
       adk_node_role: adkRole,
       owner_scope: ownerScope,
       container_id: containerId,
@@ -474,6 +483,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         module_id: asNullableString(node.module_id),
         node_kind: nodeKind,
         execution_kind: asNullableString(node.execution_kind),
+        agent_execution_mode: asAgentExecutionMode(nodeRecord.agent_execution_mode, nodeKind),
         adk_node_role: node.adk_node_role ?? null,
         owner_scope: node.owner_scope ?? (nodeKind === "remote_a2a" ? "remote" : "local"),
         container_id: asNullableString(node.container_id),
@@ -579,6 +589,24 @@ export function validateGraphIRSoft(
         target_kind: "node",
         target_id: node.id
       });
+    }
+    if (node.agent_execution_mode !== undefined && node.agent_execution_mode !== null) {
+      if (!AGENT_EXECUTION_MODE_SET.has(node.agent_execution_mode)) {
+        errors.push({
+          code: "invalid_agent_execution_mode",
+          message: `Node ${node.id} has invalid agent_execution_mode ${String(node.agent_execution_mode)}.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      if (node.node_kind !== "agent") {
+        errors.push({
+          code: "agent_execution_mode_on_non_agent",
+          message: `Node ${node.id} has agent_execution_mode but is ${node.node_kind}; only agent nodes may set it.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
     }
     if (MODULE_BOUND_NODE_KIND_SET.has(node.node_kind) && (typeof node.module_id !== "string" || !node.module_id.trim())) {
       errors.push({

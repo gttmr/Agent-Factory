@@ -502,14 +502,23 @@ root_agent = Workflow(
 function emitAgentNode(module) {
   const sym = nodeSymbol(module);
   const instruction = module.instruction || defaultAgentInstruction(module);
+  const mode = agentExecutionMode(module);
   return `${sym} = LlmAgent(
     name=${toPyStr(pyNodeName(module))},
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
     instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
     description=${toPyStr(truncate(module.name))},
     output_key=${toPyStr(agentOutputStateKey(module))},
-    mode="single_turn",
+    mode=${toPyStr(mode)},
 )`;
+}
+
+function agentExecutionMode(module) {
+  if (module?.agent_execution_mode === "chat" || module?.agent_execution_mode === "single_turn") {
+    return module.agent_execution_mode;
+  }
+  const graphNode = graphIndexes().moduleNodes.find((node) => node.module_id === module.id);
+  return graphNode?.agent_execution_mode === "chat" ? "chat" : "single_turn";
 }
 
 function defaultAgentInstruction(module) {
@@ -1052,6 +1061,7 @@ function validateRunInputs() {
   if (Array.isArray(graphErrors) && graphErrors.length > 0) {
     throw new Error(`processFlow has Graph IR errors: ${graphErrors.join("; ")}`);
   }
+  assertAgentExecutionModesSupported();
 
   const runtimeContracts = Array.isArray(analysisResult?.runtimeContracts) ? analysisResult.runtimeContracts : [];
   const unapprovedRuntimeContracts = runtimeContracts.filter((contract) => contract?.contract_status !== "approved");
@@ -1086,6 +1096,44 @@ function validateRunInputs() {
 
   validateApprovedModuleSource();
   validateGraphCoverage();
+}
+
+function assertAgentExecutionModesSupported() {
+  const validModes = new Set(["single_turn", "chat"]);
+  const invalidModules = modules
+    .filter(
+      (module) =>
+        module.agent_execution_mode !== undefined &&
+        module.agent_execution_mode !== null &&
+        !validModes.has(module.agent_execution_mode)
+    )
+    .map((module) => `${module.id}:${module.agent_execution_mode}`);
+  if (invalidModules.length > 0) {
+    throw new Error(`scaffold-plan.json has invalid agent_execution_mode values: ${invalidModules.join(", ")}`);
+  }
+  const invalidModuleScopes = modules
+    .filter(
+      (module) =>
+        module.agent_execution_mode !== undefined &&
+        module.agent_execution_mode !== null &&
+        module.module_category !== "agent"
+    )
+    .map((module) => `${module.id}:${module.module_category}:${module.agent_execution_mode}`);
+  if (invalidModuleScopes.length > 0) {
+    throw new Error(`scaffold-plan.json sets agent_execution_mode on non-agent modules: ${invalidModuleScopes.join(", ")}`);
+  }
+
+  const invalidNodes = (Array.isArray(processFlow.nodes) ? processFlow.nodes : [])
+    .filter(
+      (node) =>
+        node?.agent_execution_mode !== undefined &&
+        node.agent_execution_mode !== null &&
+        (!validModes.has(node.agent_execution_mode) || node.node_kind !== "agent")
+    )
+    .map((node) => `${node.id}:${node.node_kind}:${node.agent_execution_mode}`);
+  if (invalidNodes.length > 0) {
+    throw new Error(`processFlow has invalid agent_execution_mode values: ${invalidNodes.join(", ")}`);
+  }
 }
 
 function updateRunManifest() {
