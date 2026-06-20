@@ -56,6 +56,8 @@ export const codexAnalyzerModels = [
   "gpt-5.3-codex-spark"
 ] as const;
 
+export const sideEffects = ["none", "read", "write", "read_write", "unknown"] as const;
+
 // A2A 1.0/latest contract enumerations.
 // These constants are the single source of truth for the validator and UI.
 export const A2A_OPERATION_NAMES = [
@@ -176,7 +178,7 @@ export type RequirementDomain = (typeof requirementDomains)[number];
 export type RiskSignal = (typeof riskSignals)[number];
 export type LegacyRecommendedType = (typeof legacyRecommendedTypes)[number];
 export type CodexAnalyzerModel = (typeof codexAnalyzerModels)[number];
-export type SideEffect = "none" | "read" | "write" | "read_write" | "unknown";
+export type SideEffect = (typeof sideEffects)[number];
 
 export type A2AOperationName = (typeof A2A_OPERATION_NAMES)[number];
 export type A2AHttpPath = (typeof A2A_HTTP_PATHS)[number];
@@ -193,7 +195,7 @@ export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
 export type ComponentSource = "mcp" | "remote_a2a" | "stub";
-export type RuntimeBinding = "unresolved" | "direct_api" | "mcp_tool" | "local_function" | "remote_a2a" | "workflow_call" | "ui_input";
+export type RuntimeBinding = "unresolved" | "direct_api" | "mcp" | "mcp_tool" | "local_function" | "remote_a2a" | "workflow_call" | "ui_input";
 export type ScaffoldLevel = "none" | "handoff" | "mock_testable_skeleton" | "manual_required";
 
 export interface WorkflowRef {
@@ -573,6 +575,27 @@ export interface ExcludedScaffoldModule {
   reason: string;
 }
 
+export interface ScaffoldPlanGraph {
+  nodes: Array<{
+    id: string;
+    module_id?: string | null;
+    node_kind: NodeKind;
+    invoke_binding?: GraphInvokeBinding | null;
+    decision_owner?: GraphDecisionOwner | null;
+    call_control?: GraphCallControl | null;
+    side_effect?: GraphSideEffect | null;
+    policy?: GraphPolicy | null;
+  }>;
+  edges: Array<{
+    id?: string | null;
+    from: string;
+    to: string;
+    edge_kind: EdgeKind;
+    flow_kind?: GraphFlowKind | null;
+    call_control?: GraphCallControl | null;
+  }>;
+}
+
 export interface ScaffoldPlan {
   requirement_id: string;
   source: "approved_workbench_artifact";
@@ -582,6 +605,7 @@ export interface ScaffoldPlan {
   modules: ScaffoldPlanModule[];
   runtime_contracts: ScaffoldPlanRuntimeContract[];
   excluded_modules: ExcludedScaffoldModule[];
+  graph?: ScaffoldPlanGraph;
   manifest: {
     catalog_bound_modules: Array<{
       module_id: string;
@@ -621,6 +645,7 @@ export const GRAPH_NODE_KINDS = [
   "adapter",
   "adapter_call",
   "human_input",
+  "callback_wait",
   "workflow",
   "workflow_call",
   "remote_a2a",
@@ -679,12 +704,88 @@ export const GRAPH_EXECUTION_SEMANTICS = [
   "boundary_crossing"
 ] as const;
 
+export const GRAPH_INVOKE_BINDINGS = [
+  "unresolved",
+  "local_python",
+  "direct_api",
+  "mcp_tool",
+  "mcp_toolset",
+  "local_function",
+  "internal_workflow",
+  "ui_input",
+  "remote_a2a",
+  "callback_wait",
+  "unknown"
+] as const;
+
+export const GRAPH_DECISION_OWNERS = [
+  "workflow_code",
+  "llm",
+  "human",
+  "remote_agent",
+  "system",
+  "unknown"
+] as const;
+
+export const GRAPH_CALL_CONTROLS = [
+  "none",
+  "fixed_by_workflow",
+  "selected_by_llm",
+  "selected_by_human",
+  "event_callback",
+  "resume",
+  "unknown"
+] as const;
+
+export const GRAPH_FLOW_KINDS = [
+  "sequence",
+  "route",
+  "fan_out",
+  "fan_in",
+  "loop_back",
+  "loop_exit",
+  "fallback",
+  "error",
+  "resume",
+  "callback",
+  "unknown"
+] as const;
+
+export const GRAPH_SIDE_EFFECTS = [
+  "none",
+  "read",
+  "write",
+  "external_message",
+  "transaction",
+  "unknown"
+] as const;
+
+export const GRAPH_POLICIES = [
+  "none",
+  "auth_required",
+  "approval_required",
+  "audit_required",
+  "idempotency_required",
+  "timeout_retry_required",
+  "data_policy_required",
+  "manual_fallback_required",
+  "callback_resume_required",
+  "compensation_required",
+  "unknown"
+] as const;
+
 export type NodeKind = (typeof GRAPH_NODE_KINDS)[number];
 export type ContainerKind = (typeof GRAPH_CONTAINER_KINDS)[number];
 export type EdgeKind = (typeof GRAPH_EDGE_KINDS)[number];
 export type LaneId = (typeof GRAPH_LANE_IDS)[number];
 export type LayoutPolicy = (typeof GRAPH_LAYOUT_POLICIES)[number];
 export type ExecutionSemantics = (typeof GRAPH_EXECUTION_SEMANTICS)[number];
+export type GraphInvokeBinding = (typeof GRAPH_INVOKE_BINDINGS)[number];
+export type GraphDecisionOwner = (typeof GRAPH_DECISION_OWNERS)[number];
+export type GraphCallControl = (typeof GRAPH_CALL_CONTROLS)[number];
+export type GraphFlowKind = (typeof GRAPH_FLOW_KINDS)[number];
+export type GraphSideEffect = (typeof GRAPH_SIDE_EFFECTS)[number];
+export type GraphPolicy = (typeof GRAPH_POLICIES)[number];
 export type OwnerScope = "local" | "remote" | "external";
 
 export interface GraphPort {
@@ -746,6 +847,11 @@ export interface GraphNode {
   input_mapping?: Record<string, string> | null;
   output_mapping?: Record<string, string> | null;
   runtime_binding?: RuntimeBinding | null;
+  invoke_binding?: GraphInvokeBinding | null;
+  decision_owner?: GraphDecisionOwner | null;
+  call_control?: GraphCallControl | null;
+  side_effect?: GraphSideEffect | null;
+  policy?: GraphPolicy | null;
   mock_binding?: MockBinding | null;
   adk_skeleton_contract?: AdkSkeletonContract | null;
 }
@@ -765,6 +871,8 @@ export interface GraphEdge {
   artifact_key: string | null;
   a2a_contract_id: string | null;
   is_remote_boundary_crossing: boolean;
+  flow_kind?: GraphFlowKind | null;
+  call_control?: GraphCallControl | null;
 }
 
 export interface GraphIR {

@@ -177,6 +177,21 @@
 .af-design-sidebar > .graph-element-editor > .graph-element-editor-section {
   display: flex;
   flex-direction: column;
+  gap: var(--space-sm);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-sm);
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-section > h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-section-body {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
 }
 
@@ -254,6 +269,13 @@
 .af-design-sidebar > .graph-element-editor .graph-element-editor-warning {
   margin: 0;
   color: var(--danger-text);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-hint {
+  margin: 0;
+  color: var(--text-muted);
   font-size: var(--fs-xs);
   line-height: var(--lh-normal);
 }

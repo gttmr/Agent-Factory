@@ -33,6 +33,11 @@
       "mcp_schema_ref": "catalog.customer_profile_request.v1",
       "mcp_auth_mode": "none",
       "runtime_binding": "mcp_tool",
+      "invoke_binding": "mcp_tool",
+      "decision_owner": "workflow_code",
+      "call_control": "fixed_by_workflow",
+      "side_effect": "read",
+      "policy": "audit_required",
       "node_kind": "adapter_call",
       "workflow_ref": null,
       "input_mapping": null,
@@ -86,6 +91,11 @@
       "mcp_schema_ref": null,
       "mcp_auth_mode": null,
       "runtime_binding": "workflow_call",
+      "invoke_binding": "internal_workflow",
+      "decision_owner": "workflow_code",
+      "call_control": "fixed_by_workflow",
+      "side_effect": "none",
+      "policy": "audit_required",
       "node_kind": "workflow_call",
       "workflow_ref": {
         "id": "wf-risk-check",
@@ -108,6 +118,76 @@
     }
   ],
   "runtime_contracts": [],
+  "graph": {
+    "nodes": [
+      {
+        "id": "node-input",
+        "module_id": null,
+        "node_kind": "input",
+        "invoke_binding": null,
+        "decision_owner": null,
+        "call_control": null,
+        "side_effect": null,
+        "policy": null
+      },
+      {
+        "id": "node-customer-profile",
+        "module_id": "mod-customer-profile",
+        "node_kind": "adapter_call",
+        "invoke_binding": "mcp_tool",
+        "decision_owner": "workflow_code",
+        "call_control": "fixed_by_workflow",
+        "side_effect": "read",
+        "policy": "audit_required"
+      },
+      {
+        "id": "node-risk-workflow",
+        "module_id": "mod-risk-workflow",
+        "node_kind": "workflow_call",
+        "invoke_binding": "internal_workflow",
+        "decision_owner": "workflow_code",
+        "call_control": "fixed_by_workflow",
+        "side_effect": "none",
+        "policy": "audit_required"
+      },
+      {
+        "id": "node-output",
+        "module_id": null,
+        "node_kind": "output",
+        "invoke_binding": null,
+        "decision_owner": null,
+        "call_control": null,
+        "side_effect": null,
+        "policy": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-1",
+        "from": "node-input",
+        "to": "node-customer-profile",
+        "edge_kind": "event_output",
+        "flow_kind": "sequence",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-2",
+        "from": "node-customer-profile",
+        "to": "node-risk-workflow",
+        "edge_kind": "event_output",
+        "flow_kind": "sequence",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-3",
+        "from": "node-risk-workflow",
+        "to": "node-output",
+        "edge_kind": "event_output",
+        "flow_kind": "sequence",
+        "call_control": "fixed_by_workflow"
+      }
+    ]
+  },
   "excluded_modules": [],
   "manifest": {
     "catalog_bound_modules": [],

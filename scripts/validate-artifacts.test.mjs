@@ -1,0 +1,103 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const validator = join(repoRoot, "scripts", "validate-artifacts.mjs");
+const scenarioRoot = join(repoRoot, "templates", "regression-scenarios", "scenario-j-workflow-call-mock-lab");
+const remoteScenarioRoot = join(repoRoot, "templates", "regression-scenarios", "scenario-i-remote-a2a");
+
+test("validate-artifacts rejects module-bound human input graph semantics", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-human-");
+  const analysis = readScenarioAnalysis();
+  const target = analysis.processFlow.nodes.find((node) => node.id === "node-customer-profile");
+  assert.ok(target);
+  target.node_kind = "human_input";
+  target.lane_id = "human_input";
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /synthetic nodes must have module_id null|must not bind/i);
+});
+
+test("validate-artifacts rejects module-bound callback wait graph semantics", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-callback-");
+  const analysis = readScenarioAnalysis();
+  const target = analysis.processFlow.nodes.find((node) => node.id === "node-customer-profile");
+  assert.ok(target);
+  target.node_kind = "callback_wait";
+  target.lane_id = "local_graph";
+  target.invoke_binding = "callback_wait";
+  target.decision_owner = "workflow_code";
+  target.call_control = "event_callback";
+  analysis.processFlow.edges[0].flow_kind = "callback";
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /synthetic nodes must have module_id null|must not bind/i);
+});
+
+test("validate-artifacts rejects invalid scaffold graph metadata", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-scaffold-");
+  const plan = readJson(join(scenarioRoot, "scaffold-plan.json"));
+  plan.graph.nodes[1].invoke_binding = "mcp";
+  plan.graph.edges[0].flow_kind = "then";
+
+  writeJson(join(artifactRoot, "scaffold-plan.json"), plan);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /scaffold\.graph\.nodes\[1\]\.invoke_binding/);
+  assert.match(result.stderr, /scaffold\.graph\.edges\[0\]\.flow_kind/);
+});
+
+test("validate-artifacts accepts remote_agent_call as a Remote A2A graph endpoint", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-remote-agent-call-");
+  const analysis = readJson(join(remoteScenarioRoot, "analysis-result.json"));
+  const remoteNode = analysis.processFlow.nodes.find((node) => node.node_kind === "remote_a2a");
+  assert.ok(remoteNode);
+  remoteNode.node_kind = "remote_agent_call";
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  rmSync(artifactRoot, { recursive: true, force: true });
+  assert.match(output, /Artifact validation OK/);
+});
+
+function tempArtifactRoot(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+function readScenarioAnalysis() {
+  return readJson(join(scenarioRoot, "analysis-result.json"));
+}
+
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function writeJson(path, value) {
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function runValidatorExpectingFailure(artifactRoot) {
+  try {
+    execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  } catch (error) {
+    rmSync(artifactRoot, { recursive: true, force: true });
+    return {
+      stdout: String(error.stdout ?? ""),
+      stderr: String(error.stderr ?? "")
+    };
+  }
+  rmSync(artifactRoot, { recursive: true, force: true });
+  assert.fail("validate-artifacts unexpectedly succeeded");
+}

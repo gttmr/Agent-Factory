@@ -47,6 +47,7 @@ const graphNodeKinds = new Set([
   "adapter",
   "adapter_call",
   "human_input",
+  "callback_wait",
   "workflow",
   "workflow_call",
   "remote_a2a",
@@ -100,10 +101,44 @@ const graphExecutionSemantics = new Set([
   "conditional",
   "boundary_crossing"
 ]);
-// Synthetic node kinds that MUST NOT bind to a module candidate.
-const syntheticNodeKindsStrict = new Set(["input", "output", "join", "router", "loop_control"]);
+const graphInvokeBindings = new Set([
+  "unresolved",
+  "local_python",
+  "direct_api",
+  "mcp_tool",
+  "mcp_toolset",
+  "local_function",
+  "internal_workflow",
+  "ui_input",
+  "remote_a2a",
+  "callback_wait",
+  "unknown"
+]);
+const graphDecisionOwners = new Set(["workflow_code", "llm", "human", "remote_agent", "system", "unknown"]);
+const graphCallControls = new Set(["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"]);
+const graphFlowKinds = new Set(["sequence", "route", "fan_out", "fan_in", "loop_back", "loop_exit", "fallback", "error", "resume", "callback", "unknown"]);
+const graphSideEffects = new Set(["none", "read", "write", "external_message", "transaction", "unknown"]);
+const graphPolicies = new Set([
+  "none",
+  "auth_required",
+  "approval_required",
+  "audit_required",
+  "idempotency_required",
+  "timeout_retry_required",
+  "data_policy_required",
+  "manual_fallback_required",
+  "callback_resume_required",
+  "compensation_required",
+  "unknown"
+]);
+const callbackInvokeBindings = new Set(["callback_wait"]);
+const callbackCallControls = new Set(["event_callback", "resume"]);
+const callbackFlowKinds = new Set(["callback", "resume"]);
+// Synthetic / graph-semantics node kinds that MUST NOT bind to a module candidate.
+const syntheticNodeKindsStrict = new Set(["input", "output", "join", "router", "loop_control", "human_input", "callback_wait"]);
 // Synthetic-ish kinds that MAY optionally bind to a candidate without erroring.
-const syntheticNodeKindsLenient = new Set(["function", "tool", "human_input"]);
+const syntheticNodeKindsLenient = new Set(["function", "tool"]);
+const remoteAgentNodeKinds = new Set(["remote_a2a", "remote_agent_call"]);
 const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
 const remoteRequiredFields = [
   "owner",
@@ -605,6 +640,32 @@ function requireNonEmptyString(value, label) {
   return true;
 }
 
+function validateOptionalEnumValue(value, allowed, label) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (typeof value !== "string" || !allowed.has(value)) {
+    errors.push(`${label} has invalid value ${JSON.stringify(value)}.`);
+  }
+}
+
+function hasCallbackWaitControlMetadata(node, edges) {
+  if (typeof node.invoke_binding === "string" && callbackInvokeBindings.has(node.invoke_binding)) return true;
+  if (typeof node.call_control === "string" && callbackCallControls.has(node.call_control)) return true;
+  if (node.policy === "callback_resume_required") return true;
+  return edges.some((edge) => {
+    if (!edge || (edge.from !== node.id && edge.to !== node.id)) return false;
+    return (
+      (typeof edge.call_control === "string" && callbackCallControls.has(edge.call_control)) ||
+      (typeof edge.flow_kind === "string" && callbackFlowKinds.has(edge.flow_kind))
+    );
+  });
+}
+
+function isRemoteAgentNode(node) {
+  return node && typeof node.node_kind === "string" && remoteAgentNodeKinds.has(node.node_kind);
+}
+
 /**
  * Structural validation for an ADK 2.0 Graph IR object.
  *
@@ -708,6 +769,11 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         );
       }
     }
+    validateOptionalEnumValue(node.invoke_binding, graphInvokeBindings, `${label}.nodes[${index}] (${node.id}).invoke_binding`);
+    validateOptionalEnumValue(node.decision_owner, graphDecisionOwners, `${label}.nodes[${index}] (${node.id}).decision_owner`);
+    validateOptionalEnumValue(node.call_control, graphCallControls, `${label}.nodes[${index}] (${node.id}).call_control`);
+    validateOptionalEnumValue(node.side_effect, graphSideEffects, `${label}.nodes[${index}] (${node.id}).side_effect`);
+    validateOptionalEnumValue(node.policy, graphPolicies, `${label}.nodes[${index}] (${node.id}).policy`);
   });
 
   const containerById = new Map();
@@ -821,6 +887,8 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     if (!graphExecutionSemantics.has(edge.execution_semantics)) {
       errors.push(`${label}.edges[${index}] (${edge.id}) has invalid execution_semantics.`);
     }
+    validateOptionalEnumValue(edge.flow_kind, graphFlowKinds, `${label}.edges[${index}] (${edge.id}).flow_kind`);
+    validateOptionalEnumValue(edge.call_control, graphCallControls, `${label}.edges[${index}] (${edge.id}).call_control`);
     for (const legacyKey of ["edge_type", "data", "data_channel"]) {
       if (legacyKey in edge) {
         errors.push(`${label}.edges[${index}] (${edge.id}) uses legacy ${legacyKey}; emit native Graph IR fields only.`);
@@ -859,11 +927,10 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     if (edge.edge_kind === "remote_a2a") {
       const fromNode = nodeById.get(edge.from);
       const toNode = nodeById.get(edge.to);
-      const remoteNode =
-        fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
+      const remoteNode = isRemoteAgentNode(fromNode) ? fromNode : isRemoteAgentNode(toNode) ? toNode : null;
       if (!remoteNode || typeof remoteNode.module_id !== "string" || !remoteNode.module_id.trim()) {
         errors.push(
-          `${label}.edges[${index}] (${edge.id}) remote_a2a edge must connect to a remote_a2a node with module_id.`
+          `${label}.edges[${index}] (${edge.id}) remote_a2a edge must connect to a remote agent node with module_id.`
         );
       }
       if (edge.is_remote_boundary_crossing !== true) {
@@ -930,6 +997,16 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
   }
 
+  // callback_wait nodes are design-time pause/resume controls. They must point
+  // at callback/resume metadata so reviewers can tie them to runtimeContracts.
+  for (const node of nodes) {
+    if (node && node.node_kind === "callback_wait" && !hasCallbackWaitControlMetadata(node, edges)) {
+      errors.push(
+        `${label}.nodes (${node.id}) callback_wait node requires callback/resume invoke_binding, call_control, flow_kind, or policy metadata.`
+      );
+    }
+  }
+
   // Module-bound nodes must be connected into the reviewed workflow. A graph
   // with isolated candidate nodes can render but cannot be a scaffold source.
   for (const node of nodes) {
@@ -947,6 +1024,15 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
   // Container-kind specific structural rules.
   for (const container of containers) {
     if (!container || typeof container !== "object") continue;
+    if (
+      container.container_kind === "dynamic_workflow" &&
+      typeof container.adk_mapping === "string" &&
+      container.adk_mapping.trim()
+    ) {
+      errors.push(
+        `${label}.containers (${container.id}) dynamic_workflow is design-only and must not declare a runtime adk_mapping.`
+      );
+    }
     if (container.container_kind === "parallel_region") {
       if (!Array.isArray(container.entry_node_ids) || container.entry_node_ids.length < 2) {
         errors.push(
@@ -1032,6 +1118,7 @@ function validateScaffoldPlan(dir = root) {
     errors.push("scaffold plan modules must be an array.");
     return;
   }
+  validateScaffoldGraph(plan.graph);
   if (!Array.isArray(plan.runtime_contracts)) {
     errors.push("scaffold plan runtime_contracts must be an array.");
   } else {
@@ -1075,6 +1162,78 @@ function validateScaffoldPlan(dir = root) {
       }
     }
     validateScaffoldMcpBinding(module, label);
+  });
+}
+
+function validateScaffoldGraph(graph) {
+  if (graph === undefined || graph === null) {
+    return;
+  }
+  if (typeof graph !== "object" || Array.isArray(graph)) {
+    errors.push("scaffold.graph must be an object when present.");
+    return;
+  }
+
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : null;
+  const edges = Array.isArray(graph.edges) ? graph.edges : null;
+  if (!nodes) {
+    errors.push("scaffold.graph.nodes must be an array.");
+    return;
+  }
+  if (!edges) {
+    errors.push("scaffold.graph.edges must be an array.");
+    return;
+  }
+
+  const nodeIds = new Set();
+  nodes.forEach((node, index) => {
+    const label = `scaffold.graph.nodes[${index}]`;
+    if (!node || typeof node !== "object" || Array.isArray(node)) {
+      errors.push(`${label} must be an object.`);
+      return;
+    }
+    if (typeof node.id !== "string" || !node.id.trim()) {
+      errors.push(`${label}.id must be a non-empty string.`);
+    } else {
+      nodeIds.add(node.id);
+    }
+    if (typeof node.node_kind !== "string" || !graphNodeKinds.has(node.node_kind)) {
+      errors.push(`${label}.node_kind has invalid value ${JSON.stringify(node.node_kind)}.`);
+    }
+    if (node.module_id !== undefined && node.module_id !== null && typeof node.module_id !== "string") {
+      errors.push(`${label}.module_id must be a string or null when present.`);
+    }
+    validateOptionalEnumValue(node.invoke_binding, graphInvokeBindings, `${label}.invoke_binding`);
+    validateOptionalEnumValue(node.decision_owner, graphDecisionOwners, `${label}.decision_owner`);
+    validateOptionalEnumValue(node.call_control, graphCallControls, `${label}.call_control`);
+    validateOptionalEnumValue(node.side_effect, graphSideEffects, `${label}.side_effect`);
+    validateOptionalEnumValue(node.policy, graphPolicies, `${label}.policy`);
+  });
+
+  edges.forEach((edge, index) => {
+    const label = `scaffold.graph.edges[${index}]`;
+    if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
+      errors.push(`${label} must be an object.`);
+      return;
+    }
+    if (edge.id !== undefined && edge.id !== null && typeof edge.id !== "string") {
+      errors.push(`${label}.id must be a string or null when present.`);
+    }
+    if (typeof edge.from !== "string" || !edge.from.trim()) {
+      errors.push(`${label}.from must be a non-empty string.`);
+    } else if (!nodeIds.has(edge.from)) {
+      errors.push(`${label}.from references unknown node ${edge.from}.`);
+    }
+    if (typeof edge.to !== "string" || !edge.to.trim()) {
+      errors.push(`${label}.to must be a non-empty string.`);
+    } else if (!nodeIds.has(edge.to)) {
+      errors.push(`${label}.to references unknown node ${edge.to}.`);
+    }
+    if (typeof edge.edge_kind !== "string" || !graphEdgeKinds.has(edge.edge_kind)) {
+      errors.push(`${label}.edge_kind has invalid value ${JSON.stringify(edge.edge_kind)}.`);
+    }
+    validateOptionalEnumValue(edge.flow_kind, graphFlowKinds, `${label}.flow_kind`);
+    validateOptionalEnumValue(edge.call_control, graphCallControls, `${label}.call_control`);
   });
 }
 

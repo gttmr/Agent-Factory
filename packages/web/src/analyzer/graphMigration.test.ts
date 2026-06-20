@@ -93,7 +93,7 @@ assert.deepEqual(missingModuleErrors[0], {
   target_id: "node-agent"
 });
 
-const lenientKinds: GraphNode["node_kind"][] = ["input", "output", "function", "tool", "human_input"];
+const lenientKinds: GraphNode["node_kind"][] = ["input", "output", "function", "tool"];
 const lenientResult = validateGraphIRSoft(
   graphWithNodes(
     lenientKinds.map((nodeKind) =>
@@ -107,6 +107,32 @@ const lenientResult = validateGraphIRSoft(
   )
 );
 assert.equal(lenientResult.errors.filter((issue) => issue.code === "node_missing_module_id").length, 0);
+
+const graphSemanticsMustNotBindModules = validateGraphIRSoft(
+  graphWithNodes([
+    node({
+      id: "node-human-input",
+      label: "Approval",
+      module_id: "mod-human",
+      node_kind: "human_input",
+      lane_id: "human_input"
+    }),
+    node({
+      id: "node-callback-wait",
+      label: "Callback",
+      module_id: "mod-callback",
+      node_kind: "callback_wait",
+      lane_id: "local_graph",
+      invoke_binding: "callback_wait",
+      decision_owner: "workflow_code",
+      call_control: "event_callback"
+    } as Partial<GraphNode>)
+  ])
+);
+assert.equal(
+  graphSemanticsMustNotBindModules.errors.filter((issue) => issue.code === "node_kind_must_not_bind_module").length,
+  2
+);
 
 const linkedModule = validateGraphIRSoft(graphWithNodes([node({ module_id: "mod-agent" })]));
 assert.equal(linkedModule.errors.filter((issue) => issue.code === "node_missing_module_id").length, 0);
@@ -184,7 +210,7 @@ const remoteLinkWarnings = remoteLinkWithoutRemoteEndpoint.warnings.filter((issu
 assert.equal(remoteLinkWarnings.length, 1);
 assert.deepEqual(remoteLinkWarnings[0], {
   code: "remote_link_incoherent",
-  message: "Remote edge edge-001 should connect to a remote_a2a node with module_id.",
+  message: "Remote edge edge-001 should connect to a remote agent node with module_id.",
   target_kind: "edge",
   target_id: "edge-001"
 });
@@ -249,3 +275,161 @@ assert.deepEqual(
   mergedWithoutStaleModuleConnectivityWarnings.warnings.map((issue) => issue.code),
   []
 );
+
+const graphWithControlMetadata: GraphIR = {
+  requirement_id: "req-control-metadata",
+  graph_id: "graph-001",
+  root_workflow_module_id: null,
+  nodes: [
+    node({
+      id: "node-callback-wait",
+      label: "Wait for callback",
+      node_kind: "callback_wait",
+      lane_id: "local_graph",
+      invoke_binding: "callback_wait",
+      decision_owner: "workflow_code",
+      call_control: "event_callback",
+      side_effect: "none",
+      policy: "callback_resume_required"
+    } as Partial<GraphNode>),
+    node({ id: "node-output", node_kind: "output", lane_id: "output" })
+  ],
+  edges: [
+    edge({
+      id: "edge-001",
+      from: "node-callback-wait",
+      to: "node-output",
+      edge_kind: "control",
+      execution_semantics: "normal_transition",
+      a2a_contract_id: null,
+      is_remote_boundary_crossing: false,
+      flow_kind: "resume",
+      call_control: "resume"
+    } as Partial<GraphEdge>)
+  ],
+  containers: [],
+  lanes: [],
+  validation: { ok: true, errors: [], warnings: [] }
+};
+
+const normalizedControlMetadata = normalizeGraphIRForRuntime(graphWithControlMetadata, "req-control-metadata");
+assert.deepEqual(
+  {
+    invoke_binding: normalizedControlMetadata.nodes[0]?.invoke_binding,
+    decision_owner: normalizedControlMetadata.nodes[0]?.decision_owner,
+    call_control: normalizedControlMetadata.nodes[0]?.call_control,
+    side_effect: normalizedControlMetadata.nodes[0]?.side_effect,
+    policy: normalizedControlMetadata.nodes[0]?.policy
+  },
+  {
+    invoke_binding: "callback_wait",
+    decision_owner: "workflow_code",
+    call_control: "event_callback",
+    side_effect: "none",
+    policy: "callback_resume_required"
+  }
+);
+assert.deepEqual(
+  {
+    flow_kind: normalizedControlMetadata.edges[0]?.flow_kind,
+    call_control: normalizedControlMetadata.edges[0]?.call_control
+  },
+  {
+    flow_kind: "resume",
+    call_control: "resume"
+  }
+);
+
+const callbackWaitWithoutControl = validateGraphIRSoft(
+  graphWithNodes([
+    node({
+      id: "node-callback-wait",
+      label: "Wait for callback",
+      node_kind: "callback_wait",
+      lane_id: "local_graph"
+    } as Partial<GraphNode>)
+  ])
+);
+assert.equal(callbackWaitWithoutControl.errors.filter((issue) => issue.code === "callback_wait_missing_control_metadata").length, 1);
+
+const callbackWaitWithControl = validateGraphIRSoft(
+  graphWithNodes([
+    node({
+      id: "node-callback-wait",
+      label: "Wait for callback",
+      node_kind: "callback_wait",
+      lane_id: "local_graph",
+      invoke_binding: "callback_wait",
+      call_control: "event_callback",
+      policy: "callback_resume_required"
+    } as Partial<GraphNode>)
+  ])
+);
+assert.equal(callbackWaitWithControl.errors.filter((issue) => issue.code === "callback_wait_missing_control_metadata").length, 0);
+
+const invalidControlMetadata = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({
+        id: "node-function",
+        label: "Function",
+        node_kind: "function",
+        invoke_binding: "invalid-binding",
+        decision_owner: "invalid-owner",
+        call_control: "invalid-control",
+        side_effect: "invalid-effect",
+        policy: "invalid-policy"
+      } as unknown as Partial<GraphNode>),
+      node({ id: "node-output", node_kind: "output", lane_id: "output" })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-function",
+        to: "node-output",
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        flow_kind: "invalid-flow",
+        call_control: "invalid-edge-control"
+      } as unknown as Partial<GraphEdge>)
+    ]
+  )
+);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_invoke_binding").length, 1);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_decision_owner").length, 1);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_call_control").length, 2);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_side_effect").length, 1);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_policy").length, 1);
+assert.equal(invalidControlMetadata.errors.filter((issue) => issue.code === "invalid_flow_kind").length, 1);
+
+const remoteAgentCallEdge = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({ id: "node-local", node_kind: "agent", module_id: "mod-local", lane_id: "local_graph" }),
+      node({
+        id: "node-remote-agent-call",
+        node_kind: "remote_agent_call",
+        module_id: "mod-remote-agent",
+        lane_id: "remote_boundary",
+        owner_scope: "remote"
+      })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-local",
+        to: "node-remote-agent-call",
+        edge_kind: "remote_a2a",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: "a2a-001",
+        is_remote_boundary_crossing: true,
+        flow_kind: "sequence",
+        call_control: "fixed_by_workflow"
+      })
+    ]
+  )
+);
+assert.equal(remoteAgentCallEdge.errors.filter((issue) => issue.code === "remote_missing_contract").length, 0);
+assert.equal(remoteAgentCallEdge.warnings.filter((issue) => issue.code === "remote_link_incoherent").length, 0);

@@ -172,6 +172,11 @@ const workflowCallModule = workflowCallPlan.modules[0];
 assert.ok(workflowCallModule);
 assert.ok(workflowCallModule.adk_skeleton_contract);
 assert.equal(workflowCallModule.node_kind, "workflow_call");
+assert.equal(
+  (workflowCallModule as unknown as { invoke_binding?: string | null }).invoke_binding,
+  "internal_workflow",
+  "workflow_call nodes should default to internal_workflow invoke_binding"
+);
 assert.deepEqual(workflowCallModule.workflow_ref, {
   id: "wf-risk-check",
   version: "v1",
@@ -215,6 +220,11 @@ const mockBindingPlan = buildScaffoldPlan({
         output_ports: [],
         schema_refs: [],
         runtime_binding: "mcp_tool",
+        invoke_binding: "mcp_tool",
+        decision_owner: "workflow_code",
+        call_control: "fixed_by_workflow",
+        side_effect: "read",
+        policy: "audit_required",
         mock_binding: {
           provider: "mock_lab",
           package_path: "packages/mock-lab",
@@ -237,6 +247,11 @@ assert.ok(mockBindingModule);
 assert.ok(mockBindingModule.adk_skeleton_contract);
 assert.equal(mockBindingModule.node_kind, "adapter_call");
 assert.equal(mockBindingModule.runtime_binding, "mcp_tool");
+assert.equal((mockBindingModule as unknown as { invoke_binding?: string | null }).invoke_binding, "mcp_tool");
+assert.equal((mockBindingModule as unknown as { decision_owner?: string | null }).decision_owner, "workflow_code");
+assert.equal((mockBindingModule as unknown as { call_control?: string | null }).call_control, "fixed_by_workflow");
+assert.equal((mockBindingModule as unknown as { side_effect?: string | null }).side_effect, "read");
+assert.equal((mockBindingModule as unknown as { policy?: string | null }).policy, "audit_required");
 assert.deepEqual(mockBindingModule.mock_binding, {
   provider: "mock_lab",
   package_path: "packages/mock-lab",
@@ -248,6 +263,153 @@ assert.deepEqual(mockBindingModule.mock_binding, {
   status: "linked"
 });
 assert.equal(mockBindingModule.adk_skeleton_contract.implementation_template, "mcp_mock_adapter_stub");
+
+const graphSemanticsPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({ id: "mod-a", name: "A_agent" }),
+    candidate({
+      id: "mod-b",
+      name: "B_adapter",
+      module_category: "adapter",
+      agent_kind: null,
+      adapter_kind: "data_query",
+      inputs: [{ name: "query", type: "string", required: true }],
+      outputs: [{ name: "rows", type: "object", required: true }]
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "node-a",
+        label: "A_agent",
+        module_id: "mod-a",
+        node_kind: "agent",
+        execution_kind: "agent",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "local_graph",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        review_status: "approved"
+      },
+      {
+        id: "node-b",
+        label: "B_adapter",
+        module_id: "mod-b",
+        node_kind: "adapter_call",
+        execution_kind: "adapter_call",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "adapter",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        invoke_binding: "mcp_toolset",
+        decision_owner: "llm",
+        call_control: "selected_by_llm",
+        side_effect: "read",
+        policy: "timeout_retry_required",
+        review_status: "approved"
+      }
+    ],
+    edges: [
+      {
+        id: "edge-a-b",
+        from: "node-a",
+        to: "node-b",
+        from_port: null,
+        to_port: null,
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        data_label: "agent_to_adapter",
+        schema_ref: null,
+        route_condition: null,
+        state_key: null,
+        artifact_key: null,
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        flow_kind: "sequence",
+        call_control: "selected_by_llm"
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.invoke_binding, "mcp_toolset");
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.decision_owner, "llm");
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.call_control, "selected_by_llm");
+assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "sequence");
+assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "selected_by_llm");
+
+const selectedToolsetPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({
+      id: "mod-toolset-adapter",
+      name: "LLM 선택 Toolset",
+      module_category: "adapter",
+      agent_kind: null,
+      adapter_kind: "data_query",
+      access_protocol: "mcp",
+      mcp_server: "mock-toolset",
+      mcp_tool_name: "lookup_any",
+      inputs: [{ name: "query", type: "string", required: true }],
+      outputs: [{ name: "result", type: "object", required: true }]
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "node-toolset",
+        label: "LLM 선택 Toolset",
+        module_id: "mod-toolset-adapter",
+        node_kind: "adapter_call",
+        execution_kind: "adapter_call",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "adapter",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        invoke_binding: "mcp_toolset",
+        decision_owner: "llm",
+        call_control: "selected_by_llm",
+        mock_binding: {
+          provider: "mock_lab",
+          package_path: "packages/mock-lab",
+          mock_server_id: "mock-toolset",
+          tool_name: "lookup_any",
+          input_schema: null,
+          output_schema: null,
+          sample_response_ref: null,
+          status: "linked"
+        },
+        adk_skeleton_contract: {
+          scaffold_level: "mock_testable_skeleton",
+          target_runtime: "adk_python_2_x",
+          implementation_template: "mcp_mock_adapter_stub",
+          manual_completion_required: true,
+          developer_todos: ["stale mock adapter metadata"]
+        },
+        review_status: "approved"
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+const selectedToolsetModule = selectedToolsetPlan.modules[0];
+assert.equal(selectedToolsetModule.mock_binding?.status, "missing");
+assert.equal(selectedToolsetModule.adk_skeleton_contract?.scaffold_level, "handoff");
+assert.equal(selectedToolsetModule.adk_skeleton_contract?.implementation_template, "adapter_placeholder_stub");
 
 const catalogPlan = buildScaffoldPlan({
   normalizedRequirement,

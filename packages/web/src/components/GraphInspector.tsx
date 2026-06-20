@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   A2AContract,
   GraphEdge,
@@ -27,13 +28,26 @@ function moduleCatFromKind(kind: string | undefined): ModuleCategory | null {
   return null;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="graph-inspector-row">
       <span className="graph-inspector-key">{label}</span>
       <span className="graph-inspector-value">{children}</span>
     </div>
   );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="graph-inspector-section">
+      <h4>{title}</h4>
+      <div className="graph-inspector-section-body">{children}</div>
+    </section>
+  );
+}
+
+function EmptyValue() {
+  return <span className="graph-inspector-muted">—</span>;
 }
 
 export function GraphInspector(props: GraphInspectorProps) {
@@ -49,11 +63,17 @@ export function GraphInspector(props: GraphInspectorProps) {
 
   if (selectedNode) {
     const cat = moduleCatFromKind(selectedNode.node_kind);
+    const subtype = candidate ? getSubtypeValue(candidate) : null;
     const agentMode = selectedNode.node_kind === "agent"
       ? selectedNode.agent_execution_mode === "chat"
         ? "chat"
         : "single_turn"
       : null;
+    const schemaRefs = selectedNode.schema_refs ?? [];
+    const inputPorts = selectedNode.input_ports ?? [];
+    const hasMockLab = Boolean(selectedNode.mock_binding);
+    const hasAdkCompat = Boolean(selectedNode.adk_skeleton_contract || selectedNode.adk_node_role);
+
     return (
       <aside className="graph-inspector">
         <header className="graph-inspector-head">
@@ -66,136 +86,157 @@ export function GraphInspector(props: GraphInspectorProps) {
           </button>
         </header>
 
-        <Row label="ID">
-          <code>{selectedNode.id}</code>
-        </Row>
-        <Row label="kind">{selectedNode.node_kind ?? "-"}</Row>
-        {cat ? (
-          <Row label="카테고리">
-            <CategoryBadge category={cat} />
-            {candidate ? (() => {
-              const sub = getSubtypeValue(candidate);
-              return sub ? <SubtypeBadge value={sub} /> : null;
-            })() : null}
+        <Section title="책임 분류">
+          <Row label="ID">
+            <code>{selectedNode.id}</code>
           </Row>
-        ) : null}
-        <Row label="module_id">{selectedNode.module_id ?? "—"}</Row>
-        {selectedNode.execution_kind ? (
-          <Row label="execution">{selectedNode.execution_kind}</Row>
-        ) : null}
-        {selectedNode.runtime_binding ? <Row label="runtime_binding">{selectedNode.runtime_binding}</Row> : null}
-        {agentMode ? (
-          <>
-            <Row label="agent mode">{agentMode}</Row>
-            <Row label="context">
-              {agentMode === "chat" ? "session history implicit input" : "current input only"}
+          <Row label="node_kind">{selectedNode.node_kind ?? <EmptyValue />}</Row>
+          {cat ? (
+            <Row label="카테고리">
+              <div className="graph-inspector-chips">
+                <CategoryBadge category={cat} />
+                {subtype ? <SubtypeBadge value={subtype} /> : null}
+              </div>
             </Row>
-          </>
-        ) : null}
-        {selectedNode.adk_node_role ? (
-          <Row label="adk_role">{selectedNode.adk_node_role}</Row>
-        ) : null}
-        <Row label="container">{selectedNode.container_id ?? "—"}</Row>
-        <Row label="lane">{(selectedNode.lane_id as string) ?? "—"}</Row>
-        <Row label="owner">{selectedNode.owner_scope ?? "—"}</Row>
-        <Row label="검토 상태">{selectedNode.review_status ?? "—"}</Row>
-        {selectedNode.schema_refs && selectedNode.schema_refs.length ? (
+          ) : null}
+          <Row label="module_id">{selectedNode.module_id ?? <EmptyValue />}</Row>
+          <Row label="검토 상태">{selectedNode.review_status ?? <EmptyValue />}</Row>
+          <Row label="lane">{(selectedNode.lane_id as string) ?? <EmptyValue />}</Row>
+          <Row label="container">{selectedNode.container_id ?? <EmptyValue />}</Row>
+        </Section>
+
+        <Section title="계약">
           <Row label="schemas">
-            <div className="graph-inspector-chips">
-              {selectedNode.schema_refs.map((s) => (
-                <span key={s} className="chip">
-                  {s}
-                </span>
-              ))}
-            </div>
+            {schemaRefs.length ? (
+              <div className="graph-inspector-chips">
+                {schemaRefs.map((schemaRef) => (
+                  <span key={schemaRef} className="chip">
+                    {schemaRef}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <EmptyValue />
+            )}
           </Row>
-        ) : null}
-        {selectedNode.workflow_ref ? (
-          <>
-            <Row label="workflow_ref">
-              {selectedNode.workflow_ref.display_name} · {selectedNode.workflow_ref.id}
-              {selectedNode.workflow_ref.version ? ` · ${selectedNode.workflow_ref.version}` : ""}
+          {selectedNode.input_schema ? <Row label="input_schema">{selectedNode.input_schema}</Row> : null}
+          {selectedNode.output_schema ? <Row label="output_schema">{selectedNode.output_schema}</Row> : null}
+          {selectedNode.workflow_ref ? (
+            <>
+              <Row label="workflow_ref">
+                {selectedNode.workflow_ref.display_name} · {selectedNode.workflow_ref.id}
+                {selectedNode.workflow_ref.version ? ` · ${selectedNode.workflow_ref.version}` : ""}
+              </Row>
+              <Row label="input_mapping">
+                <code>{JSON.stringify(selectedNode.input_mapping ?? {})}</code>
+              </Row>
+              <Row label="output_mapping">
+                <code>{JSON.stringify(selectedNode.output_mapping ?? {})}</code>
+              </Row>
+            </>
+          ) : null}
+          {selectedNode.node_kind === "human_input" ? (
+            <Row label="입력 포트">
+              <div className="graph-inspector-chips">
+                {inputPorts.map((port) => (
+                  <span key={port.id} className="chip">
+                    {port.label}
+                  </span>
+                ))}
+                {inputPorts.length === 0 ? <EmptyValue /> : null}
+              </div>
             </Row>
-            <Row label="input_mapping">
-              <code>{JSON.stringify(selectedNode.input_mapping ?? {})}</code>
+          ) : null}
+        </Section>
+
+        <Section title="실행 설정">
+          <Row label="invoke_binding">{selectedNode.invoke_binding ?? <EmptyValue />}</Row>
+          {selectedNode.runtime_binding ? (
+            <Row label="runtime_binding">
+              <span className="graph-inspector-muted">legacy/compat · {selectedNode.runtime_binding}</span>
             </Row>
-            <Row label="output_mapping">
-              <code>{JSON.stringify(selectedNode.output_mapping ?? {})}</code>
+          ) : null}
+          <Row label="decision_owner">{selectedNode.decision_owner ?? <EmptyValue />}</Row>
+          <Row label="call_control">{selectedNode.call_control ?? <EmptyValue />}</Row>
+          {selectedNode.execution_kind ? <Row label="execution_kind">{selectedNode.execution_kind}</Row> : null}
+          {agentMode ? <Row label="agent mode">{agentMode}</Row> : null}
+        </Section>
+
+        <Section title="정책·리스크">
+          <Row label="owner">{selectedNode.owner_scope ?? <EmptyValue />}</Row>
+          <Row label="side_effect">{selectedNode.side_effect ?? <EmptyValue />}</Row>
+          <Row label="policy">{selectedNode.policy ?? <EmptyValue />}</Row>
+          {candidate ? (
+            <>
+              <Row label="risk">{candidate.risk_level}</Row>
+              {candidate.risk_signals?.length ? (
+                <Row label="risk signals">
+                  <div className="graph-inspector-chips">
+                    {candidate.risk_signals.map((signal) => (
+                      <span key={signal} className="chip">
+                        {signal}
+                      </span>
+                    ))}
+                  </div>
+                </Row>
+              ) : null}
+              {candidate.missing_information?.length ? (
+                <Row label="누락 정보">
+                  <ul className="graph-inspector-list">
+                    {candidate.missing_information.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))}
+                  </ul>
+                </Row>
+              ) : null}
+              {candidate.adk_hints ? (
+                <Row label="ADK 힌트">
+                  <span>state/callback/artifact 검토 필요</span>
+                </Row>
+              ) : null}
+            </>
+          ) : null}
+        </Section>
+
+        {hasMockLab ? (
+          <Section title="Mock Lab">
+            <Row label="binding">
+              {selectedNode.mock_binding?.status} · {selectedNode.mock_binding?.mock_server_id ?? "missing"} ·{" "}
+              {selectedNode.mock_binding?.tool_name ?? "missing"}
             </Row>
-          </>
-        ) : null}
-        {selectedNode.mock_binding ? (
-          <Row label="Mock Lab">
-            {selectedNode.mock_binding.status} · {selectedNode.mock_binding.mock_server_id ?? "missing"} ·{" "}
-            {selectedNode.mock_binding.tool_name ?? "missing"}
-          </Row>
-        ) : null}
-        {selectedNode.adk_skeleton_contract ? (
-          <Row label="ADK Skeleton">
-            {selectedNode.adk_skeleton_contract.scaffold_level} · {selectedNode.adk_skeleton_contract.implementation_template}
-          </Row>
+          </Section>
         ) : null}
 
-        {selectedNode.node_kind === "human_input" ? (
-          <Row label="입력 포트">
-            <div className="graph-inspector-chips">
-              {(selectedNode.input_ports ?? []).map((p) => (
-                <span key={p.id} className="chip">
-                  {p.label}
-                </span>
-              ))}
-              {(selectedNode.input_ports ?? []).length === 0 ? <span>—</span> : null}
-            </div>
-          </Row>
-        ) : null}
-
-        {candidate ? (
-          <>
-            <Row label="risk">{candidate.risk_level}</Row>
-            {candidate.risk_signals?.length ? (
-              <Row label="risk signals">
-                <div className="graph-inspector-chips">
-                  {candidate.risk_signals.map((s) => (
-                    <span key={s} className="chip">
-                      {s}
-                    </span>
-                  ))}
-                </div>
+        {hasAdkCompat ? (
+          <Section title="ADK Skeleton">
+            {selectedNode.adk_skeleton_contract ? (
+              <Row label="contract">
+                {selectedNode.adk_skeleton_contract.scaffold_level} ·{" "}
+                {selectedNode.adk_skeleton_contract.implementation_template}
               </Row>
             ) : null}
-            {candidate.missing_information?.length ? (
-              <Row label="누락 정보">
-                <ul className="graph-inspector-list">
-                  {candidate.missing_information.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
-                </ul>
-              </Row>
+            {selectedNode.adk_node_role ? (
+              <p className="graph-inspector-note">ADK role 호환 메타데이터: {selectedNode.adk_node_role}</p>
             ) : null}
-            {candidate.adk_hints ? (
-              <Row label="ADK 힌트">
-                <span>state/callbacks/artifacts 등 모듈 검토에서 확인하세요.</span>
-              </Row>
-            ) : null}
-          </>
+          </Section>
         ) : null}
       </aside>
     );
   }
 
-  // Edge
   if (selectedEdge) {
-    const e = selectedEdge;
-    const remoteContract = e.a2a_contract_id
-      ? a2aContracts.find((c) => c.contract_id === e.a2a_contract_id) ?? null
+    const edge = selectedEdge;
+    const remoteContract = edge.a2a_contract_id
+      ? a2aContracts.find((contract) => contract.contract_id === edge.a2a_contract_id) ?? null
       : null;
+
     return (
       <aside className="graph-inspector">
         <header className="graph-inspector-head">
           <div>
             <p className="eyebrow">엣지 상세</p>
             <h3>
-              {nodeLabel(e.from)} → {nodeLabel(e.to)}
+              {nodeLabel(edge.from)} → {nodeLabel(edge.to)}
             </h3>
           </div>
           <button type="button" className="link" onClick={onClose}>
@@ -203,20 +244,36 @@ export function GraphInspector(props: GraphInspectorProps) {
           </button>
         </header>
 
-        <Row label="ID">
-          <code>{e.id ?? "—"}</code>
-        </Row>
-        <Row label="edge_kind">{e.edge_kind ?? "event_output"}</Row>
-        <Row label="실행 의미">{e.execution_semantics ?? "—"}</Row>
-        {e.data_label ? <Row label="data label">{e.data_label}</Row> : null}
-        {e.schema_ref ? <Row label="schema">{e.schema_ref}</Row> : null}
-        {e.route_condition ? <Row label="route">{e.route_condition}</Row> : null}
-        {e.state_key ? <Row label="state_key">{e.state_key}</Row> : null}
-        {e.artifact_key ? <Row label="artifact_key">{e.artifact_key}</Row> : null}
-        {e.a2a_contract_id ? <Row label="A2A 계약">{e.a2a_contract_id}</Row> : null}
-        <Row label="boundary crossing">{e.is_remote_boundary_crossing ? "예" : "아니오"}</Row>
+        <Section title="책임 분류">
+          <Row label="ID">
+            <code>{edge.id ?? "—"}</code>
+          </Row>
+          <Row label="연결">
+            {edge.from} → {edge.to}
+          </Row>
+          <Row label="edge_kind">{edge.edge_kind ?? "event_output"}</Row>
+          <Row label="execution">{edge.execution_semantics ?? <EmptyValue />}</Row>
+        </Section>
 
-        {e.edge_kind === "remote_a2a" && onNavigateToA2AContracts ? (
+        <Section title="계약">
+          <Row label="data_label">{edge.data_label || <EmptyValue />}</Row>
+          {edge.schema_ref ? <Row label="schema">{edge.schema_ref}</Row> : null}
+          {edge.route_condition ? <Row label="route">{edge.route_condition}</Row> : null}
+          {edge.state_key ? <Row label="state_key">{edge.state_key}</Row> : null}
+          {edge.artifact_key ? <Row label="artifact_key">{edge.artifact_key}</Row> : null}
+          {edge.a2a_contract_id ? <Row label="A2A 계약">{edge.a2a_contract_id}</Row> : null}
+        </Section>
+
+        <Section title="실행 설정">
+          <Row label="flow_kind">{edge.flow_kind ?? <EmptyValue />}</Row>
+          <Row label="call_control">{edge.call_control ?? <EmptyValue />}</Row>
+        </Section>
+
+        <Section title="정책·리스크">
+          <Row label="boundary">{edge.is_remote_boundary_crossing ? "예" : "아니오"}</Row>
+        </Section>
+
+        {edge.edge_kind === "remote_a2a" && onNavigateToA2AContracts ? (
           <div className="graph-inspector-actions">
             <button type="button" className="primary" onClick={onNavigateToA2AContracts}>
               Remote A2A 계약 검토 →
