@@ -526,6 +526,50 @@
   letter-spacing: 0.06em;
 }
 
+.graph-element-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+}
+
+.graph-element-tab {
+  min-width: 0;
+  min-height: 36px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+  letter-spacing: 0;
+  line-height: var(--lh-tight);
+  overflow: hidden;
+  padding: var(--space-sm) var(--space-2xs);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-element-tab:hover {
+  color: var(--text-strong);
+  background: var(--surface-muted);
+}
+
+.graph-element-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.graph-element-tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent-strong);
+}
+
 .graph-inspector-section {
   display: grid;
   gap: var(--space-sm);

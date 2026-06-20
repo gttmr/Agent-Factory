@@ -16,7 +16,7 @@
 
 .af-design-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  grid-template-columns: 338px minmax(0, 1fr) 320px;
   gap: 12px;
   min-height: 70vh;
 }
@@ -25,7 +25,7 @@
    열을 없애고 캔버스(1fr)가 그 영역까지 차지한다. 아래 1100px collapse 규칙이
    소스 순서상 뒤에 있어 좁은 화면에서는 동일하게 1열로 접힌다. */
 .af-design-grid--no-inspector {
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 338px minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {

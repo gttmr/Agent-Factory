@@ -1,32 +1,30 @@
 // Controlled by GraphEditState.draft: field changes update the live draft immediately.
 // The canvas toolbar owns whole-graph save/cancel, so this form keeps no mirror state.
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AGENT_EXECUTION_MODES,
-  GRAPH_CALL_CONTROLS,
-  GRAPH_DECISION_OWNERS,
   GRAPH_EDGE_KINDS,
-  GRAPH_EXECUTION_SEMANTICS,
-  GRAPH_FLOW_KINDS,
   GRAPH_INVOKE_BINDINGS,
-  GRAPH_LANE_IDS,
   type AgentExecutionMode,
   type A2AContract,
   type EdgeKind,
-  type ExecutionSemantics,
-  type GraphCallControl,
-  type GraphDecisionOwner,
   type GraphEdge,
-  type GraphFlowKind,
   type GraphInvokeBinding,
   type GraphNode,
-  type LaneId,
   type ModuleCandidate,
   type ModuleCategory,
   type NodeKind
 } from "../analyzer/types";
 import { CategoryBadge } from "./CategoryBadge";
 import type { GraphEditState } from "./GraphCanvas";
+import {
+  GRAPH_ELEMENT_TABS,
+  isEdgeKindEditable,
+  isModuleBoundNodeKind,
+  isNodeModuleLinkEditable,
+  isNodeRuntimeControlEditable,
+  type GraphElementTabId
+} from "./graphElementEditorModel";
 import { Button, Field, SelectField, TextareaField } from "../ui/primitives";
 
 interface GraphElementEditorProps {
@@ -36,15 +34,6 @@ interface GraphElementEditorProps {
   onClose: () => void;
 }
 
-const MODULE_NODE_KINDS = new Set([
-  "agent",
-  "workflow",
-  "workflow_call",
-  "adapter",
-  "adapter_call",
-  "remote_a2a",
-  "remote_agent_call"
-]);
 const STATE_EDGE_KINDS = new Set(["session_state", "temp_state", "user_state", "app_state"]);
 
 const NODE_KIND_LABEL: Record<NodeKind, string> = {
@@ -89,39 +78,6 @@ const INVOKE_BINDING_LABEL: Record<GraphInvokeBinding, string> = {
   unknown: "Unknown"
 };
 
-const DECISION_OWNER_LABEL: Record<GraphDecisionOwner, string> = {
-  workflow_code: "Workflow code",
-  llm: "LLM",
-  human: "Human",
-  remote_agent: "Remote agent",
-  system: "System",
-  unknown: "Unknown"
-};
-
-const CALL_CONTROL_LABEL: Record<GraphCallControl, string> = {
-  none: "없음",
-  fixed_by_workflow: "Workflow 고정",
-  selected_by_llm: "LLM 선택",
-  selected_by_human: "Human 선택",
-  event_callback: "Event callback",
-  resume: "Resume",
-  unknown: "Unknown"
-};
-
-const FLOW_KIND_LABEL: Record<GraphFlowKind, string> = {
-  sequence: "순차",
-  route: "분기",
-  fan_out: "Fan-out",
-  fan_in: "Fan-in",
-  loop_back: "Loop back",
-  loop_exit: "Loop exit",
-  fallback: "Fallback",
-  error: "Error",
-  resume: "Resume",
-  callback: "Callback",
-  unknown: "Unknown"
-};
-
 // "데이터 전달 방식" picker metadata. edge_kind is how a connected edge passes
 // data in the generated ADK code: an in-process channel (event/state/artifact),
 // a control edge, or a remote A2A call. Groups + labels are UI copy; the enum
@@ -162,12 +118,25 @@ const EDGE_KIND_HELP: Record<EdgeKind, string> = {
 };
 
 export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, onClose }: GraphElementEditorProps) {
+  const [activeTab, setActiveTab] = useState<GraphElementTabId>("basic");
+  const selectionKey = editState.selectedNode
+    ? `node:${editState.selectedNode.id}`
+    : editState.selectedEdge
+      ? `edge:${editState.selectedEdge.id ?? `${editState.selectedEdge.from}->${editState.selectedEdge.to}`}`
+      : "empty";
+
+  useEffect(() => {
+    setActiveTab("basic");
+  }, [selectionKey]);
+
   if (editState.selectedNode) {
     return (
       <NodeForm
         node={editState.selectedNode}
         editState={editState}
         moduleCandidates={moduleCandidates}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         onClose={onClose}
       />
     );
@@ -179,6 +148,8 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
         edge={editState.selectedEdge}
         editState={editState}
         a2aContracts={a2aContracts}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         onClose={onClose}
       />
     );
@@ -191,29 +162,71 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
   );
 }
 
+function GraphElementTabs({
+  activeTab,
+  onTabChange
+}: {
+  activeTab: GraphElementTabId;
+  onTabChange: (tab: GraphElementTabId) => void;
+}) {
+  return (
+    <div className="graph-element-tabs" role="tablist" aria-label="그래프 요소 편집 탭">
+      {GRAPH_ELEMENT_TABS.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          className={`graph-element-tab${activeTab === tab.id ? " is-active" : ""}`}
+          onClick={() => onTabChange(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EmptyTabMessage({ children }: { children: ReactNode }) {
+  return <p className="graph-element-editor-hint">{children}</p>;
+}
+
+function ReadonlyInput({ value }: { value: ReactNode }) {
+  return <input value={typeof value === "string" || typeof value === "number" ? String(value) : ""} readOnly />;
+}
+
 function NodeForm({
   node,
   editState,
   moduleCandidates,
+  activeTab,
+  onTabChange,
   onClose
 }: {
   node: GraphNode;
   editState: GraphEditState;
   moduleCandidates: ModuleCandidate[];
+  activeTab: GraphElementTabId;
+  onTabChange: (tab: GraphElementTabId) => void;
   onClose: () => void;
 }) {
   const category = moduleCategoryFromNodeKind(node.node_kind);
-  const canLinkModule = MODULE_NODE_KINDS.has(node.node_kind);
+  const canLinkModule = isModuleBoundNodeKind(node.node_kind);
+  const moduleLinkEditable = isNodeModuleLinkEditable(node, editState.draft.edges);
+  const runtimeControlEditable = isNodeRuntimeControlEditable(node);
   const matchingCandidates = canLinkModule
     ? moduleCandidates.filter((candidate) => candidate.module_category === moduleCategoryFromNodeKind(node.node_kind))
     : [];
   const agentExecutionMode: AgentExecutionMode = node.agent_execution_mode === "chat" ? "chat" : "single_turn";
   const schemaRefs = node.schema_refs ?? [];
-  const showContractSection =
-    Boolean(node.workflow_ref || node.input_schema || node.output_schema || schemaRefs.length) ||
-    node.node_kind === "workflow_call";
-  const showMockLab = node.node_kind === "adapter_call" || Boolean(node.mock_binding);
-  const showAdkSkeleton = Boolean(node.adk_skeleton_contract || node.adk_node_role);
+  const containerLabel = node.container_id
+    ? editState.draft.containers.find((container) => container.id === node.container_id)?.label ?? node.container_id
+    : "없음";
+  const moduleLabel = node.module_id
+    ? matchingCandidates.find((candidate) => candidate.id === node.module_id)?.name
+      ? `${matchingCandidates.find((candidate) => candidate.id === node.module_id)?.name} (${node.module_id})`
+      : node.module_id
+    : "없음";
 
   return (
     <aside className="graph-element-editor">
@@ -231,7 +244,10 @@ function NodeForm({
         </Button>
       </header>
 
-      <EditorSection title="책임 분류">
+      <GraphElementTabs activeTab={activeTab} onTabChange={onTabChange} />
+
+      {activeTab === "basic" ? (
+      <EditorSection title="기본">
         <Field label="라벨">
           <input value={node.label} onChange={(event) => editState.updateNodeFields(node.id, { label: event.target.value })} />
         </Field>
@@ -240,67 +256,58 @@ function NodeForm({
           <input value={`${NODE_KIND_LABEL[node.node_kind] ?? node.node_kind} (${node.node_kind})`} readOnly />
         </Field>
 
-        <SelectField
-          label="레인 lane_id"
-          value={node.lane_id}
-          onChange={(event) => editState.updateNodeFields(node.id, { lane_id: event.target.value as LaneId })}
-        >
-          {GRAPH_LANE_IDS.map((laneId) => (
-            <option key={laneId} value={laneId}>
-              {laneId}
-            </option>
-          ))}
-        </SelectField>
+        <Field label="module_category">
+          <ReadonlyInput value={category ?? "없음"} />
+        </Field>
 
-        <SelectField
-          label="컨테이너 container_id"
-          value={node.container_id ?? ""}
-          onChange={(event) =>
-            editState.updateNodeFields(node.id, { container_id: nullableString(event.target.value) })
-          }
-        >
-          <option value="">없음</option>
-          {editState.draft.containers.map((container) => (
-            <option key={container.id} value={container.id}>
-              {container.label} ({container.id})
-            </option>
-          ))}
-        </SelectField>
+        <Field label="레인 lane_id" hint="node_kind 기준 자동값">
+          <ReadonlyInput value={node.lane_id} />
+        </Field>
+
+        <Field label="컨테이너 container_id" hint="연결 구조와 container membership에서 관리">
+          <ReadonlyInput value={node.container_id ? `${containerLabel} (${node.container_id})` : "없음"} />
+        </Field>
 
         {canLinkModule ? (
           <>
-            <SelectField
-              label="모듈 연결 module_id"
-              value={node.module_id ?? ""}
-              onChange={(event) => {
-                const moduleId = nullableString(event.target.value);
-                if (!moduleId) {
+            {moduleLinkEditable ? (
+              <SelectField
+                label="모듈 연결 module_id"
+                value={node.module_id ?? ""}
+                onChange={(event) => {
+                  const moduleId = nullableString(event.target.value);
+                  if (!moduleId) {
+                    editState.updateNodeFields(node.id, {
+                      module_id: null,
+                      execution_kind: null,
+                      agent_execution_mode: node.node_kind === "agent" ? "single_turn" : null,
+                      review_status: "n/a"
+                    });
+                    return;
+                  }
+                  const candidate = matchingCandidates.find((item) => item.id === moduleId);
+                  if (!candidate) return;
                   editState.updateNodeFields(node.id, {
-                    module_id: null,
-                    execution_kind: null,
-                    agent_execution_mode: node.node_kind === "agent" ? "single_turn" : null,
-                    review_status: "n/a"
+                    module_id: candidate.id,
+                    execution_kind: candidate.module_category,
+                    agent_execution_mode: node.node_kind === "agent" ? agentExecutionMode : null,
+                    review_status: candidate.status
                   });
-                  return;
-                }
-                const candidate = matchingCandidates.find((item) => item.id === moduleId);
-                if (!candidate) return;
-                editState.updateNodeFields(node.id, {
-                  module_id: candidate.id,
-                  execution_kind: candidate.module_category,
-                  agent_execution_mode: node.node_kind === "agent" ? agentExecutionMode : null,
-                  review_status: candidate.status
-                });
-              }}
-            >
-              <option value="">없음</option>
-              {matchingCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name} ({candidate.id})
-                </option>
-              ))}
-            </SelectField>
-            {!node.module_id ? (
+                }}
+              >
+                <option value="">없음</option>
+                {matchingCandidates.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name} ({candidate.id})
+                  </option>
+                ))}
+              </SelectField>
+            ) : (
+              <Field label="모듈 연결 module_id" hint="연결된 엣지 또는 계약이 있으면 삭제 후 재추가로 변경">
+                <ReadonlyInput value={moduleLabel} />
+              </Field>
+            )}
+            {!node.module_id && moduleLinkEditable ? (
               <p className="graph-element-editor-warning">이 노드는 모듈 후보 연결이 필요합니다.</p>
             ) : null}
           </>
@@ -310,8 +317,9 @@ function NodeForm({
           <input value={node.review_status ?? "n/a"} readOnly />
         </Field>
       </EditorSection>
+      ) : null}
 
-      {showContractSection ? (
+      {activeTab === "contract" ? (
         <EditorSection title="계약">
           {schemaRefs.length ? (
             <TextareaField label="schema_refs" value={JSON.stringify(schemaRefs, null, 2)} readOnly rows={4} />
@@ -334,26 +342,36 @@ function NodeForm({
               <TextareaField label="output_mapping" value={JSON.stringify(node.output_mapping ?? {}, null, 2)} readOnly rows={4} />
             </>
           ) : null}
+          {!schemaRefs.length && !node.input_schema && !node.output_schema && !node.workflow_ref ? (
+            <EmptyTabMessage>이 노드에 표시할 계약 정보가 없습니다.</EmptyTabMessage>
+          ) : null}
         </EditorSection>
       ) : null}
 
-      <EditorSection title="실행 설정">
-        <SelectField
-          label="invoke_binding"
-          value={node.invoke_binding ?? ""}
-          onChange={(event) =>
-            editState.updateNodeFields(node.id, {
-              invoke_binding: nullableEnum<GraphInvokeBinding>(event.target.value)
-            })
-          }
-        >
-          <option value="">없음</option>
-          {GRAPH_INVOKE_BINDINGS.map((binding) => (
-            <option key={binding} value={binding}>
-              {INVOKE_BINDING_LABEL[binding]} ({binding})
-            </option>
-          ))}
-        </SelectField>
+      {activeTab === "runtime" ? (
+      <EditorSection title="실행">
+        {runtimeControlEditable ? (
+          <SelectField
+            label="invoke_binding"
+            value={node.invoke_binding ?? ""}
+            onChange={(event) =>
+              editState.updateNodeFields(node.id, {
+                invoke_binding: nullableEnum<GraphInvokeBinding>(event.target.value)
+              })
+            }
+          >
+            <option value="">없음</option>
+            {GRAPH_INVOKE_BINDINGS.map((binding) => (
+              <option key={binding} value={binding}>
+                {INVOKE_BINDING_LABEL[binding]} ({binding})
+              </option>
+            ))}
+          </SelectField>
+        ) : (
+          <Field label="invoke_binding" hint="node_kind와 runtime contract에서 고정">
+            <ReadonlyInput value={node.invoke_binding ?? "없음"} />
+          </Field>
+        )}
 
         {node.runtime_binding ? (
           <Field label="runtime_binding" hint="legacy/compat">
@@ -361,39 +379,13 @@ function NodeForm({
           </Field>
         ) : null}
 
-        <SelectField
-          label="decision_owner"
-          value={node.decision_owner ?? ""}
-          onChange={(event) =>
-            editState.updateNodeFields(node.id, {
-              decision_owner: nullableEnum<GraphDecisionOwner>(event.target.value)
-            })
-          }
-        >
-          <option value="">없음</option>
-          {GRAPH_DECISION_OWNERS.map((owner) => (
-            <option key={owner} value={owner}>
-              {DECISION_OWNER_LABEL[owner]} ({owner})
-            </option>
-          ))}
-        </SelectField>
+        <Field label="decision_owner" hint="Workflow-first Graph Model에서 자동 결정">
+          <ReadonlyInput value={node.decision_owner ?? "없음"} />
+        </Field>
 
-        <SelectField
-          label="call_control"
-          value={node.call_control ?? ""}
-          onChange={(event) =>
-            editState.updateNodeFields(node.id, {
-              call_control: nullableEnum<GraphCallControl>(event.target.value)
-            })
-          }
-        >
-          <option value="">없음</option>
-          {GRAPH_CALL_CONTROLS.map((control) => (
-            <option key={control} value={control}>
-              {CALL_CONTROL_LABEL[control]} ({control})
-            </option>
-          ))}
-        </SelectField>
+        <Field label="call_control" hint="node_kind와 호출 주체 기준 고정">
+          <ReadonlyInput value={node.call_control ?? "없음"} />
+        </Field>
 
         {node.node_kind === "agent" ? (
           <div className="ui-field graph-agent-mode-field">
@@ -415,7 +407,9 @@ function NodeForm({
           </div>
         ) : null}
       </EditorSection>
+      ) : null}
 
+      {activeTab === "policy" ? (
       <EditorSection title="정책·리스크">
         <Field label="owner_scope">
           <input value={node.owner_scope ?? ""} readOnly />
@@ -427,27 +421,34 @@ function NodeForm({
           <input value={node.policy ?? "없음"} readOnly />
         </Field>
       </EditorSection>
+      ) : null}
 
-      {showMockLab ? (
-        <EditorSection title="Mock Lab">
-          <TextareaField
-            label="binding"
-            value={JSON.stringify(
-              node.mock_binding ?? { provider: "mock_lab", package_path: "packages/mock-lab", status: "missing" },
-              null,
-              2
-            )}
-            readOnly
-            rows={7}
-          />
+      {activeTab === "mock" ? (
+        <EditorSection title="Mock">
+          {node.node_kind === "adapter_call" || node.mock_binding ? (
+            <TextareaField
+              label="binding"
+              value={JSON.stringify(
+                node.mock_binding ?? { provider: "mock_lab", package_path: "packages/mock-lab", status: "missing" },
+                null,
+                2
+              )}
+              readOnly
+              rows={7}
+            />
+          ) : (
+            <EmptyTabMessage>이 노드는 Mock Lab binding 대상이 아닙니다.</EmptyTabMessage>
+          )}
         </EditorSection>
       ) : null}
 
-      {showAdkSkeleton ? (
-        <EditorSection title="ADK Skeleton">
+      {activeTab === "adk" ? (
+        <EditorSection title="ADK">
           {node.adk_skeleton_contract ? (
             <TextareaField label="contract" value={JSON.stringify(node.adk_skeleton_contract, null, 2)} readOnly rows={7} />
-          ) : null}
+          ) : (
+            <EmptyTabMessage>ADK Skeleton Contract가 없습니다.</EmptyTabMessage>
+          )}
           {node.adk_node_role ? (
             <p className="graph-element-editor-hint">ADK role 호환 메타데이터: {node.adk_node_role}</p>
           ) : null}
@@ -467,17 +468,22 @@ function EdgeForm({
   edge,
   editState,
   a2aContracts,
+  activeTab,
+  onTabChange,
   onClose
 }: {
   edge: GraphEdge;
   editState: GraphEditState;
   a2aContracts: A2AContract[];
+  activeTab: GraphElementTabId;
+  onTabChange: (tab: GraphElementTabId) => void;
   onClose: () => void;
 }) {
   const edgeId = selectedEdgeId(editState, edge);
   const fromLabel = nodeLabel(editState.draft.nodes, edge.from);
   const toLabel = nodeLabel(editState.draft.nodes, edge.to);
   const isStateEdge = STATE_EDGE_KINDS.has(edge.edge_kind);
+  const edgeKindEditable = isEdgeKindEditable(edge);
   // Any enum value not yet placed in a group still renders (under "기타") so a
   // future edge_kind never silently disappears from the picker.
   const ungroupedEdgeKinds = GRAPH_EDGE_KINDS.filter(
@@ -501,52 +507,53 @@ function EdgeForm({
         </Button>
       </header>
 
-      <EditorSection title="책임 분류">
+      <GraphElementTabs activeTab={activeTab} onTabChange={onTabChange} />
+
+      {activeTab === "basic" ? (
+      <EditorSection title="기본">
         <Field label="연결">
           <input value={`${edge.from} → ${edge.to}`} readOnly />
         </Field>
 
-        <SelectField
-          label="edge_kind"
-          value={edge.edge_kind}
-          onChange={(event) => editState.updateEdgeFields(edgeId, { edge_kind: event.target.value as EdgeKind })}
-        >
-          {EDGE_KIND_GROUPS.map((group) => (
-            <optgroup key={group.label} label={group.label}>
-              {group.kinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {EDGE_KIND_OPTION_LABEL[kind]} ({kind})
-                </option>
-              ))}
-            </optgroup>
-          ))}
-          {ungroupedEdgeKinds.length ? (
-            <optgroup label="기타">
-              {ungroupedEdgeKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {EDGE_KIND_OPTION_LABEL[kind] ?? kind} ({kind})
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-        </SelectField>
+        {edgeKindEditable ? (
+          <SelectField
+            label="edge_kind"
+            value={edge.edge_kind}
+            onChange={(event) => editState.updateEdgeFields(edgeId, { edge_kind: event.target.value as EdgeKind })}
+          >
+            {EDGE_KIND_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.kinds.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {EDGE_KIND_OPTION_LABEL[kind]} ({kind})
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            {ungroupedEdgeKinds.length ? (
+              <optgroup label="기타">
+                {ungroupedEdgeKinds.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {EDGE_KIND_OPTION_LABEL[kind] ?? kind} ({kind})
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+          </SelectField>
+        ) : (
+          <Field label="edge_kind" hint="router/remote boundary 연결에서 자동 고정">
+            <ReadonlyInput value={edge.edge_kind} />
+          </Field>
+        )}
         <p className="graph-element-editor-hint">{EDGE_KIND_HELP[edge.edge_kind] ?? ""}</p>
 
-        <SelectField
-          label="execution_semantics"
-          value={edge.execution_semantics}
-          onChange={(event) =>
-            editState.updateEdgeFields(edgeId, { execution_semantics: event.target.value as ExecutionSemantics })
-          }
-        >
-          {GRAPH_EXECUTION_SEMANTICS.map((semantics) => (
-            <option key={semantics} value={semantics}>
-              {semantics}
-            </option>
-          ))}
-        </SelectField>
+        <Field label="execution_semantics" hint="연결된 노드의 실행 의미에서 자동 결정">
+          <ReadonlyInput value={edge.execution_semantics} />
+        </Field>
       </EditorSection>
+      ) : null}
 
+      {activeTab === "contract" ? (
       <EditorSection title="계약">
         <Field label="data_label">
           <input value={edge.data_label} onChange={(event) => editState.updateEdgeFields(edgeId, { data_label: event.target.value })} />
@@ -609,48 +616,39 @@ function EdgeForm({
           </>
         ) : null}
       </EditorSection>
+      ) : null}
 
-      <EditorSection title="실행 설정">
-        <SelectField
-          label="flow_kind"
-          value={edge.flow_kind ?? ""}
-          onChange={(event) =>
-            editState.updateEdgeFields(edgeId, {
-              flow_kind: nullableEnum<GraphFlowKind>(event.target.value)
-            })
-          }
-        >
-          <option value="">없음</option>
-          {GRAPH_FLOW_KINDS.map((flowKind) => (
-            <option key={flowKind} value={flowKind}>
-              {FLOW_KIND_LABEL[flowKind]} ({flowKind})
-            </option>
-          ))}
-        </SelectField>
+      {activeTab === "runtime" ? (
+      <EditorSection title="실행">
+        <Field label="flow_kind" hint="edge_kind와 graph topology에서 고정">
+          <ReadonlyInput value={edge.flow_kind ?? "없음"} />
+        </Field>
 
-        <SelectField
-          label="call_control"
-          value={edge.call_control ?? ""}
-          onChange={(event) =>
-            editState.updateEdgeFields(edgeId, {
-              call_control: nullableEnum<GraphCallControl>(event.target.value)
-            })
-          }
-        >
-          <option value="">없음</option>
-          {GRAPH_CALL_CONTROLS.map((control) => (
-            <option key={control} value={control}>
-              {CALL_CONTROL_LABEL[control]} ({control})
-            </option>
-          ))}
-        </SelectField>
+        <Field label="call_control" hint="routing/callback/resume 의미에서 고정">
+          <ReadonlyInput value={edge.call_control ?? "없음"} />
+        </Field>
       </EditorSection>
+      ) : null}
 
-      <EditorSection title="정책·리스크">
+      {activeTab === "policy" ? (
+      <EditorSection title="정책">
         <Field label="is_remote_boundary_crossing">
           <input value={edge.is_remote_boundary_crossing ? "true" : "false"} readOnly />
         </Field>
       </EditorSection>
+      ) : null}
+
+      {activeTab === "mock" ? (
+        <EditorSection title="Mock">
+          <EmptyTabMessage>엣지는 Mock Lab binding을 직접 갖지 않습니다.</EmptyTabMessage>
+        </EditorSection>
+      ) : null}
+
+      {activeTab === "adk" ? (
+        <EditorSection title="ADK">
+          <EmptyTabMessage>엣지는 ADK Skeleton Contract를 직접 갖지 않습니다.</EmptyTabMessage>
+        </EditorSection>
+      ) : null}
 
       <div className="af-action-row">
         <Button variant="secondary" type="button" onClick={onClose}>

@@ -189,6 +189,11 @@
 - **배경**: 수용 상태가 리로드 시 초기화되는 버그.
 - **영향**: `AnalyzeWorkbench.tsx`, `analyzer/types.ts`, `schemas/analysis-result.schema.json`, `docs/workbench/validation.md`·`agent-factory-harness.md`.
 
+### Graph 편집 속성 패널은 6탭과 파생값 잠금을 기본으로 한다
+- **결정**: 좌측 Graph 속성 패널은 `기본 / 계약 / 실행 / 정책 / Mock / ADK` 6탭으로 정리하고, `node_kind`, `module_category`, `lane_id`, `container_id`, runtime control 같은 파생/고정값은 직접 편집하지 않는다. 모듈 연결은 신규·미연결·계약 없음 노드에서만 허용한다.
+- **배경**: Workbench Graph 편집 화면에서 taxonomy, runtime binding, policy, layout 값이 같은 수준의 편집 가능 필드처럼 보여 사용자가 Graph IR의 책임 축을 잘못 변경할 수 있었다.
+- **영향**: `GraphInspector.tsx`, `GraphElementEditor.tsx`, `styles/features/graph.css`, `styles/router/design.css`.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)
