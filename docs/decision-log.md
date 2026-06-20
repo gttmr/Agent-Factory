@@ -29,6 +29,13 @@
 - **배경**: `execution_kind`는 기존 카테고리/기술 라벨 성격으로 이미 쓰이고 있어 ADK LLM context contract 저장소로 재사용하면 충돌한다. `task`는 작은 workflow reuse나 coordinator/sub-agent topology와 구분해야 하므로 일반 노드 mode 선택값에서 제외한다.
 - **영향**: `GraphNode`/process-flow schema, `scaffold-plan` module schema, `GraphElementEditor`/`GraphInspector`/GraphCanvas badge, `generate-adk-source.mjs`, `validate-artifacts.mjs`, active docs. 기존 artifact는 필드 누락 시 `single_turn`으로 해석한다.
 
+## 2026-06-19 · 작업 브랜치 `docs/edge-data-passing-followups` — ADK LlmAgent execution mode 정책 문서화
+
+### Graph node 기본은 `single_turn`, `chat`은 stateful node, `task`는 static graph node 금지
+- **결정**: ADK `LlmAgent.mode`를 단순 enum이 아니라 runtime topology/context contract로 취급한다. Graph Workflow의 일반 LLM node 기본은 `single_turn`이며, `chat`은 session history를 암묵 입력으로 받는 stateful node로만 명시 허용한다. `task`는 static graph node로 생성하지 않고 coordinator agent + task sub-agent 또는 dynamic `ctx.run_node` dispatch 구조로만 표현한다.
+- **배경**: ADK 2.2.0 source inspection과 실제 Gemini 2턴 smoke에서 `single_turn`은 이전 턴을 보지 못하고 `chat`은 이전 턴을 볼 수 있음을 확인했다. ADK 공식 collaboration 문서는 mode를 sub-agent용으로 설명하며, 로컬 ADK 2.2.0 `Workflow`는 static graph node의 `mode='task'`를 validation error로 거부한다.
+- **영향**: 신규 문서 `docs/workbench/adk-agent-execution-modes.md`, `docs/README.md`. 향후 Graph IR schema/UI/generator/skill 변경에서 `task`를 node enum으로 단순 추가하지 말고 topology 변경으로 설계해야 한다.
+
 ## 2026-06-18 · 작업 브랜치 `worktree-adk-generator-structure` — remote_a2a runnable lowering (PR-B)
 
 ### `remote_a2a` 노드를 ADK `RemoteA2aAgent` 그래프 노드로 lower

@@ -11,13 +11,15 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
    `module_category`, subtype enum, catalog runtime binding의 단일 활성 기준이다.
 3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
    ADK 2.0 baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
-4. [Process Flow](./workbench/process-flow.md)
+4. [ADK Agent Execution Modes](./workbench/adk-agent-execution-modes.md)
+   ADK `LlmAgent.mode`를 Graph IR와 runnable source 생성에서 해석하는 기준이다. Graph node 기본은 `single_turn`, `chat`은 session-history를 암묵 입력으로 받는 stateful node, `task`는 static graph node가 아니라 coordinator/sub-agent topology라는 정책을 정의한다.
+5. [Process Flow](./workbench/process-flow.md)
    분석 결과를 어떤 node와 edge로 그릴지 설명한다.
-5. [Review Board](./workbench/review-board.md)
+6. [Review Board](./workbench/review-board.md)
    개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다. 현재 워크벤치 UI에서는 DesignWorkbench(`/af/:reqId/design`)의 모듈 검토 패널과 Design Stage Runner(`af-design-boundaries`)가 Resolution Draft/patch 제안을 분담하지만, 후보 승인 정책 자체와 hard/soft 게이트 의미는 이 문서가 기준이다.
-6. [Validation](./workbench/validation.md)
+7. [Validation](./workbench/validation.md)
    review artifact, Stage Runner run evidence, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다. ADK Runtime Handoff(현 BuildWorkbench + VerifyWorkbench)가 배포가 아니라 승인 artifact 기반 source-bundle handoff와 검증 게이트라는 점은 이 문서의 `Scaffold-plan and ADK Runtime Handoff` 절을 기준으로 한다.
-7. [Agent Factory Harness](./workbench/agent-factory-harness.md)
+8. [Agent Factory Harness](./workbench/agent-factory-harness.md)
    Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, docs 최신화, 검증 기준을 정의한다.
 
 ## 보조 참조
