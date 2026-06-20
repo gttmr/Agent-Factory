@@ -18,6 +18,9 @@ interface GraphInspectorProps {
 }
 
 function moduleCatFromKind(kind: string | undefined): ModuleCategory | null {
+  if (kind === "workflow_call") return "workflow";
+  if (kind === "adapter_call") return "adapter";
+  if (kind === "remote_agent_call") return "remote_a2a";
   if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") {
     return kind;
   }
@@ -80,6 +83,7 @@ export function GraphInspector(props: GraphInspectorProps) {
         {selectedNode.execution_kind ? (
           <Row label="execution">{selectedNode.execution_kind}</Row>
         ) : null}
+        {selectedNode.runtime_binding ? <Row label="runtime_binding">{selectedNode.runtime_binding}</Row> : null}
         {agentMode ? (
           <>
             <Row label="agent mode">{agentMode}</Row>
@@ -104,6 +108,31 @@ export function GraphInspector(props: GraphInspectorProps) {
                 </span>
               ))}
             </div>
+          </Row>
+        ) : null}
+        {selectedNode.workflow_ref ? (
+          <>
+            <Row label="workflow_ref">
+              {selectedNode.workflow_ref.display_name} · {selectedNode.workflow_ref.id}
+              {selectedNode.workflow_ref.version ? ` · ${selectedNode.workflow_ref.version}` : ""}
+            </Row>
+            <Row label="input_mapping">
+              <code>{JSON.stringify(selectedNode.input_mapping ?? {})}</code>
+            </Row>
+            <Row label="output_mapping">
+              <code>{JSON.stringify(selectedNode.output_mapping ?? {})}</code>
+            </Row>
+          </>
+        ) : null}
+        {selectedNode.mock_binding ? (
+          <Row label="Mock Lab">
+            {selectedNode.mock_binding.status} · {selectedNode.mock_binding.mock_server_id ?? "missing"} ·{" "}
+            {selectedNode.mock_binding.tool_name ?? "missing"}
+          </Row>
+        ) : null}
+        {selectedNode.adk_skeleton_contract ? (
+          <Row label="ADK Skeleton">
+            {selectedNode.adk_skeleton_contract.scaffold_level} · {selectedNode.adk_skeleton_contract.implementation_template}
           </Row>
         ) : null}
 

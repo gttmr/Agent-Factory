@@ -129,6 +129,126 @@ const chatPlan = buildScaffoldPlan({
 });
 assert.equal(chatPlan.modules[0].agent_execution_mode, "chat");
 
+const workflowCallPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({
+      id: "mod-risk-workflow",
+      name: "이탈위험 판단 Workflow",
+      module_category: "workflow",
+      agent_kind: null,
+      workflow_kind: "graph",
+      inputs: [{ name: "customer_id", type: "string", required: true }],
+      outputs: [{ name: "risk_result", type: "object", required: true }]
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "node-risk-workflow",
+        label: "이탈위험 판단 Workflow 호출",
+        module_id: "mod-risk-workflow",
+        node_kind: "workflow_call",
+        execution_kind: "workflow_call",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "local_graph",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        workflow_ref: { id: "wf-risk-check", version: "v1", source: "catalog", display_name: "이탈위험 판단 Workflow" },
+        input_mapping: { customer_id: "$state.customer.id" },
+        output_mapping: { risk_result: "$result" },
+        review_status: "approved"
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+const workflowCallModule = workflowCallPlan.modules[0];
+assert.ok(workflowCallModule);
+assert.ok(workflowCallModule.adk_skeleton_contract);
+assert.equal(workflowCallModule.node_kind, "workflow_call");
+assert.deepEqual(workflowCallModule.workflow_ref, {
+  id: "wf-risk-check",
+  version: "v1",
+  source: "catalog",
+  display_name: "이탈위험 판단 Workflow"
+});
+assert.equal(workflowCallModule.adk_skeleton_contract.scaffold_level, "mock_testable_skeleton");
+assert.equal(workflowCallModule.adk_skeleton_contract.implementation_template, "workflow_call_stub");
+assert.ok(workflowCallModule.developer_todos.some((todo) => todo.includes("workflow_call")));
+
+const mockBindingPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({
+      id: "mod-customer-profile",
+      name: "고객 프로파일 조회",
+      module_category: "adapter",
+      agent_kind: null,
+      adapter_kind: "legacy_api",
+      access_protocol: "mcp",
+      mcp_server: "mock-customer-profile",
+      mcp_tool_name: "get_customer_profile",
+      mcp_schema_ref: "catalog.customer_profile_request.v1",
+      outputs: [{ name: "profile", type: "object", required: true }]
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "node-profile",
+        label: "고객 프로파일 조회",
+        module_id: "mod-customer-profile",
+        node_kind: "adapter_call",
+        execution_kind: "adapter_call",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "adapter",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        runtime_binding: "mcp_tool",
+        mock_binding: {
+          provider: "mock_lab",
+          package_path: "packages/mock-lab",
+          mock_server_id: "mock-customer-profile",
+          tool_name: "get_customer_profile",
+          input_schema: "catalog.customer_profile_request.v1",
+          output_schema: "catalog.customer_profile_response.v1",
+          sample_response_ref: "mock_samples.customer_profile.basic",
+          status: "linked"
+        },
+        review_status: "approved"
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+const mockBindingModule = mockBindingPlan.modules[0];
+assert.ok(mockBindingModule);
+assert.ok(mockBindingModule.adk_skeleton_contract);
+assert.equal(mockBindingModule.node_kind, "adapter_call");
+assert.equal(mockBindingModule.runtime_binding, "mcp_tool");
+assert.deepEqual(mockBindingModule.mock_binding, {
+  provider: "mock_lab",
+  package_path: "packages/mock-lab",
+  mock_server_id: "mock-customer-profile",
+  tool_name: "get_customer_profile",
+  input_schema: "catalog.customer_profile_request.v1",
+  output_schema: "catalog.customer_profile_response.v1",
+  sample_response_ref: "mock_samples.customer_profile.basic",
+  status: "linked"
+});
+assert.equal(mockBindingModule.adk_skeleton_contract.implementation_template, "mcp_mock_adapter_stub");
+
 const catalogPlan = buildScaffoldPlan({
   normalizedRequirement,
   moduleCandidates: [candidate({ catalog_entry_id: "cat-page-agent" })],

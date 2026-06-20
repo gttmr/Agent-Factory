@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-20 · 작업 브랜치 `main` — workflow_call + Mock Lab skeleton handoff 공식화
+
+### workflow_call + Mock Lab skeleton handoff 공식화
+- **결정**: 기존 Workflow 추가/선택 기능은 Graph IR에서 `node_kind: workflow_call`로 저장하고, Adapter 호출은 `node_kind: adapter_call` + `runtime_binding: mcp_tool` + `mock_binding.provider: mock_lab`로 Mock Lab test double을 참조한다. ADK source generation은 production generator가 아니라 `mock_testable_skeleton` handoff이며 `workflow.py`, `nodes/*`, `mock_config.yaml`, `sample_inputs.yaml`, README/TODO를 생성한다.
+- **배경**: Dynamic Workflow 자동 생성보다 업무별 Workflow를 분리하고 parent graph에서 기존 Workflow 호출 노드로 조립하는 방향이 더 작고 검토 가능하다. Mock Lab은 이미 `packages/mock-lab`에 있으므로 새 mock server system을 만들지 않고 저장된 MockSpec/MCP discovery를 재사용한다.
+- **영향**: `analyzer/types.ts`, `nestedWorkflowInsert.ts`, `scaffoldPlan.ts`, `GraphCanvas.tsx`, `GraphElementEditor.tsx`, `GraphInspector.tsx`, `scripts/generate-adk-source.mjs`, `schemas/*`, `docs/workbench/taxonomy.md`, `docs/workbench/workflow-decision-guide.md`.
+
 ## 2026-06-18 · 작업 브랜치 `codex/mock-lab-prompt-spec` — Mock Lab 실행 기준을 saved `MockSpec`으로 전환
 
 ### Codex는 Prompt-to-Spec 초안 보조로 한정

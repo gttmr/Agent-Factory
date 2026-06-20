@@ -799,9 +799,12 @@
             "function",
             "tool",
             "adapter",
+            "adapter_call",
             "human_input",
             "workflow",
+            "workflow_call",
             "remote_a2a",
+            "remote_agent_call",
             "join",
             "router",
             "loop_control"
@@ -829,7 +832,64 @@
         "review_status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected", "n/a"] },
         "position": {
           "anyOf": [{ "$ref": "#/$defs/graphPosition" }, { "type": "null" }]
-        }
+        },
+        "workflow_ref": { "anyOf": [{ "$ref": "#/$defs/graphWorkflowRef" }, { "type": "null" }] },
+        "input_schema": { "$ref": "#/$defs/nullableString" },
+        "output_schema": { "$ref": "#/$defs/nullableString" },
+        "input_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
+        "output_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
+        "runtime_binding": {
+          "anyOf": [
+            { "type": "string", "enum": ["unresolved", "direct_api", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
+            { "type": "null" }
+          ]
+        },
+        "mock_binding": { "anyOf": [{ "$ref": "#/$defs/graphMockBinding" }, { "type": "null" }] },
+        "adk_skeleton_contract": { "anyOf": [{ "$ref": "#/$defs/adkSkeletonContract" }, { "type": "null" }] }
+      }
+    },
+    "graphWorkflowRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "source", "display_name"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "$ref": "#/$defs/nullableString" },
+        "source": { "type": "string", "enum": ["catalog", "artifact", "placeholder"] },
+        "display_name": { "type": "string" }
+      }
+    },
+    "stringMapping": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "graphMockBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "package_path", "mock_server_id", "tool_name", "input_schema", "output_schema", "sample_response_ref", "status"],
+      "properties": {
+        "provider": { "type": "string", "const": "mock_lab" },
+        "package_path": { "type": "string", "const": "packages/mock-lab" },
+        "mock_server_id": { "$ref": "#/$defs/nullableString" },
+        "tool_name": { "$ref": "#/$defs/nullableString" },
+        "input_schema": { "$ref": "#/$defs/nullableString" },
+        "output_schema": { "$ref": "#/$defs/nullableString" },
+        "sample_response_ref": { "$ref": "#/$defs/nullableString" },
+        "status": { "type": "string", "enum": ["linked", "missing", "invalid"] }
+      }
+    },
+    "adkSkeletonContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scaffold_level", "implementation_template", "manual_completion_required", "developer_todos"],
+      "properties": {
+        "scaffold_level": { "type": "string", "enum": ["none", "handoff", "mock_testable_skeleton", "manual_required"] },
+        "target_runtime": { "type": "string", "enum": ["adk_python_2_x"] },
+        "entrypoint": { "type": "string", "enum": ["root_agent"] },
+        "generation_mode": { "type": "string", "enum": ["deterministic_template", "llm_assisted_patch", "manual"] },
+        "implementation_template": { "type": "string" },
+        "manual_completion_required": { "type": "boolean" },
+        "developer_todos": { "type": "array", "items": { "type": "string" } }
       }
     },
     "graphPosition": {

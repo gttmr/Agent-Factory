@@ -124,7 +124,7 @@ assert.ok(candidate, "candidate should be appended");
 assert.match(candidate.id, /^mod-[a-z0-9-]+$/);
 assert.equal(candidate.id, "mod-credit-review-2");
 assert.equal(candidate.module_category, "workflow");
-assert.equal(candidate.workflow_kind, "dynamic");
+assert.equal(candidate.workflow_kind, "graph");
 assert.equal(candidate.catalog_entry_id, entry.id);
 assert.equal(candidate.reuse_candidate, true);
 assert.equal(candidate.name, entry.name);
@@ -146,16 +146,31 @@ assert.deepEqual(candidate.missing_information, []);
 const node = inserted.processFlow.nodes.find((item) => item.module_id === candidate.id);
 assert.ok(node, "workflow graph node should be appended");
 assert.equal(node.id, "node-credit-review");
-assert.equal(node.node_kind, "workflow");
+assert.equal(node.node_kind, "workflow_call");
 assert.equal(node.module_id, candidate.id);
 assert.equal(node.label, entry.name);
 assert.equal(node.lane_id, "local_graph");
 assert.equal(node.owner_scope, "local");
-assert.equal(node.execution_kind, "workflow");
+assert.equal(node.execution_kind, "workflow_call");
 assert.equal(node.review_status, "needs_info");
-assert.deepEqual(node.input_ports, []);
-assert.deepEqual(node.output_ports, []);
-assert.deepEqual(node.schema_refs, []);
+assert.deepEqual(node.input_ports, [{ id: "input", label: "input", schema_ref: "catalog.workflow.Credit_Review.input.v3" }]);
+assert.deepEqual(node.output_ports, [{ id: "output", label: "output", schema_ref: "catalog.workflow.Credit_Review.output.v3" }]);
+assert.deepEqual(node.schema_refs, ["catalog.workflow.Credit_Review.input.v3", "catalog.workflow.Credit_Review.output.v3"]);
+assert.deepEqual(node.workflow_ref, {
+  id: entry.id,
+  version: "v3",
+  source: "catalog",
+  display_name: entry.name
+});
+assert.deepEqual(node.input_mapping, {});
+assert.deepEqual(node.output_mapping, {});
+assert.deepEqual(node.adk_skeleton_contract, {
+  scaffold_level: "mock_testable_skeleton",
+  target_runtime: "adk_python_2_x",
+  implementation_template: "workflow_call_stub",
+  manual_completion_required: true,
+  developer_todos: ["target workflow skeleton 연결 방식 확인", "input/output schema mapping 검토"]
+});
 assert.equal(node.position, null);
 assert.equal(node.container_id, "container-root");
 assert.ok(

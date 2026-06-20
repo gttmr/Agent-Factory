@@ -4,6 +4,9 @@ import type { GraphNodeData } from "./layout";
 import type { ModuleCategory } from "../../analyzer/types";
 
 function moduleCategoryFromKind(kind: string | undefined): ModuleCategory | null {
+  if (kind === "workflow_call") return "workflow";
+  if (kind === "adapter_call") return "adapter";
+  if (kind === "remote_agent_call") return "remote_a2a";
   if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") {
     return kind;
   }
@@ -190,8 +193,11 @@ function PillNode({ data, kind }: NodeProps<GraphNodeData> & { kind: "input" | "
 export const nodeTypes = {
   agent: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="agent" />,
   workflow: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="workflow" />,
+  workflow_call: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="workflow" />,
   adapter: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="adapter" />,
+  adapter_call: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="adapter" />,
   remote_a2a: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="remote_a2a" />,
+  remote_agent_call: (p: NodeProps<GraphNodeData>) => <ModuleCard {...p} kind="remote_a2a" />,
   function: (p: NodeProps<GraphNodeData>) => <FunctionToolNode {...p} kind="function" />,
   tool: (p: NodeProps<GraphNodeData>) => <FunctionToolNode {...p} kind="tool" />,
   human_input: HumanInputNode,

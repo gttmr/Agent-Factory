@@ -1,9 +1,8 @@
 import { appendNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
-import { workflowKinds, type AnalysisResult, type FieldSpec, type GraphNode, type ModuleCandidate, type WorkflowKind } from "./types";
+import { type AnalysisResult, type FieldSpec, type GraphNode, type ModuleCandidate, type WorkflowKind } from "./types";
 import type { CatalogHubEntry } from "../catalog/catalogIndex";
 
 const REQUIREMENT_ID_PATTERN = /^req-[a-z0-9-]+$/;
-const WORKFLOW_KIND_SET = new Set<string>(workflowKinds);
 type CatalogField = NonNullable<CatalogHubEntry["inputs"]>[number] & { schema?: FieldSpec["schema"] };
 
 export function insertCatalogWorkflowNode(
@@ -65,18 +64,34 @@ export function insertCatalogWorkflowNode(
     id: nodeId,
     label: entry.name,
     module_id: candidateId,
-    node_kind: "workflow",
-    execution_kind: "workflow",
+    node_kind: "workflow_call",
+    execution_kind: "workflow_call",
     agent_execution_mode: null,
     adk_node_role: "workflow_node",
     owner_scope: "local",
     container_id: rootContainerId,
     lane_id: "local_graph",
-    input_ports: [],
-    output_ports: [],
-    schema_refs: [],
+    input_ports: [{ id: "input", label: "input", schema_ref: workflowSchemaRef(entry, "input") }],
+    output_ports: [{ id: "output", label: "output", schema_ref: workflowSchemaRef(entry, "output") }],
+    schema_refs: [workflowSchemaRef(entry, "input"), workflowSchemaRef(entry, "output")],
     review_status: "needs_info",
-    position: null
+    position: null,
+    workflow_ref: {
+      id: entry.id,
+      version: typeof entry.version === "number" ? `v${entry.version}` : null,
+      source: "catalog",
+      display_name: entry.name
+    },
+    input_mapping: {},
+    output_mapping: {},
+    runtime_binding: "workflow_call",
+    adk_skeleton_contract: {
+      scaffold_level: "mock_testable_skeleton",
+      target_runtime: "adk_python_2_x",
+      implementation_template: "workflow_call_stub",
+      manual_completion_required: true,
+      developer_todos: ["target workflow skeleton 연결 방식 확인", "input/output schema mapping 검토"]
+    }
   };
 
   return {
@@ -93,7 +108,13 @@ export function insertCatalogWorkflowNode(
 }
 
 function normalizeWorkflowKind(value: unknown): WorkflowKind {
-  return typeof value === "string" && WORKFLOW_KIND_SET.has(value) ? (value as WorkflowKind) : "graph";
+  return value === "orchestration" || value === "graph" ? value : "graph";
+}
+
+function workflowSchemaRef(entry: CatalogHubEntry, direction: "input" | "output"): string {
+  const version = typeof entry.version === "number" ? `v${entry.version}` : "v1";
+  const name = entry.name.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "workflow";
+  return `catalog.workflow.${name}.${direction}.${version}`;
 }
 
 function sourceRequirementIdForInsertedCandidate(analysis: AnalysisResult, reqId: string): string {

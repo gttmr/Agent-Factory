@@ -269,7 +269,7 @@ export function GraphCanvas({
         return;
       }
       const nextPosition = position ?? nextNodeFallbackPosition(draftGraphIR, flowPositions);
-      const containerId = addKind === "remote_a2a" ? null : rootWorkflowContainerId(draftGraphIR);
+      const containerId = addKind === "remote_a2a" || addKind === "remote_agent_call" ? null : rootWorkflowContainerId(draftGraphIR);
       const node = buildEditableNode(draftGraphIR, addKind, label, nextPosition, containerId);
       updateDraft((graph) => {
         const containers = containerId
@@ -546,6 +546,25 @@ interface GraphEditToolbarProps {
   onToggleEditMode: () => void;
 }
 
+const ADD_NODE_KINDS: NodeKind[] = ["agent", "adapter_call", "router", "human_input", "workflow_call", "remote_agent_call"];
+const ADD_NODE_LABELS: Record<NodeKind, string> = {
+  input: "입력",
+  output: "출력",
+  agent: "판단 노드",
+  function: "함수 노드",
+  tool: "도구 노드",
+  adapter: "Adapter",
+  adapter_call: "API/도구 호출 노드",
+  human_input: "사람 입력/승인 노드",
+  workflow: "Workflow",
+  workflow_call: "기존 Workflow 호출 노드",
+  remote_a2a: "외부 Agent 호출",
+  remote_agent_call: "외부 Agent 호출 노드",
+  join: "Join",
+  router: "조건 분기 노드",
+  loop_control: "Loop Control"
+};
+
 function GraphEditToolbar({
   addKind,
   addLabel,
@@ -599,9 +618,9 @@ function GraphEditToolbar({
               value={addKind}
               onChange={(event) => onAddKindChange(event.target.value as NodeKind)}
             >
-              {GRAPH_NODE_KINDS.map((kind) => (
+              {ADD_NODE_KINDS.filter((kind) => GRAPH_NODE_KINDS.includes(kind)).map((kind) => (
                 <option key={kind} value={kind}>
-                  {kind}
+                  {ADD_NODE_LABELS[kind]} ({kind})
                 </option>
               ))}
             </select>
@@ -815,7 +834,7 @@ function buildEditableNode(
     execution_kind: null,
     agent_execution_mode: kind === "agent" ? "single_turn" : null,
     adk_node_role: null,
-    owner_scope: kind === "remote_a2a" ? "remote" : "local",
+    owner_scope: kind === "remote_a2a" || kind === "remote_agent_call" ? "remote" : "local",
     container_id: containerId,
     lane_id: laneForNodeKind(kind),
     input_ports: [],
@@ -830,8 +849,8 @@ function laneForNodeKind(kind: NodeKind): LaneId {
   if (kind === "input") return "input";
   if (kind === "output") return "output";
   if (kind === "human_input") return "human_input";
-  if (kind === "tool" || kind === "adapter") return "adapter";
-  if (kind === "remote_a2a") return "remote_boundary";
+  if (kind === "tool" || kind === "adapter" || kind === "adapter_call") return "adapter";
+  if (kind === "remote_a2a" || kind === "remote_agent_call") return "remote_boundary";
   return "local_graph";
 }
 

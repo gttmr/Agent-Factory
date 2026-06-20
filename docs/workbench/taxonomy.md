@@ -35,9 +35,13 @@ Skill-led 실행은 검토 artifact를 `artifacts/af/<req-id>/` 아래에 둘 �
 
 `module_category`는 책임의 종류를 나타내고, `runtime_binding`은 실행/연결 방식을 나타낸다.
 
-- `runtime_binding: mcp`: MCP server/tool 계약으로 호출한다.
+- `runtime_binding: direct_api`: 실제 API/EAI client로 보강될 호출 경계다. 생성 skeleton에는 endpoint나 credential을 넣지 않는다.
+- `runtime_binding: mcp_tool`: MCP server/tool 계약으로 호출한다. 로컬 skeleton smoke에서는 Mock Lab binding을 통해 synthetic tool을 호출할 수 있다.
+- `runtime_binding: local_function`: 로컬 함수 placeholder 또는 개발자 보강 경계다.
+- `runtime_binding: workflow_call`: 기존 Workflow 또는 생성 예정 Workflow skeleton을 호출하는 parent graph node다.
 - `runtime_binding: remote_a2a`: Remote A2A 방식으로 호출되는 runtime contract다.
-- `runtime_binding: unresolved`: Python import, local package, remote call 등 실행 방식이 아직 확정되지 않았다.
+- `runtime_binding: ui_input`: 사람 입력/승인 지점이다.
+- `runtime_binding: unresolved`: 실행 방식이 아직 확정되지 않았다.
 
 공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
 이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
@@ -91,6 +95,29 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 - `graph`: ADK 2.0 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
 - `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
 - `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
+
+현재 ADK skeleton 생성 범위에서는 `workflow_kind: dynamic`을 runnable codegen 대상으로 삼지 않는다.
+동적 로직이 필요한 복잡한 흐름은 하위 업무 Workflow로 분리하고 parent Graph IR에서는 `node_kind: workflow_call`로 조립한다.
+실제 dynamic Python 로직은 생성 bundle의 TODO 경계 안에서 전문 개발자가 수동 보강한다.
+
+## Graph IR call nodes
+
+Workbench Graph IR는 책임 분류와 실행 노드를 분리한다.
+
+- `node_kind: agent`: Workflow 안의 판단/추론 노드다.
+- `node_kind: adapter_call`: Adapter capability 호출 노드다. Mock Lab 연계는 `mock_binding`에 저장한다.
+- `node_kind: router`: 조건 분기 노드다.
+- `node_kind: human_input`: 사람 입력/승인 노드다.
+- `node_kind: workflow_call`: 기존 Workflow 또는 target skeleton을 호출하는 노드다.
+- `node_kind: remote_agent_call`: Remote A2A 계약을 가진 외부 Agent 호출 노드다.
+
+`workflow_call`은 `workflow_ref`, `input_schema`, `output_schema`, `input_mapping`, `output_mapping`, `adk_skeleton_contract`를 가질 수 있다.
+target workflow가 아직 없으면 placeholder skeleton을 만들고 README/TODO에 수동 연결 필요를 남긴다.
+
+`adapter_call`은 `runtime_binding: mcp_tool`과 함께 `mock_binding.provider: mock_lab`를 가질 수 있다.
+Mock Lab은 `packages/mock-lab`의 local test double이며 catalog runtime contract를 mock으로 바꾸지 않는다.
+최소 binding은 `provider`, `package_path`, `mock_server_id`, `tool_name`, `input_schema`, `output_schema`, `sample_response_ref`, `status`다.
+`status: linked`일 때만 ADK Web smoke용 mock wiring을 생성한다.
 
 ## adapter_kind
 

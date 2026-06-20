@@ -30,7 +30,15 @@ const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
 const EDGE_KIND_SET = new Set<string>(GRAPH_EDGE_KINDS);
 const LANE_ID_SET = new Set<string>(GRAPH_LANE_IDS);
 const AGENT_EXECUTION_MODE_SET = new Set<string>(AGENT_EXECUTION_MODES);
-const MODULE_BOUND_NODE_KIND_SET = new Set<string>(["agent", "workflow", "adapter", "remote_a2a"]);
+const MODULE_BOUND_NODE_KIND_SET = new Set<string>([
+  "agent",
+  "workflow",
+  "workflow_call",
+  "adapter",
+  "adapter_call",
+  "remote_a2a",
+  "remote_agent_call"
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -74,7 +82,7 @@ function laneForLegacyType(legacyType: string | undefined, nodeKind: NodeKind): 
   if (legacyType === "input" || nodeKind === "input") return "input";
   if (legacyType === "output" || nodeKind === "output") return "output";
   if (legacyType === "remote_a2a" || nodeKind === "remote_a2a") return "remote_boundary";
-  if (legacyType === "adapter" || nodeKind === "adapter") return "adapter";
+  if (legacyType === "adapter" || nodeKind === "adapter" || nodeKind === "adapter_call") return "adapter";
   if (nodeKind === "human_input") return "human_input";
   return "local_graph";
 }
@@ -492,6 +500,16 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         output_ports: Array.isArray(node.output_ports) ? node.output_ports : [],
         schema_refs: Array.isArray(node.schema_refs) ? node.schema_refs : [],
         review_status: node.review_status ?? "needs_info",
+        workflow_ref: isRecord(nodeRecord.workflow_ref) ? structuredClone(nodeRecord.workflow_ref) : null,
+        input_schema: asNullableString(nodeRecord.input_schema),
+        output_schema: asNullableString(nodeRecord.output_schema),
+        input_mapping: isRecord(nodeRecord.input_mapping) ? structuredClone(nodeRecord.input_mapping) : null,
+        output_mapping: isRecord(nodeRecord.output_mapping) ? structuredClone(nodeRecord.output_mapping) : null,
+        runtime_binding: asNullableString(nodeRecord.runtime_binding) as GraphNode["runtime_binding"],
+        mock_binding: isRecord(nodeRecord.mock_binding) ? structuredClone(nodeRecord.mock_binding) : null,
+        adk_skeleton_contract: isRecord(nodeRecord.adk_skeleton_contract)
+          ? structuredClone(nodeRecord.adk_skeleton_contract)
+          : null,
         ...(position !== undefined ? { position } : {})
       };
     }),
@@ -612,6 +630,14 @@ export function validateGraphIRSoft(
       errors.push({
         code: "node_missing_module_id",
         message: `Node ${node.id} (${node.node_kind}) requires a module_id.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (node.node_kind === "workflow_call" && !node.workflow_ref) {
+      warnings.push({
+        code: "workflow_call_missing_ref",
+        message: `Node ${node.id} is a workflow_call without workflow_ref; skeleton generation will require manual target resolution.`,
         target_kind: "node",
         target_id: node.id
       });
