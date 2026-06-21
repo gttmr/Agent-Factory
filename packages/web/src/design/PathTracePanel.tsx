@@ -28,14 +28,14 @@ export function PathTracePanel({ graphIR, author, saving, onSelectNode, onCreate
   const nodeLabel = (id: string) => graphIR?.nodes.find((node) => node.id === id)?.label ?? id;
 
   if (!graphIR || nodes.length === 0) {
-    return <EmptyState title="Graph IR 없음" description="경로를 만들려면 먼저 Graph IR 이 필요합니다." />;
+    return <EmptyState title="그래프 없음" description="경로 하이라이트를 만들려면 먼저 설계 그래프가 필요합니다." />;
   }
 
   const defaultLabel = fromId && toId ? `${nodeLabel(fromId)} -> ${nodeLabel(toId)}` : "검토 경로";
 
   return (
     <div className="af-path-panel">
-      <p className="af-design-empty">두 노드를 선택해 검토 경로를 만들고 highlight로 저장합니다.</p>
+      <p className="af-design-empty">두 노드를 선택해 검토할 경로를 찾고 하이라이트로 저장합니다.</p>
       <label>
         시작 노드
         <select
@@ -73,7 +73,7 @@ export function PathTracePanel({ graphIR, author, saving, onSelectNode, onCreate
         </select>
       </label>
       <label>
-        label
+        라벨
         <input
           value={label}
           onChange={(event) => setLabel(event.target.value)}
@@ -122,7 +122,7 @@ export function PathTracePanel({ graphIR, author, saving, onSelectNode, onCreate
           });
         }}
       >
-        {saving ? "저장 중..." : "highlight로 저장"}
+        {saving ? "저장 중..." : "하이라이트로 저장"}
       </Button>
     </div>
   );

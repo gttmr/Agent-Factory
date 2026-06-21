@@ -194,6 +194,11 @@
 - **배경**: Workbench Graph 편집 화면에서 taxonomy, runtime binding, policy, layout 값이 같은 수준의 편집 가능 필드처럼 보여 사용자가 Graph IR의 책임 축을 잘못 변경할 수 있었다.
 - **영향**: `GraphInspector.tsx`, `GraphElementEditor.tsx`, `styles/features/graph.css`, `styles/router/design.css`.
 
+### Design 하단 탭은 사용자 검토 흐름만 남긴다
+- **결정**: Design 검토 하단 탭을 `모듈 / Runtime 계약 / Remote A2A / 검토 메모`로 축소한다. 기존 `Graph IR` 노드·엣지 목록 탭은 제거하고, `경로` 하이라이트 기능은 `검토 메모` 안의 섹션으로 통합한다.
+- **배경**: `Graph IR` 목록은 캔버스 선택을 보조하는 내부 인덱스에 가까워 업무 사용자의 검토 흐름을 분산시켰고, `경로`는 코멘트와 같은 협업 산출물 성격이어서 독립 탭보다 검토 메모 안에서 보는 편이 명확하다.
+- **영향**: `DesignWorkbench.tsx`, `ReviewNotesPanel.tsx`, `designWorkbenchTabs.ts`, `styles/router/design.css`, `styles/router/comments.css`.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)

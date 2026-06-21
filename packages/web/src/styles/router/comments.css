@@ -1,5 +1,111 @@
 /* ===== Comment thread ===== */
 
+.af-review-notes-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.af-review-notes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.af-review-notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.af-review-notes-header h4 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-heavy);
+  color: var(--text-strong);
+}
+
+.af-review-notes-header p {
+  margin: 3px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.af-review-notes-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-heavy);
+  color: var(--text-muted);
+}
+
+.af-review-highlight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-review-highlight-empty {
+  margin: 0;
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+}
+
+.af-review-highlight-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  padding: 8px;
+}
+
+.af-review-highlight-entry > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.af-review-highlight-entry strong,
+.af-review-highlight-entry span,
+.af-review-highlight-entry small {
+  overflow-wrap: anywhere;
+}
+
+.af-review-highlight-entry strong {
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+
+.af-review-highlight-entry span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.af-review-highlight-entry small {
+  color: var(--text-subtle);
+  font-size: var(--fs-2xs);
+}
+
+@media (max-width: 900px) {
+  .af-review-notes-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
 .af-comment-thread {
   display: flex;
   flex-direction: column;
