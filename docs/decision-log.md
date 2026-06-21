@@ -10,6 +10,23 @@
 
 ---
 
+## 2026-06-21 · 작업 브랜치 `codex/review-followup-taxonomy-graph` — PR #36/#37 리뷰 후속 보완
+
+### 호출 축 불변식 강제: LLM-선택 toolset은 agent 노드에만
+- **결정**: `node_kind`가 `agent`가 아닌데 `invoke_binding: mcp_toolset` 또는 `call_control: selected_by_llm`를 가지면 export validator(`validate-artifacts.mjs`)와 soft validation(`graphMigration.ts`) 모두 `llm_toolset_requires_agent_node` 오류를 낸다. `selected_by_llm`은 agent 노드 소유 메타데이터이므로 edge `call_control: selected_by_llm`도 같은 오류로 거부한다(node·scaffold·analysis 그래프 모두). 즉 `adapter_call`은 고정 호출(`mcp_tool` + `fixed_by_workflow`)만 허용하고 LLM-선택 toolset 의미를 가질 수 없다.
+- **배경**: taxonomy/workflow-decision-guide/validation 문서는 "Adapter=call node, LLM toolset 선택=agent"를 명문화했으나, 직전 PR(#36/#37)까지 검증은 enum 존재만 확인하고 교차 필드 의미를 강제하지 않았다. scaffold 단계는 잘못된 toolset-adapter를 handoff placeholder로 강등시켜 잘못된 runnable 코드는 막았지만, 모순된 IR이 0-error로 통과해 `boundaries_approved`까지 토글될 수 있었다. 리뷰 회귀 테스트가 그 모순 형태의 "보존"을 단언하고 있어 함께 정정했다.
+- **영향**: `scripts/validate-artifacts.mjs`(node + scaffold graph 검증), `packages/web/src/analyzer/graphMigration.ts`(soft validation code + `SOFT_VALIDATION_CODES`), `scaffoldPlan.test.ts`(보존 단언을 valid fixed-call로 교체), `graphMigration.test.ts`·`validate-artifacts.test.mjs`(거부/허용 회귀), `docs/workbench/validation.md`. 기존 템플릿·시나리오는 toolset-adapter를 쓰지 않아 영향 없음.
+
+### Dynamic Workflow runnable 게이트를 scaffold-plan 검증으로 끌어올림
+- **결정**: `output_mode: runnable`에서 `module_category: workflow` + `workflow_kind: dynamic` 모듈이나 `dynamic_workflow` container가 있으면 `scaffoldPlan.collectBlockers`가 `can_generate_source: false`로 두고 하위 Workflow 분리 + `workflow_call` 조립을 안내하는 blocker를 남긴다. smoke mode는 design/contract handoff로 통과한다.
+- **배경**: generator(`assertRunnableGraphSupported`)는 runnable+dynamic을 throw로 거부했지만, plan-level `can_generate_source`는 이를 모르고 Build 버튼을 활성화해 클릭 후 런타임 에러가 났다. 안전 구멍은 아니나 "dynamic은 workflow_call로 전환 안내" 방향과 어긋나는 UX였다.
+- **영향**: `packages/web/src/analyzer/scaffoldPlan.ts`, `scaffoldPlan.test.ts`(runnable 차단 + smoke 통과 회귀), `docs/workbench/validation.md`.
+
+### 제거된 하단 탭 문서 정정 + 회귀 테스트 표준 러너 연결
+- **결정**: Design 하단 탭이 `모듈/Runtime 계약/Remote A2A/검토 메모` 4탭(경로는 검토 메모 내부 섹션)임을 권위·온보딩 문서에 반영하고, repo-root node:test 회귀(`validate-artifacts.test.mjs`, `generate-adk-source.test.mjs`)와 신규 `reviewNotesModel.test.ts`를 `npm run test:analyzer`에 연결한다.
+- **배경**: 직전 PR이 decision-log에는 탭 변경을 기록했으나 `CLAUDE.md`·`docs/visualization/design-system.md`(권위 UI 스펙, 파일 내부 모순)·`docs/onboarding/06-review-board.html`는 제거된 `Graph IR/경로/Comments` 탭을 현재 기능으로 안내했다. 또한 두 node:test 회귀가 어떤 표준 러너에도 연결돼 있지 않아 조용히 썩을 수 있었다.
+- **영향**: `CLAUDE.md`, `docs/visualization/design-system.md`, `docs/onboarding/06-review-board.html`, `docs/workbench/taxonomy.md`(legacy node_kind alias 한 줄), `packages/web/package.json`(test:analyzer), `ReviewNotesPanel.tsx`→`reviewNotesModel.ts`(순수 helper 추출), `DesignWorkbench.tsx`(badge helper 사용).
+
 ## 2026-06-20 · 작업 브랜치 `codex/taxonomy-graph-model-correction` — Workflow-first Graph Model 축 정정
 
 ### Workflow-first Graph Model과 호출 축 분리
