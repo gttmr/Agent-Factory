@@ -56,6 +56,56 @@ test("validate-artifacts rejects invalid scaffold graph metadata", () => {
   assert.match(result.stderr, /scaffold\.graph\.edges\[0\]\.flow_kind/);
 });
 
+test("validate-artifacts rejects adapter_call carrying LLM-selected toolset semantics (scaffold graph)", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-toolset-scaffold-");
+  const plan = readJson(join(scenarioRoot, "scaffold-plan.json"));
+  // node[1] is the adapter_call node; LLM-selected MCP toolset belongs on an agent.
+  plan.graph.nodes[1].invoke_binding = "mcp_toolset";
+  plan.graph.nodes[1].call_control = "selected_by_llm";
+
+  writeJson(join(artifactRoot, "scaffold-plan.json"), plan);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /mcp_toolset \/ selected_by_llm belong on an agent decision node/);
+});
+
+test("validate-artifacts rejects adapter_call carrying LLM-selected toolset semantics (analysis graph)", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-toolset-analysis-");
+  const analysis = readScenarioAnalysis();
+  const target = analysis.processFlow.nodes.find((node) => node.node_kind === "adapter_call");
+  assert.ok(target);
+  target.invoke_binding = "mcp_toolset";
+  target.call_control = "selected_by_llm";
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /mcp_toolset \/ selected_by_llm belong on an agent decision node/);
+});
+
+test("validate-artifacts rejects edge call_control selected_by_llm (scaffold graph)", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-edge-toolset-scaffold-");
+  const plan = readJson(join(scenarioRoot, "scaffold-plan.json"));
+  plan.graph.edges[0].call_control = "selected_by_llm";
+
+  writeJson(join(artifactRoot, "scaffold-plan.json"), plan);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /call_control selected_by_llm; LLM-selected toolset selection is agent node metadata/);
+});
+
+test("validate-artifacts rejects edge call_control selected_by_llm (analysis graph)", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-edge-toolset-analysis-");
+  const analysis = readScenarioAnalysis();
+  assert.ok(analysis.processFlow.edges.length > 0);
+  analysis.processFlow.edges[0].call_control = "selected_by_llm";
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /call_control selected_by_llm; LLM-selected toolset selection is agent node metadata/);
+});
+
 test("validate-artifacts accepts remote_agent_call as a Remote A2A graph endpoint", () => {
   const artifactRoot = tempArtifactRoot("af-validator-remote-agent-call-");
   const analysis = readJson(join(remoteScenarioRoot, "analysis-result.json"));
