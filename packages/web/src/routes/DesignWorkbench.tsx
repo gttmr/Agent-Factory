@@ -31,6 +31,7 @@ import {
   buildA2AReviewRows
 } from "../design/A2AContractPanel";
 import { CommentThread } from "../design/CommentThread";
+import { nextDesignBottomTabAfterModuleSelect } from "../design/designWorkbenchTabs";
 import { PathTracePanel } from "../design/PathTracePanel";
 import {
   RuntimeContractInspector,
@@ -650,7 +651,7 @@ export default function DesignWorkbench() {
                       if (!graphIR) return;
                       const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
                       setSelection({ nodeId: node?.id ?? null, edgeId: null });
-                      setActiveTab("graph");
+                      setActiveTab((currentTab) => nextDesignBottomTabAfterModuleSelect(currentTab));
                     }}
                   />
                   <ModuleReviewDetail

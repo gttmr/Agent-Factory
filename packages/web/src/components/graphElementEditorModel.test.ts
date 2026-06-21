@@ -3,7 +3,8 @@ import {
   GRAPH_ELEMENT_TABS,
   isEdgeKindEditable,
   isNodeModuleLinkEditable,
-  isNodeRuntimeControlEditable
+  isNodeRuntimeControlEditable,
+  nextGraphElementTabAfterSelectionChange
 } from "./graphElementEditorModel.ts";
 import type { GraphEdge, GraphNode } from "../analyzer/types";
 
@@ -50,6 +51,16 @@ assert.deepEqual(
   GRAPH_ELEMENT_TABS.map((tab) => tab.id),
   ["basic", "contract", "runtime", "policy", "mock", "adk"],
   "Graph element editor keeps the approved six-tab order"
+);
+assert.equal(
+  nextGraphElementTabAfterSelectionChange("contract"),
+  "contract",
+  "graph element tab should stay on the current tab when another node or edge is selected"
+);
+assert.equal(
+  nextGraphElementTabAfterSelectionChange("adk"),
+  "adk",
+  "graph element tab should preserve the current ADK tab across selection changes"
 );
 
 assert.equal(

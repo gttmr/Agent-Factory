@@ -57,3 +57,7 @@ export function isNodeRuntimeControlEditable(_node: GraphNode): boolean {
 export function isEdgeKindEditable(edge: GraphEdge): boolean {
   return edge.edge_kind !== "route" && edge.edge_kind !== "remote_a2a";
 }
+
+export function nextGraphElementTabAfterSelectionChange(currentTab: GraphElementTabId): GraphElementTabId {
+  return currentTab;
+}

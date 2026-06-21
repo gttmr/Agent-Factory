@@ -23,6 +23,7 @@ import {
   isModuleBoundNodeKind,
   isNodeModuleLinkEditable,
   isNodeRuntimeControlEditable,
+  nextGraphElementTabAfterSelectionChange,
   type GraphElementTabId
 } from "./graphElementEditorModel";
 import { Button, Field, SelectField, TextareaField } from "../ui/primitives";
@@ -126,7 +127,7 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
       : "empty";
 
   useEffect(() => {
-    setActiveTab("basic");
+    setActiveTab((currentTab) => nextGraphElementTabAfterSelectionChange(currentTab));
   }, [selectionKey]);
 
   if (editState.selectedNode) {

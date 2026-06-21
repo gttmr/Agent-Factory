@@ -7,7 +7,11 @@ import type {
   ModuleCategory
 } from "../analyzer/types";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "./CategoryBadge";
-import { GRAPH_ELEMENT_TABS, type GraphElementTabId } from "./graphElementEditorModel";
+import {
+  GRAPH_ELEMENT_TABS,
+  nextGraphElementTabAfterSelectionChange,
+  type GraphElementTabId
+} from "./graphElementEditorModel";
 
 interface GraphInspectorProps {
   selectedNode: GraphNode | null;
@@ -90,7 +94,7 @@ export function GraphInspector(props: GraphInspectorProps) {
       : "empty";
 
   useEffect(() => {
-    setActiveTab("basic");
+    setActiveTab((currentTab) => nextGraphElementTabAfterSelectionChange(currentTab));
   }, [selectionKey]);
 
   if (!selectedNode && !selectedEdge) {
