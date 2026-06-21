@@ -11,6 +11,7 @@ ADK 2.0 Graph Workflow, Dynamic Workflow, Human Input 문서를 기준으로 한
 - Adapter 호출이 여러 개라는 사실만으로 Workflow가 필요한 것은 아니다. 실행 순서, 라우팅, 병렬성, 반복, 승인 gate가 설계상 의미 있을 때 Workflow를 둔다.
 - Remote A2A는 workflow pattern이 아니다. 독립 원격 agent 계약이 확인될 때만 사용한다.
 - Catalog에 등록된 공통 Workflow는 `module_category: workflow`를 유지하면서 `runtime_binding: remote_a2a`로 호출될 수 있다. 이것은 실행 binding이며, 독립 원격 Agent 후보인 `module_category: remote_a2a`와 구분한다.
+- ADK Web smoke skeleton 생성 범위에서는 Dynamic Workflow를 생성하지 않는다. 동적 로직은 하위 Workflow로 분리하고 parent graph에서는 `workflow_call` 노드로 조립한다.
 
 ## orchestration
 
@@ -43,7 +44,25 @@ Graph IR 표현:
 - 승인/보완 요청은 `human_review_region`과 `node_kind: human_input`으로 표현한다.
 - route는 명시적인 `router` node와 `edge_kind: route`, `route_condition`으로 표현한다.
 
-## dynamic
+## existing workflow calls
+
+기존 Workflow 추가/선택 기능은 Graph IR에서 `node_kind: workflow_call`로 저장한다.
+
+필수 계약:
+
+- `workflow_ref.id`, `workflow_ref.version`, `workflow_ref.source`, `workflow_ref.display_name`
+- `input_schema`, `output_schema` 또는 입출력 port의 schema ref
+- `input_mapping`, `output_mapping`
+- `adk_skeleton_contract.scaffold_level`
+
+처리 정책:
+
+- target workflow가 존재하면 `workflow_ref`로 연결하고 skeleton 생성 시 workflow call stub을 만든다.
+- target workflow skeleton이 아직 없으면 placeholder workflow call stub을 만들고 README와 TODO에 수동 연결 필요를 남긴다.
+- target workflow ref가 깨졌거나 입출력 schema가 없으면 `manual_required` 또는 validation warning으로 처리한다.
+- dynamic workflow 요청은 "기존 Workflow로 분리한 뒤 workflow_call node로 추가"하도록 안내한다.
+
+## dynamic classification
 
 `workflow_kind: dynamic`은 코드가 런타임 경로를 직접 결정해야 할 때 사용한다.
 
@@ -54,8 +73,10 @@ Graph IR 표현:
 - static graph로 표현하면 지나치게 복잡하거나 runtime 값이 있어야만 다음 경로를 알 수 있다.
 - ADK dynamic workflow의 `ctx.run_node` 기반 composition, checkpointing, resume semantics가 핵심이다.
 
-Graph IR에는 `dynamic_workflow` container를 두고, 외부에서 관찰 가능한 input/output, human input, remote boundary, 주요 adapter call만 노출한다.
-종료 조건, max iteration, fallback, escalation이 없으면 `needs_info`로 남긴다.
+`workflow_kind: dynamic`은 분석 분류로는 남아 있지만 이번 skeleton 생성 범위에서는 runnable lowering 대상이 아니다.
+Graph IR/UI/codegen에 신규 `dynamic_workflow` container나 `dynamic_*` codegen을 추가하지 않는다.
+관찰 가능한 주요 호출은 별도 `workflow`로 분리하고 parent graph는 `workflow_call`로 조립한다.
+종료 조건, max iteration, fallback, escalation은 target Workflow 내부의 수동 구현 TODO로 남긴다.
 
 ## ADK Component Routing
 
@@ -65,8 +86,17 @@ Graph IR에는 `dynamic_workflow` container를 두고, 외부에서 관찰 가�
 | 독립 작업 병렬 실행 후 병합 | `workflow_kind: graph` | `parallel_region`, `fan_out`, `join`, `fan_in` |
 | 품질 충족이나 재시도 반복 | static이면 `graph`, 코드 중심이면 `dynamic` | `loop_region`, `loop_control`, `loop_back`, `loop_exit` |
 | 사람 승인 또는 보완 요청 | `workflow_kind: graph` 안의 human input | `human_review_region`, `human_input`, `route` |
-| 매 호출마다 코드가 경로 결정 | `workflow_kind: dynamic` | `dynamic_workflow` container |
+| 매 호출마다 코드가 경로 결정 | 하위 Workflow로 분리 후 parent에서는 `workflow_call` | target Workflow 내부 수동 구현 TODO |
 | 독립 remote agent 호출 | 충분한 계약 증거가 있을 때만 `remote_a2a` | `remote_boundary`, `remote_a2a` edge |
+
+## Mock Lab and skeleton handoff
+
+Adapter 호출 노드는 `node_kind: adapter_call`, `runtime_binding: mcp_tool`, `mock_binding.provider: mock_lab`로 Mock Lab tool을 참조할 수 있다.
+Mock Lab은 repo 내부 `packages/mock-lab`의 local test double 기능이며, 별도 mock server framework를 만들지 않는다.
+생성 bundle의 목표는 production code가 아니라 ADK Web에서 흐름을 확인하는 skeleton이다.
+
+생성 bundle은 TODO, `mock_config.yaml`, `sample_inputs.yaml`, `workflow.py`, `nodes/*`, README를 포함한다.
+실제 API/EAI endpoint, credential, 운영 배포 설정, 고객 데이터, 확정된 production prompt는 생성하지 않는다.
 
 ## ADK MCP 사용 주의
 

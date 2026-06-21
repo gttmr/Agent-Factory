@@ -26,7 +26,7 @@ interface GraphElementEditorProps {
   onClose: () => void;
 }
 
-const MODULE_NODE_KINDS = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
+const MODULE_NODE_KINDS = new Set(["agent", "workflow", "workflow_call", "adapter", "adapter_call", "remote_a2a", "remote_agent_call"]);
 const STATE_EDGE_KINDS = new Set(["session_state", "temp_state", "user_state", "app_state"]);
 const AGENT_EXECUTION_MODE_LABEL: Record<AgentExecutionMode, string> = {
   single_turn: "Single turn",
@@ -120,7 +120,7 @@ function NodeForm({
   const category = moduleCategoryFromNodeKind(node.node_kind);
   const canLinkModule = MODULE_NODE_KINDS.has(node.node_kind);
   const matchingCandidates = canLinkModule
-    ? moduleCandidates.filter((candidate) => candidate.module_category === node.node_kind)
+    ? moduleCandidates.filter((candidate) => candidate.module_category === moduleCategoryFromNodeKind(node.node_kind))
     : [];
   const agentExecutionMode: AgentExecutionMode = node.agent_execution_mode === "chat" ? "chat" : "single_turn";
 
@@ -235,6 +235,26 @@ function NodeForm({
               </p>
             ) : null}
           </>
+        ) : null}
+
+        {node.node_kind === "workflow_call" ? (
+          <>
+            <Field label="workflow_ref">
+              <input value={node.workflow_ref ? `${node.workflow_ref.display_name} (${node.workflow_ref.id}${node.workflow_ref.version ? ` ${node.workflow_ref.version}` : ""})` : "placeholder"} readOnly />
+            </Field>
+            <TextareaField label="input_mapping" value={JSON.stringify(node.input_mapping ?? {}, null, 2)} readOnly rows={4} />
+            <TextareaField label="output_mapping" value={JSON.stringify(node.output_mapping ?? {}, null, 2)} readOnly rows={4} />
+          </>
+        ) : null}
+
+        {node.node_kind === "adapter_call" ? (
+          <>
+            <TextareaField label="Mock Lab binding" value={JSON.stringify(node.mock_binding ?? { provider: "mock_lab", package_path: "packages/mock-lab", status: "missing" }, null, 2)} readOnly rows={7} />
+          </>
+        ) : null}
+
+        {node.adk_skeleton_contract ? (
+          <TextareaField label="ADK Skeleton Contract" value={JSON.stringify(node.adk_skeleton_contract, null, 2)} readOnly rows={7} />
         ) : null}
       </section>
 
@@ -407,6 +427,9 @@ function EdgeForm({
 }
 
 function moduleCategoryFromNodeKind(kind: GraphNode["node_kind"]): ModuleCategory | null {
+  if (kind === "workflow_call") return "workflow";
+  if (kind === "adapter_call") return "adapter";
+  if (kind === "remote_agent_call") return "remote_a2a";
   if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") return kind;
   return null;
 }

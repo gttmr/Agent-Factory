@@ -69,7 +69,36 @@ function baseModules(runnable, { connectedAdapter = false, agentExecutionMode = 
       mcp_tool_name: connectedAdapter ? "lookup_test_data" : null,
       mcp_schema_ref: connectedAdapter ? "catalog/contracts/mcp/test.lookup.v1.json" : null,
       mcp_auth_mode: connectedAdapter ? "none" : null,
-      runtime_binding: connectedAdapter ? "mcp" : null
+      runtime_binding: connectedAdapter ? "mcp_tool" : null,
+      node_kind: "adapter_call",
+      mock_binding: connectedAdapter
+        ? {
+            provider: "mock_lab",
+            package_path: "packages/mock-lab",
+            mock_server_id: "test-mcp",
+            tool_name: "lookup_test_data",
+            input_schema: "catalog/contracts/mcp/test.lookup.v1.json",
+            output_schema: "catalog/contracts/mcp/test.lookup.output.v1.json",
+            sample_response_ref: "mock_samples.test.lookup",
+            status: "linked"
+          }
+        : {
+            provider: "mock_lab",
+            package_path: "packages/mock-lab",
+            mock_server_id: null,
+            tool_name: null,
+            input_schema: null,
+            output_schema: null,
+            sample_response_ref: null,
+            status: "missing"
+          },
+      adk_skeleton_contract: {
+        scaffold_level: runnable && connectedAdapter ? "mock_testable_skeleton" : "handoff",
+        target_runtime: "adk_python_2_x",
+        implementation_template: connectedAdapter ? "mcp_mock_adapter_stub" : "adapter_placeholder_stub",
+        manual_completion_required: true,
+        developer_todos: ["replace_mock_with_real_eai_client"]
+      }
     }
   ];
 }
@@ -212,6 +241,12 @@ function assertRunnableBundle(outputRoot) {
   );
   assert.equal(manifest.runtime.connected_adapters.length, 0);
   assert.ok(existsSync(join(outputRoot, "agents.config.yaml")), "runnable bundle must emit agents.config.yaml");
+  assert.ok(existsSync(join(outputRoot, packageName, "workflow.py")), "bundle must include workflow.py for developer handoff");
+  assert.ok(existsSync(join(outputRoot, packageName, "schemas.py")), "bundle must include schemas.py");
+  assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")), "bundle must include mock_config.yaml");
+  assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
+  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "adapters.py")), "bundle must include nodes/adapters.py");
+  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "workflow_calls.py")), "bundle must include nodes/workflow_calls.py");
   assert.ok(existsSync(join(outputRoot, ".env.example")), "runnable bundle must emit .env.example");
   assert.ok(existsSync(join(outputRoot, ".gitignore")), "runnable bundle must emit .gitignore");
   assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
@@ -226,14 +261,19 @@ function assertRunnableBundle(outputRoot) {
 
 function assertConnectedMcpRuntimeLabels(outputRoot) {
   const { manifest, agentSource } = readBundle(outputRoot);
+  const mockConfig = readFileSync(join(outputRoot, discoverGeneratedPackage(outputRoot), "mock_config.yaml"), "utf8");
   assert.equal(manifest.runtime.connected_adapters.length, 1);
   assert.equal(manifest.runtime.connected_adapters[0].runtime_mcp_label, "런타임 MCP");
+  assert.equal(manifest.runtime.connected_adapters[0].mock_binding.provider, "mock_lab");
   assert.match(manifest.runtime.connected_adapters[0].runtime_mcp_note, /실행 시점/);
   assert.match(agentSource, /"runtime_mcp_label": "런타임 MCP"/);
   assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
   assert.match(agentSource, /"connection_status": "mcp_connected"/);
   assert.match(agentSource, /def _user_text_from_context\(ctx: Context\) -> str:/);
   assert.match(agentSource, /source_key in \{"query", "user_request"\}/);
+  assert.match(mockConfig, /provider: mock_lab/);
+  assert.match(mockConfig, /package_path: packages\/mock-lab/);
+  assert.match(mockConfig, /tool_name: "?lookup_test_data"?/);
 }
 
 function assertManifestStageUpdated(artifactRoot) {

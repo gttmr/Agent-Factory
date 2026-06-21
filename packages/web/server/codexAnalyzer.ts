@@ -640,12 +640,20 @@ function hydrateGraphNodes(value: unknown, moduleCandidates: Record<string, unkn
         nodeKind === "remote_a2a" ? "boundary" : moduleBoundNodeKind(nodeKind) ? "workflow_node" : "synthetic"
       ),
       owner_scope: ownerScope,
-      container_id: stringOr(node.container_id, nodeKind === "remote_a2a" ? "container-remote" : "container-root"),
+      container_id: stringOr(node.container_id, nodeKind === "remote_a2a" || nodeKind === "remote_agent_call" ? "container-remote" : "container-root"),
       lane_id: laneId,
       input_ports: [],
       output_ports: [],
       schema_refs: stringArrayOr(node.schema_refs),
-      review_status: enumOr(node.review_status, new Set(["needs_info", "approved", "deferred", "rejected", "n/a"]), moduleBoundNodeKind(nodeKind) ? "needs_info" : "n/a")
+      review_status: enumOr(node.review_status, new Set(["needs_info", "approved", "deferred", "rejected", "n/a"]), moduleBoundNodeKind(nodeKind) ? "needs_info" : "n/a"),
+      workflow_ref: isRecord(node.workflow_ref) ? node.workflow_ref : null,
+      input_schema: stringOr(node.input_schema, null),
+      output_schema: stringOr(node.output_schema, null),
+      input_mapping: isRecord(node.input_mapping) ? node.input_mapping : null,
+      output_mapping: isRecord(node.output_mapping) ? node.output_mapping : null,
+      runtime_binding: stringOr(node.runtime_binding, null),
+      mock_binding: isRecord(node.mock_binding) ? node.mock_binding : null,
+      adk_skeleton_contract: isRecord(node.adk_skeleton_contract) ? node.adk_skeleton_contract : null
     };
   });
 }
@@ -875,7 +883,15 @@ function defaultSideEffect(category: string): "none" | "read" | "write" | "read_
 }
 
 function moduleBoundNodeKind(kind: string): boolean {
-  return kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a";
+  return (
+    kind === "agent" ||
+    kind === "workflow" ||
+    kind === "workflow_call" ||
+    kind === "adapter" ||
+    kind === "adapter_call" ||
+    kind === "remote_a2a" ||
+    kind === "remote_agent_call"
+  );
 }
 
 function inferNodeKind(node: Record<string, unknown>, moduleById: Map<string, Record<string, unknown>>): string {
@@ -900,9 +916,9 @@ function inferModuleIdFromNode(node: Record<string, unknown>, moduleById: Map<st
 function laneForNodeKind(kind: string): string {
   if (kind === "input") return "input";
   if (kind === "output") return "output";
-  if (kind === "adapter" || kind === "tool") return "adapter";
+  if (kind === "adapter" || kind === "adapter_call" || kind === "tool") return "adapter";
   if (kind === "human_input") return "human_input";
-  if (kind === "remote_a2a") return "remote_boundary";
+  if (kind === "remote_a2a" || kind === "remote_agent_call") return "remote_boundary";
   return "local_graph";
 }
 

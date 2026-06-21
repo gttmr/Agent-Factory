@@ -79,6 +79,16 @@ function buildFiles() {
   const base = {
     [`${packageName}/__init__.py`]: "from .agent import root_agent\n",
     [`${packageName}/agent.py`]: buildAgentPy(),
+    [`${packageName}/workflow.py`]: buildWorkflowPy(),
+    [`${packageName}/schemas.py`]: buildSchemasPy(),
+    [`${packageName}/mock_config.yaml`]: buildMockConfigYaml(),
+    [`${packageName}/sample_inputs.yaml`]: buildSampleInputsYaml(),
+    [`${packageName}/nodes/__init__.py`]: "",
+    [`${packageName}/nodes/agents.py`]: buildNodeHelperPy("agents"),
+    [`${packageName}/nodes/adapters.py`]: buildNodeHelperPy("adapters"),
+    [`${packageName}/nodes/human_inputs.py`]: buildNodeHelperPy("human_inputs"),
+    [`${packageName}/nodes/routers.py`]: buildNodeHelperPy("routers"),
+    [`${packageName}/nodes/workflow_calls.py`]: buildWorkflowCallsPy(),
     [`${packageName}/workflow_manifest.json`]: `${JSON.stringify(buildManifest(), null, 2)}\n`,
     "scaffold-plan.json": `${JSON.stringify(scaffoldPlan, null, 2)}\n`,
     "implementation-handoff.md": buildImplementationHandoff(),
@@ -673,6 +683,130 @@ function buildAgentsConfig() {
   return `${lines.join("\n")}\n`;
 }
 
+function buildWorkflowPy() {
+  return `"""ADK Workflow entrypoint shim.
+
+The executable root_agent lives in agent.py so ADK Web can import the package.
+This file gives developers a stable place to inspect workflow-level handoff
+metadata without adding production business logic.
+"""
+
+from .agent import root_agent
+
+__all__ = ["root_agent"]
+`;
+}
+
+function buildSchemasPy() {
+  return `"""Reviewed input/output schema names for the generated skeleton."""
+
+MODULE_SCHEMAS = ${toPythonLiteral(
+    Object.fromEntries(
+      modules.map((module) => [
+        module.id,
+        {
+          inputs: module.inputs ?? [],
+          outputs: module.outputs ?? [],
+          workflow_ref: module.workflow_ref ?? null,
+          mock_binding: module.mock_binding ?? null,
+        },
+      ])
+    )
+  )}
+`;
+}
+
+function buildNodeHelperPy(kind) {
+  const note = {
+    agents: "Agent node instructions are emitted in agent.py as LlmAgent declarations.",
+    adapters: "Adapter stubs call Mock Lab only when mock_binding is linked; replace with real EAI/API clients manually.",
+    human_inputs: "Human input nodes are RequestInput placeholders for ADK Web smoke tests.",
+    routers: "Router/business branching is not auto-generated in this skeleton scope.",
+  }[kind];
+  return `"""${note}"""
+
+DEVELOPER_NOTE = ${toPyStr(note)}
+`;
+}
+
+function buildWorkflowCallsPy() {
+  const workflowCalls = modules.filter((module) => module.module_category === "workflow");
+  const rows = workflowCalls.map((module) => ({
+    module_id: module.id,
+    module_name: module.name,
+    workflow_ref: module.workflow_ref ?? {
+      id: module.id,
+      version: null,
+      source: "placeholder",
+      display_name: module.name,
+    },
+    input_mapping: module.input_mapping ?? {},
+    output_mapping: module.output_mapping ?? {},
+    developer_todos: module.developer_todos ?? [],
+  }));
+  return `"""workflow_call placeholders for existing/sub-workflow calls.
+
+These functions intentionally do not implement target workflow business logic.
+Developers should replace the placeholder return with an import/call to the
+reviewed target Workflow skeleton after confirming the contract.
+"""
+
+WORKFLOW_CALLS = ${toPythonLiteral(rows)}
+
+
+async def call_existing_workflow(ctx, input_data, workflow_ref):
+    return {
+        "status": "workflow_call_placeholder",
+        "manual_completion_required": True,
+        "target_workflow": workflow_ref,
+        "input": input_data,
+    }
+`;
+}
+
+function buildMockConfigYaml() {
+  const adapters = modules.filter((module) => module.module_category === "adapter");
+  const lines = ["provider: mock_lab", "package_path: packages/mock-lab", "adapters:"];
+  if (!adapters.length) lines.push("  []");
+  for (const module of adapters) {
+    const binding = module.mock_binding ?? mockBindingFromModule(module);
+    lines.push(`  - module_id: ${yamlScalar(module.id)}`);
+    lines.push(`    module_name: ${yamlScalar(module.name)}`);
+    lines.push(`    status: ${yamlScalar(binding.status)}`);
+    lines.push(`    provider: ${yamlScalar(binding.provider)}`);
+    lines.push(`    package_path: ${yamlScalar(binding.package_path)}`);
+    lines.push(`    mock_server_id: ${yamlScalar(binding.mock_server_id)}`);
+    lines.push(`    tool_name: ${yamlScalar(binding.tool_name)}`);
+    lines.push(`    input_schema: ${yamlScalar(binding.input_schema)}`);
+    lines.push(`    output_schema: ${yamlScalar(binding.output_schema)}`);
+    lines.push(`    sample_response_ref: ${yamlScalar(binding.sample_response_ref)}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function buildSampleInputsYaml() {
+  const lines = ["samples:"];
+  let count = 0;
+  for (const module of modules) {
+    const inputs = module.smoke_spec?.synthetic_inputs;
+    if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) continue;
+    count += 1;
+    lines.push(`  - module_id: ${yamlScalar(module.id)}`);
+    lines.push(`    module_name: ${yamlScalar(module.name)}`);
+    lines.push("    input:");
+    for (const [key, value] of Object.entries(inputs)) {
+      lines.push(`      ${key}: ${yamlScalar(value)}`);
+    }
+  }
+  if (!count) {
+    lines.push("  - module_id: workflow");
+    lines.push(`    module_name: ${yamlScalar(normalizedRequirement.title || packageName)}`);
+    lines.push("    input:");
+    lines.push(`      user_request: ${yamlScalar(firstSmokeSample() || "ADK Web smoke test sample")}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 function buildEnvExample() {
   return `# Agent Factory 공유 runtime env template입니다.
 # 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
@@ -685,6 +819,26 @@ function buildEnvExample() {
 
 function buildGitignore() {
   return `.env\n.venv/\n.adk/\n__pycache__/\n*.pyc\n`;
+}
+
+function mockBindingFromModule(module) {
+  if (module.mock_binding && typeof module.mock_binding === "object") return module.mock_binding;
+  return {
+    provider: "mock_lab",
+    package_path: "packages/mock-lab",
+    mock_server_id: module.mcp_server ?? null,
+    tool_name: module.mcp_tool_name ?? null,
+    input_schema: module.mcp_schema_ref ?? null,
+    output_schema: null,
+    sample_response_ref: null,
+    status: adapterConnection(module) === "mcp_connected" ? "linked" : "missing",
+  };
+}
+
+function yamlScalar(value) {
+  if (value === null || value === undefined || value === "") return "null";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(String(value));
 }
 
 // ---------------------------------------------------------------------------
@@ -739,7 +893,8 @@ function buildManifest() {
               runtime_mcp_label: RUNTIME_MCP_LABEL,
               runtime_mcp_note: RUNTIME_MCP_NOTE,
               mcp_server: module.mcp_server ?? null,
-              mcp_tool_name: module.mcp_tool_name ?? null
+              mcp_tool_name: module.mcp_tool_name ?? null,
+              mock_binding: mockBindingFromModule(module)
             })),
             unconnected_adapters: unconnectedAdapters.map((module) => ({
               module_id: module.id,
@@ -1025,6 +1180,11 @@ function componentContracts() {
           access_protocol: module.access_protocol ?? null,
           mcp_server: module.mcp_server ?? null,
           mcp_tool_name: module.mcp_tool_name ?? null,
+          workflow_ref: module.workflow_ref ?? null,
+          input_mapping: module.input_mapping ?? null,
+          output_mapping: module.output_mapping ?? null,
+          mock_binding: mockBindingFromModule(module),
+          adk_skeleton_contract: module.adk_skeleton_contract ?? null,
           runtime_mcp_label: adapterConnection(module) === "mcp_connected" ? RUNTIME_MCP_LABEL : null,
           runtime_mcp_note: adapterConnection(module) === "mcp_connected" ? RUNTIME_MCP_NOTE : null,
           connection_status: adapterConnection(module)
@@ -1895,7 +2055,9 @@ function assertRemoteA2aSupported() {
 
 function adapterConnection(module) {
   if (module.module_category !== "adapter") return "n/a";
-  if (module.access_protocol === "mcp" && module.mcp_server && module.mcp_tool_name) return "mcp_connected";
+  const binding = module.runtime_binding === "mcp" || module.runtime_binding === "mcp_tool";
+  const mockLinked = module.mock_binding?.status === "linked";
+  if ((module.access_protocol === "mcp" || binding || mockLinked) && module.mcp_server && module.mcp_tool_name) return "mcp_connected";
   return "unconnected";
 }
 

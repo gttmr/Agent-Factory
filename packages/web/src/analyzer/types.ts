@@ -193,6 +193,36 @@ export type RiskLevel = "low" | "medium" | "high";
 export type ModuleStatus = "needs_info" | "approved" | "deferred" | "rejected";
 export type RequirementStatus = "draft" | "reviewed" | "approved" | "rejected";
 export type ComponentSource = "mcp" | "remote_a2a" | "stub";
+export type RuntimeBinding = "unresolved" | "direct_api" | "mcp_tool" | "local_function" | "remote_a2a" | "workflow_call" | "ui_input";
+export type ScaffoldLevel = "none" | "handoff" | "mock_testable_skeleton" | "manual_required";
+
+export interface WorkflowRef {
+  id: string;
+  version: string | null;
+  source: "catalog" | "artifact" | "placeholder";
+  display_name: string;
+}
+
+export interface MockBinding {
+  provider: "mock_lab";
+  package_path: "packages/mock-lab";
+  mock_server_id: string | null;
+  tool_name: string | null;
+  input_schema: string | null;
+  output_schema: string | null;
+  sample_response_ref: string | null;
+  status: "linked" | "missing" | "invalid";
+}
+
+export interface AdkSkeletonContract {
+  scaffold_level: ScaffoldLevel;
+  target_runtime?: "adk_python_2_x";
+  entrypoint?: "root_agent";
+  generation_mode?: "deterministic_template" | "llm_assisted_patch" | "manual";
+  implementation_template: string;
+  manual_completion_required: boolean;
+  developer_todos: string[];
+}
 
 export interface RuntimeContract {
   contract_id: string;
@@ -512,7 +542,13 @@ export interface ScaffoldPlanModule {
   mcp_tool_name?: string | null;
   mcp_schema_ref?: string | null;
   mcp_auth_mode?: string | null;
-  runtime_binding?: "unresolved" | "mcp" | "remote_a2a" | null;
+  runtime_binding?: RuntimeBinding | "mcp" | null;
+  node_kind?: NodeKind | null;
+  workflow_ref?: WorkflowRef | null;
+  input_mapping?: Record<string, string> | null;
+  output_mapping?: Record<string, string> | null;
+  mock_binding?: MockBinding | null;
+  adk_skeleton_contract?: AdkSkeletonContract;
 }
 
 export interface ScaffoldPlanRuntimeContract {
@@ -583,9 +619,12 @@ export const GRAPH_NODE_KINDS = [
   "function",
   "tool",
   "adapter",
+  "adapter_call",
   "human_input",
   "workflow",
+  "workflow_call",
   "remote_a2a",
+  "remote_agent_call",
   "join",
   "router",
   "loop_control"
@@ -701,6 +740,14 @@ export interface GraphNode {
   schema_refs: string[];
   review_status: ModuleStatus | "n/a";
   position?: { x: number; y: number } | null;
+  workflow_ref?: WorkflowRef | null;
+  input_schema?: string | null;
+  output_schema?: string | null;
+  input_mapping?: Record<string, string> | null;
+  output_mapping?: Record<string, string> | null;
+  runtime_binding?: RuntimeBinding | null;
+  mock_binding?: MockBinding | null;
+  adk_skeleton_contract?: AdkSkeletonContract | null;
 }
 
 export interface GraphEdge {

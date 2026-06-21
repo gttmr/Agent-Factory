@@ -44,12 +44,21 @@ export function buildScaffoldPlan({
   // counted as an unresolved/needs-info blocker.
   const rootWorkflowModuleId = processFlow?.root_workflow_module_id ?? null;
   const agentExecutionModes = agentExecutionModeByModuleId(processFlow);
+  const graphNodeByModuleId = graphNodeByModuleIdFor(processFlow);
   const isRootWorkflowCandidate = (candidate: ModuleCandidate): boolean =>
     rootWorkflowModuleId !== null && candidate.id === rootWorkflowModuleId;
   const deployableCandidates = moduleCandidates.filter((candidate) => !isRootWorkflowCandidate(candidate));
   const modules = deployableCandidates
     .filter((candidate) => candidate.status === "approved")
-    .map((candidate) => buildScaffoldModule(candidate, activeCatalog, outputMode, agentExecutionModes.get(candidate.id) ?? null));
+    .map((candidate) =>
+      buildScaffoldModule(
+        candidate,
+        activeCatalog,
+        outputMode,
+        agentExecutionModes.get(candidate.id) ?? null,
+        graphNodeByModuleId.get(candidate.id) ?? null
+      )
+    );
   const excludedModules = [
     ...moduleCandidates.filter(isRootWorkflowCandidate).map((candidate) => ({
       id: candidate.id,
@@ -118,7 +127,8 @@ function buildScaffoldModule(
   candidate: ModuleCandidate,
   catalogEntries: CatalogEntry[],
   outputMode: ScaffoldOutputMode,
-  agentExecutionMode: AgentExecutionMode | null
+  agentExecutionMode: AgentExecutionMode | null,
+  graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null
 ): ScaffoldPlanModule {
   const catalogEntry = findCatalogBinding(candidate, catalogEntries);
   const componentSource = componentSourceFor(catalogEntry);
@@ -138,7 +148,7 @@ function buildScaffoldModule(
   const mcpToolName = candidate.mcp_tool_name ?? catalogEntry?.mcp_tool_name ?? null;
   const mcpSchemaRef = candidate.mcp_schema_ref ?? catalogEntry?.mcp_schema_ref ?? null;
   const mcpAuthMode = candidate.mcp_auth_mode ?? catalogEntry?.mcp_auth_mode ?? null;
-  const runtimeBinding = catalogEntry?.runtime_binding ?? null;
+  const runtimeBinding = normalizeRuntimeBinding(graphNode?.runtime_binding ?? catalogEntry?.runtime_binding ?? null);
 
   const isAgent = candidate.module_category === "agent";
 
@@ -170,7 +180,13 @@ function buildScaffoldModule(
     mcp_tool_name: runnable ? mcpToolName : null,
     mcp_schema_ref: runnable ? mcpSchemaRef : null,
     mcp_auth_mode: runnable ? mcpAuthMode : null,
-    runtime_binding: runnable ? runtimeBinding : null
+    runtime_binding: runnable ? runtimeBinding : null,
+    node_kind: graphNode?.node_kind ?? null,
+    workflow_ref: graphNode?.workflow_ref ?? null,
+    input_mapping: graphNode?.input_mapping ?? null,
+    output_mapping: graphNode?.output_mapping ?? null,
+    mock_binding: runnable ? normalizeMockBinding(candidate, graphNode) : null,
+    adk_skeleton_contract: adkSkeletonContractFor(candidate, graphNode, runnable)
   };
 }
 
@@ -181,6 +197,85 @@ function agentExecutionModeByModuleId(processFlow: ProcessFlow): Map<string, Age
     modes.set(node.module_id, node.agent_execution_mode === "chat" ? "chat" : "single_turn");
   }
   return modes;
+}
+
+function graphNodeByModuleIdFor(processFlow: ProcessFlow): Map<string, ProcessFlow["nodes"][number]> {
+  const nodes = new Map<string, ProcessFlow["nodes"][number]>();
+  for (const node of processFlow?.nodes ?? []) {
+    if (typeof node.module_id !== "string") continue;
+    if (!nodes.has(node.module_id)) nodes.set(node.module_id, node);
+  }
+  return nodes;
+}
+
+function normalizeRuntimeBinding(value: unknown): ScaffoldPlanModule["runtime_binding"] {
+  if (value === "mcp" || value === "mcp_tool") return "mcp_tool";
+  if (
+    value === "unresolved" ||
+    value === "direct_api" ||
+    value === "local_function" ||
+    value === "remote_a2a" ||
+    value === "workflow_call" ||
+    value === "ui_input"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function normalizeMockBinding(candidate: ModuleCandidate, graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null): ScaffoldPlanModule["mock_binding"] {
+  if (graphNode?.mock_binding) return graphNode.mock_binding;
+  if (candidate.module_category !== "adapter") return null;
+  if (!candidate.mcp_server || !candidate.mcp_tool_name) {
+    return {
+      provider: "mock_lab",
+      package_path: "packages/mock-lab",
+      mock_server_id: null,
+      tool_name: null,
+      input_schema: candidate.mcp_schema_ref ?? null,
+      output_schema: null,
+      sample_response_ref: null,
+      status: "missing"
+    };
+  }
+  return {
+    provider: "mock_lab",
+    package_path: "packages/mock-lab",
+    mock_server_id: candidate.mcp_server,
+    tool_name: candidate.mcp_tool_name,
+    input_schema: candidate.mcp_schema_ref ?? null,
+    output_schema: null,
+    sample_response_ref: null,
+    status: "linked"
+  };
+}
+
+function adkSkeletonContractFor(
+  candidate: ModuleCandidate,
+  graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null,
+  runnable: boolean
+): ScaffoldPlanModule["adk_skeleton_contract"] {
+  if (graphNode?.adk_skeleton_contract) return graphNode.adk_skeleton_contract;
+  const nodeKind = graphNode?.node_kind;
+  const isWorkflowCall = nodeKind === "workflow_call";
+  const isMockAdapter = candidate.module_category === "adapter" && normalizeMockBinding(candidate, graphNode)?.status === "linked";
+  return {
+    scaffold_level: runnable && (isWorkflowCall || isMockAdapter || candidate.module_category === "agent") ? "mock_testable_skeleton" : "handoff",
+    target_runtime: "adk_python_2_x",
+    implementation_template: isWorkflowCall
+      ? "workflow_call_stub"
+      : isMockAdapter
+        ? "mcp_mock_adapter_stub"
+        : candidate.module_category === "agent"
+            ? "llm_agent_stub"
+            : "adapter_placeholder_stub",
+    manual_completion_required: true,
+    developer_todos: isWorkflowCall
+      ? ["workflow_call target skeleton 연결 확인", "input/output mapping 검토"]
+      : isMockAdapter
+        ? ["Mock Lab MCP tool binding 확인", "실제 EAI/API client로 교체할 TODO 유지"]
+        : ["검토된 scaffold boundary 안에서 개발자가 수동 보강"]
+  };
 }
 
 /**
@@ -238,6 +333,12 @@ function developerTodosFor(
     return [
       "remote agent card 또는 discovery 계약을 검토 가능한 값으로 채우세요.",
       "런타임 사용 전에 인증, timeout, retry, fallback, audit, data policy 처리를 구현하세요."
+    ];
+  }
+  if (candidate.module_category === "workflow") {
+    return [
+      "workflow_call target skeleton 연결 방식과 version을 확인하세요.",
+      "하위 Workflow input/output mapping을 검토하고 실제 동적 로직은 target Workflow 내부에서 수동 보강하세요."
     ];
   }
   return [

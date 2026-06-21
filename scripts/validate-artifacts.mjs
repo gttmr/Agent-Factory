@@ -27,7 +27,7 @@ const workflowKinds = new Set([
 ]);
 const remoteKinds = new Set(["a2a", "unknown"]);
 const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
-const runtimeBindings = new Set(["unresolved", "mcp", "remote_a2a"]);
+const runtimeBindings = new Set(["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"]);
 const scaffoldOutputModes = new Set(["smoke", "runnable"]);
 const smokeScaffoldOutputs = {
   adapter: "contract_or_stub_only",
@@ -45,9 +45,12 @@ const graphNodeKinds = new Set([
   "function",
   "tool",
   "adapter",
+  "adapter_call",
   "human_input",
   "workflow",
+  "workflow_call",
   "remote_a2a",
+  "remote_agent_call",
   "join",
   "router",
   "loop_control"
@@ -770,9 +773,9 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
           );
         } else if (
           (node.node_kind === "agent" && candidate.module_category !== "agent") ||
-          (node.node_kind === "workflow" && candidate.module_category !== "workflow") ||
-          (node.node_kind === "adapter" && candidate.module_category !== "adapter") ||
-          (node.node_kind === "remote_a2a" && candidate.module_category !== "remote_a2a")
+          ((node.node_kind === "workflow" || node.node_kind === "workflow_call") && candidate.module_category !== "workflow") ||
+          ((node.node_kind === "adapter" || node.node_kind === "adapter_call") && candidate.module_category !== "adapter") ||
+          ((node.node_kind === "remote_a2a" || node.node_kind === "remote_agent_call") && candidate.module_category !== "remote_a2a")
         ) {
           errors.push(
             `${label}.nodes[${index}] (${node.id}) node_kind ${node.node_kind} does not match candidate ${candidate.id} module_category ${candidate.module_category}.`
@@ -1099,7 +1102,7 @@ function validateScaffoldMcpBinding(module, label) {
   // requires a complete, non-blank binding so the generator can emit a connected
   // adapter; otherwise it is a bug, not a silent unconnected downgrade.
   const declaresMcp =
-    module.access_protocol === "mcp" || module.runtime_binding === "mcp" || hasServer || hasTool;
+    module.access_protocol === "mcp" || module.runtime_binding === "mcp" || module.runtime_binding === "mcp_tool" || hasServer || hasTool;
   if (declaresMcp && (!hasServer || !hasTool || module.access_protocol !== "mcp")) {
     errors.push(
       `${label} has an incomplete MCP binding (require access_protocol="mcp" with non-empty mcp_server and mcp_tool_name).`
