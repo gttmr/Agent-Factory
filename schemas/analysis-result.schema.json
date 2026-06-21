@@ -801,6 +801,7 @@
             "adapter",
             "adapter_call",
             "human_input",
+            "callback_wait",
             "workflow",
             "workflow_call",
             "remote_a2a",
@@ -840,7 +841,67 @@
         "output_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
         "runtime_binding": {
           "anyOf": [
-            { "type": "string", "enum": ["unresolved", "direct_api", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
+            { "type": "string", "enum": ["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
+            { "type": "null" }
+          ]
+        },
+        "invoke_binding": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "unresolved",
+                "local_python",
+                "direct_api",
+                "mcp_tool",
+                "mcp_toolset",
+                "local_function",
+                "internal_workflow",
+                "ui_input",
+                "remote_a2a",
+                "callback_wait",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "decision_owner": {
+          "anyOf": [
+            { "type": "string", "enum": ["workflow_code", "llm", "human", "remote_agent", "system", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "call_control": {
+          "anyOf": [
+            { "type": "string", "enum": ["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "side_effect": {
+          "anyOf": [
+            { "type": "string", "enum": ["none", "read", "write", "external_message", "transaction", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "auth_required",
+                "approval_required",
+                "audit_required",
+                "idempotency_required",
+                "timeout_retry_required",
+                "data_policy_required",
+                "manual_fallback_required",
+                "callback_resume_required",
+                "compensation_required",
+                "unknown"
+              ]
+            },
             { "type": "null" }
           ]
         },
@@ -959,7 +1020,19 @@
         "state_key": { "$ref": "#/$defs/nullableString" },
         "artifact_key": { "$ref": "#/$defs/nullableString" },
         "a2a_contract_id": { "$ref": "#/$defs/nullableString" },
-        "is_remote_boundary_crossing": { "type": "boolean" }
+        "is_remote_boundary_crossing": { "type": "boolean" },
+        "flow_kind": {
+          "anyOf": [
+            { "type": "string", "enum": ["sequence", "route", "fan_out", "fan_in", "loop_back", "loop_exit", "fallback", "error", "resume", "callback", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "call_control": {
+          "anyOf": [
+            { "type": "string", "enum": ["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"] },
+            { "type": "null" }
+          ]
+        }
       }
     },
     "graphContainer": {

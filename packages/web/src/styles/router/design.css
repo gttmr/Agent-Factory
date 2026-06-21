@@ -7,7 +7,7 @@
 }
 
 /* Design 검토 스텝을 상/하로 나눈다: 상단 = [선택 정보 패널 | 그래프 캔버스],
-   하단(신규·전체폭) = 모듈·Graph IR·계약 등 탭 목록. */
+   하단(전체폭) = 모듈·계약·검토 메모 탭 목록. */
 .af-design-split {
   display: flex;
   flex-direction: column;
@@ -16,7 +16,7 @@
 
 .af-design-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  grid-template-columns: 338px minmax(0, 1fr) 320px;
   gap: 12px;
   min-height: 70vh;
 }
@@ -25,7 +25,7 @@
    열을 없애고 캔버스(1fr)가 그 영역까지 차지한다. 아래 1100px collapse 규칙이
    소스 순서상 뒤에 있어 좁은 화면에서는 동일하게 1열로 접힌다. */
 .af-design-grid--no-inspector {
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 338px minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {
@@ -177,6 +177,21 @@
 .af-design-sidebar > .graph-element-editor > .graph-element-editor-section {
   display: flex;
   flex-direction: column;
+  gap: var(--space-sm);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-sm);
+}
+
+.af-design-sidebar > .graph-element-editor > .graph-element-editor-section > h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-heavy);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-section-body {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
 }
 
@@ -258,7 +273,14 @@
   line-height: var(--lh-normal);
 }
 
-/* 하단 전체폭 패널: 모듈·Graph IR·계약 등 탭 목록을 담는다(상단 캔버스+좌측 패널 아래). */
+.af-design-sidebar > .graph-element-editor .graph-element-editor-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+
+/* 하단 전체폭 패널: 모듈·계약·검토 메모 탭 목록을 담는다(상단 캔버스+좌측 패널 아래). */
 .af-design-bottom {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -548,55 +570,6 @@
 
 .af-module-review-actions small {
   color: var(--text-muted);
-}
-
-.af-graph-sidebar-stats {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-
-.af-graph-list {
-  list-style: none;
-  margin: 4px 0 12px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.af-graph-list-button {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 4px 6px;
-  cursor: pointer;
-  text-align: left;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 6px;
-  align-items: baseline;
-  font-size: var(--fs-sm);
-}
-
-.af-graph-list-button:hover {
-  background: var(--surface-muted);
-}
-
-.af-graph-list-button-active {
-  background: var(--surface-muted);
-  border-color: var(--line-strong);
-}
-
-.af-graph-list-button code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-
-.af-graph-list-button small {
-  font-size: var(--fs-2xs);
-  color: var(--text-subtle);
 }
 
 .af-path-panel {

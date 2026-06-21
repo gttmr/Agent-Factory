@@ -35,6 +35,9 @@
         "$ref": "#/$defs/runtime_contract"
       }
     },
+    "graph": {
+      "$ref": "#/$defs/graph"
+    },
     "excluded_modules": {
       "type": "array",
       "items": {
@@ -250,6 +253,77 @@
             { "type": "null" }
           ]
         },
+        "invoke_binding": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "unresolved",
+                "local_python",
+                "direct_api",
+                "mcp_tool",
+                "mcp_toolset",
+                "local_function",
+                "internal_workflow",
+                "ui_input",
+                "remote_a2a",
+                "callback_wait",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "decision_owner": {
+          "anyOf": [
+            { "type": "string", "enum": ["workflow_code", "llm", "human", "remote_agent", "system", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "call_control": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "fixed_by_workflow",
+                "selected_by_llm",
+                "selected_by_human",
+                "event_callback",
+                "resume",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "side_effect": {
+          "anyOf": [
+            { "type": "string", "enum": ["none", "read", "write", "external_message", "transaction", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "auth_required",
+                "approval_required",
+                "audit_required",
+                "idempotency_required",
+                "timeout_retry_required",
+                "data_policy_required",
+                "manual_fallback_required",
+                "callback_resume_required",
+                "compensation_required",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
         "node_kind": {
           "anyOf": [
             {
@@ -263,6 +337,7 @@
                 "adapter",
                 "adapter_call",
                 "human_input",
+                "callback_wait",
                 "workflow",
                 "workflow_call",
                 "remote_a2a",
@@ -289,6 +364,194 @@
         },
         "adk_skeleton_contract": {
           "$ref": "#/$defs/adk_skeleton_contract"
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graph_node" }
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/graph_edge" }
+        }
+      }
+    },
+    "graph_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "module_id",
+        "node_kind",
+        "invoke_binding",
+        "decision_owner",
+        "call_control",
+        "side_effect",
+        "policy"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "module_id": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "node_kind": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output",
+            "agent",
+            "function",
+            "tool",
+            "adapter",
+            "adapter_call",
+            "human_input",
+            "callback_wait",
+            "workflow",
+            "workflow_call",
+            "remote_a2a",
+            "remote_agent_call",
+            "join",
+            "router",
+            "loop_control"
+          ]
+        },
+        "invoke_binding": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "unresolved",
+                "local_python",
+                "direct_api",
+                "mcp_tool",
+                "mcp_toolset",
+                "local_function",
+                "internal_workflow",
+                "ui_input",
+                "remote_a2a",
+                "callback_wait",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "decision_owner": {
+          "anyOf": [
+            { "type": "string", "enum": ["workflow_code", "llm", "human", "remote_agent", "system", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "call_control": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "fixed_by_workflow",
+                "selected_by_llm",
+                "selected_by_human",
+                "event_callback",
+                "resume",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "side_effect": {
+          "anyOf": [
+            { "type": "string", "enum": ["none", "read", "write", "external_message", "transaction", "unknown"] },
+            { "type": "null" }
+          ]
+        },
+        "policy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "auth_required",
+                "approval_required",
+                "audit_required",
+                "idempotency_required",
+                "timeout_retry_required",
+                "data_policy_required",
+                "manual_fallback_required",
+                "callback_resume_required",
+                "compensation_required",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "graph_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "edge_kind", "flow_kind", "call_control"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "edge_kind": {
+          "type": "string",
+          "enum": [
+            "event_output",
+            "event_message",
+            "session_state",
+            "temp_state",
+            "user_state",
+            "app_state",
+            "artifact",
+            "route",
+            "control",
+            "remote_a2a"
+          ]
+        },
+        "flow_kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "sequence",
+                "route",
+                "fan_out",
+                "fan_in",
+                "loop_back",
+                "loop_exit",
+                "fallback",
+                "error",
+                "resume",
+                "callback",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
+        },
+        "call_control": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "none",
+                "fixed_by_workflow",
+                "selected_by_llm",
+                "selected_by_human",
+                "event_callback",
+                "resume",
+                "unknown"
+              ]
+            },
+            { "type": "null" }
+          ]
         }
       }
     },

@@ -247,6 +247,12 @@ function assertRunnableBundle(outputRoot) {
   assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "nodes", "adapters.py")), "bundle must include nodes/adapters.py");
   assert.ok(existsSync(join(outputRoot, packageName, "nodes", "workflow_calls.py")), "bundle must include nodes/workflow_calls.py");
+  assert.ok(existsSync(join(outputRoot, "README.md")), "bundle must include README.md");
+  assert.match(
+    readFileSync(join(outputRoot, "implementation-handoff.md"), "utf8"),
+    /TODO/,
+    "bundle must keep a TODO handoff"
+  );
   assert.ok(existsSync(join(outputRoot, ".env.example")), "runnable bundle must emit .env.example");
   assert.ok(existsSync(join(outputRoot, ".gitignore")), "runnable bundle must emit .gitignore");
   assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
@@ -325,6 +331,119 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   try {
     assertConnectedMcpRuntimeLabels(outputRoot);
     assertManifestStageUpdated(artifactRoot);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable keeps LLM-selected MCP toolsets as unconnected handoff stubs", () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-llm-toolset-"));
+  try {
+    writeFixture(artifactRoot, { runnable: true, connectedAdapter: true });
+    const planPath = join(artifactRoot, "scaffold-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    const adapter = plan.modules.find((module) => module.id === "mod-gen-adapter");
+    adapter.invoke_binding = "mcp_toolset";
+    adapter.decision_owner = "llm";
+    adapter.call_control = "selected_by_llm";
+    adapter.adk_skeleton_contract = {
+      ...adapter.adk_skeleton_contract,
+      scaffold_level: "handoff",
+      implementation_template: "adapter_placeholder_stub"
+    };
+    writeJson(planPath, plan);
+
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const { manifest, agentSource } = readBundle(outputRoot);
+    assert.equal(manifest.runtime.connected_adapters.length, 0);
+    assert.ok(
+      manifest.runtime.unconnected_adapters.some((adapterEntry) => adapterEntry.module_id === "mod-gen-adapter"),
+      "LLM-selected MCP toolset must remain an unconnected handoff"
+    );
+    assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context\) -> dict:/);
+    assert.match(agentSource, /"connection_status": "unconnected"/);
+    assert.doesNotMatch(agentSource, /from mcp import ClientSession/);
+    assert.doesNotMatch(agentSource, /"connection_status": "mcp_connected"/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable preserves workflow_call stubs and handoff files", () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-workflow-call-"));
+  try {
+    const [agentBase] = baseModules(true);
+    const workflowModule = {
+      id: "mod-risk-workflow",
+      name: "이탈위험_판단_Workflow",
+      module_category: "workflow",
+      agent_kind: null,
+      workflow_kind: "graph",
+      adapter_kind: null,
+      remote_contract_kind: null,
+      scaffold_output: "runnable",
+      no_runnable_business_logic: false,
+      catalog_binding: null,
+      developer_todos: ["confirm_workflow_call_contract"],
+      inputs: [{ name: "customer_id", type: "string", required: true }],
+      outputs: [{ name: "risk_result", type: "object", required: true }],
+      risk_signals: [],
+      required_review_fields: [],
+      runtime_mock: null,
+      instruction: null,
+      model: null,
+      agent_execution_mode: null,
+      access_protocol: null,
+      mcp_server: null,
+      mcp_tool_name: null,
+      mcp_schema_ref: null,
+      mcp_auth_mode: null,
+      runtime_binding: "workflow_call",
+      node_kind: "workflow_call",
+      invoke_binding: "internal_workflow",
+      decision_owner: "workflow_code",
+      call_control: "fixed_by_workflow",
+      workflow_ref: { id: "wf-risk-check", version: "v1", source: "catalog", display_name: "이탈위험 판단 Workflow" },
+      input_mapping: { customer_id: "$state.customer.id" },
+      output_mapping: { risk_result: "$result" },
+      mock_binding: null,
+      adk_skeleton_contract: {
+        scaffold_level: "mock_testable_skeleton",
+        target_runtime: "adk_python_2_x",
+        implementation_template: "workflow_call_stub",
+        manual_completion_required: true,
+        developer_todos: ["confirm_workflow_call_contract"]
+      }
+    };
+    writeChannelFixture(artifactRoot, {
+      modules: [{ ...agentBase, id: "mod-a", name: "접수_Agent" }, workflowModule],
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "wf", node_kind: "workflow_call", module_id: "mod-risk-workflow" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "wf" },
+        { from: "wf", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const packageName = discoverGeneratedPackage(outputRoot);
+    const workflowCalls = readFileSync(join(outputRoot, packageName, "nodes", "workflow_calls.py"), "utf8");
+    const adapters = readFileSync(join(outputRoot, packageName, "nodes", "adapters.py"), "utf8");
+    const handoff = readFileSync(join(outputRoot, "implementation-handoff.md"), "utf8");
+    assert.ok(existsSync(join(outputRoot, packageName, "workflow.py")));
+    assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")));
+    assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")));
+    assert.ok(existsSync(join(outputRoot, "README.md")));
+    assert.match(workflowCalls, /workflow_call_placeholder/);
+    assert.match(workflowCalls, /wf-risk-check/);
+    assert.match(adapters, /Adapter stubs call Mock Lab/);
+    assert.match(handoff, /confirm_workflow_call_contract/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -642,6 +761,28 @@ test("runnable lowers a remote_a2a node to RemoteA2aAgent from its A2A contract"
     assert.match(source, /use_legacy=False/);
     const reqs = readFileSync(join(outputRoot, "requirements.txt"), "utf8");
     assert.match(reqs, /google-adk\[a2a\]/, "requirements include the a2a extra");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable lowers a remote_agent_call node to RemoteA2aAgent from its A2A contract", () => {
+  const [agentBase] = baseModules(true);
+  const modules = [{ ...agentBase, id: "mod-a", name: "local_dispatcher_agent" }, remoteModule()];
+  const a2aContracts = [{
+    contract_id: "a2a-001", remote_module_id: "mod-r", target_agent_name: "Partner Prime Agent",
+    contract_status: "approved",
+    agent_card: { discovery_method: "well-known", agent_card_url: "http://localhost:8001/a2a/test_agent/.well-known/agent-card.json", version: "1.0.0", notes: "" }
+  }];
+  const nodes = remoteGraph.nodes.map((node) => node.id === "r" ? { ...node, node_kind: "remote_agent_call" } : node);
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-agent-call-"));
+  try {
+    writeRemoteFixture(artifactRoot, { modules, nodes, edges: remoteGraph.edges, a2aContracts });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_remote_adk", "agent.py"), "utf8");
+    assert.match(source, /= RemoteA2aAgent\(/, "emits a RemoteA2aAgent node");
+    assert.match(source, /agent_card="http:\/\/localhost:8001\/a2a\/test_agent\/\.well-known\/agent-card\.json"/, "agent_card from the contract");
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

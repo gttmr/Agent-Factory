@@ -112,7 +112,7 @@ export function CommentThread({
           ) : null}
         </form>
       ) : (
-        <p className="af-comment-anchor-hint">{emptyHint ?? "Graph IR 또는 사이드바에서 항목을 선택하면 코멘트를 작성할 수 있습니다."}</p>
+        <p className="af-comment-anchor-hint">{emptyHint ?? "그래프 또는 사이드바에서 항목을 선택하면 코멘트를 작성할 수 있습니다."}</p>
       )}
 
       <ul className="af-comment-list">

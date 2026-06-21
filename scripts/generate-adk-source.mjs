@@ -289,7 +289,7 @@ function buildRunnableAgentPy() {
   )}.`;
 
   // Artifact channels need json (serialize the payload) + google.genai.types
-  // (wrap as a Part); remote_a2a nodes need RemoteA2aAgent. Gated so bundles
+  // (wrap as a Part); Remote A2A nodes need RemoteA2aAgent. Gated so bundles
   // without those features keep an unchanged import block.
   const usesArtifacts = usesArtifactChannels();
   const artifactStdlibImport = usesArtifacts ? "import json\n" : "";
@@ -707,8 +707,13 @@ MODULE_SCHEMAS = ${toPythonLiteral(
         {
           inputs: module.inputs ?? [],
           outputs: module.outputs ?? [],
+          invoke_binding: module.invoke_binding ?? null,
+          decision_owner: module.decision_owner ?? null,
+          call_control: module.call_control ?? null,
+          side_effect: module.side_effect ?? null,
+          policy: module.policy ?? null,
           workflow_ref: module.workflow_ref ?? null,
-          mock_binding: module.mock_binding ?? null,
+          mock_binding: module.module_category === "adapter" ? mockBindingFromModule(module) : null,
         },
       ])
     )
@@ -769,7 +774,7 @@ function buildMockConfigYaml() {
   const lines = ["provider: mock_lab", "package_path: packages/mock-lab", "adapters:"];
   if (!adapters.length) lines.push("  []");
   for (const module of adapters) {
-    const binding = module.mock_binding ?? mockBindingFromModule(module);
+    const binding = mockBindingFromModule(module);
     lines.push(`  - module_id: ${yamlScalar(module.id)}`);
     lines.push(`    module_name: ${yamlScalar(module.name)}`);
     lines.push(`    status: ${yamlScalar(binding.status)}`);
@@ -822,7 +827,13 @@ function buildGitignore() {
 }
 
 function mockBindingFromModule(module) {
-  if (module.mock_binding && typeof module.mock_binding === "object") return module.mock_binding;
+  const connection = adapterConnection(module);
+  if (module.mock_binding && typeof module.mock_binding === "object") {
+    return {
+      ...module.mock_binding,
+      status: connection === "mcp_connected" ? "linked" : "missing"
+    };
+  }
   return {
     provider: "mock_lab",
     package_path: "packages/mock-lab",
@@ -831,7 +842,7 @@ function mockBindingFromModule(module) {
     input_schema: module.mcp_schema_ref ?? null,
     output_schema: null,
     sample_response_ref: null,
-    status: adapterConnection(module) === "mcp_connected" ? "linked" : "missing",
+    status: connection === "mcp_connected" ? "linked" : "missing",
   };
 }
 
@@ -894,6 +905,9 @@ function buildManifest() {
               runtime_mcp_note: RUNTIME_MCP_NOTE,
               mcp_server: module.mcp_server ?? null,
               mcp_tool_name: module.mcp_tool_name ?? null,
+              invoke_binding: module.invoke_binding ?? null,
+              decision_owner: module.decision_owner ?? null,
+              call_control: module.call_control ?? null,
               mock_binding: mockBindingFromModule(module)
             })),
             unconnected_adapters: unconnectedAdapters.map((module) => ({
@@ -917,7 +931,9 @@ function buildManifest() {
       terminal_outputs: terminalOutputIds(),
       node_count: Array.isArray(processFlow.nodes) ? processFlow.nodes.length : 0,
       edge_count: Array.isArray(processFlow.edges) ? processFlow.edges.length : 0,
-      validation: processFlow.validation ?? null
+      validation: processFlow.validation ?? null,
+      nodes: graphNodeSemantics(),
+      edges: graphEdgeSemantics()
     },
     edges: Array.isArray(processFlow.edges) ? processFlow.edges : [],
     excluded_modules: scaffoldPlan.excluded_modules ?? [],
@@ -1180,6 +1196,11 @@ function componentContracts() {
           access_protocol: module.access_protocol ?? null,
           mcp_server: module.mcp_server ?? null,
           mcp_tool_name: module.mcp_tool_name ?? null,
+          invoke_binding: module.invoke_binding ?? null,
+          decision_owner: module.decision_owner ?? null,
+          call_control: module.call_control ?? null,
+          side_effect: module.side_effect ?? null,
+          policy: module.policy ?? null,
           workflow_ref: module.workflow_ref ?? null,
           input_mapping: module.input_mapping ?? null,
           output_mapping: module.output_mapping ?? null,
@@ -1613,7 +1634,7 @@ function assertRunnableGraphSupported() {
   const graph = graphIndexes();
   // Allowlist: lowering can represent input/output (→ START/terminal) and
   // synthetic human_input/join nodes, plus module-bound agent/adapter/workflow/
-  // remote_a2a nodes. ANY other module_id-null node would be silently dropped by
+  // remote_a2a/remote_agent_call nodes. ANY other module_id-null node would be silently dropped by
   // resolve(), which would break graph connectivity, so reject it.
   const allowedBareKinds = new Set(["input", "output", "human_input", "join"]);
   // Router and loop-control nodes are NOT lowerable even if they carry a module_id,
@@ -1649,7 +1670,7 @@ function assertRunnableGraphSupported() {
   }
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow/remote_a2a nodes (no router/loop-control or module_id-null intermediary nodes). Use smoke mode.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow/remote_a2a/remote_agent_call nodes (no router/loop-control or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
   // Containers are a separate top-level array in Graph IR, not a node field.
@@ -1675,11 +1696,11 @@ function assertRunnableGraphSupported() {
       // A dangling endpoint (node id not in the graph) also resolves to null and
       // is silently dropped — reject it (don't rely only on processFlow.validation).
       if (!fromNode || !toNode) return true;
-      // A remote_a2a edge must genuinely connect a remote_a2a node. Only such an
+      // A remote_a2a edge must genuinely connect a Remote A2A graph node. Only such an
       // edge gets the boundary_crossing / is_remote_boundary_crossing relaxation;
       // a "remote_a2a"-tagged edge between two local nodes is mislabeled and would
       // otherwise bypass the boundary gate — reject it.
-      const touchesRemote = fromNode.node_kind === "remote_a2a" || toNode.node_kind === "remote_a2a";
+      const touchesRemote = isRemoteAgentGraphNode(fromNode) || isRemoteAgentGraphNode(toNode);
       if (edge.edge_kind === "remote_a2a" && !touchesRemote) return true;
       const isGenuineRemoteEdge = edge.edge_kind === "remote_a2a" && touchesRemote;
       if (
@@ -1769,6 +1790,30 @@ function graphIndexes() {
     (node) => node && typeof node.module_id === "string" && moduleById.has(node.module_id)
   );
   return { moduleById, moduleNodes, nodes, nodesById };
+}
+
+function graphNodeSemantics() {
+  return (Array.isArray(processFlow.nodes) ? processFlow.nodes : []).map((node) => ({
+    id: node.id ?? null,
+    module_id: node.module_id ?? null,
+    node_kind: node.node_kind ?? null,
+    invoke_binding: node.invoke_binding ?? null,
+    decision_owner: node.decision_owner ?? null,
+    call_control: node.call_control ?? null,
+    side_effect: node.side_effect ?? null,
+    policy: node.policy ?? null
+  }));
+}
+
+function graphEdgeSemantics() {
+  return (Array.isArray(processFlow.edges) ? processFlow.edges : []).map((edge) => ({
+    id: edge.id ?? null,
+    from: edge.from ?? null,
+    to: edge.to ?? null,
+    edge_kind: edge.edge_kind ?? null,
+    flow_kind: edge.flow_kind ?? null,
+    call_control: edge.call_control ?? null
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -2023,6 +2068,10 @@ function usesRemoteA2a() {
   return modules.some((module) => module.module_category === "remote_a2a");
 }
 
+function isRemoteAgentGraphNode(node) {
+  return node?.node_kind === "remote_a2a" || node?.node_kind === "remote_agent_call";
+}
+
 function emitRemoteA2aNode(module) {
   const contract = a2aContractForModule(module);
   const url = a2aAgentCardUrl(contract);
@@ -2035,7 +2084,8 @@ function emitRemoteA2aNode(module) {
 )`;
 }
 
-// Each remote_a2a node needs a resolvable A2A contract with an agent card URL.
+// Each Remote A2A module-backed node needs a resolvable A2A contract with an
+// agent card URL.
 function assertRemoteA2aSupported() {
   const bad = [];
   for (const module of modules) {
@@ -2048,16 +2098,28 @@ function assertRemoteA2aSupported() {
   }
   if (bad.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these remote_a2a nodes: ${bad.join("; ")}. Each needs an approved A2A contract with agent_card.agent_card_url.`
+      `runnable mode cannot lower these Remote A2A nodes: ${bad.join("; ")}. Each needs an approved A2A contract with agent_card.agent_card_url.`
     );
   }
 }
 
 function adapterConnection(module) {
   if (module.module_category !== "adapter") return "n/a";
-  const binding = module.runtime_binding === "mcp" || module.runtime_binding === "mcp_tool";
-  const mockLinked = module.mock_binding?.status === "linked";
-  if ((module.access_protocol === "mcp" || binding || mockLinked) && module.mcp_server && module.mcp_tool_name) return "mcp_connected";
+  if (!module.mcp_server || !module.mcp_tool_name) return "unconnected";
+  const hasGraphInvocationSemantics = module.invoke_binding != null || module.call_control != null;
+  if (hasGraphInvocationSemantics) {
+    if (
+      module.node_kind === "adapter_call" &&
+      module.invoke_binding === "mcp_tool" &&
+      module.call_control === "fixed_by_workflow"
+    ) {
+      return "mcp_connected";
+    }
+    return "unconnected";
+  }
+  const legacyBinding = module.runtime_binding === "mcp" || module.runtime_binding === "mcp_tool";
+  const legacyMockLinked = module.mock_binding?.status === "linked";
+  if (module.access_protocol === "mcp" || legacyBinding || legacyMockLinked) return "mcp_connected";
   return "unconnected";
 }
 

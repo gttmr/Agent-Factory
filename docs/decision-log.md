@@ -10,12 +10,22 @@
 
 ---
 
-## 2026-06-20 · 작업 브랜치 `main` — workflow_call + Mock Lab skeleton handoff 공식화
+## 2026-06-20 · 작업 브랜치 `codex/taxonomy-graph-model-correction` — Workflow-first Graph Model 축 정정
 
-### workflow_call + Mock Lab skeleton handoff 공식화
-- **결정**: 기존 Workflow 추가/선택 기능은 Graph IR에서 `node_kind: workflow_call`로 저장하고, Adapter 호출은 `node_kind: adapter_call` + `runtime_binding: mcp_tool` + `mock_binding.provider: mock_lab`로 Mock Lab test double을 참조한다. ADK source generation은 production generator가 아니라 `mock_testable_skeleton` handoff이며 `workflow.py`, `nodes/*`, `mock_config.yaml`, `sample_inputs.yaml`, README/TODO를 생성한다.
-- **배경**: Dynamic Workflow 자동 생성보다 업무별 Workflow를 분리하고 parent graph에서 기존 Workflow 호출 노드로 조립하는 방향이 더 작고 검토 가능하다. Mock Lab은 이미 `packages/mock-lab`에 있으므로 새 mock server system을 만들지 않고 저장된 MockSpec/MCP discovery를 재사용한다.
-- **영향**: `analyzer/types.ts`, `nestedWorkflowInsert.ts`, `scaffoldPlan.ts`, `GraphCanvas.tsx`, `GraphElementEditor.tsx`, `GraphInspector.tsx`, `scripts/generate-adk-source.mjs`, `schemas/*`, `docs/workbench/taxonomy.md`, `docs/workbench/workflow-decision-guide.md`.
+### Workflow-first Graph Model과 호출 축 분리
+- **결정**: Workbench를 Workflow-first Graph Model로 명문화한다. `module_category`는 계속 `agent`/`workflow`/`adapter`/`remote_a2a` 네 값만 허용하고, Graph IR의 `node_kind`/`invoke_binding`/`call_control`/`mock_binding`이 실행 방식을 표현한다. Agent는 judgment node, Adapter는 call node이며, MCP는 category가 아니라 `invoke_binding`/`mock_binding`으로 표현한다. 고정 MCP 호출은 `adapter_call` + `invoke_binding: mcp_tool` + `call_control: fixed_by_workflow`, LLM-selected toolset은 `agent` + `invoke_binding: mcp_toolset` + `call_control: selected_by_llm`로 분리한다. 기존 Workflow 추가/선택 기능은 공식 subworkflow/existing workflow node인 `node_kind: workflow_call`로 저장한다.
+- **배경**: taxonomy 책임 축과 Graph IR 실행 축이 섞이면 MCP, Adapter, Agent toolset, workflow reuse가 새 category처럼 보인다. Dynamic Workflow 자동 생성보다 업무별 Workflow를 분리하고 parent graph에서 `workflow_call`로 조립하는 방향이 더 작고 검토 가능하다. Mock Lab은 이미 `packages/mock-lab`에 있으므로 새 mock server system을 만들지 않고 저장된 MockSpec/MCP discovery를 재사용한다.
+- **영향**: `analyzer/types.ts`, `nestedWorkflowInsert.ts`, `scaffoldPlan.ts`, `GraphCanvas.tsx`, `GraphElementEditor.tsx`, `GraphInspector.tsx`, `scripts/generate-adk-source.mjs`, `schemas/*`, `docs/workbench/taxonomy.md`, `docs/workbench/workflow-decision-guide.md`, `docs/workbench/process-flow.md`, `docs/workbench/validation.md`, `docs/reference/target-agent-architecture/README.md`.
+
+### Dynamic, callback/resume, governance, skeleton handoff 범위
+- **결정**: `workflow_kind: dynamic`과 `container_kind: dynamic_workflow`는 이번 skeleton scope에서 design/contract container로만 남긴다. Runnable dynamic codegen은 생성하지 않는다. `callback_wait`와 resume은 새 category가 아니라 Graph IR execution semantics다. `side_effect`와 `policy`는 node-level governance summary이며 `AnalysisResult.runtimeContracts`와 A2A contract artifact가 runtime governance source of truth다. ADK source generation은 production generator가 아니라 ADK Web smoke skeleton handoff이며 `workflow.py`, `nodes/*`, `mock_config.yaml`, `sample_inputs.yaml`, README/TODO를 생성한다.
+- **배경**: callback, resume, governance policy, side effect, dynamic runtime control을 taxonomy 값으로 승격하면 검토 artifact의 source of truth가 갈라진다. Generated bundle은 reviewer가 ADK Web에서 흐름을 확인하는 smoke skeleton이어야 하고, production API/EAI client, credential, deployment, dynamic Python logic, production prompt는 developer TODO 경계로 남겨야 한다.
+- **영향**: `docs/workbench/taxonomy.md`, `docs/workbench/workflow-decision-guide.md`, `docs/workbench/process-flow.md`, `docs/workbench/validation.md`, `docs/reference/target-agent-architecture/README.md`, generated handoff README/TODO wording.
+
+### Graph semantics validation과 Remote A2A endpoint alias 정렬
+- **결정**: `human_input`과 `callback_wait`는 module-bound node가 아니라 Graph IR execution semantics로 검증한다. 두 node_kind에 `module_id`가 있으면 soft/hard validation에서 오류로 처리한다. `remote_agent_call`은 Workbench UI의 workflow-first node_kind이며 Remote A2A boundary로서 `remote_a2a` node_kind와 동일하게 edge creation, validation, runnable lowering에서 remote endpoint로 인정한다. `ScaffoldPlan.graph`는 TypeScript type과 custom validator 양쪽에서 node/edge 호출 축 enum을 검증한다.
+- **배경**: UI 메뉴가 workflow-first node_kind를 노출한 뒤에도 일부 validator/generator 경로가 오래된 `remote_a2a` 전용 판정과 schema-only scaffold graph 계약에 머물러 있었다.
+- **영향**: `graphMigration.ts`, `validate-artifacts.mjs`, `generate-adk-source.mjs`, `GraphCanvas.tsx`, `types.ts`, `validate-artifacts.test.mjs`, `graphMigration.test.ts`, `generate-adk-source.test.mjs`.
 
 ## 2026-06-18 · 작업 브랜치 `codex/mock-lab-prompt-spec` — Mock Lab 실행 기준을 saved `MockSpec`으로 전환
 
@@ -178,6 +188,16 @@
 - **결정**: 누락 정보 "수용" 토글을 컴포넌트 메모리가 아니라 `evidence.accepted_missing_information`(optional string array)에 토글 즉시 저장한다. 아티팩트 루트가 canonical store라는 원칙의 일관 적용.
 - **배경**: 수용 상태가 리로드 시 초기화되는 버그.
 - **영향**: `AnalyzeWorkbench.tsx`, `analyzer/types.ts`, `schemas/analysis-result.schema.json`, `docs/workbench/validation.md`·`agent-factory-harness.md`.
+
+### Graph 편집 속성 패널은 6탭과 파생값 잠금을 기본으로 한다
+- **결정**: 좌측 Graph 속성 패널은 `기본 / 계약 / 실행 / 정책 / Mock / ADK` 6탭으로 정리하고, `node_kind`, `module_category`, `lane_id`, `container_id`, runtime control 같은 파생/고정값은 직접 편집하지 않는다. 모듈 연결은 신규·미연결·계약 없음 노드에서만 허용한다.
+- **배경**: Workbench Graph 편집 화면에서 taxonomy, runtime binding, policy, layout 값이 같은 수준의 편집 가능 필드처럼 보여 사용자가 Graph IR의 책임 축을 잘못 변경할 수 있었다.
+- **영향**: `GraphInspector.tsx`, `GraphElementEditor.tsx`, `styles/features/graph.css`, `styles/router/design.css`.
+
+### Design 하단 탭은 사용자 검토 흐름만 남긴다
+- **결정**: Design 검토 하단 탭을 `모듈 / Runtime 계약 / Remote A2A / 검토 메모`로 축소한다. 기존 `Graph IR` 노드·엣지 목록 탭은 제거하고, `경로` 하이라이트 기능은 `검토 메모` 안의 섹션으로 통합한다.
+- **배경**: `Graph IR` 목록은 캔버스 선택을 보조하는 내부 인덱스에 가까워 업무 사용자의 검토 흐름을 분산시켰고, `경로`는 코멘트와 같은 협업 산출물 성격이어서 독립 탭보다 검토 메모 안에서 보는 편이 명확하다.
+- **영향**: `DesignWorkbench.tsx`, `ReviewNotesPanel.tsx`, `designWorkbenchTabs.ts`, `styles/router/design.css`, `styles/router/comments.css`.
 
 ---
 

@@ -26,16 +26,6 @@ function reviewChip(status: string | undefined) {
   return <span className={cls}>{status}</span>;
 }
 
-function agentModeChip(graphNode: GraphNodeData["graphNode"], kind: "agent" | "workflow" | "adapter" | "remote_a2a") {
-  if (kind !== "agent") return null;
-  const mode = graphNode.agent_execution_mode === "chat" ? "chat" : "single_turn";
-  return (
-    <span className={`graph-node-mode ${mode === "chat" ? "is-chat" : ""}`}>
-      {mode === "chat" ? "chat · history" : "single turn"}
-    </span>
-  );
-}
-
 function CollaborationBadges({ data }: { data: GraphNodeData }) {
   const commentCount = data.commentCount ?? 0;
   const highlightCount = data.highlightCount ?? 0;
@@ -73,7 +63,6 @@ function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" |
       <div className="graph-node-head">
         {cat ? <CategoryBadge category={cat} /> : null}
         {sub ? <SubtypeBadge value={sub} /> : null}
-        {agentModeChip(graphNode, kind)}
       </div>
       <strong className="graph-node-label">{graphNode.label}</strong>
       <div className="graph-node-meta">
@@ -112,11 +101,33 @@ function HumanInputNode({ data }: NodeProps<GraphNodeData>) {
     >
       <HandleStrip />
       <CollaborationBadges data={data} />
-      <span className="graph-node-eyebrow">human ⏸︎</span>
+      <span className="graph-node-eyebrow">사람 입력/승인</span>
       <strong className="graph-node-label">{graphNode.label}</strong>
-      {graphNode.execution_kind ? (
-        <span className="graph-node-mod">{graphNode.execution_kind}</span>
-      ) : null}
+      <div className="graph-node-meta">
+        {graphNode.module_id ? <span className="graph-node-mod">{graphNode.module_id}</span> : null}
+        {reviewChip(graphNode.review_status)}
+      </div>
+    </div>
+  );
+}
+
+function CallbackWaitNode({ data }: NodeProps<GraphNodeData>) {
+  const { graphNode, selected, onSelect } = data;
+  return (
+    <div
+      className={`graph-node graph-node-card graph-node-callback ${selected ? "is-selected" : ""} ${
+        data.highlightCount ? "has-highlight" : ""
+      }`}
+      onClick={() => onSelect(graphNode.id)}
+    >
+      <HandleStrip />
+      <CollaborationBadges data={data} />
+      <span className="graph-node-eyebrow">대기/callback</span>
+      <strong className="graph-node-label">{graphNode.label}</strong>
+      <div className="graph-node-meta">
+        {graphNode.module_id ? <span className="graph-node-mod">{graphNode.module_id}</span> : null}
+        {reviewChip(graphNode.review_status)}
+      </div>
     </div>
   );
 }
@@ -201,6 +212,7 @@ export const nodeTypes = {
   function: (p: NodeProps<GraphNodeData>) => <FunctionToolNode {...p} kind="function" />,
   tool: (p: NodeProps<GraphNodeData>) => <FunctionToolNode {...p} kind="tool" />,
   human_input: HumanInputNode,
+  callback_wait: CallbackWaitNode,
   router: RouterNode,
   join: JoinNode,
   loop_control: LoopControlNode,

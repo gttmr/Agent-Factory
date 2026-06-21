@@ -4,6 +4,12 @@ import type {
   CatalogBinding,
   ComponentSource,
   FieldSpec,
+  GraphCallControl,
+  GraphDecisionOwner,
+  GraphFlowKind,
+  GraphInvokeBinding,
+  GraphPolicy,
+  GraphSideEffect,
   ModuleCandidate,
   NormalizedRequirement,
   ProcessFlow,
@@ -80,13 +86,14 @@ export function buildScaffoldPlan({
   blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
   const warnings = collectWarnings(modules, deployableCandidates, runtimeContracts);
 
-  return {
+  const scaffoldPlan = {
     requirement_id: normalizedRequirement.id,
-    source: "approved_workbench_artifact",
-    raw_requirement_to_code: false,
+    source: "approved_workbench_artifact" as const,
+    raw_requirement_to_code: false as const,
     output_mode: outputMode,
     modules,
     runtime_contracts: runtimeContractPlans,
+    graph: scaffoldGraphFor(processFlow),
     excluded_modules: excludedModules,
     manifest: {
       catalog_bound_modules: modules.flatMap((module) =>
@@ -117,6 +124,7 @@ export function buildScaffoldPlan({
       warnings
     }
   };
+  return scaffoldPlan;
 }
 
 export function approvedScaffoldModuleIds(scaffoldPlan: ScaffoldPlan): Set<string> {
@@ -149,10 +157,15 @@ function buildScaffoldModule(
   const mcpSchemaRef = candidate.mcp_schema_ref ?? catalogEntry?.mcp_schema_ref ?? null;
   const mcpAuthMode = candidate.mcp_auth_mode ?? catalogEntry?.mcp_auth_mode ?? null;
   const runtimeBinding = normalizeRuntimeBinding(graphNode?.runtime_binding ?? catalogEntry?.runtime_binding ?? null);
+  const invokeBinding = normalizeInvokeBinding(graphNode?.invoke_binding ?? null, graphNode?.node_kind ?? null);
+  const decisionOwner = normalizeDecisionOwner(graphNode?.decision_owner ?? null);
+  const callControl = normalizeCallControl(graphNode?.call_control ?? null);
+  const sideEffect = normalizeGraphSideEffect(graphNode?.side_effect ?? null);
+  const policy = normalizeGraphPolicy(graphNode?.policy ?? null);
 
   const isAgent = candidate.module_category === "agent";
 
-  return {
+  const scaffoldModule = {
     id: candidate.id,
     name: candidate.name,
     module_category: candidate.module_category,
@@ -181,6 +194,11 @@ function buildScaffoldModule(
     mcp_schema_ref: runnable ? mcpSchemaRef : null,
     mcp_auth_mode: runnable ? mcpAuthMode : null,
     runtime_binding: runnable ? runtimeBinding : null,
+    invoke_binding: runnable ? invokeBinding : null,
+    decision_owner: runnable ? decisionOwner : null,
+    call_control: runnable ? callControl : null,
+    side_effect: runnable ? sideEffect : null,
+    policy: runnable ? policy : null,
     node_kind: graphNode?.node_kind ?? null,
     workflow_ref: graphNode?.workflow_ref ?? null,
     input_mapping: graphNode?.input_mapping ?? null,
@@ -188,6 +206,7 @@ function buildScaffoldModule(
     mock_binding: runnable ? normalizeMockBinding(candidate, graphNode) : null,
     adk_skeleton_contract: adkSkeletonContractFor(candidate, graphNode, runnable)
   };
+  return scaffoldModule;
 }
 
 function agentExecutionModeByModuleId(processFlow: ProcessFlow): Map<string, AgentExecutionMode> {
@@ -223,9 +242,95 @@ function normalizeRuntimeBinding(value: unknown): ScaffoldPlanModule["runtime_bi
   return null;
 }
 
+const GRAPH_INVOKE_BINDINGS = new Set([
+  "unresolved",
+  "local_python",
+  "direct_api",
+  "mcp_tool",
+  "mcp_toolset",
+  "local_function",
+  "internal_workflow",
+  "ui_input",
+  "remote_a2a",
+  "callback_wait",
+  "unknown"
+]);
+
+const GRAPH_DECISION_OWNERS = new Set(["workflow_code", "llm", "human", "remote_agent", "system", "unknown"]);
+
+const GRAPH_CALL_CONTROLS = new Set([
+  "none",
+  "fixed_by_workflow",
+  "selected_by_llm",
+  "selected_by_human",
+  "event_callback",
+  "resume",
+  "unknown"
+]);
+
+const GRAPH_SIDE_EFFECTS = new Set(["none", "read", "write", "external_message", "transaction", "unknown"]);
+
+const GRAPH_POLICIES = new Set([
+  "none",
+  "auth_required",
+  "approval_required",
+  "audit_required",
+  "idempotency_required",
+  "timeout_retry_required",
+  "data_policy_required",
+  "manual_fallback_required",
+  "callback_resume_required",
+  "compensation_required",
+  "unknown"
+]);
+
+const GRAPH_FLOW_KINDS = new Set([
+  "sequence",
+  "route",
+  "fan_out",
+  "fan_in",
+  "loop_back",
+  "loop_exit",
+  "fallback",
+  "error",
+  "resume",
+  "callback",
+  "unknown"
+]);
+
+function normalizeInvokeBinding(
+  value: unknown,
+  nodeKind: ProcessFlow["nodes"][number]["node_kind"] | null
+): GraphInvokeBinding | null {
+  if (typeof value === "string" && GRAPH_INVOKE_BINDINGS.has(value)) return value as GraphInvokeBinding;
+  if (nodeKind === "workflow_call") return "internal_workflow";
+  return null;
+}
+
+function normalizeDecisionOwner(value: unknown): GraphDecisionOwner | null {
+  return typeof value === "string" && GRAPH_DECISION_OWNERS.has(value) ? (value as GraphDecisionOwner) : null;
+}
+
+function normalizeCallControl(value: unknown): GraphCallControl | null {
+  return typeof value === "string" && GRAPH_CALL_CONTROLS.has(value) ? (value as GraphCallControl) : null;
+}
+
+function normalizeGraphSideEffect(value: unknown): GraphSideEffect | null {
+  return typeof value === "string" && GRAPH_SIDE_EFFECTS.has(value) ? (value as GraphSideEffect) : null;
+}
+
+function normalizeGraphPolicy(value: unknown): GraphPolicy | null {
+  return typeof value === "string" && GRAPH_POLICIES.has(value) ? (value as GraphPolicy) : null;
+}
+
+function normalizeFlowKind(value: unknown): GraphFlowKind | null {
+  return typeof value === "string" && GRAPH_FLOW_KINDS.has(value) ? (value as GraphFlowKind) : null;
+}
+
 function normalizeMockBinding(candidate: ModuleCandidate, graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null): ScaffoldPlanModule["mock_binding"] {
-  if (graphNode?.mock_binding) return graphNode.mock_binding;
   if (candidate.module_category !== "adapter") return null;
+  const connected = isFixedMcpAdapterCall(candidate, graphNode);
+  if (graphNode?.mock_binding && connected) return graphNode.mock_binding;
   if (!candidate.mcp_server || !candidate.mcp_tool_name) {
     return {
       provider: "mock_lab",
@@ -246,8 +351,30 @@ function normalizeMockBinding(candidate: ModuleCandidate, graphNode: NonNullable
     input_schema: candidate.mcp_schema_ref ?? null,
     output_schema: null,
     sample_response_ref: null,
-    status: "linked"
+    status: connected ? "linked" : "missing"
   };
+}
+
+function isFixedMcpAdapterCall(
+  candidate: ModuleCandidate,
+  graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null
+): boolean {
+  if (candidate.module_category !== "adapter") return false;
+  const hasMcpTarget = Boolean(candidate.mcp_server && candidate.mcp_tool_name);
+  if (!hasMcpTarget) return false;
+  const hasExplicitGraphSemantics = graphNode?.invoke_binding != null || graphNode?.call_control != null;
+  if (hasExplicitGraphSemantics) {
+    return (
+      graphNode?.node_kind === "adapter_call" &&
+      graphNode.invoke_binding === "mcp_tool" &&
+      graphNode.call_control === "fixed_by_workflow"
+    );
+  }
+  return (
+    graphNode?.runtime_binding === "mcp_tool" ||
+    graphNode?.runtime_binding === "mcp" ||
+    candidate.access_protocol === "mcp"
+  );
 }
 
 function adkSkeletonContractFor(
@@ -255,10 +382,12 @@ function adkSkeletonContractFor(
   graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null,
   runnable: boolean
 ): ScaffoldPlanModule["adk_skeleton_contract"] {
-  if (graphNode?.adk_skeleton_contract) return graphNode.adk_skeleton_contract;
   const nodeKind = graphNode?.node_kind;
   const isWorkflowCall = nodeKind === "workflow_call";
-  const isMockAdapter = candidate.module_category === "adapter" && normalizeMockBinding(candidate, graphNode)?.status === "linked";
+  const isMockAdapter = isFixedMcpAdapterCall(candidate, graphNode);
+  if (graphNode?.adk_skeleton_contract && (candidate.module_category !== "adapter" || isMockAdapter)) {
+    return graphNode.adk_skeleton_contract;
+  }
   return {
     scaffold_level: runnable && (isWorkflowCall || isMockAdapter || candidate.module_category === "agent") ? "mock_testable_skeleton" : "handoff",
     target_runtime: "adk_python_2_x",
@@ -275,6 +404,29 @@ function adkSkeletonContractFor(
       : isMockAdapter
         ? ["Mock Lab MCP tool binding 확인", "실제 EAI/API client로 교체할 TODO 유지"]
         : ["검토된 scaffold boundary 안에서 개발자가 수동 보강"]
+  };
+}
+
+function scaffoldGraphFor(processFlow: ProcessFlow) {
+  return {
+    nodes: (processFlow?.nodes ?? []).map((node) => ({
+      id: node.id,
+      module_id: node.module_id,
+      node_kind: node.node_kind,
+      invoke_binding: normalizeInvokeBinding(node.invoke_binding ?? null, node.node_kind),
+      decision_owner: normalizeDecisionOwner(node.decision_owner ?? null),
+      call_control: normalizeCallControl(node.call_control ?? null),
+      side_effect: normalizeGraphSideEffect(node.side_effect ?? null),
+      policy: normalizeGraphPolicy(node.policy ?? null)
+    })),
+    edges: (processFlow?.edges ?? []).map((edge) => ({
+      id: edge.id,
+      from: edge.from,
+      to: edge.to,
+      edge_kind: edge.edge_kind,
+      flow_kind: normalizeFlowKind(edge.flow_kind ?? null),
+      call_control: normalizeCallControl(edge.call_control ?? null)
+    }))
   };
 }
 

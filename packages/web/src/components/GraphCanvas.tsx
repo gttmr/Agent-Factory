@@ -63,10 +63,34 @@ export interface Selection {
 export type NodeFieldPatch = Partial<
   Pick<
     GraphNode,
-    "label" | "lane_id" | "container_id" | "execution_kind" | "agent_execution_mode" | "module_id" | "review_status"
+    | "label"
+    | "lane_id"
+    | "container_id"
+    | "execution_kind"
+    | "agent_execution_mode"
+    | "module_id"
+    | "review_status"
+    | "invoke_binding"
+    | "decision_owner"
+    | "call_control"
   >
 >;
-export type EdgeFieldPatch = Partial<Pick<GraphEdge, "edge_kind" | "execution_semantics" | "data_label" | "route_condition" | "state_key" | "artifact_key" | "schema_ref" | "a2a_contract_id" | "is_remote_boundary_crossing">>;
+export type EdgeFieldPatch = Partial<
+  Pick<
+    GraphEdge,
+    | "edge_kind"
+    | "execution_semantics"
+    | "data_label"
+    | "route_condition"
+    | "state_key"
+    | "artifact_key"
+    | "schema_ref"
+    | "a2a_contract_id"
+    | "is_remote_boundary_crossing"
+    | "flow_kind"
+    | "call_control"
+  >
+>;
 
 export interface GraphEditState {
   editModeActive: boolean;
@@ -546,23 +570,34 @@ interface GraphEditToolbarProps {
   onToggleEditMode: () => void;
 }
 
-const ADD_NODE_KINDS: NodeKind[] = ["agent", "adapter_call", "router", "human_input", "workflow_call", "remote_agent_call"];
+const ADD_NODE_KINDS: NodeKind[] = [
+  "agent",
+  "adapter_call",
+  "router",
+  "human_input",
+  "join",
+  "loop_control",
+  "workflow_call",
+  "remote_agent_call",
+  "callback_wait"
+];
 const ADD_NODE_LABELS: Record<NodeKind, string> = {
   input: "입력",
   output: "출력",
-  agent: "판단 노드",
+  agent: "판단",
   function: "함수 노드",
   tool: "도구 노드",
   adapter: "Adapter",
-  adapter_call: "API/도구 호출 노드",
-  human_input: "사람 입력/승인 노드",
+  adapter_call: "API/도구 호출",
+  human_input: "사람 입력/승인",
+  callback_wait: "대기/callback",
   workflow: "Workflow",
-  workflow_call: "기존 Workflow 호출 노드",
+  workflow_call: "서브워크플로우 호출",
   remote_a2a: "외부 Agent 호출",
-  remote_agent_call: "외부 Agent 호출 노드",
-  join: "Join",
-  router: "조건 분기 노드",
-  loop_control: "Loop Control"
+  remote_agent_call: "외부 Agent 호출",
+  join: "병합",
+  router: "조건 분기",
+  loop_control: "반복 제어"
 };
 
 function GraphEditToolbar({
@@ -620,7 +655,7 @@ function GraphEditToolbar({
             >
               {ADD_NODE_KINDS.filter((kind) => GRAPH_NODE_KINDS.includes(kind)).map((kind) => (
                 <option key={kind} value={kind}>
-                  {ADD_NODE_LABELS[kind]} ({kind})
+                  {ADD_NODE_LABELS[kind]}
                 </option>
               ))}
             </select>
@@ -841,7 +876,8 @@ function buildEditableNode(
     output_ports: [],
     schema_refs: [],
     review_status: "n/a",
-    position: { x: position.x, y: position.y }
+    position: { x: position.x, y: position.y },
+    ...defaultNodeControlMetadata(kind)
   };
 }
 
@@ -852,6 +888,23 @@ function laneForNodeKind(kind: NodeKind): LaneId {
   if (kind === "tool" || kind === "adapter" || kind === "adapter_call") return "adapter";
   if (kind === "remote_a2a" || kind === "remote_agent_call") return "remote_boundary";
   return "local_graph";
+}
+
+function defaultNodeControlMetadata(
+  kind: NodeKind
+): Pick<GraphNode, "invoke_binding" | "decision_owner" | "call_control"> {
+  if (kind === "callback_wait") {
+    return {
+      invoke_binding: "callback_wait",
+      decision_owner: "workflow_code",
+      call_control: "event_callback"
+    };
+  }
+  return {
+    invoke_binding: null,
+    decision_owner: null,
+    call_control: null
+  };
 }
 
 function nextNodeId(graphIR: GraphIR, kind: NodeKind): string {
@@ -885,8 +938,8 @@ function buildEditableEdge(
     return { edge: null, message: "노드를 찾을 수 없어 엣지를 만들 수 없습니다." };
   }
 
-  const sourceRemote = source.node_kind === "remote_a2a";
-  const targetRemote = target.node_kind === "remote_a2a";
+  const sourceRemote = isRemoteAgentNodeKind(source.node_kind);
+  const targetRemote = isRemoteAgentNodeKind(target.node_kind);
   const edgeKind: EdgeKind =
     sourceRemote || targetRemote ? "remote_a2a" : source.node_kind === "router" ? "route" : "event_output";
   const executionSemantics: ExecutionSemantics =
@@ -908,6 +961,10 @@ function buildEditableEdge(
     is_remote_boundary_crossing: edgeKind === "remote_a2a"
   };
   return { edge, message: `${edge.id} 엣지를 추가했습니다.` };
+}
+
+function isRemoteAgentNodeKind(kind: NodeKind): boolean {
+  return kind === "remote_a2a" || kind === "remote_agent_call";
 }
 
 function deleteFromGraph(graphIR: GraphIR, selection: Selection): GraphIR {

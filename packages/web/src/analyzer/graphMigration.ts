@@ -6,9 +6,15 @@
 
 import {
   AGENT_EXECUTION_MODES,
+  GRAPH_CALL_CONTROLS,
+  GRAPH_DECISION_OWNERS,
   GRAPH_EDGE_KINDS,
+  GRAPH_FLOW_KINDS,
+  GRAPH_INVOKE_BINDINGS,
   GRAPH_LANE_IDS,
-  GRAPH_NODE_KINDS
+  GRAPH_NODE_KINDS,
+  GRAPH_POLICIES,
+  GRAPH_SIDE_EFFECTS
 } from "./types";
 import type {
   AgentExecutionMode,
@@ -19,6 +25,11 @@ import type {
   GraphIR,
   GraphLane,
   GraphNode,
+  GraphCallControl,
+  GraphDecisionOwner,
+  GraphFlowKind,
+  GraphInvokeBinding,
+  GraphPolicy,
   GraphValidation,
   GraphValidationIssue,
   LaneId,
@@ -30,6 +41,15 @@ const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
 const EDGE_KIND_SET = new Set<string>(GRAPH_EDGE_KINDS);
 const LANE_ID_SET = new Set<string>(GRAPH_LANE_IDS);
 const AGENT_EXECUTION_MODE_SET = new Set<string>(AGENT_EXECUTION_MODES);
+const GRAPH_INVOKE_BINDING_SET = new Set<string>(GRAPH_INVOKE_BINDINGS);
+const GRAPH_DECISION_OWNER_SET = new Set<string>(GRAPH_DECISION_OWNERS);
+const GRAPH_CALL_CONTROL_SET = new Set<string>(GRAPH_CALL_CONTROLS);
+const GRAPH_FLOW_KIND_SET = new Set<string>(GRAPH_FLOW_KINDS);
+const GRAPH_POLICY_SET = new Set<string>(GRAPH_POLICIES);
+const SIDE_EFFECT_SET = new Set<string>(GRAPH_SIDE_EFFECTS);
+const CALLBACK_INVOKE_BINDINGS = new Set<string>(["callback_wait"]);
+const CALLBACK_CALL_CONTROLS = new Set<string>(["event_callback", "resume"]);
+const CALLBACK_FLOW_KINDS = new Set<string>(["callback", "resume"]);
 const MODULE_BOUND_NODE_KIND_SET = new Set<string>([
   "agent",
   "workflow",
@@ -39,6 +59,16 @@ const MODULE_BOUND_NODE_KIND_SET = new Set<string>([
   "remote_a2a",
   "remote_agent_call"
 ]);
+const MODULE_FORBIDDEN_NODE_KIND_SET = new Set<string>([
+  "input",
+  "output",
+  "join",
+  "router",
+  "loop_control",
+  "human_input",
+  "callback_wait"
+]);
+const REMOTE_AGENT_NODE_KIND_SET = new Set<string>(["remote_a2a", "remote_agent_call"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -63,9 +93,78 @@ function asNullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function optionalNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
 function asAgentExecutionMode(value: unknown, nodeKind: NodeKind): AgentExecutionMode | null {
   if (nodeKind !== "agent") return null;
   return typeof value === "string" && AGENT_EXECUTION_MODE_SET.has(value) ? (value as AgentExecutionMode) : null;
+}
+
+function graphNodeControlMetadata(raw: Record<string, unknown>): Pick<
+  GraphNode,
+  "invoke_binding" | "decision_owner" | "call_control" | "side_effect" | "policy"
+> {
+  const metadata: Pick<GraphNode, "invoke_binding" | "decision_owner" | "call_control" | "side_effect" | "policy"> = {};
+  const invokeBinding = optionalNullableString(raw.invoke_binding);
+  const decisionOwner = optionalNullableString(raw.decision_owner);
+  const callControl = optionalNullableString(raw.call_control);
+  const sideEffect = optionalNullableString(raw.side_effect);
+  const policy = optionalNullableString(raw.policy);
+  if (invokeBinding !== undefined) metadata.invoke_binding = invokeBinding as GraphInvokeBinding | null;
+  if (decisionOwner !== undefined) metadata.decision_owner = decisionOwner as GraphDecisionOwner | null;
+  if (callControl !== undefined) metadata.call_control = callControl as GraphCallControl | null;
+  if (sideEffect !== undefined) metadata.side_effect = sideEffect as GraphNode["side_effect"];
+  if (policy !== undefined) metadata.policy = policy as GraphPolicy | null;
+  return metadata;
+}
+
+function graphEdgeControlMetadata(raw: Record<string, unknown>): Pick<GraphEdge, "flow_kind" | "call_control"> {
+  const metadata: Pick<GraphEdge, "flow_kind" | "call_control"> = {};
+  const flowKind = optionalNullableString(raw.flow_kind);
+  const callControl = optionalNullableString(raw.call_control);
+  if (flowKind !== undefined) metadata.flow_kind = flowKind as GraphFlowKind | null;
+  if (callControl !== undefined) metadata.call_control = callControl as GraphCallControl | null;
+  return metadata;
+}
+
+function isRemoteAgentNode(node: GraphNode | undefined): node is GraphNode {
+  return typeof node?.node_kind === "string" && REMOTE_AGENT_NODE_KIND_SET.has(node.node_kind);
+}
+
+function validateOptionalEnum(
+  value: unknown,
+  allowed: Set<string>,
+  code: string,
+  message: string,
+  targetKind: GraphValidationIssue["target_kind"],
+  targetId: string | null,
+  errors: GraphValidationIssue[]
+): void {
+  if (value === undefined || value === null) return;
+  if (typeof value !== "string" || !allowed.has(value)) {
+    errors.push({
+      code,
+      message,
+      target_kind: targetKind,
+      target_id: targetId
+    });
+  }
+}
+
+function hasCallbackWaitControlMetadata(node: GraphNode, edges: GraphEdge[]): boolean {
+  if (typeof node.invoke_binding === "string" && CALLBACK_INVOKE_BINDINGS.has(node.invoke_binding)) return true;
+  if (typeof node.call_control === "string" && CALLBACK_CALL_CONTROLS.has(node.call_control)) return true;
+  if (node.policy === "callback_resume_required") return true;
+  return edges.some((edge) => {
+    if (!edge || (edge.from !== node.id && edge.to !== node.id)) return false;
+    return (
+      (typeof edge.call_control === "string" && CALLBACK_CALL_CONTROLS.has(edge.call_control)) ||
+      (typeof edge.flow_kind === "string" && CALLBACK_FLOW_KINDS.has(edge.flow_kind))
+    );
+  });
 }
 
 function normalizeNodePosition(value: unknown): GraphNode["position"] | undefined {
@@ -167,6 +266,13 @@ function resolveContainerReference(value: unknown, idMap: Map<string, string>): 
 
 const SOFT_VALIDATION_CODES = new Set([
   "graph_not_object",
+  "invalid_invoke_binding",
+  "invalid_decision_owner",
+  "invalid_call_control",
+  "invalid_side_effect",
+  "invalid_policy",
+  "invalid_flow_kind",
+  "callback_wait_missing_control_metadata",
   "duplicate_node_id",
   "node_missing_module_id",
   "module_node_missing_incoming",
@@ -183,6 +289,7 @@ const SOFT_VALIDATION_CODES = new Set([
   "remote_boundary_flag_missing",
   "remote_link_incoherent",
   "invalid_container_id",
+  "dynamic_workflow_design_only",
   "parallel_region_needs_two_entries",
   "parallel_region_missing_join",
   "loop_region_missing_back",
@@ -360,7 +467,8 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
       input_ports: [],
       output_ports: [],
       schema_refs: [],
-      review_status: reviewStatus
+      review_status: reviewStatus,
+      ...graphNodeControlMetadata(raw)
     });
   }
 
@@ -395,7 +503,8 @@ export function legacyStageToGraphIR(input: unknown, requirementId: string): Gra
         typeof (raw as Record<string, unknown>).a2a_contract_id === "string"
           ? ((raw as Record<string, unknown>).a2a_contract_id as string)
           : null,
-      is_remote_boundary_crossing: isRemote
+      is_remote_boundary_crossing: isRemote,
+      ...graphEdgeControlMetadata(raw)
     });
   }
 
@@ -506,6 +615,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         input_mapping: isRecord(nodeRecord.input_mapping) ? structuredClone(nodeRecord.input_mapping) : null,
         output_mapping: isRecord(nodeRecord.output_mapping) ? structuredClone(nodeRecord.output_mapping) : null,
         runtime_binding: asNullableString(nodeRecord.runtime_binding) as GraphNode["runtime_binding"],
+        ...graphNodeControlMetadata(nodeRecord),
         mock_binding: isRecord(nodeRecord.mock_binding) ? structuredClone(nodeRecord.mock_binding) : null,
         adk_skeleton_contract: isRecord(nodeRecord.adk_skeleton_contract)
           ? structuredClone(nodeRecord.adk_skeleton_contract)
@@ -535,7 +645,8 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         state_key: asNullableString(edge.state_key),
         artifact_key: asNullableString(edge.artifact_key),
         a2a_contract_id: asNullableString(edge.a2a_contract_id),
-        is_remote_boundary_crossing: edge.is_remote_boundary_crossing === true || edgeKind === "remote_a2a"
+        is_remote_boundary_crossing: edge.is_remote_boundary_crossing === true || edgeKind === "remote_a2a",
+        ...graphEdgeControlMetadata(edgeRecord)
       };
     }),
     containers,
@@ -626,6 +737,63 @@ export function validateGraphIRSoft(
         });
       }
     }
+    validateOptionalEnum(
+      node.invoke_binding,
+      GRAPH_INVOKE_BINDING_SET,
+      "invalid_invoke_binding",
+      `Node ${node.id} has invalid invoke_binding ${String(node.invoke_binding)}.`,
+      "node",
+      node.id,
+      errors
+    );
+    validateOptionalEnum(
+      node.decision_owner,
+      GRAPH_DECISION_OWNER_SET,
+      "invalid_decision_owner",
+      `Node ${node.id} has invalid decision_owner ${String(node.decision_owner)}.`,
+      "node",
+      node.id,
+      errors
+    );
+    validateOptionalEnum(
+      node.call_control,
+      GRAPH_CALL_CONTROL_SET,
+      "invalid_call_control",
+      `Node ${node.id} has invalid call_control ${String(node.call_control)}.`,
+      "node",
+      node.id,
+      errors
+    );
+    validateOptionalEnum(
+      node.side_effect,
+      SIDE_EFFECT_SET,
+      "invalid_side_effect",
+      `Node ${node.id} has invalid side_effect ${String(node.side_effect)}.`,
+      "node",
+      node.id,
+      errors
+    );
+    validateOptionalEnum(
+      node.policy,
+      GRAPH_POLICY_SET,
+      "invalid_policy",
+      `Node ${node.id} has invalid policy ${String(node.policy)}.`,
+      "node",
+      node.id,
+      errors
+    );
+    if (
+      MODULE_FORBIDDEN_NODE_KIND_SET.has(node.node_kind) &&
+      typeof node.module_id === "string" &&
+      node.module_id.trim()
+    ) {
+      errors.push({
+        code: "node_kind_must_not_bind_module",
+        message: `Node ${node.id} (${node.node_kind}) must not bind to module ${node.module_id}; it is workflow graph semantics.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
     if (MODULE_BOUND_NODE_KIND_SET.has(node.node_kind) && (typeof node.module_id !== "string" || !node.module_id.trim())) {
       errors.push({
         code: "node_missing_module_id",
@@ -638,6 +806,14 @@ export function validateGraphIRSoft(
       warnings.push({
         code: "workflow_call_missing_ref",
         message: `Node ${node.id} is a workflow_call without workflow_ref; skeleton generation will require manual target resolution.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (node.node_kind === "callback_wait" && !hasCallbackWaitControlMetadata(node, edges)) {
+      errors.push({
+        code: "callback_wait_missing_control_metadata",
+        message: `Node ${node.id} is callback_wait but lacks callback/resume control metadata.`,
         target_kind: "node",
         target_id: node.id
       });
@@ -699,6 +875,24 @@ export function validateGraphIRSoft(
         target_id: edge.id ?? null
       });
     }
+    validateOptionalEnum(
+      edge.flow_kind,
+      GRAPH_FLOW_KIND_SET,
+      "invalid_flow_kind",
+      `Edge ${edge.id ?? ""} has invalid flow_kind ${String(edge.flow_kind)}.`,
+      "edge",
+      edge.id ?? null,
+      errors
+    );
+    validateOptionalEnum(
+      edge.call_control,
+      GRAPH_CALL_CONTROL_SET,
+      "invalid_call_control",
+      `Edge ${edge.id ?? ""} has invalid call_control ${String(edge.call_control)}.`,
+      "edge",
+      edge.id ?? null,
+      errors
+    );
     if (
       (edge.edge_kind === "session_state" ||
         edge.edge_kind === "temp_state" ||
@@ -724,12 +918,11 @@ export function validateGraphIRSoft(
       }
       const fromNode = typeof edge.from === "string" ? nodeById.get(edge.from) : undefined;
       const toNode = typeof edge.to === "string" ? nodeById.get(edge.to) : undefined;
-      const remoteNode =
-        fromNode?.node_kind === "remote_a2a" ? fromNode : toNode?.node_kind === "remote_a2a" ? toNode : null;
+      const remoteNode = isRemoteAgentNode(fromNode) ? fromNode : isRemoteAgentNode(toNode) ? toNode : null;
       if (!remoteNode || typeof remoteNode.module_id !== "string" || !remoteNode.module_id.trim()) {
         warnings.push({
           code: "remote_link_incoherent",
-          message: `Remote edge ${edge.id ?? ""} should connect to a remote_a2a node with module_id.`,
+          message: `Remote edge ${edge.id ?? ""} should connect to a remote agent node with module_id.`,
           target_kind: "edge",
           target_id: edge.id ?? null
         });
@@ -773,6 +966,18 @@ export function validateGraphIRSoft(
       errors.push({
         code: "invalid_container_id",
         message: `Container id ${String(container?.id)} must match ^container-[a-z0-9-]+$.`,
+        target_kind: "container",
+        target_id: typeof container.id === "string" ? container.id : null
+      });
+    }
+    if (
+      container.container_kind === "dynamic_workflow" &&
+      typeof container.adk_mapping === "string" &&
+      container.adk_mapping.trim()
+    ) {
+      errors.push({
+        code: "dynamic_workflow_design_only",
+        message: `dynamic_workflow ${container.id} is design-only and must not declare a runtime adk_mapping.`,
         target_kind: "container",
         target_id: typeof container.id === "string" ? container.id : null
       });
