@@ -37,6 +37,7 @@ import {
   type DesignBottomTab
 } from "../design/designWorkbenchTabs";
 import { ReviewNotesPanel } from "../design/ReviewNotesPanel";
+import { reviewNotesBadgeCount } from "../design/reviewNotesModel";
 import {
   RuntimeContractInspector,
   RuntimeContractSidebar,
@@ -629,8 +630,8 @@ export default function DesignWorkbench() {
                   onClick={() => setActiveTab(tab.id)}
                 >
                   {tab.label}
-                  {tab.id === "reviewNotes" && comments.length + highlights.length > 0 ? (
-                    <span className="af-design-tab-count">{comments.length + highlights.length}</span>
+                  {tab.id === "reviewNotes" && reviewNotesBadgeCount(comments.length, highlights.length) > 0 ? (
+                    <span className="af-design-tab-count">{reviewNotesBadgeCount(comments.length, highlights.length)}</span>
                   ) : null}
                 </button>
               ))}
