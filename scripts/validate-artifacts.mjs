@@ -666,6 +666,32 @@ function isRemoteAgentNode(node) {
   return node && typeof node.node_kind === "string" && remoteAgentNodeKinds.has(node.node_kind);
 }
 
+// Workflow-first invariant: LLM-selected MCP toolset semantics belong on an
+// `agent` decision node. A fixed call node (adapter_call/adapter) must use
+// invoke_binding: mcp_tool + call_control: fixed_by_workflow and must never
+// carry mcp_toolset / selected_by_llm. See docs/workbench/taxonomy.md
+// ("Graph invoke binding") and docs/workbench/validation.md. Returns an error
+// suffix string when the node violates the rule, or null when it is fine.
+function llmToolsetOwnerIssue(node) {
+  if (!node || typeof node !== "object") return null;
+  const llmSelected = node.invoke_binding === "mcp_toolset" || node.call_control === "selected_by_llm";
+  if (!llmSelected || node.node_kind === "agent") return null;
+  return `carries LLM-selected MCP toolset semantics (invoke_binding=${JSON.stringify(
+    node.invoke_binding ?? null
+  )}, call_control=${JSON.stringify(
+    node.call_control ?? null
+  )}); mcp_toolset / selected_by_llm belong on an agent decision node, while adapter_call must use mcp_tool + fixed_by_workflow.`;
+}
+
+// Same invariant on the edge surface: `selected_by_llm` is agent-node ownership
+// metadata (LLM toolset selection), never edge control. Returns an error suffix
+// string when an edge carries it, or null otherwise.
+function llmToolsetEdgeIssue(edge) {
+  if (!edge || typeof edge !== "object") return null;
+  if (edge.call_control !== "selected_by_llm") return null;
+  return `has call_control selected_by_llm; LLM-selected toolset selection is agent node metadata (node_kind: agent), not edge metadata.`;
+}
+
 /**
  * Structural validation for an ADK 2.0 Graph IR object.
  *
@@ -774,6 +800,10 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     validateOptionalEnumValue(node.call_control, graphCallControls, `${label}.nodes[${index}] (${node.id}).call_control`);
     validateOptionalEnumValue(node.side_effect, graphSideEffects, `${label}.nodes[${index}] (${node.id}).side_effect`);
     validateOptionalEnumValue(node.policy, graphPolicies, `${label}.nodes[${index}] (${node.id}).policy`);
+    const toolsetIssue = llmToolsetOwnerIssue(node);
+    if (toolsetIssue) {
+      errors.push(`${label}.nodes[${index}] (${node.id}) ${toolsetIssue}`);
+    }
   });
 
   const containerById = new Map();
@@ -889,6 +919,10 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
     validateOptionalEnumValue(edge.flow_kind, graphFlowKinds, `${label}.edges[${index}] (${edge.id}).flow_kind`);
     validateOptionalEnumValue(edge.call_control, graphCallControls, `${label}.edges[${index}] (${edge.id}).call_control`);
+    const edgeToolsetIssue = llmToolsetEdgeIssue(edge);
+    if (edgeToolsetIssue) {
+      errors.push(`${label}.edges[${index}] (${edge.id}) ${edgeToolsetIssue}`);
+    }
     for (const legacyKey of ["edge_type", "data", "data_channel"]) {
       if (legacyKey in edge) {
         errors.push(`${label}.edges[${index}] (${edge.id}) uses legacy ${legacyKey}; emit native Graph IR fields only.`);
@@ -1208,6 +1242,10 @@ function validateScaffoldGraph(graph) {
     validateOptionalEnumValue(node.call_control, graphCallControls, `${label}.call_control`);
     validateOptionalEnumValue(node.side_effect, graphSideEffects, `${label}.side_effect`);
     validateOptionalEnumValue(node.policy, graphPolicies, `${label}.policy`);
+    const toolsetIssue = llmToolsetOwnerIssue(node);
+    if (toolsetIssue) {
+      errors.push(`${label} ${toolsetIssue}`);
+    }
   });
 
   edges.forEach((edge, index) => {
@@ -1234,6 +1272,10 @@ function validateScaffoldGraph(graph) {
     }
     validateOptionalEnumValue(edge.flow_kind, graphFlowKinds, `${label}.flow_kind`);
     validateOptionalEnumValue(edge.call_control, graphCallControls, `${label}.call_control`);
+    const edgeToolsetIssue = llmToolsetEdgeIssue(edge);
+    if (edgeToolsetIssue) {
+      errors.push(`${label} ${edgeToolsetIssue}`);
+    }
   });
 }
 

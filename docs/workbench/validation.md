@@ -27,6 +27,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - Workbench는 Workflow-first Graph Model이다. `module_category`는 `agent`, `workflow`, `adapter`, `remote_a2a` 네 값만 유지하고, Graph IR node는 judgment/call/wait/subworkflow semantics를 별도 축으로 저장한다.
 - `agent_execution_mode`는 `agent` node에서만 `single_turn` 또는 `chat`을 허용한다. 누락되면 `single_turn`으로 해석하며, `task` 값은 static Graph IR와 runnable source generation에서 거부한다.
 - 고정 MCP Adapter 호출은 `node_kind: adapter_call`, `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`로 검토한다. LLM-selected toolset 경로는 `node_kind: agent`, `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`로 검토한다.
+- 이 호출 축 구분은 검증으로 강제된다. `node_kind`가 `agent`가 아닌데 `invoke_binding: mcp_toolset` 또는 `call_control: selected_by_llm`를 가지면 export validator와 soft validation 모두 `llm_toolset_requires_agent_node` 오류를 낸다. `selected_by_llm`은 agent 노드 소유 메타데이터이므로 edge의 `call_control: selected_by_llm`도 같은 오류로 거부한다. 즉 `adapter_call`은 LLM-선택 toolset 의미를 가질 수 없고 고정 호출(`mcp_tool` + `fixed_by_workflow`)만 허용하며, toolset 선택은 agent 판단 노드에 둔다.
 - `workflow_call`은 공식 subworkflow/existing workflow 호출 노드다. `workflow_ref`가 없으면 skeleton generation은 수동 target resolution warning을 남긴다.
 - `callback_wait`와 resume은 category가 아니라 graph execution semantics다. `callback_wait` node는 `flow_kind: callback|resume` 또는 `call_control: event_callback|resume` metadata를 가져야 한다.
 - `side_effect`와 `policy`는 node-level governance summary다. 실제 auth/timeout/retry/fallback/data policy/callback resume 계약의 source of truth는 `AnalysisResult.runtimeContracts`와 A2A contract artifact다.
@@ -36,6 +37,7 @@ Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, 
 - `loop_region`은 `loop_back`과 `loop_exit` edge가 있어야 한다.
 - `human_input` node는 downstream edge가 있어야 한다.
 - `dynamic_workflow` container는 design/contract container다. Runtime `adk_mapping`을 선언하면 `dynamic_workflow_design_only` error가 되며 runnable dynamic codegen은 생성하지 않는다.
+- runnable scaffold-plan 검증은 generator의 runnable 거부와 일치한다. `output_mode: runnable`에서 `module_category: workflow` + `workflow_kind: dynamic` 모듈이나 `dynamic_workflow` container가 있으면 `scaffoldPlan.collectBlockers`가 `can_generate_source: false`로 두고 하위 Workflow 분리 + `workflow_call` 조립을 안내하는 blocker를 남긴다. smoke mode는 dynamic을 design/contract handoff로 통과시킨다.
 - soft validation error `node_missing_module_id`는 export validator의 node kind 규칙을 미리 반영한다. `agent`, `workflow`, `workflow_call`, `adapter`, `adapter_call`, `remote_a2a`, `remote_agent_call` node는 `module_id`가 필요하다. `human_input`과 `callback_wait`는 module-bound component가 아니라 Graph IR execution semantics이므로 `module_id`가 있으면 `node_kind_must_not_bind_module` 오류가 된다.
 - soft validation warning `remote_link_incoherent`는 `remote_a2a` edge가 `node_kind === "remote_a2a"` endpoint를 갖지 않거나, 그 remote endpoint node에 `module_id`가 없을 때 표시된다. 경고만 추가하며 기존 export error count를 대신하지 않는다.
 - module-bound node는 incoming edge와 outgoing edge를 각각 최소 1개 가져야 한다. 화면에 노드가 렌더링되더라도 고립 후보는 scaffold source가 될 수 없다.

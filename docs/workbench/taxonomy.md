@@ -134,6 +134,8 @@ Workbench Graph IR는 책임 분류와 실행 노드를 분리한다.
 - `node_kind: workflow_call`: 공식 subworkflow/existing workflow 호출 노드다. 기존 Workflow, catalog Workflow, artifact Workflow, 또는 target skeleton을 parent graph에 조립한다.
 - `node_kind: remote_agent_call`: Remote A2A 계약을 가진 외부 Agent 호출 노드다.
 
+legacy node kind `adapter`, `workflow`, `remote_a2a`, `tool`, `function`은 legacy/migration 호환을 위해서만 유효하며, 새로 작성하는 노드는 call-node kind `adapter_call`, `workflow_call`, `remote_agent_call`을 우선 사용한다.
+
 `workflow_call`은 `workflow_ref`, `input_schema`, `output_schema`, `input_mapping`, `output_mapping`, `adk_skeleton_contract`를 가질 수 있다.
 target workflow가 아직 없으면 placeholder skeleton을 만들고 README/TODO에 수동 연결 필요를 남긴다.
 
