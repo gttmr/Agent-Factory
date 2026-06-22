@@ -56,6 +56,17 @@ test("validate-artifacts rejects invalid scaffold graph metadata", () => {
   assert.match(result.stderr, /scaffold\.graph\.edges\[0\]\.flow_kind/);
 });
 
+test("validate-artifacts rejects invalid scaffold package_name", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-package-name-");
+  const plan = readJson(join(scenarioRoot, "scaffold-plan.json"));
+  plan.package_name = "wf-page-recommendation-required";
+
+  writeJson(join(artifactRoot, "scaffold-plan.json"), plan);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /scaffold plan package_name/);
+});
+
 test("validate-artifacts accepts remote_agent_call as a Remote A2A graph endpoint", () => {
   const artifactRoot = tempArtifactRoot("af-validator-remote-agent-call-");
   const analysis = readJson(join(remoteScenarioRoot, "analysis-result.json"));
