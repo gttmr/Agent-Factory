@@ -136,6 +136,15 @@ When the user authorizes subagents for Agent Factory work, default subagent mode
 
 For code-changing subagents, assign a clear file or module ownership boundary and instruct them not to revert or overwrite unrelated work. For review subagents, ask for concrete findings with file and line references, not broad opinions.
 
+## Worktree Hygiene
+
+Git worktrees created for isolated slices (subagent/Codex work, parallel branches) must be cleaned up once their work lands — do not let them accumulate.
+
+- After creating a PR and confirming it is merged, treat the source worktree and its branch as cleanup-pending in the same session: the task is not done until they are removed (or the user explicitly chooses to keep them).
+- To clean up a landed branch: `git worktree remove <path>` then `git branch -d <branch>`. Run `git worktree prune` to drop dead registrations (directories already gone).
+- Before deleting, confirm the branch is merged (`git merge-base --is-ancestor <branch> main`) or its content is already on `main`, and that the worktree has no uncommitted changes (`git -C <path> status`). Keep anything unmerged and surface it instead of deleting.
+- Periodically run `git worktree list` to spot leftovers. Never remove the primary checkout, and do not touch remote branches unless the user asks.
+
 ## Editing Rules
 
 - Keep changes scoped to the requested workbench behavior.

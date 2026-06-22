@@ -143,3 +143,4 @@ Then in MCP or Playwright: drive route navigation / button clicks and save scree
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.
 - The UI labels are in Korean (`App.tsx`, components). Preserve that when editing copy.
 - Visual changes must follow `docs/visualization/design-system.md` and be verified with a chrome-devtools MCP screenshot before being reported as done.
+- Worktree hygiene: when a worktree's branch lands (PR merged, or commits already on `main`), remove the worktree and delete its local branch (`git worktree remove` + `git branch -d`), and `git worktree prune` dead registrations. Verify merged + clean before deleting; keep and surface anything unmerged, and never remove the primary checkout. See AGENTS.md "Worktree Hygiene".
