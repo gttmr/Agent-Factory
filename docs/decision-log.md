@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-21 · 작업 브랜치 `main` — page recommendation skeleton + route lowering
+
+### Static user-confirmation route lowering and explicit package names
+- **결정**: Runnable ADK source generator가 reviewed `router` node와 `edge_kind: route`/`execution_semantics: conditional` edge를 ADK `Event(route=...)` 함수와 Workflow route map으로 lower한다. 이 support는 static user-confirmation branch에 한정하며, loop/dynamic workflow codegen은 계속 후속으로 남긴다. `scaffold-plan.json`에는 optional `package_name`을 허용해 승인된 fixture가 생성 package 이름을 명시할 수 있게 한다.
+- **배경**: `1-1 페이지 추천(필수)` smoke skeleton은 “추가 분석 실행 여부”를 사용자가 직접 선택한 뒤 분석 fan-out 또는 최종 확인으로 분기해야 한다. 기존 `req_*_adk` 자동 이름은 요구된 `wf_page_recommendation_required` bundle 이름을 만들 수 없었다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/validate-artifacts.mjs`, `schemas/scaffold-plan.schema.json`, `packages/web/src/analyzer/types.ts`, `templates/regression-scenarios/wf-page-recommendation-required/`, `docs/workbench/validation.md`, `docs/workbench/workflow-decision-guide.md`.
+
 ## 2026-06-20 · 작업 브랜치 `codex/taxonomy-graph-model-correction` — Workflow-first Graph Model 축 정정
 
 ### Workflow-first Graph Model과 호출 축 분리
