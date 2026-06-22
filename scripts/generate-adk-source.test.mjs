@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -230,6 +230,7 @@ function assertRunnableBundle(outputRoot) {
   assert.match(agentSource, /http:\/\/127\.0\.0\.1:5173\/api\/mock-lab\/mcp/);
   assert.match(agentSource, /AF_RUNTIME_ENV_FILE/);
   assert.match(agentSource, /\.agent-factory\/runtime\.env/);
+  assert.match(agentSource, /if key not in os\.environ:/);
   assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
   // The fixture adapter is unconnected → emitted as a FunctionNode stub and
   // classified as unconnected in the manifest.
@@ -245,7 +246,9 @@ function assertRunnableBundle(outputRoot) {
   assert.ok(existsSync(join(outputRoot, packageName, "schemas.py")), "bundle must include schemas.py");
   assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")), "bundle must include mock_config.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
+  assert.ok(existsSync(join(outputRoot, packageName, "README.md")), "bundle must include package-local README.md");
   assert.ok(existsSync(join(outputRoot, packageName, "nodes", "adapters.py")), "bundle must include nodes/adapters.py");
+  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "gates.py")), "bundle must include nodes/gates.py");
   assert.ok(existsSync(join(outputRoot, packageName, "nodes", "workflow_calls.py")), "bundle must include nodes/workflow_calls.py");
   assert.ok(existsSync(join(outputRoot, "README.md")), "bundle must include README.md");
   assert.match(
@@ -261,7 +264,30 @@ function assertRunnableBundle(outputRoot) {
   assert.match(agentsConfig, /한글 우선/);
   assert.match(agentsConfig, /name: 응답_생성_Agent/);
   assert.match(readme, /repository root의 `\.agent-factory\/runtime\.env`로 복사/);
+  assert.match(readme, /npm run dev --prefix packages\/mock-lab -- --host 0\.0\.0\.0 --port 5176 --strictPort/);
+  assert.match(readme, /AF_MOCK_LAB_MCP_URL=http:\/\/127\.0\.0\.1:5176\/api\/mock-lab\/mcp/);
   assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
+  // Regression guard: the generator must stay domain-neutral. A synthetic,
+  // domain-free fixture must never surface requirement-specific literals that a
+  // previous version hardcoded into sample output (banking / page-recommendation).
+  // Data echoed FROM a scenario's own artifacts is legitimate; this fixture has
+  // none of these tokens, so any occurrence is a generator-authored leak.
+  const sampleInputs = readFileSync(join(outputRoot, packageName, "sample_inputs.yaml"), "utf8");
+  const generatorAuthoredLeaks = [
+    "wf-page-recommendation-mock",
+    "WORKFLOW_INSTRUCTION",
+    "Page Metadata RAG",
+    "적금",
+    "T2S",
+    "UserFlow",
+    "행동유형",
+    "PAGE_B"
+  ];
+  for (const token of generatorAuthoredLeaks) {
+    for (const [label, text] of [["README.md", readme], ["agent.py", agentSource], ["sample_inputs.yaml", sampleInputs]]) {
+      assert.ok(!text.includes(token), `domain-neutral bundle leaked generator-authored literal "${token}" into ${label}`);
+    }
+  }
   return packageName;
 }
 
@@ -331,6 +357,103 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   try {
     assertConnectedMcpRuntimeLabels(outputRoot);
     assertManifestStageUpdated(artifactRoot);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable honors an explicit scaffold package_name", () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-package-name-"));
+  try {
+    writeFixture(artifactRoot, { runnable: true });
+    const planPath = join(artifactRoot, "scaffold-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    plan.package_name = "wf_page_recommendation_required";
+    writeJson(planPath, plan);
+
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    assert.ok(existsSync(join(outputRoot, "wf_page_recommendation_required", "agent.py")));
+    assert.equal(discoverGeneratedPackage(outputRoot), "wf_page_recommendation_required");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable README uses an env file path relative to the generated output root", () => {
+  const artifactRoot = join(here, "..", "artifacts", "af", `req-gen-env-${process.pid}`);
+  try {
+    const outputRoot = join(artifactRoot, "runtime-stub");
+    mkdirSync(artifactRoot, { recursive: true });
+    writeFixture(artifactRoot, { runnable: true, connectedAdapter: true });
+    // Pin cwd to the repo root so runtimeEnvRelativePath() (which anchors on
+    // process.cwd()) is deterministic whether this runs standalone or via the
+    // packages/web `test:analyzer` runner.
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe", cwd: join(here, "..") });
+
+    const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
+    assert.match(readme, /AF_RUNTIME_ENV_FILE=\.\.\/\.\.\/\.\.\/\.\.\/\.agent-factory\/runtime\.env/);
+    assert.doesNotMatch(readme, /AF_RUNTIME_ENV_FILE=\.\.\/\.\.\/\.agent-factory\/runtime\.env/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable lowers a user-confirmation route without joining branch convergence", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "초기_선택_Agent" },
+    { ...unconnectedAdapter, id: "mod-analysis", name: "분석_실행_Adapter" },
+    { ...unconnectedAdapter, id: "mod-final", name: "최종_선택_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-route-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "confirm", node_kind: "human_input", module_id: null, label: "추가 분석을 수행할까요?" },
+        { id: "analysis-router", node_kind: "router", module_id: null, label: "분석 실행 여부 route" },
+        { id: "analysis", node_kind: "adapter", module_id: "mod-analysis" },
+        { id: "final", node_kind: "adapter", module_id: "mod-final" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "confirm" },
+        { from: "confirm", to: "analysis-router" },
+        {
+          from: "analysis-router",
+          to: "analysis",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "choice == run_analysis"
+        },
+        {
+          from: "analysis-router",
+          to: "final",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "choice == skip_analysis"
+        },
+        { from: "analysis", to: "final" },
+        { from: "final", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    const sampleInputs = readFileSync(join(outputRoot, "req_ch_adk", "sample_inputs.yaml"), "utf8");
+    assert.match(source, /from google\.adk\.events import Event, RequestInput/);
+    assert.match(source, /def _route_analysis_router\(node_input=None\):/);
+    assert.match(source, /Event\(route="run_analysis"\)/);
+    assert.match(source, /\(node_analysis_router,\s*\{\s*"run_analysis": node_mod_analysis,\s*"skip_analysis": node_mod_final,\s*\}\s*\)/s);
+    assert.doesNotMatch(source, /join_1 = JoinNode\(name="join_1"\)/);
+    assert.match(sampleInputs, /workflow_chat_smoke:/);
+    assert.match(sampleInputs, /conversation:/);
+    assert.match(sampleInputs, /추가 분석을 수행할까요\?/);
+    assert.match(sampleInputs, /"1"/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -454,9 +577,7 @@ test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/f
     { name: "module-bound human_input node", mutate: (pf) => pf.nodes.push({ id: "h1", node_kind: "human_input", module_id: "mod-gen-agent" }) },
     { name: "module-bound input node", mutate: (pf) => { pf.nodes.find((n) => n.id === "in1").module_id = "mod-gen-agent"; } },
     { name: "module-bound output node", mutate: (pf) => { pf.nodes.find((n) => n.id === "out1").module_id = "mod-gen-adapter"; } },
-    { name: "router node", mutate: (pf) => pf.nodes.push({ id: "r1", node_kind: "router", module_id: null }) },
     { name: "module_id-null function node", mutate: (pf) => pf.nodes.push({ id: "f1", node_kind: "function", module_id: null }) },
-    { name: "route edge", mutate: (pf) => { pf.edges[0].edge_kind = "route"; } },
     { name: "conditional edge", mutate: (pf) => { pf.edges[0].execution_semantics = "conditional"; } },
     { name: "remote boundary edge", mutate: (pf) => { pf.edges[0].is_remote_boundary_crossing = true; } },
     { name: "input->output passthrough", mutate: (pf) => pf.edges.push({ from: "in1", to: "out1", edge_kind: "event_output", execution_semantics: "normal_transition" }) },

@@ -598,6 +598,7 @@ export interface ScaffoldPlanGraph {
 
 export interface ScaffoldPlan {
   requirement_id: string;
+  package_name?: string;
   source: "approved_workbench_artifact";
   raw_requirement_to_code: false;
   /** Defaults to `smoke`. Drives `no_runnable_business_logic` and `scaffold_output` semantics. */

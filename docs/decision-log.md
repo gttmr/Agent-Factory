@@ -27,6 +27,18 @@
 - **배경**: 직전 PR이 decision-log에는 탭 변경을 기록했으나 `CLAUDE.md`·`docs/visualization/design-system.md`(권위 UI 스펙, 파일 내부 모순)·`docs/onboarding/06-review-board.html`는 제거된 `Graph IR/경로/Comments` 탭을 현재 기능으로 안내했다. 또한 두 node:test 회귀가 어떤 표준 러너에도 연결돼 있지 않아 조용히 썩을 수 있었다.
 - **영향**: `CLAUDE.md`, `docs/visualization/design-system.md`, `docs/onboarding/06-review-board.html`, `docs/workbench/taxonomy.md`(legacy node_kind alias 한 줄), `packages/web/package.json`(test:analyzer), `ReviewNotesPanel.tsx`→`reviewNotesModel.ts`(순수 helper 추출), `DesignWorkbench.tsx`(badge helper 사용).
 
+## 2026-06-21 · 작업 브랜치 `feat/wf-page-recommendation-scenario` (PR #39) — page recommendation 시나리오 + 제너레이터 도메인-중립화
+
+### Static user-confirmation route lowering and explicit package names
+- **결정**: Runnable ADK source generator가 reviewed `router` node와 `edge_kind: route`/`execution_semantics: conditional` edge를 ADK `Event(route=...)` 함수와 Workflow route map으로 lower한다. 이 support는 static user-confirmation branch에 한정하며, loop/dynamic workflow codegen은 계속 후속으로 남긴다. `scaffold-plan.json`에는 optional `package_name`을 허용해 승인된 fixture가 생성 package 이름을 명시할 수 있게 한다.
+- **배경**: `1-1 페이지 추천(필수)` smoke skeleton은 “추가 분석 실행 여부”를 사용자가 직접 선택한 뒤 분석 fan-out 또는 최종 확인으로 분기해야 한다. 기존 `req_*_adk` 자동 이름은 요구된 `wf_page_recommendation_required` bundle 이름을 만들 수 없었다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/validate-artifacts.mjs`, `schemas/scaffold-plan.schema.json`, `packages/web/src/analyzer/types.ts`, `templates/regression-scenarios/wf-page-recommendation-required/`, `docs/workbench/validation.md`, `docs/workbench/workflow-decision-guide.md`.
+
+### 제너레이터 도메인-중립화: 하드코딩된 샘플 출력 제거
+- **결정**: ADK source generator의 샘플 출력은 (구조/보일러플레이트) + (승인 아티팩트에서 읽은 값)만 emit한다. 특정 요구사항(은행/페이지 추천) 문자열을 리터럴로 박지 않는다. 죽은 `WORKFLOW_INSTRUCTION` 상수를 제거하고, `sampleConversationMessages()`를 아티팩트 유도형(목적·human-input 노드·종료 노드·미확정 workflow)으로 재작성하며, README mock 슬러그는 mock-spec `mock_id`에서 유도한다. 도메인-중립 fixture에 generator-authored 도메인 리터럴이 새지 않는지 회귀 가드로 강제한다.
+- **배경**: page-recommendation 시나리오 추가 작업에서 시나리오 특화 내용이 데이터가 아니라 generator 리터럴로 들어가, 모든 요구사항의 생성물에 누수됐다(`agent.py`, `sample_inputs.yaml`, README). 빈 placeholder보다 위험한 "그럴듯하지만 틀린" 산출물이었다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/generate-adk-source.test.mjs`(도메인-중립 회귀 가드).
+
 ## 2026-06-20 · 작업 브랜치 `codex/taxonomy-graph-model-correction` — Workflow-first Graph Model 축 정정
 
 ### Workflow-first Graph Model과 호출 축 분리

@@ -1,0 +1,285 @@
+{
+  "mock_id": "wf-page-recommendation-mock",
+  "server_name": "WF Page Recommendation Mock Server",
+  "protocol": "mcp_stdio",
+  "description": "1-1 페이지 추천 Workflow의 ADK Web smoke test용 synthetic MCP mock server입니다.",
+  "source": {
+    "prefill_from_catalog": false,
+    "catalog_entry_name": null,
+    "catalog_file": null
+  },
+  "tools": [
+    {
+      "name": "search_page_candidates",
+      "title": "Search Page Candidates",
+      "description": "Synthetic Page Metadata RAG 결과를 반환합니다.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objective_text": { "type": "string", "minLength": 1 },
+          "product_hint": { "type": "string", "minLength": 1 },
+          "journey_stage": { "type": "string", "minLength": 1 },
+          "event_type": { "type": "string", "minLength": 1 },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["objective_text", "product_hint", "journey_stage", "event_type", "keywords"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": { "type": "boolean" },
+          "source": { "type": "string" },
+          "page_candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": { "type": "string" },
+                "page_group_id": { "type": "string" },
+                "page_name": { "type": "string" },
+                "matched_reason": { "type": "string" },
+                "rag_score": { "type": "number" }
+              },
+              "required": ["page_id", "page_group_id", "page_name", "matched_reason", "rag_score"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["synthetic", "source", "page_candidates"],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "page_candidates": [
+          {
+            "page_id": "PAGE_B",
+            "page_group_id": "GROUP_B",
+            "page_name": "적금 가입 입력",
+            "matched_reason": "가입 과정 이탈 구간 후보",
+            "rag_score": 0.82
+          },
+          {
+            "page_id": "PAGE_C",
+            "page_group_id": "GROUP_C",
+            "page_name": "가입 완료 전 확인",
+            "matched_reason": "전환 직전 이탈 가능 구간",
+            "rag_score": 0.76
+          }
+        ]
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": ["customer_impact", "audit_required"],
+      "auditRequired": true
+    },
+    {
+      "name": "run_userflow_analysis",
+      "title": "Run UserFlow Analysis",
+      "description": "Synthetic UserFlow 분석 결과를 반환합니다.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selected_page_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "selected_page_group_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "objective_text": { "type": "string", "minLength": 1 }
+        },
+        "required": ["selected_page_ids", "selected_page_group_ids", "objective_text"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": { "type": "boolean" },
+          "source": { "type": "string" },
+          "funnel_dropoff_pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": { "type": "string" },
+                "page_group_id": { "type": "string" },
+                "dropoff_rate": { "type": "number" },
+                "reason": { "type": "string" }
+              },
+              "required": ["page_id", "page_group_id", "dropoff_rate", "reason"],
+              "additionalProperties": false
+            }
+          },
+          "major_previous_pages": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "major_next_pages": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "insight": { "type": "string" }
+        },
+        "required": ["synthetic", "source", "funnel_dropoff_pages", "major_previous_pages", "major_next_pages", "insight"],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "funnel_dropoff_pages": [
+          {
+            "page_id": "PAGE_B",
+            "page_group_id": "GROUP_B",
+            "dropoff_rate": 0.42,
+            "reason": "가입 입력 단계 이탈률 높음"
+          }
+        ],
+        "major_previous_pages": ["PAGE_A"],
+        "major_next_pages": ["PAGE_D"],
+        "insight": "PAGE_B가 가입 과정 이탈 고객 푸시 대상 선정에 가장 직접적임"
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": ["customer_impact", "audit_required"],
+      "auditRequired": true
+    },
+    {
+      "name": "recommend_scenario_by_behavior_type",
+      "title": "Recommend Scenario By Behavior Type",
+      "description": "Synthetic 행동 유형 기반 시나리오 추천 결과를 반환합니다.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objective_text": { "type": "string", "minLength": 1 },
+          "selected_page_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "selected_page_group_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "customer_behavior_hint": { "type": "string", "minLength": 1 }
+        },
+        "required": ["objective_text", "selected_page_ids", "selected_page_group_ids", "customer_behavior_hint"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": { "type": "boolean" },
+          "source": { "type": "string" },
+          "recommended_scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario_id": { "type": "string" },
+                "scenario_name": { "type": "string" },
+                "related_page_group_id": { "type": "string" },
+                "score": { "type": "number" },
+                "basis": { "type": "string" }
+              },
+              "required": ["scenario_id", "scenario_name", "related_page_group_id", "score", "basis"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["synthetic", "source", "recommended_scenarios"],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "recommended_scenarios": [
+          {
+            "scenario_id": "SCN_SAVINGS_DROPOFF_001",
+            "scenario_name": "적금 가입 중단 고객 재유도",
+            "related_page_group_id": "GROUP_B",
+            "score": 0.88,
+            "basis": "행동유형 기반 추천 mock"
+          }
+        ]
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": ["customer_impact", "audit_required"],
+      "auditRequired": true
+    },
+    {
+      "name": "analyze_page_customer_relation",
+      "title": "Analyze Page Customer Relation",
+      "description": "Synthetic T2S/Page-Customer 관계 분석 결과를 반환합니다.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selected_page_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "selected_page_group_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "objective_text": { "type": "string", "minLength": 1 }
+        },
+        "required": ["selected_page_ids", "selected_page_group_ids", "objective_text"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": { "type": "boolean" },
+          "source": { "type": "string" },
+          "page_customer_relations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_group_id": { "type": "string" },
+                "target_customer_count": { "type": "integer" },
+                "signal": { "type": "string" },
+                "recommendation_score": { "type": "number" }
+              },
+              "required": ["page_group_id", "target_customer_count", "signal", "recommendation_score"],
+              "additionalProperties": false
+            }
+          },
+          "insight": { "type": "string" }
+        },
+        "required": ["synthetic", "source", "page_customer_relations", "insight"],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "page_customer_relations": [
+          {
+            "page_group_id": "GROUP_B",
+            "target_customer_count": 5634,
+            "signal": "high_dropoff",
+            "recommendation_score": 0.91
+          }
+        ],
+        "insight": "GROUP_B는 고객 규모와 이탈 신호 기준에서 우선 후보"
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": ["customer_impact", "audit_required"],
+      "auditRequired": true
+    }
+  ],
+  "guardrails": {
+    "synthetic_only": true,
+    "no_private_data": true,
+    "no_private_endpoint": true,
+    "no_credentials": true,
+    "no_production_business_logic": true
+  }
+}

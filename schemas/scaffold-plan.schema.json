@@ -10,6 +10,11 @@
       "type": "string",
       "pattern": "^req-[a-z0-9-]+$"
     },
+    "package_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "Optional explicit Python package directory name for generated ADK skeletons."
+    },
     "source": {
       "type": "string",
       "const": "approved_workbench_artifact"

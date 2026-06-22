@@ -1141,6 +1141,9 @@ function validateScaffoldPlan(dir = root) {
   if (plan.raw_requirement_to_code !== false) {
     errors.push("scaffold plan must explicitly set raw_requirement_to_code to false.");
   }
+  if (plan.package_name !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(plan.package_name)) {
+    errors.push("scaffold plan package_name must be a valid ASCII Python package identifier.");
+  }
   // Absent output_mode is treated as smoke (fail-closed): smoke keeps the strict
   // no-runnable-logic rules; runnable allows reviewed synthetic wiring. The
   // raw_requirement_to_code / source invariants above hold in BOTH modes.

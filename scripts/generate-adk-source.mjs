@@ -11,6 +11,7 @@ const normalizedRequirement = readOptionalJson("normalized-requirement.json") ??
 const processFlow = readOptionalJson("process-flow.json") ?? analysisResult?.processFlow;
 const moduleCandidates = readOptionalJson("module-candidates.json") ?? analysisResult?.moduleCandidates ?? null;
 const runManifest = readOptionalJson("af-run-manifest.json");
+const mockLabSpec = readOptionalJson("mock-lab/mock-spec.json");
 const scaffoldPlan = readJson("scaffold-plan.json", "scaffold-plan.template.json");
 
 if (!normalizedRequirement || typeof normalizedRequirement !== "object") {
@@ -37,7 +38,7 @@ if (scaffoldPlan.validation?.can_generate_source === false) {
 }
 validateRunInputs();
 
-const packageName = `${toPythonIdentifier(normalizedRequirement.id || scaffoldPlan.requirement_id || "agent_factory_workflow")}_adk`;
+const packageName = scaffoldPackageName();
 const connectedAdapters = modules.filter((module) => adapterConnection(module) === "mcp_connected");
 const unconnectedAdapters = modules.filter((module) => adapterConnection(module) === "unconnected");
 const files = buildFiles();
@@ -83,9 +84,11 @@ function buildFiles() {
     [`${packageName}/schemas.py`]: buildSchemasPy(),
     [`${packageName}/mock_config.yaml`]: buildMockConfigYaml(),
     [`${packageName}/sample_inputs.yaml`]: buildSampleInputsYaml(),
+    [`${packageName}/README.md`]: buildReadme(),
     [`${packageName}/nodes/__init__.py`]: "",
     [`${packageName}/nodes/agents.py`]: buildNodeHelperPy("agents"),
     [`${packageName}/nodes/adapters.py`]: buildNodeHelperPy("adapters"),
+    [`${packageName}/nodes/gates.py`]: buildNodeHelperPy("gates"),
     [`${packageName}/nodes/human_inputs.py`]: buildNodeHelperPy("human_inputs"),
     [`${packageName}/nodes/routers.py`]: buildNodeHelperPy("routers"),
     [`${packageName}/nodes/workflow_calls.py`]: buildWorkflowCallsPy(),
@@ -250,9 +253,10 @@ function buildRunnableAgentPy() {
   const graph = graphIndexes();
   const orderedModules = orderedGraphModules();
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
+  const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
   const autoJoins = joins.filter((join) => join.explicit === false);
-  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...explicitJoinNodes, ...autoJoins]);
+  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
   const nodeBlocks = [];
   const funcBlocks = [];
 
@@ -269,6 +273,7 @@ function buildRunnableAgentPy() {
     connected_adapter: { emitFunc: emitConnectedAdapterFunc, emitDecl: emitFunctionNodeDecl },
     stub_function: { emitFunc: emitStubFunc, emitDecl: emitFunctionNodeDecl },
     human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl },
+    router: { emitFunc: emitRouteFunc, emitDecl: emitRouterNodeDecl },
     remote_a2a: { emitFunc: () => null, emitDecl: emitRemoteA2aNode }
   };
   const emitNode = (role, target) => {
@@ -281,9 +286,10 @@ function buildRunnableAgentPy() {
 
   for (const module of orderedModules) emitNode(moduleLoweringRole(module), module);
   for (const node of humanInputNodes) emitNode("human_input", node);
+  for (const node of routerNodes) emitNode("router", node);
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
-  const edgeLiteral = `[\n${edges.map(([s, t]) => `        (${s}, ${t}),`).join("\n")}\n    ]`;
+  const edgeLiteral = workflowEdgeLiteral(edges);
   const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.1 워크플로우입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
@@ -292,11 +298,13 @@ function buildRunnableAgentPy() {
   // (wrap as a Part); Remote A2A nodes need RemoteA2aAgent. Gated so bundles
   // without those features keep an unchanged import block.
   const usesArtifacts = usesArtifactChannels();
+  const usesRouteNodes = usesRoutes();
   const artifactStdlibImport = usesArtifacts ? "import json\n" : "";
   const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a()
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
+  const eventImport = usesRouteNodes ? "Event, RequestInput" : "RequestInput";
 
   return `from __future__ import annotations
 
@@ -308,7 +316,7 @@ import yaml
 
 from google.adk import Context
 from google.adk.agents import LlmAgent
-${remoteImport}from google.adk.events import RequestInput
+${remoteImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 ${artifactGenaiImport}
 
@@ -372,7 +380,8 @@ def _load_central_runtime_env() -> None:
     if not path.exists():
         return
     for key, value in _parse_runtime_env(path.read_text(encoding="utf-8")).items():
-        os.environ[key] = value
+        if key not in os.environ:
+            os.environ[key] = value
 
 
 _load_central_runtime_env()
@@ -552,6 +561,29 @@ function emitHumanInputNodeDecl(node) {
   return `${syntheticNodeSymbol(node)} = FunctionNode(func=${hitlFuncName(node)}, name=${toPyStr(pyGraphNodeName(node))})`;
 }
 
+function emitRouteFunc(node) {
+  const routeCases = routeCasesFor(node.id);
+  if (routeCases.length === 0) {
+    throw new Error(`router node ${node.id} has no route edges.`);
+  }
+  const checks = routeCases
+    .map(({ value, aliases }) => {
+      const aliasLiteral = toPythonLiteral(aliases);
+      return `    if any(alias and alias in text for alias in ${aliasLiteral}):
+        return Event(route=${toPyStr(value)})`;
+    })
+    .join("\n");
+  const fallback = routeCases.find((route) => route.value.includes("skip")) ?? routeCases[0];
+  return `def ${routeFuncName(node)}(node_input=None):
+    text = str(node_input or "").strip().lower()
+${checks}
+    return Event(route=${toPyStr(fallback.value)})`;
+}
+
+function emitRouterNodeDecl(node) {
+  return `${syntheticNodeSymbol(node)} = FunctionNode(func=${routeFuncName(node)}, name=${toPyStr(pyGraphNodeName(node))})`;
+}
+
 function emitStubFunc(module) {
   const kindNote =
     module.module_category === "workflow"
@@ -725,8 +757,9 @@ function buildNodeHelperPy(kind) {
   const note = {
     agents: "Agent node instructions are emitted in agent.py as LlmAgent declarations.",
     adapters: "Adapter stubs call Mock Lab only when mock_binding is linked; replace with real EAI/API clients manually.",
+    gates: "User confirmation gates are modeled with RequestInput nodes and reviewed router route edges.",
     human_inputs: "Human input nodes are RequestInput placeholders for ADK Web smoke tests.",
-    routers: "Router/business branching is not auto-generated in this skeleton scope.",
+    routers: "Reviewed router nodes lower route edges into ADK Workflow route functions.",
   }[kind];
   return `"""${note}"""
 
@@ -790,7 +823,8 @@ function buildMockConfigYaml() {
 }
 
 function buildSampleInputsYaml() {
-  const lines = ["samples:"];
+  const lines = buildWorkflowChatSampleYaml();
+  lines.push("samples:");
   let count = 0;
   for (const module of modules) {
     const inputs = module.smoke_spec?.synthetic_inputs;
@@ -810,6 +844,104 @@ function buildSampleInputsYaml() {
     lines.push(`      user_request: ${yamlScalar(firstSmokeSample() || "ADK Web smoke test sample")}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+function buildWorkflowChatSampleYaml() {
+  const sampleText =
+    firstSmokeSample() || `${normalizedRequirement.title || packageName} 워크플로우를 합성 sample input으로 실행하세요.`;
+  const lines = ["workflow_chat_smoke:", `  initial_user_message: ${yamlScalar(sampleText)}`];
+  const replies = humanInputSamples();
+  if (replies.length) {
+    lines.push("  operator_replies:");
+    for (const reply of replies) {
+      lines.push(`    - prompt: ${yamlScalar(reply.prompt)}`);
+      lines.push(`      response: ${yamlScalar(reply.response)}`);
+    }
+  }
+  lines.push("  conversation:");
+  for (const message of sampleConversationMessages()) {
+    lines.push(`    - role: ${yamlScalar(message.role)}`);
+    lines.push(`      text: ${yamlScalar(message.text)}`);
+  }
+  lines.push(`  expected_checkpoint: ${yamlScalar("reviewed synthetic sample reaches the generated output or handoff node")}`);
+  const unresolvedWorkflow = firstWorkflowPlaceholder();
+  if (unresolvedWorkflow) {
+    lines.push("  unresolved_followup:");
+    lines.push(`    workflow_ref: ${yamlScalar(unresolvedWorkflow)}`);
+    lines.push(`    status: ${yamlScalar("placeholder_only")}`);
+  }
+  lines.push("");
+  return lines;
+}
+
+function humanInputSamples() {
+  return (Array.isArray(processFlow.nodes) ? processFlow.nodes : [])
+    .filter((node) => node?.node_kind === "human_input")
+    .map((node, index) => ({
+      prompt: typeof node.label === "string" && node.label.trim() ? node.label.trim() : node.id,
+      response: suggestedHumanInputReply(node, index),
+    }));
+}
+
+function suggestedHumanInputReply(node, index) {
+  const label = typeof node.label === "string" ? node.label : "";
+  if (/분석/.test(label) && /(수행|실행|1)/.test(label)) return "1";
+  if (/목적|시나리오/.test(label)) return inferredPurposeText();
+  return index === 0 ? firstSmokeSample() || "확인" : "확인";
+}
+
+function inferredPurposeText() {
+  for (const module of modules) {
+    const inputs = module.smoke_spec?.synthetic_inputs;
+    if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) continue;
+    const objective = inputs.objective_text ?? inputs.user_request ?? inputs.request_text;
+    if (typeof objective === "string" && objective.trim()) return objective.trim();
+  }
+  return firstSmokeSample() || "확인";
+}
+
+function firstWorkflowPlaceholder() {
+  const workflow = modules.find((module) => module.module_category === "workflow" && module.workflow_ref);
+  if (!workflow) return "";
+  return workflow.workflow_ref?.display_name || workflow.workflow_ref?.id || workflow.name || workflow.id || "";
+}
+
+// Generic, artifact-derived sample transcript. Walks the approved process flow
+// (objective → human-input turns → terminal outputs) and stays domain-neutral —
+// no requirement-specific narration is baked into the generator.
+function sampleConversationMessages() {
+  const objective = inferredPurposeText();
+  const messages = [
+    {
+      role: "User",
+      text: firstSmokeSample() || `${objective} 합성 sample 실행`,
+    },
+    {
+      role: "Assistant",
+      text: [
+        "검토된 합성 입력으로 진행합니다.",
+        `- 목적: ${objective}`,
+        "이 응답은 검토된 합성 테스트 더블만 사용하며 실제 업무 로직이 아닙니다.",
+      ].join("\n"),
+    },
+  ];
+  for (const reply of humanInputSamples()) {
+    messages.push({ role: "Assistant", text: reply.prompt });
+    messages.push({ role: "User", text: reply.response });
+  }
+  const summary = ["합성 실행을 완료했습니다."];
+  const terminals = terminalOutputIds();
+  if (terminals.length) summary.push(`- 최종 출력 노드: ${terminals.join(", ")}`);
+  const unresolved = firstWorkflowPlaceholder();
+  if (unresolved) summary.push(`- 미확정 후속 workflow: ${unresolved} (placeholder_only)`);
+  messages.push({ role: "Assistant", text: summary.join("\n") });
+  return messages;
+}
+
+function sampleConversationTranscript() {
+  return sampleConversationMessages()
+    .map((message) => `${message.role}:\n${message.text}`)
+    .join("\n\n");
 }
 
 function buildEnvExample() {
@@ -1027,6 +1159,8 @@ def test_runtime_chat_smoke_contract_is_present():
 }
 
 function buildReadme() {
+  const runtimeEnvPath = runtimeEnvRelativePath();
+  const runtimeEnvDir = posixDirname(runtimeEnvPath);
   if (outputMode === "runnable") {
     return `# ${packageName}
 
@@ -1036,8 +1170,8 @@ ${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 r
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-mkdir -p ../../../../.agent-factory
-cp .env.example ../../../../.agent-factory/runtime.env
+mkdir -p ${runtimeEnvDir}
+cp .env.example ${runtimeEnvPath}
 python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
@@ -1057,6 +1191,10 @@ python -m pytest -q
 \`.env.example\`을 repository root의 \`.agent-factory/runtime.env\`로 복사하고 공유 runtime secret은 그 파일에 둡니다.
 \`AF_RUNTIME_ENV_FILE\`로 다른 파일을 지정할 수도 있습니다. 각 \`runtime-stub\`마다 \`GOOGLE_API_KEY\`를 반복해서 넣지 마세요.
 
+${buildMockLabRunMarkdown()}
+
+${buildSampleDialogueMarkdown()}
+
 ## Adapter와 Mock Lab
 
 연결된 adapter는 streamable-HTTP로 실행 중인 Mock Lab MCP tool을 호출합니다
@@ -1065,10 +1203,12 @@ python -m pytest -q
 Mock Lab server가 binding/running 상태가 아닌 adapter는 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
 \`workflow_manifest.json\`의 \`runtime.unconnected_adapters\`에 표시됩니다.
 
-## ADK runtime chat
+## ADK Web
 
 \`\`\`bash
-adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
+AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
+adk web --host 127.0.0.1 --port 8765 --no-reload .
 curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
 curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
 \`\`\`
@@ -1099,6 +1239,52 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 `;
 }
 
+function runtimeEnvRelativePath() {
+  return relative(outputRoot, join(process.cwd(), ".agent-factory", "runtime.env")).replace(/\\/g, "/");
+}
+
+function posixDirname(path) {
+  const segments = String(path).split("/");
+  segments.pop();
+  return segments.length ? segments.join("/") : ".";
+}
+
+function mockSpecRelativePath() {
+  return relative(outputRoot, join(artifactRoot, "mock-lab", "mock-spec.json")).replace(/\\/g, "/");
+}
+
+function buildSampleDialogueMarkdown() {
+  return ["## Sample ADK Web messages", "", "```text", sampleConversationTranscript(), "```"].join("\n");
+}
+
+function buildMockLabRunMarkdown() {
+  const mockId = mockLabSpec?.mock_id || "<mock-id>";
+  return `## Mock Lab MCP server
+
+From the repo root, start the existing Mock Lab package on its fixed standalone port and run the saved spec:
+
+\`\`\`bash
+npm run dev --prefix packages/mock-lab -- --host 0.0.0.0 --port 5176 --strictPort
+curl -X POST http://127.0.0.1:5176/api/mock-lab/${mockId}/server/start
+curl 'http://127.0.0.1:5176/api/mock-lab/mcp-discovery?server=${mockId}'
+\`\`\`
+
+Then run ADK Web from this generated output root with the standalone Mock Lab URL explicit, so it wins over any central runtime default:
+
+\`\`\`bash
+AF_RUNTIME_ENV_FILE=${runtimeEnvRelativePath()} \\
+AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
+adk web --host 127.0.0.1 --port 8765 --no-reload .
+\`\`\`
+
+Direct stdio smoke for the same saved spec:
+
+\`\`\`bash
+AFML_MOCK_SPEC=$PWD/${mockSpecRelativePath()} \\
+npm run mcp:stdio --prefix ../../packages/mock-lab
+\`\`\``;
+}
+
 function buildRuntimeChatSmoke() {
   const sample = firstSmokeSample();
   const text =
@@ -1116,6 +1302,17 @@ function buildRuntimeChatSmoke() {
       parts: [{ text }]
     }
   };
+}
+
+function scaffoldPackageName() {
+  const explicit = typeof scaffoldPlan.package_name === "string" ? scaffoldPlan.package_name.trim() : "";
+  if (explicit) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(explicit)) {
+      throw new Error("scaffold-plan.json package_name must be a valid ASCII Python package identifier.");
+    }
+    return explicit;
+  }
+  return `${toPythonIdentifier(normalizedRequirement.id || scaffoldPlan.requirement_id || "agent_factory_workflow")}_adk`;
 }
 
 function firstSmokeSample() {
@@ -1482,18 +1679,26 @@ function buildRunnableGraph() {
       return nodeSymbol(graph.moduleById.get(node.module_id));
     }
     if (side === "from" && node.node_kind === "input") return "START";
-    if (node.node_kind === "human_input" || node.node_kind === "join") return syntheticNodeSymbol(node);
+    if (node.node_kind === "human_input" || node.node_kind === "join" || node.node_kind === "router") {
+      return syntheticNodeSymbol(node);
+    }
     return null; // output nodes (terminal markers) and unknowns are dropped
   };
 
   const baseEdges = [];
+  const routeEdgesBySource = new Map();
   const seen = new Set();
-  const add = (from, to) => {
+  const add = (from, to, edge = {}) => {
     if (!from || !to || from === to) return;
     const key = `${from}->${to}`;
     if (seen.has(key)) return;
     seen.add(key);
-    baseEdges.push([from, to]);
+    baseEdges.push({
+      from,
+      to,
+      fanIn: edge.execution_semantics === "fan_in" || edge.flow_kind === "fan_in",
+      route: edge.edge_kind === "route"
+    });
   };
 
   if (Array.isArray(processFlow.edges)) {
@@ -1505,12 +1710,20 @@ function buildRunnableGraph() {
           `runnable mode does not support self-loop/loop Graph IR yet (node ${from}). Use smoke mode or wait for loop lowering.`
         );
       }
-      add(from, to);
+      if (edge.edge_kind === "route") {
+        if (from && to) {
+          if (!routeEdgesBySource.has(from)) routeEdgesBySource.set(from, []);
+          routeEdgesBySource.get(from).push({ value: routeValue(edge), target: to });
+        }
+        add(from, to, edge);
+        continue;
+      }
+      add(from, to, edge);
     }
   }
 
   // Every module node must be reachable from START.
-  const incoming = new Set(baseEdges.map(([, to]) => to));
+  const incoming = new Set(baseEdges.map((edge) => edge.to));
   for (const node of graph.moduleNodes) {
     const sym = nodeSymbol(graph.moduleById.get(node.module_id));
     if (!incoming.has(sym)) add("START", sym);
@@ -1518,9 +1731,9 @@ function buildRunnableGraph() {
 
   // Fan-in: any target with >1 distinct predecessor gets a JoinNode.
   const sourcesByTarget = new Map();
-  for (const [from, to] of baseEdges) {
-    if (!sourcesByTarget.has(to)) sourcesByTarget.set(to, []);
-    sourcesByTarget.get(to).push(from);
+  for (const edge of baseEdges) {
+    if (!sourcesByTarget.has(edge.to)) sourcesByTarget.set(edge.to, []);
+    sourcesByTarget.get(edge.to).push(edge);
   }
   const joins = explicitJoinNodes.map((node) => ({
     sym: syntheticNodeSymbol(node),
@@ -1533,20 +1746,28 @@ function buildRunnableGraph() {
   let joinIndex = 0;
   for (const [target, sources] of sourcesByTarget) {
     // A target with >1 predecessor must fan in through a JoinNode so it waits for
-    // all of them. Suppress auto-join only when the target IS an explicit join
-    // node (it already is a JoinNode). An explicit join that feeds the target
-    // *alongside* other predecessors still needs an auto JoinNode wrapping every
-    // predecessor — otherwise the target could run without waiting for the others.
-    if (sources.length > 1 && !explicitJoinSymbols.has(target)) {
+    // all fan-in predecessors. Route branch convergence is different: only one
+    // route executes, so it must remain an ordinary multi-predecessor target.
+    if (sources.length > 1 && sources.some((edge) => edge.fanIn) && !explicitJoinSymbols.has(target)) {
       const joinSym = `join_${++joinIndex}`;
       joins.push({ sym: joinSym, name: joinSym, target, explicit: false });
-      for (const source of sources) finalEdges.push([source, joinSym]);
-      finalEdges.push([joinSym, target]);
+      for (const source of sources) finalEdges.push({ kind: "pair", from: source.from, to: joinSym });
+      finalEdges.push({ kind: "pair", from: joinSym, to: target });
       joined.add(target);
     }
   }
-  for (const [from, to] of baseEdges) {
-    if (!joined.has(to)) finalEdges.push([from, to]);
+  for (const edge of baseEdges) {
+    if (!joined.has(edge.to) && !edge.route) finalEdges.push({ kind: "pair", from: edge.from, to: edge.to });
+  }
+  for (const [from, routes] of routeEdgesBySource) {
+    const uniqueRoutes = [];
+    const seenRouteValues = new Set();
+    for (const route of routes) {
+      if (seenRouteValues.has(route.value)) continue;
+      seenRouteValues.add(route.value);
+      uniqueRoutes.push(route);
+    }
+    finalEdges.push({ kind: "route", from, routes: uniqueRoutes });
   }
 
   if (finalEdges.length === 0) {
@@ -1557,7 +1778,7 @@ function buildRunnableGraph() {
   // (human_input/join) get no START backfill, so a bare human_input/join with an
   // outgoing edge but no incoming path would otherwise produce an orphan branch.
   const adjacency = new Map();
-  for (const [from, to] of finalEdges) {
+  for (const [from, to] of runtimePairs(finalEdges)) {
     if (!adjacency.has(from)) adjacency.set(from, []);
     adjacency.get(from).push(to);
   }
@@ -1571,19 +1792,84 @@ function buildRunnableGraph() {
       }
     }
   }
-  const unreachable = [...new Set(finalEdges.flat())].filter((sym) => sym !== "START" && !reachable.has(sym));
+  const unreachable = [...new Set(runtimePairs(finalEdges).flat())].filter((sym) => sym !== "START" && !reachable.has(sym));
   if (unreachable.length > 0) {
     throw new Error(
       `runnable mode produced nodes unreachable from START: ${unreachable.join(", ")}. Ensure every node (incl. human_input/join) has an incoming path from an input node. Use smoke mode.`
     );
   }
-  assertAcyclic(finalEdges);
+  assertAcyclic(runtimePairs(finalEdges));
   return { edges: finalEdges, joins };
 }
 
-// Runnable v1 supports DAG + fan-out/fan-in only. A cycle (incl. one created by
-// a back-edge feeding a JoinNode, which would deadlock waiting on a successor)
-// is rejected with a clear error rather than emitting a broken/looping graph.
+function runtimePairs(edgeSpecs) {
+  const pairs = [];
+  for (const spec of edgeSpecs) {
+    if (spec.kind === "pair") {
+      pairs.push([spec.from, spec.to]);
+      continue;
+    }
+    if (spec.kind === "route") {
+      for (const route of spec.routes) pairs.push([spec.from, route.target]);
+    }
+  }
+  return pairs;
+}
+
+function workflowEdgeLiteral(edgeSpecs) {
+  if (!Array.isArray(edgeSpecs) || edgeSpecs.length === 0) return "[]";
+  const rows = edgeSpecs.map((spec) => {
+    if (spec.kind === "route") {
+      const routeRows = spec.routes.map((route) => `            ${toPyStr(route.value)}: ${route.target},`).join("\n");
+      return `        (${spec.from}, {\n${routeRows}\n        }),`;
+    }
+    return `        (${spec.from}, ${spec.to}),`;
+  });
+  return `[\n${rows.join("\n")}\n    ]`;
+}
+
+function usesRoutes() {
+  return (Array.isArray(processFlow.edges) ? processFlow.edges : []).some((edge) => edge?.edge_kind === "route");
+}
+
+function routeCasesFor(nodeId) {
+  const routes = [];
+  const seen = new Set();
+  for (const edge of Array.isArray(processFlow.edges) ? processFlow.edges : []) {
+    if (edge?.edge_kind !== "route" || edge.from !== nodeId) continue;
+    const value = routeValue(edge);
+    if (seen.has(value)) continue;
+    seen.add(value);
+    routes.push({ value, aliases: routeAliases(value) });
+  }
+  return routes;
+}
+
+function routeValue(edge) {
+  const condition = typeof edge?.route_condition === "string" ? edge.route_condition.trim() : "";
+  const match = /(?:choice|route|decision)\s*==\s*["']?([A-Za-z0-9_-]+)["']?/i.exec(condition);
+  if (match) return match[1];
+  if (/^[A-Za-z0-9_-]+$/.test(condition)) return condition;
+  return toPythonIdentifier(condition || edge?.id || "route").toLowerCase();
+}
+
+function routeAliases(value) {
+  const normalized = String(value).trim().toLowerCase();
+  const aliases = new Set([normalized, normalized.replace(/_/g, " ")]);
+  if (normalized === "run_analysis") {
+    aliases.add("분석 실행");
+    aliases.add("1");
+  }
+  if (normalized === "skip_analysis") {
+    aliases.add("분석 없이 진행");
+    aliases.add("2");
+  }
+  return [...aliases].filter(Boolean);
+}
+
+// Runnable v1 supports static DAGs plus reviewed route maps. A cycle (incl. one
+// created by a back-edge feeding a JoinNode, which would deadlock waiting on a
+// successor) is rejected with a clear error rather than emitting a broken loop.
 function assertAcyclic(edges) {
   const adjacency = new Map();
   const inDegree = new Map();
@@ -1619,16 +1905,16 @@ function assertAcyclic(edges) {
 }
 
 // Runnable lowering supports strict DAG Graph workflows: START fan-out, explicit
-// and auto fan-in joins, module-bound agent/adapter/workflow nodes, and
-// synthetic human-input nodes. Conditional routing, loops, and remote boundary
-// crossing are still rejected up front rather than mis-generated. (Sets are
-// declared inside the function to avoid a temporal-dead-zone with the top-level
-// buildFiles() call.)
+// and reviewed fan-in joins, module-bound agent/adapter/workflow nodes,
+// synthetic human-input nodes, and router route maps. Loops and unsupported
+// remote boundary crossing are still rejected up front rather than
+// mis-generated. (Sets are declared inside the function to avoid a
+// temporal-dead-zone with the top-level buildFiles() call.)
 function assertRunnableGraphSupported() {
   const unsupportedExecSemantics = new Set(["loop_back", "loop_exit", "conditional", "boundary_crossing"]);
   // remote_a2a is now lowered (RemoteA2aAgent node, gated per-edge + contract check);
   // remote_boundary is a visual grouping like parallel_region.
-  const unsupportedEdgeKinds = new Set(["route"]);
+  const unsupportedEdgeKinds = new Set([]);
   const unsupportedContainerKinds = new Set(["dynamic_workflow", "loop_region"]);
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
   const graph = graphIndexes();
@@ -1636,11 +1922,11 @@ function assertRunnableGraphSupported() {
   // synthetic human_input/join nodes, plus module-bound agent/adapter/workflow/
   // remote_a2a/remote_agent_call nodes. ANY other module_id-null node would be silently dropped by
   // resolve(), which would break graph connectivity, so reject it.
-  const allowedBareKinds = new Set(["input", "output", "human_input", "join"]);
-  // Router and loop-control nodes are NOT lowerable even if they carry a module_id,
-  // so deny them by kind before the module-bound check. (remote_a2a IS lowerable
-  // when module-bound — handled in the module branch + assertRemoteA2aSupported.)
-  const unlowerableNodeKinds = new Set(["router", "loop_control"]);
+  const allowedBareKinds = new Set(["input", "output", "human_input", "join", "router"]);
+  // Loop-control nodes are NOT lowerable even if they carry a module_id, so deny
+  // them by kind before the module-bound check. (remote_a2a IS lowerable when
+  // module-bound — handled in the module branch + assertRemoteA2aSupported.)
+  const unlowerableNodeKinds = new Set(["loop_control"]);
   const badNodes = [];
   for (const node of nodes) {
     if (!node) continue;
@@ -1670,7 +1956,7 @@ function assertRunnableGraphSupported() {
   }
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join, and module-bound agent/adapter/workflow/remote_a2a/remote_agent_call nodes (no router/loop-control or module_id-null intermediary nodes). Use smoke mode.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join/router, and module-bound agent/adapter/workflow/remote_a2a/remote_agent_call nodes (no loop-control or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
   // Containers are a separate top-level array in Graph IR, not a node field.
@@ -1680,7 +1966,7 @@ function assertRunnableGraphSupported() {
     .map((container) => `${container.id} (${container.container_kind})`);
   if (badContainers.length > 0) {
     throw new Error(
-      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. parallel_region and human_review_region are visual groupings only; use smoke mode or wait for loop/remote/dynamic lowering.`
+      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. parallel_region, human_review_region, and remote_boundary are visual groupings only; use smoke mode or wait for loop/dynamic lowering.`
     );
   }
   const edges = Array.isArray(processFlow.edges) ? processFlow.edges : [];
@@ -1702,6 +1988,16 @@ function assertRunnableGraphSupported() {
       // otherwise bypass the boundary gate — reject it.
       const touchesRemote = isRemoteAgentGraphNode(fromNode) || isRemoteAgentGraphNode(toNode);
       if (edge.edge_kind === "remote_a2a" && !touchesRemote) return true;
+      const isRouteEdge = edge.edge_kind === "route";
+      if (isRouteEdge) {
+        return (
+          fromNode.node_kind !== "router" ||
+          !edge.route_condition ||
+          edge.execution_semantics !== "conditional" ||
+          toNode.node_kind === "input" ||
+          fromNode.node_kind === "output"
+        );
+      }
       const isGenuineRemoteEdge = edge.edge_kind === "remote_a2a" && touchesRemote;
       if (
         !isGenuineRemoteEdge &&
@@ -1724,7 +2020,7 @@ function assertRunnableGraphSupported() {
     .map((edge) => `${edge.from}->${edge.to} (${edge.edge_kind}/${edge.execution_semantics})`);
   if (badEdges.length > 0) {
     throw new Error(
-      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Supported DAG edges include normal fan-out/fan-in transitions; use smoke mode or wait for route/loop/remote lowering.`
+      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Supported DAG edges include normal fan-out/fan-in transitions, reviewed router route edges, and genuine remote_a2a edges; use smoke mode or wait for loop/dynamic lowering.`
     );
   }
 }
@@ -1758,6 +2054,12 @@ function assertNoSymbolCollisions(orderedModules, syntheticNodes = []) {
       check(node.id, [
         ["node symbol", syntheticNodeSymbol(node)],
         ["function name", hitlFuncName(node)],
+        ["node name", pyGraphNodeName(node)]
+      ]);
+    } else if (node.node_kind === "router") {
+      check(node.id, [
+        ["node symbol", syntheticNodeSymbol(node)],
+        ["function name", routeFuncName(node)],
         ["node name", pyGraphNodeName(node)]
       ]);
     } else if (node.node_kind === "join" || node.explicit === true) {
@@ -2142,6 +2444,10 @@ function syntheticNodeSymbol(node) {
 
 function hitlFuncName(node) {
   return `_hitl_${toPythonIdentifier(node.id)}`;
+}
+
+function routeFuncName(node) {
+  return `_route_${toPythonIdentifier(node.id)}`;
 }
 
 function pyGraphNodeName(node) {
