@@ -433,3 +433,97 @@ const remoteAgentCallEdge = validateGraphIRSoft(
 );
 assert.equal(remoteAgentCallEdge.errors.filter((issue) => issue.code === "remote_missing_contract").length, 0);
 assert.equal(remoteAgentCallEdge.warnings.filter((issue) => issue.code === "remote_link_incoherent").length, 0);
+
+// Workflow-first invariant: LLM-selected MCP toolset semantics belong on an
+// agent decision node. An adapter_call carrying mcp_toolset / selected_by_llm
+// is rejected; the same semantics on an agent node are valid.
+const toolsetOnAdapter = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({
+        id: "node-toolset",
+        node_kind: "adapter_call",
+        module_id: "mod-toolset",
+        lane_id: "adapter",
+        invoke_binding: "mcp_toolset",
+        decision_owner: "llm",
+        call_control: "selected_by_llm"
+      }),
+      node({ id: "node-output", node_kind: "output", lane_id: "output" })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-toolset",
+        to: "node-output",
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
+      })
+    ]
+  )
+);
+assert.equal(
+  toolsetOnAdapter.errors.filter((issue) => issue.code === "llm_toolset_requires_agent_node").length,
+  1
+);
+
+const toolsetOnAgent = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({
+        id: "node-agent",
+        node_kind: "agent",
+        module_id: "mod-agent",
+        lane_id: "local_graph",
+        invoke_binding: "mcp_toolset",
+        decision_owner: "llm",
+        call_control: "selected_by_llm"
+      }),
+      node({ id: "node-output", node_kind: "output", lane_id: "output" })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-agent",
+        to: "node-output",
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
+      })
+    ]
+  )
+);
+assert.equal(
+  toolsetOnAgent.errors.filter((issue) => issue.code === "llm_toolset_requires_agent_node").length,
+  0
+);
+
+// `selected_by_llm` is agent-node ownership metadata, never edge control —
+// an edge carrying it is rejected too.
+const toolsetOnEdge = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({ id: "node-agent", node_kind: "agent", module_id: "mod-agent", lane_id: "local_graph" }),
+      node({ id: "node-output", node_kind: "output", lane_id: "output" })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-agent",
+        to: "node-output",
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        call_control: "selected_by_llm"
+      })
+    ]
+  )
+);
+assert.equal(
+  toolsetOnEdge.errors.filter((issue) => issue.code === "llm_toolset_requires_agent_node").length,
+  1
+);

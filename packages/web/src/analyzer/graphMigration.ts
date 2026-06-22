@@ -272,6 +272,7 @@ const SOFT_VALIDATION_CODES = new Set([
   "invalid_side_effect",
   "invalid_policy",
   "invalid_flow_kind",
+  "llm_toolset_requires_agent_node",
   "callback_wait_missing_control_metadata",
   "duplicate_node_id",
   "node_missing_module_id",
@@ -783,6 +784,17 @@ export function validateGraphIRSoft(
       errors
     );
     if (
+      (node.invoke_binding === "mcp_toolset" || node.call_control === "selected_by_llm") &&
+      node.node_kind !== "agent"
+    ) {
+      errors.push({
+        code: "llm_toolset_requires_agent_node",
+        message: `Node ${node.id} (${node.node_kind}) carries LLM-selected MCP toolset semantics; mcp_toolset / selected_by_llm belong on an agent decision node, while adapter_call must use mcp_tool + fixed_by_workflow.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (
       MODULE_FORBIDDEN_NODE_KIND_SET.has(node.node_kind) &&
       typeof node.module_id === "string" &&
       node.module_id.trim()
@@ -893,6 +905,14 @@ export function validateGraphIRSoft(
       edge.id ?? null,
       errors
     );
+    if (edge.call_control === "selected_by_llm") {
+      errors.push({
+        code: "llm_toolset_requires_agent_node",
+        message: `Edge ${edge.id ?? ""} has call_control selected_by_llm; LLM-selected toolset selection is agent node metadata (node_kind: agent), not edge metadata.`,
+        target_kind: "edge",
+        target_id: edge.id ?? null
+      });
+    }
     if (
       (edge.edge_kind === "session_state" ||
         edge.edge_kind === "temp_state" ||

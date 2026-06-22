@@ -82,6 +82,7 @@ export function buildScaffoldPlan({
       }))
   ];
   const blockers = collectBlockers(modules, deployableCandidates);
+  blockers.push(...collectRunnableDynamicBlockers(outputMode, modules, processFlow));
   const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
   blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
   const warnings = collectWarnings(modules, deployableCandidates, runtimeContracts);
@@ -540,6 +541,36 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
       return moduleBlockers;
     })
   ];
+}
+
+// Dynamic Workflow stays design/contract-only in this skeleton scope: the
+// runnable ADK generator (`assertRunnableGraphSupported`) rejects dynamic
+// workflow modules and `dynamic_workflow` containers. Mirror that rejection at
+// plan-validation time so `can_generate_source` never reports a runnable plan
+// the generator will then refuse — surface the workflow_call redirect instead.
+function collectRunnableDynamicBlockers(
+  outputMode: ScaffoldOutputMode,
+  modules: ScaffoldPlanModule[],
+  processFlow: ProcessFlow
+): string[] {
+  if (outputMode !== "runnable") return [];
+  const blockers: string[] = [];
+  for (const module of modules) {
+    if (module.module_category === "workflow" && module.workflow_kind === "dynamic") {
+      blockers.push(
+        `${module.name}: Dynamic Workflow는 runnable 생성 대상이 아닙니다. 하위 업무 Workflow로 분리하고 parent graph에서 workflow_call 노드로 조립하세요.`
+      );
+    }
+  }
+  const dynamicContainers = (processFlow?.containers ?? []).filter(
+    (container) => container?.container_kind === "dynamic_workflow"
+  );
+  if (dynamicContainers.length > 0) {
+    blockers.push(
+      `dynamic_workflow container ${dynamicContainers.length}개는 runnable 생성 대상이 아닙니다. design/contract container로 유지하고 동적 흐름은 workflow_call로 조립하세요.`
+    );
+  }
+  return blockers;
 }
 
 function collectRuntimeContractBlockers(contracts: RuntimeContract[]): string[] {

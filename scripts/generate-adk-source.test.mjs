@@ -386,7 +386,10 @@ test("runnable README uses an env file path relative to the generated output roo
     const outputRoot = join(artifactRoot, "runtime-stub");
     mkdirSync(artifactRoot, { recursive: true });
     writeFixture(artifactRoot, { runnable: true, connectedAdapter: true });
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    // Pin cwd to the repo root so runtimeEnvRelativePath() (which anchors on
+    // process.cwd()) is deterministic whether this runs standalone or via the
+    // packages/web `test:analyzer` runner.
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe", cwd: join(here, "..") });
 
     const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
     assert.match(readme, /AF_RUNTIME_ENV_FILE=\.\.\/\.\.\/\.\.\/\.\.\/\.agent-factory\/runtime\.env/);

@@ -309,9 +309,13 @@ const graphSemanticsPlan = buildScaffoldPlan({
         input_ports: [],
         output_ports: [],
         schema_refs: [],
-        invoke_binding: "mcp_toolset",
-        decision_owner: "llm",
-        call_control: "selected_by_llm",
+        // adapter_call is a fixed call node: mcp_tool + fixed_by_workflow.
+        // (LLM-selected toolset semantics — mcp_toolset / selected_by_llm —
+        // belong on an agent node and are rejected by the validator; covered in
+        // validate-artifacts.test.mjs and graphMigration.test.ts.)
+        invoke_binding: "mcp_tool",
+        decision_owner: "workflow_code",
+        call_control: "fixed_by_workflow",
         side_effect: "read",
         policy: "timeout_retry_required",
         review_status: "approved"
@@ -334,18 +338,18 @@ const graphSemanticsPlan = buildScaffoldPlan({
         a2a_contract_id: null,
         is_remote_boundary_crossing: false,
         flow_kind: "sequence",
-        call_control: "selected_by_llm"
+        call_control: "fixed_by_workflow"
       }
     ]
   },
   catalogEntries: [],
   outputMode: "runnable"
 });
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.invoke_binding, "mcp_toolset");
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.decision_owner, "llm");
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.call_control, "selected_by_llm");
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.invoke_binding, "mcp_tool");
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.decision_owner, "workflow_code");
+assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.call_control, "fixed_by_workflow");
 assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "sequence");
-assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "selected_by_llm");
+assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "fixed_by_workflow");
 
 const selectedToolsetPlan = buildScaffoldPlan({
   normalizedRequirement,
@@ -451,3 +455,64 @@ assert.ok(
   "root workflow's needs_info must not produce a scaffold blocker"
 );
 assert.equal(rootPlan.validation.can_generate_source, true, "plan with the root excluded and an approved child should be generatable");
+
+// --- dynamic workflow stays smoke-only: runnable plans block before generation ---
+// The runnable ADK generator rejects dynamic workflow modules and
+// `dynamic_workflow` containers. The scaffold plan must mirror that so the Build
+// gate (`can_generate_source`) never offers a runnable plan the generator refuses.
+const dynamicWorkflowCandidate = candidate({
+  id: "mod-dynamic-wf",
+  name: "이탈위험 동적 Workflow",
+  module_category: "workflow",
+  agent_kind: null,
+  workflow_kind: "dynamic"
+});
+const dynamicRunnablePlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [dynamicWorkflowCandidate],
+  processFlow: {
+    ...flow,
+    containers: [
+      {
+        id: "container-dynamic",
+        module_id: null,
+        label: "Dynamic region",
+        container_kind: "dynamic_workflow",
+        adk_mapping: null,
+        contains_node_ids: [],
+        entry_node_ids: [],
+        exit_node_ids: [],
+        layout_policy: "free",
+        parent_container_id: null
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.equal(
+  dynamicRunnablePlan.validation.can_generate_source,
+  false,
+  "runnable plan with a dynamic workflow module must not be generatable"
+);
+assert.ok(
+  dynamicRunnablePlan.validation.blockers.some((b) => b.includes("Dynamic Workflow") && b.includes("workflow_call")),
+  "dynamic workflow module should produce a workflow_call redirect blocker"
+);
+assert.ok(
+  dynamicRunnablePlan.validation.blockers.some((b) => b.includes("dynamic_workflow container")),
+  "dynamic_workflow container should produce a blocker"
+);
+
+// Smoke mode keeps dynamic workflows as a design/contract handoff — no dynamic blocker.
+const dynamicSmokePlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [dynamicWorkflowCandidate],
+  processFlow: flow,
+  catalogEntries: [],
+  outputMode: "smoke"
+});
+assert.ok(
+  dynamicSmokePlan.validation.blockers.every((b) => !b.includes("Dynamic Workflow")),
+  "smoke mode must not block a dynamic workflow handoff"
+);
