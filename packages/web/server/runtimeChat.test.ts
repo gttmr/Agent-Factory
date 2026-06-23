@@ -8,7 +8,8 @@ import {
   DEFAULT_ADK_CHAT_PORT,
   RuntimeChatManager,
   buildAdkServerCommand,
-  extractFinalTextFromAdkEvents
+  extractFinalTextFromAdkEvents,
+  resolveAdkRuntimeVenv
 } from "./runtimeChat.ts";
 
 const repoRoot = await mkdtemp(join(tmpdir(), "af-runtime-chat-"));
@@ -23,8 +24,6 @@ try {
     `${JSON.stringify({ package: "req_chat_adk" }, null, 2)}\n`,
     "utf8"
   );
-  await writeFile(join(stubDir, "requirements.txt"), "google-adk\npytest\n", "utf8");
-
   const statusPort = await getAvailablePort();
   const manager = new RuntimeChatManager({ repoRoot, store, port: statusPort });
   const status = await manager.status("req-chat");
@@ -34,12 +33,29 @@ try {
   assert.equal(status.host, "127.0.0.1");
   assert.equal(status.app_name, "req_chat_adk");
   assert.equal(status.installed, false);
+  assert.equal(status.install_supported, false);
+  assert.match(status.setup_hint, /requirements\/adk-runtime\.txt/);
   assert.equal(status.server.status, "stopped");
   assert.equal(status.api_base_url, `http://127.0.0.1:${statusPort}`);
   assert.equal(status.web_url, `http://127.0.0.1:${statusPort}`);
+  assert.equal(status.paths.venv, join(repoRoot, ".agent-factory/runtime/.venv"));
+  assert.equal(status.paths.python, join(repoRoot, ".agent-factory/runtime/.venv/bin/python"));
+  assert.equal(status.paths.adk, join(repoRoot, ".agent-factory/runtime/.venv/bin/adk"));
 
-  const command = buildAdkServerCommand({ stubDir, host: "127.0.0.1", port: 8765 });
-  assert.equal(command.command, join(stubDir, ".venv/bin/adk"));
+  const venv = resolveAdkRuntimeVenv({ repoRoot, platform: "linux", env: {} });
+  assert.equal(venv.venvDir, join(repoRoot, ".agent-factory/runtime/.venv"));
+  assert.equal(venv.pythonPath, join(repoRoot, ".agent-factory/runtime/.venv/bin/python"));
+  assert.equal(venv.adkPath, join(repoRoot, ".agent-factory/runtime/.venv/bin/adk"));
+  const winVenv = resolveAdkRuntimeVenv({
+    repoRoot,
+    platform: "win32",
+    env: { AF_ADK_VENV_DIR: "C:\\agent-factory\\adk-venv" }
+  });
+  assert.equal(winVenv.pythonPath, "C:\\agent-factory\\adk-venv\\Scripts\\python.exe");
+  assert.equal(winVenv.adkPath, "C:\\agent-factory\\adk-venv\\Scripts\\adk.exe");
+
+  const command = buildAdkServerCommand({ adkPath: venv.adkPath, host: "127.0.0.1", port: 8765 });
+  assert.equal(command.command, join(repoRoot, ".agent-factory/runtime/.venv/bin/adk"));
   assert.deepEqual(command.args, [
     "api_server",
     "--host",
@@ -64,16 +80,17 @@ try {
   await store.createRoot("req-adopt");
   const adoptPort = await getAvailablePort();
   const adoptStubDir = join(repoRoot, "artifacts/af/req-adopt/runtime-stub");
+  const sharedVenvDir = join(repoRoot, ".agent-factory/runtime/.venv");
   await mkdir(join(adoptStubDir, "req_adopt_adk"), { recursive: true });
-  await mkdir(join(adoptStubDir, ".venv/bin"), { recursive: true });
+  await mkdir(join(sharedVenvDir, "bin"), { recursive: true });
   await writeFile(
     join(adoptStubDir, "req_adopt_adk/workflow_manifest.json"),
     `${JSON.stringify({ package: "req_adopt_adk" }, null, 2)}\n`,
     "utf8"
   );
-  await writeFile(join(adoptStubDir, ".venv/bin/python"), "#!/bin/sh\nexit 0\n", "utf8");
+  await writeFile(join(sharedVenvDir, "bin/python"), "#!/bin/sh\nexit 0\n", "utf8");
   await writeFile(
-    join(adoptStubDir, ".venv/bin/adk"),
+    join(sharedVenvDir, "bin/adk"),
     [
       "#!/usr/bin/env node",
       "const http = require('node:http');",
@@ -88,8 +105,8 @@ try {
     ].join("\n"),
     "utf8"
   );
-  await chmod(join(adoptStubDir, ".venv/bin/python"), 0o755);
-  await chmod(join(adoptStubDir, ".venv/bin/adk"), 0o755);
+  await chmod(join(sharedVenvDir, "bin/python"), 0o755);
+  await chmod(join(sharedVenvDir, "bin/adk"), 0o755);
 
   const firstManager = new RuntimeChatManager({ repoRoot, store, port: adoptPort });
   const started = await firstManager.start("req-adopt");

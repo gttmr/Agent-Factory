@@ -76,7 +76,7 @@
             <div class="step-num">6</div>
             <div class="step-body">
               <h4>실행 — ADK 런타임 (게이트 없음)</h4>
-              <p><code>/af/:reqId/run</code>. <code>runtime-stub/</code>이 생성된 뒤 <code>runtime-stub/.venv</code>에 ADK dependency를 설치하고, 로컬 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며, ADK 공식 dev UI(채팅·세션·이벤트·트레이스)를 새 탭으로 <strong>링크</strong>한다. 워크벤치 자체 챗은 만들지 않고 ADK가 제공하는 UI를 그대로 쓴다(iframe 임베드 아님). 승인 게이트가 없는 보조 도구 화면이라 <code>afRunStageIds</code>에 들어가지 않는다.</p>
+              <p><code>/af/:reqId/run</code>. <code>runtime-stub/</code>이 생성된 뒤 공유 ADK venv(<code>.agent-factory/runtime/.venv</code> 또는 <code>AF_ADK_VENV_DIR</code>)의 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며, ADK 공식 dev UI(채팅·세션·이벤트·트레이스)를 새 탭으로 <strong>링크</strong>한다. 웹은 Python dependency를 설치하지 않고, 수동 설치 기준은 <code>requirements/adk-runtime.txt</code>다. 워크벤치 자체 챗은 만들지 않고 ADK가 제공하는 UI를 그대로 쓴다(iframe 임베드 아님). 승인 게이트가 없는 보조 도구 화면이라 <code>afRunStageIds</code>에 들어가지 않는다.</p>
             </div>
           </div>
           <div class="step">

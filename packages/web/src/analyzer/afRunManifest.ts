@@ -13,6 +13,12 @@ export interface AfRunStage {
   outputs: string[];
 }
 
+export interface AfStageRunCodexMetadata {
+  backend: "sdk" | "fake";
+  thread_id: string | null;
+  event_count: number;
+}
+
 export interface AfStageRunManifestEntry {
   latest_run_id: string;
   status: AfStageRunStatus;
@@ -22,6 +28,7 @@ export interface AfStageRunManifestEntry {
   model: string;
   output_artifacts: string[];
   last_error: string | null;
+  codex?: AfStageRunCodexMetadata;
 }
 
 export interface AfRunManifest {
@@ -172,7 +179,7 @@ function normalizeStageRunEntry(value: unknown): AfStageRunManifestEntry | null 
   const skillName = optionalString(value.skill_name);
   const model = optionalString(value.model);
   if (!latestRunId || !startedAt || !skillName || !model) return null;
-  return {
+  const entry: AfStageRunManifestEntry = {
     latest_run_id: latestRunId,
     status,
     started_at: startedAt,
@@ -183,6 +190,24 @@ function normalizeStageRunEntry(value: unknown): AfStageRunManifestEntry | null 
       ? value.output_artifacts.filter((item): item is string => typeof item === "string")
       : [],
     last_error: typeof value.last_error === "string" ? value.last_error : null
+  };
+  const codex = normalizeStageRunCodex(value.codex);
+  if (codex) entry.codex = codex;
+  return entry;
+}
+
+function normalizeStageRunCodex(value: unknown): AfStageRunCodexMetadata | undefined {
+  if (!isRecord(value)) return undefined;
+  const backend = value.backend === "sdk" || value.backend === "fake" ? value.backend : null;
+  if (!backend) return undefined;
+  const eventCount =
+    typeof value.event_count === "number" && Number.isInteger(value.event_count) && value.event_count >= 0
+      ? value.event_count
+      : 0;
+  return {
+    backend,
+    thread_id: typeof value.thread_id === "string" ? value.thread_id : null,
+    event_count: eventCount
   };
 }
 

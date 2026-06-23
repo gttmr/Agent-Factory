@@ -19,3 +19,4 @@ catalog/generated/
 catalog/local/
 catalog/**/*.local.*
 .agent-factory/runtime.env
+.agent-factory/runtime/

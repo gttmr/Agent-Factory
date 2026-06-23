@@ -107,14 +107,14 @@ export function useAnalyze(reqId: string | undefined) {
           setError(terminalEvent.message);
         } else {
           setStatus("failed");
-          setError("Codex CLI 가 종료 이벤트를 보내지 않고 스트림이 끊겼습니다.");
+          setError("Codex SDK 가 종료 이벤트를 보내지 않고 스트림이 끊겼습니다.");
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           setStatus("aborted");
           return;
         }
-        const message = err instanceof Error ? err.message : "Codex CLI 분석에 실패했습니다.";
+        const message = err instanceof Error ? err.message : "Codex SDK 분석에 실패했습니다.";
         setStatus("failed");
         setError(message);
       } finally {

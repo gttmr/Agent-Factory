@@ -51,13 +51,13 @@ Object.entries(files).forEach(([relativePath, content]) => {
 updateRunManifest();
 
 console.log(`ADK source generated from scaffold-plan.json (output_mode=${outputMode}): ${join(outputRoot, packageName)}`);
-console.log(`Run from ${outputRoot}:`);
-console.log("  python3 -m venv .venv");
-console.log("  source .venv/bin/activate");
-console.log("  pip install -r requirements.txt");
+console.log("Prepare the shared ADK runtime from the repository root:");
+console.log("  python3 -m venv .agent-factory/runtime/.venv");
+console.log("  .agent-factory/runtime/.venv/bin/python -m pip install -r requirements/adk-runtime.txt");
 if (outputMode === "runnable") {
   console.log("  # .env.example을 <repo>/.agent-factory/runtime.env로 복사하고 GOOGLE_API_KEY를 그 파일에 설정하세요");
 }
+console.log(`Run checks from ${outputRoot}:`);
 console.log(`  python -m compileall ${packageName}`);
 console.log("  python -m pytest -q");
 
@@ -96,7 +96,6 @@ function buildFiles() {
     "scaffold-plan.json": `${JSON.stringify(scaffoldPlan, null, 2)}\n`,
     "implementation-handoff.md": buildImplementationHandoff(),
     "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(), null, 2)}\n`,
-    "requirements.txt": buildRequirements(),
     // tests live INSIDE the agent package so the ADK agents_dir (the bundle
     // root) has only the package as a non-dot subdir. Otherwise `adk
     // api_server` scans a sibling `tests/` as an app and the dev UI errors
@@ -1073,17 +1072,6 @@ function buildManifest() {
   };
 }
 
-function buildRequirements() {
-  if (outputMode === "runnable") {
-    const extras = [];
-    if (connectedAdapters.length) extras.push("mcp");
-    if (usesRemoteA2a()) extras.push("a2a");
-    const adk = extras.length ? `google-adk[${extras.join(",")}]>=2.1.0` : "google-adk>=2.1.0";
-    return `${[adk, "google-genai>=1.0.0", "pyyaml>=6.0", "pytest"].join("\n")}\n`;
-  }
-  return `${["google-adk>=2.0.0", "pytest"].join("\n")}\n`;
-}
-
 function buildContractTest() {
   if (outputMode === "runnable") {
     return `import importlib.util
@@ -1161,20 +1149,26 @@ def test_runtime_chat_smoke_contract_is_present():
 function buildReadme() {
   const runtimeEnvPath = runtimeEnvRelativePath();
   const runtimeEnvDir = posixDirname(runtimeEnvPath);
+  const runtimeRequirementsPath = runtimeRequirementsRelativePath();
   if (outputMode === "runnable") {
     return `# ${packageName}
 
 ${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 runnable ADK 2.1 Workflow입니다.
 
 \`\`\`bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# repository root
+python3 -m venv .agent-factory/runtime/.venv
+.agent-factory/runtime/.venv/bin/python -m pip install -r requirements/adk-runtime.txt
+
+# generated runtime-stub
 mkdir -p ${runtimeEnvDir}
 cp .env.example ${runtimeEnvPath}
 python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
+
+Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-factory\\runtime\\.venv\\Scripts\\python.exe -m pip install -r requirements\\adk-runtime.txt\` 를 사용하세요.
+이 bundle은 artifact-local \`requirements.txt\` 를 만들지 않습니다. 공유 dependency 기준은 repository root의 \`${runtimeRequirementsPath}\` 입니다.
 
 ## 이 번들의 역할
 
@@ -1219,12 +1213,17 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 ${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 ADK smoke handoff입니다.
 
 \`\`\`bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# repository root
+python3 -m venv .agent-factory/runtime/.venv
+.agent-factory/runtime/.venv/bin/python -m pip install -r requirements/adk-runtime.txt
+
+# generated runtime-stub
 python -m compileall ${packageName}
 python -m pytest -q
 \`\`\`
+
+Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-factory\\runtime\\.venv\\Scripts\\python.exe -m pip install -r requirements\\adk-runtime.txt\` 를 사용하세요.
+이 bundle은 artifact-local \`requirements.txt\` 를 만들지 않습니다. 공유 dependency 기준은 repository root의 \`${runtimeRequirementsPath}\` 입니다.
 
 ## ADK runtime chat smoke
 
@@ -1241,6 +1240,10 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 
 function runtimeEnvRelativePath() {
   return relative(outputRoot, join(process.cwd(), ".agent-factory", "runtime.env")).replace(/\\/g, "/");
+}
+
+function runtimeRequirementsRelativePath() {
+  return relative(outputRoot, join(process.cwd(), "requirements", "adk-runtime.txt")).replace(/\\/g, "/");
 }
 
 function posixDirname(path) {

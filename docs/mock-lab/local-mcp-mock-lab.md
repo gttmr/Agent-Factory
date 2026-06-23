@@ -26,7 +26,7 @@ Catalog prefill은 Mock Spec Editor의 `+ tool`을 누를 때 뜨는 3x3 선택 
 
 Codex는 server project를 생성하지 않는다. `Draft Spec with Codex`는 자연어 prompt에서 `MockSpec` 초안을 만드는 보조 기능이다. 사용자는 초안을 editor로 불러온 뒤 직접 검토·수정하고 `Save spec`으로 canonical `mock-spec.json`에 저장해야 한다.
 
-`POST /api/mock-lab/:mockId/drafts`는 `{ prompt, model }`을 받아 백그라운드 `codex exec` draft run을 시작하고 즉시 `draft_id`와 `running` 상태를 반환한다. 성공한 draft는 `artifacts/mock-lab/<mock-id>/drafts/<draft-id>/draft-spec.json`에 저장된다.
+`POST /api/mock-lab/:mockId/drafts`는 `{ prompt, model }`을 받아 백그라운드 Codex SDK draft run을 시작하고 즉시 `draft_id`와 `running` 상태를 반환한다. 성공한 draft는 `artifacts/mock-lab/<mock-id>/drafts/<draft-id>/draft-spec.json`에 저장된다.
 
 `GET /api/mock-lab/:mockId/drafts`와 `GET /api/mock-lab/:mockId/drafts/:draftId`는 draft 상태, validation 결과, event log, stdout/stderr tail, valid draft preview를 표시한다. `POST /api/mock-lab/:mockId/drafts/:draftId/cancel`로 실행 중 draft를 중단할 수 있다.
 

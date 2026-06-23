@@ -7,6 +7,7 @@ import { serializeAfRunManifest } from "../src/analyzer/afRunManifest.ts";
 import { ArtifactConflictError, ArtifactRootStore } from "./artifactRootStore.ts";
 import {
   applyStageRun,
+  type CodexStageRunner,
   listStageRuns,
   readStageRunDetail,
   runStageSkill
@@ -122,6 +123,81 @@ const manifestAfterDesignRun = await store.readManifest("req-001");
 assert.equal(manifestAfterDesignRun.manifest.approvals.boundaries_approved, false);
 assert.equal(manifestAfterDesignRun.manifest.approvals.runtime_contracts_approved, false);
 assert.equal(manifestAfterDesignRun.manifest.stage_runs?.design?.latest_run_id, designRun.run_id);
+
+await store.createRoot("req-sdk");
+await store.writeArtifact("req-sdk", "analysis-result.json", `${JSON.stringify(fixture, null, 2)}\n`, null);
+const sdkRunner: CodexStageRunner = {
+  async run(input) {
+    assert.equal(input.stage, "analyze");
+    assert.equal(input.model, "gpt-5.5");
+    const proposed = {
+      ...fixture,
+      normalizedRequirement: {
+        ...fixture.normalizedRequirement,
+        id: "req-sdk",
+        raw_text: "SDK runner proposed requirement"
+      }
+    };
+    await writeFile(join(input.proposedDir, "analysis-result.json"), `${JSON.stringify(proposed, null, 2)}\n`, "utf8");
+    await input.emit({
+      phase: "codex_event",
+      message: "command completed",
+      title: "command execution",
+      rawEventType: "item.completed",
+      itemType: "command_execution",
+      status: "completed",
+      toolName: "command",
+      snippet: "node scripts/example.js"
+    });
+    return {
+      backend: "sdk",
+      thread_id: "thread-sdk-001",
+      event_count: 3,
+      usage: {
+        input_tokens: 100,
+        cached_input_tokens: 20,
+        output_tokens: 30,
+        reasoning_output_tokens: 10
+      }
+    };
+  }
+};
+const sdkAnalyzeRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-sdk",
+  stage: "analyze",
+  body: {
+    model: "gpt-5.5",
+    input: {
+      rawText: "SDK runner proposed requirement",
+      domain: "공통"
+    },
+    catalog: []
+  },
+  codexRunner: sdkRunner
+});
+assert.equal(sdkAnalyzeRun.status, "completed");
+assert.deepEqual(sdkAnalyzeRun.codex, {
+  backend: "sdk",
+  thread_id: "thread-sdk-001",
+  event_count: 3,
+  usage: {
+    input_tokens: 100,
+    cached_input_tokens: 20,
+    output_tokens: 30,
+    reasoning_output_tokens: 10
+  }
+});
+const sdkCanonicalAfterRun = JSON.parse(await readFile(join(repoRoot, "artifacts/af/req-sdk/analysis-result.json"), "utf8"));
+assert.equal(sdkCanonicalAfterRun.normalizedRequirement.raw_text, fixture.normalizedRequirement.raw_text);
+const sdkDetail = await readStageRunDetail({ store, reqId: "req-sdk", stage: "analyze", runId: sdkAnalyzeRun.run_id });
+assert.ok(sdkDetail.events.some((event) => event.phase === "codex_event" && event.itemType === "command_execution"));
+const manifestAfterSdkRun = await store.readManifest("req-sdk");
+assert.equal(manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex?.backend, "sdk");
+assert.equal(manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex?.thread_id, "thread-sdk-001");
+assert.equal(manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex?.event_count, 3);
+assert.equal("usage" in (manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex ?? {}), false);
 
 await assert.rejects(
   () =>

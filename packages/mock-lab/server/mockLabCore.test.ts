@@ -125,40 +125,58 @@ const draftRegistry = new MockDraftRegistry({
   repoRoot,
   store,
   timeoutMs: 5000,
-  commandBuilder: ({ draftSpecPath }) => ({
-    command: process.execPath,
-    args: [
-      "-e",
-      [
-        "const fs = require('node:fs');",
-        "const out = process.argv[1];",
-        "setTimeout(() => {",
-        "  fs.writeFileSync(out, '```json\\n' + JSON.stringify({",
-        "    mock_id: 'bank_document_ocr_mock_adapter',",
-        "    server_name: 'drafted-ocr-mcp',",
-        "    protocol: 'mcp_stdio',",
-        "    description: 'Drafted OCR spec',",
-        "    tools: [{",
-        "      name: 'drafted_ocr_tool',",
-        "      description: 'Drafted synthetic OCR tool.',",
-        "      inputSchema: { type: 'object', properties: { document_uri: { type: 'string' } }, required: ['document_uri'], additionalProperties: false },",
-        "      outputSchema: { type: 'object', properties: { ocr_text: { type: 'string' } }, required: ['ocr_text'], additionalProperties: false },",
-        "      successResponse: { ocr_text: '[SYNTHETIC] drafted OCR text' },",
-        "      errorScenarios: [],",
-        "      latencyMs: 0,",
-        "      riskSignals: [],",
-        "      auditRequired: true",
-        "    }],",
-        "    guardrails: { synthetic_only: true, no_private_data: true, no_private_endpoint: true, no_credentials: true, no_production_business_logic: true }",
-        "  }, null, 2) + '\\n```');",
-        "  console.log(JSON.stringify({ event: 'fake-draft-complete' }));",
-        "}, 50);",
-        "setTimeout(() => {}, 120);"
-      ].join("\n"),
-      draftSpecPath
-    ],
-    displayCommand: "fake codex draft"
-  })
+  draftRunner: {
+    async run() {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return {
+        command: "fake codex sdk draft",
+        outputText:
+          "```json\n" +
+          JSON.stringify(
+            {
+              mock_id: "bank_document_ocr_mock_adapter",
+              server_name: "drafted-ocr-mcp",
+              protocol: "mcp_stdio",
+              description: "Drafted OCR spec",
+              tools: [
+                {
+                  name: "drafted_ocr_tool",
+                  description: "Drafted synthetic OCR tool.",
+                  inputSchema: {
+                    type: "object",
+                    properties: { document_uri: { type: "string" } },
+                    required: ["document_uri"],
+                    additionalProperties: false
+                  },
+                  outputSchema: {
+                    type: "object",
+                    properties: { ocr_text: { type: "string" } },
+                    required: ["ocr_text"],
+                    additionalProperties: false
+                  },
+                  successResponse: { ocr_text: "[SYNTHETIC] drafted OCR text" },
+                  errorScenarios: [],
+                  latencyMs: 0,
+                  riskSignals: [],
+                  auditRequired: true
+                }
+              ],
+              guardrails: {
+                synthetic_only: true,
+                no_private_data: true,
+                no_private_endpoint: true,
+                no_credentials: true,
+                no_production_business_logic: true
+              }
+            },
+            null,
+            2
+          ) +
+          "\n```",
+        stdout: "{\"event\":\"fake-draft-complete\"}\n"
+      };
+    }
+  }
 });
 const startedDraft = await draftRegistry.start({
   mockId: validSpec.mock_id,
@@ -166,7 +184,7 @@ const startedDraft = await draftRegistry.start({
   model: "gpt-5.5"
 });
 assert.equal(startedDraft.status, "running");
-assert.ok(startedDraft.pid);
+assert.equal(startedDraft.pid, null);
 const runningDrafts = await store.listDrafts(validSpec.mock_id);
 assert.equal(runningDrafts[0].status, "running");
 await waitFor(async () => {
@@ -180,11 +198,14 @@ const invalidDraftRegistry = new MockDraftRegistry({
   repoRoot,
   store,
   timeoutMs: 5000,
-  commandBuilder: ({ draftSpecPath }) => ({
-    command: process.execPath,
-    args: ["-e", "require('node:fs').writeFileSync(process.argv[1], JSON.stringify({ mock_id: 'bad' }))", draftSpecPath],
-    displayCommand: "fake invalid draft"
-  })
+  draftRunner: {
+    async run() {
+      return {
+        command: "fake invalid sdk draft",
+        outputText: JSON.stringify({ mock_id: "bad" })
+      };
+    }
+  }
 });
 const invalidDraft = await invalidDraftRegistry.start({
   mockId: validSpec.mock_id,

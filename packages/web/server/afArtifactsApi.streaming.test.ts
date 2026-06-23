@@ -28,35 +28,7 @@ async function writeFakeScripts(root: string): Promise<void> {
   );
   await writeFile(
     join(binDir, "python3"),
-    [
-      "#!/bin/sh",
-      "if [ \"$1\" = '-m' ] && [ \"$2\" = 'venv' ]; then",
-      "  venv_dir=\"$3\"",
-      "  mkdir -p \"$venv_dir/bin\"",
-      "  cat > \"$venv_dir/bin/python\" <<'PYEOF'",
-      "#!/bin/sh",
-      "if [ \"$1\" = '-m' ] && [ \"$2\" = 'pip' ] && [ \"$3\" = 'install' ]; then",
-      "  mkdir -p .venv/bin",
-      "  cat > .venv/bin/adk <<'ADEOF'",
-      "#!/bin/sh",
-      "echo 'fake adk server started'",
-      "sleep 30",
-      "ADEOF",
-      "  chmod +x .venv/bin/adk",
-      "  echo 'fake pip installed google-adk'",
-      "  exit 0",
-      "fi",
-      "echo 'unexpected fake venv python args: $@' >&2",
-      "exit 2",
-      "PYEOF",
-      "  chmod +x \"$venv_dir/bin/python\"",
-      "  echo 'fake venv created'",
-      "  exit 0",
-      "fi",
-      "echo 'unexpected fake python3 args: $@' >&2",
-      "exit 2",
-      ""
-    ].join("\n")
+    "#!/bin/sh\necho 'unexpected fake python3 args: $@' >&2\nexit 2\n"
   );
   await chmod(join(binDir, "python3"), 0o755);
   await writeFile(
@@ -78,8 +50,7 @@ async function writeFakeScripts(root: string): Promise<void> {
       "    echo 'build stderr line' >&2",
       "    mkdir -p \"$stub_dir\"",
       "    printf '# TODO runtime wiring\\n' > \"$stub_dir/agent.py\"",
-      "    mkdir -p \"$stub_dir/.venv/bin\" \"$stub_dir/req_stream_adk/__pycache__\"",
-      "    printf '# local adk shim\\n' > \"$stub_dir/.venv/bin/adk\"",
+      "    mkdir -p \"$stub_dir/req_stream_adk/__pycache__\"",
       "    printf 'compiled cache\\n' > \"$stub_dir/req_stream_adk/__pycache__/agent.pyc\"",
       "    exit 0",
       "    ;;",
@@ -214,7 +185,18 @@ async function writeFakeRuntimeStub(root: string, reqId: string): Promise<void> 
     join(stubDir, "req_stream_adk/workflow_manifest.json"),
     `${JSON.stringify({ package: "req_stream_adk" }, null, 2)}\n`
   );
-  await writeFile(join(stubDir, "requirements.txt"), "google-adk\npytest\n");
+}
+
+async function writeFakeSharedAdkRuntime(root: string): Promise<void> {
+  const binDir = join(root, ".agent-factory/runtime/.venv/bin");
+  await mkdir(binDir, { recursive: true });
+  await writeFile(join(binDir, "python"), "#!/bin/sh\nexit 0\n");
+  await writeFile(
+    join(binDir, "adk"),
+    ["#!/bin/sh", "echo 'fake adk server started'", "sleep 30", ""].join("\n")
+  );
+  await chmod(join(binDir, "python"), 0o755);
+  await chmod(join(binDir, "adk"), 0o755);
 }
 
 async function assertRuntimeChatLifecycle(request: ReturnType<typeof createRequester>, root: string): Promise<void> {
@@ -230,12 +212,15 @@ async function assertRuntimeChatLifecycle(request: ReturnType<typeof createReque
   assert.equal(before.app_name, "req_stream_adk");
   assert.equal(before.server.status, "stopped");
 
-  const install = responseJson<{ ok: boolean; stdout: string; status: { installed: boolean } }>(
-    await request({ url: "/req-runtime/runtime-chat/install", method: "POST" })
-  );
-  assert.equal(install.ok, true);
-  assert.match(install.stdout, /fake pip installed google-adk/);
-  assert.equal(install.status.installed, true);
+  const installResponse = await request({ url: "/req-runtime/runtime-chat/install", method: "POST" });
+  assert.equal(installResponse.status, 405);
+  const install = JSON.parse(installResponse.text()) as { error: string; status: { installed: boolean } };
+  assert.match(install.error, /설치는 지원하지 않습니다/);
+  assert.equal(install.status.installed, false);
+
+  await writeFakeSharedAdkRuntime(root);
+  const ready = responseJson<{ installed: boolean }>(await request({ url: "/req-runtime/runtime-chat/status" }));
+  assert.equal(ready.installed, true);
 
   const started = responseJson<{ ok: boolean; status: { server: { status: string; pid: number | null } } }>(
     await request({ url: "/req-runtime/runtime-chat/start", method: "POST" })

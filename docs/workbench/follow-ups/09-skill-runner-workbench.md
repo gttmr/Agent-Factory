@@ -4,6 +4,7 @@
 
 작성일: 2026-05-27 (KST)
 구현 상태: Analyze + Design 1차 구현 완료 (`d547aca feat: brief 09 skill runner workbench`).
+현재 상태: 2026-06-23 이후 서버 실행 primitive는 외부 `codex exec` 직접 spawn이 아니라 `@openai/codex-sdk` TypeScript SDK다. 아래 질문/답변 원문에 남은 Codex CLI 표현은 당시 결정 기록으로만 보존한다.
 
 ## 목적
 
@@ -14,7 +15,7 @@ Build/Verify Stage Runner 확장은 아직 numbered brief가 없는 별도 후�
 이 브리프가 확정한 현재 계약은 다음과 같다.
 
 - 각 stage 화면에서 해당 스킬 실행을 서버에 요청한다.
-- 서버는 stage별 Skill Runner를 통해 Codex/CLI 실행, 진행 이벤트, 산출물 후보, validation 결과를 생성한다.
+- 서버는 stage별 Skill Runner를 통해 Codex SDK 실행, 진행 이벤트, 산출물 후보, validation 결과를 생성한다.
 - canonical artifact는 바로 덮어쓰지 않고 파일별 preview/diff 후 사용자가 적용한다.
 - approval gate는 스킬이 자동으로 켜지 않고 사람이 직접 토글한다.
 - 새 세션이 같은 결정을 반복 질문하지 않도록 질문/답변 원문과 확정 정책을 이 파일에 보존한다.
