@@ -502,9 +502,10 @@ export interface CatalogBinding {
 /**
  * Scaffold output mode. `smoke` (default) keeps the synthetic, no-runnable-logic
  * handoff. `runnable` emits the reviewed ADK 2.1 LlmAgent/Workflow graph that
- * calls Gemini and live Mock Lab MCP servers. In BOTH modes the source is still
- * the approved workbench artifacts — `raw_requirement_to_code` stays false and
- * raw requirements never drive code generation.
+ * selects its LLM from runtime env and calls live Mock Lab MCP servers. In BOTH
+ * modes the source is still the approved workbench artifacts —
+ * `raw_requirement_to_code` stays false and raw requirements never drive code
+ * generation.
  */
 export type ScaffoldOutputMode = "smoke" | "runnable";
 export const AGENT_EXECUTION_MODES = ["single_turn", "chat"] as const;

@@ -43,6 +43,7 @@ try {
   assert.equal(env.AF_MOCK_LAB_MCP_URL, "http://127.0.0.1:5173/api/mock-lab/mcp");
   assert.equal(env.MCP_TOKEN, "central-mcp-token");
   assert.equal(env.PYTHONUNBUFFERED, "1");
+  assert.equal(env.PYTHONUTF8, "1");
   assert.equal(env.PYTHONPATH, join(repoRoot, "artifacts/af/req-demo/runtime-stub"));
   assert.equal(env.PATH, "/bin");
 } finally {

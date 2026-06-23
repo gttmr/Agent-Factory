@@ -22,7 +22,7 @@ import type {
 } from "./types";
 import { runtimeContractReadinessIssues } from "./runtimeContracts";
 
-const DEFAULT_RUNNABLE_MODEL = "gemini-2.5-flash";
+const DEFAULT_RUNNABLE_MODEL = "hosted_vllm/local-model";
 
 export interface BuildScaffoldPlanInput {
   normalizedRequirement: NormalizedRequirement;
