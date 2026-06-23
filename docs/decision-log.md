@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-23 · 작업 브랜치 `codex/adk-graph-runtime-arguments` — artifact-first generator contract 명문화
+
+### 생성기 하드코딩보다 Graph IR/scaffold-plan 계약을 먼저 확장한다
+- **결정**: artifact나 generated ADK 동작 수정 요청을 받으면 `scripts/generate-adk-source.mjs`에 도메인 용어, route alias, 상품명, 시나리오명, workflow-specific literal을 즉시 하드코딩하지 않는다. 먼저 Graph IR / scaffold-plan / schema가 해당 의도를 표현할 수 있는지 검토하고, 부족하면 generic contract field를 schema/types/validator/UI/generator에 추가한 뒤 artifact data가 그 필드를 채우도록 수정한다.
+- **배경**: route alias(`분석 실행`, `분석 없이 진행`, `1`, `2`)와 smoke prompt 같은 workflow-specific 값이 generator에 들어가면서 artifact-first 원칙이 깨지고, 사용자가 artifact를 수정해도 생성 동작이 예측과 다르게 고정되는 문제가 생겼다.
+- **영향**: `AGENTS.md`, `CLAUDE.md`. 향후 generator 변경은 artifact-authored contract와 regression을 우선해야 한다.
+
 ## 2026-06-23 · 작업 브랜치 `main` — ADK route payload와 Graph IR runtime I/O 계약 정합화
 
 ### Route는 분기 신호, payload는 Event.output으로 전달한다

@@ -150,6 +150,8 @@ Git worktrees created for isolated slices (subagent/Codex work, parallel branche
 - Keep changes scoped to the requested workbench behavior.
 - Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
 - Do not introduce abstractions, configuration, or extensibility unless the present task requires it.
+- When the user asks to modify an artifact or generated ADK behavior, do not solve it by hard-coding domain terms, route aliases, product names, scenario names, or workflow-specific literals into `scripts/generate-adk-source.mjs` or another generator. First decide whether the current Graph IR / scaffold-plan / schema can express the needed behavior. If not, add a reviewed, generic contract field across schema/types/validator/UI/generator as needed, then update the artifact data to use that field.
+- Generator defaults may be deterministic, but they must be framework/runtime-neutral. Workflow-specific choices such as router labels, human choice aliases, adapter argument hints, prompt rules, and business terms belong in reviewed artifacts or catalog/mock specs, not in generator code. If a compatibility fallback is unavoidable, document why and cover it with a regression.
 - Preserve legacy migration data with `legacy_recommended_type`; do not use it as the primary classifier.
 - Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
 - ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
