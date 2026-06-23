@@ -14,7 +14,7 @@ import {
   setCandidateStatus
 } from "../analyzer/moduleReview";
 import { createA2AContractForCandidate } from "../analyzer/a2aNormalize";
-import { insertCatalogWorkflowNode } from "../analyzer/nestedWorkflowInsert";
+import { insertCatalogWorkflowNode, pruneDetachedCatalogWorkflowCandidates } from "../analyzer/nestedWorkflowInsert";
 import type {
   AnalysisResult,
   GraphEdge,
@@ -37,7 +37,7 @@ import {
   type DesignBottomTab
 } from "../design/designWorkbenchTabs";
 import { ReviewNotesPanel } from "../design/ReviewNotesPanel";
-import { reviewNotesBadgeCount } from "../design/reviewNotesModel";
+import { commentAnchorFromSelection, reviewNotesBadgeCount } from "../design/reviewNotesModel";
 import {
   RuntimeContractInspector,
   RuntimeContractSidebar,
@@ -74,9 +74,8 @@ const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
 // 복원된다.
 //
 // 비활성 동안 함께 휴면 상태가 되는 것: Runtime 계약 / Remote A2A 탭의 *편집*
-// 우측 인스펙터(RuntimeContractInspector / A2AContractInspector)와 노드/엣지 앵커
-// 코멘트 *작성* 패널(SelectionHeader + 우측 CommentThread). 검토 메모 탭의 읽기 표시는
-// 그대로 동작한다. Remote A2A 편집은 하단 탭에서 제공한다.
+// 우측 인스펙터(RuntimeContractInspector / A2AContractInspector). 노드/엣지 앵커
+// 코멘트 작성은 하단 검토 메모 탭에서 제공한다. Remote A2A 편집도 하단 탭에서 제공한다.
 // 관련 핸들러(handleSaveRuntimeContract, handleSaveA2AContract, handleCreateComment)는 보존한다.
 // ──────────────────────────────────────────────────────────────────────────
 const INSPECTOR_ENABLED = false;
@@ -168,11 +167,7 @@ export default function DesignWorkbench() {
   const defaultStep: DesignStepId = !hasGraph ? "run" : !reviewReady ? "review" : "approve";
   const [activeStep, setActiveStep] = useStageStep(DESIGN_STEP_IDS, defaultStep);
 
-  const anchor = useMemo<CommentAnchor | null>(() => {
-    if (selection.nodeId) return { kind: "node", node_id: selection.nodeId };
-    if (selection.edgeId) return { kind: "edge", edge_id: selection.edgeId };
-    return null;
-  }, [selection]);
+  const anchor = useMemo<CommentAnchor | null>(() => commentAnchorFromSelection(selection), [selection]);
 
   // 좌측 사이드바 상단에 선택한 노드/엣지 상세를 표시하기 위한 파생값.
   // (GraphCanvas 내부 inspector 와 동일한 derivation — id 매핑도 layout.ts 와 맞춘다.)
@@ -319,10 +314,10 @@ export default function DesignWorkbench() {
 
   function handleSaveGraphIR(nextGraph: GraphIR) {
     if (!analysis) return;
-    const nextAnalysis: AnalysisResult = {
+    const nextAnalysis = pruneDetachedCatalogWorkflowCandidates({
       ...analysis,
       processFlow: nextGraph
-    };
+    });
     saveAnalysisMutation.mutate(
       { analysis: nextAnalysis, etag: analysisEtag },
       {
@@ -636,20 +631,22 @@ export default function DesignWorkbench() {
                 </button>
               ))}
             </nav>
-            <div className="af-design-sidebar-body">
+            <div className={`af-design-sidebar-body${activeTab === "modules" ? " af-design-sidebar-body--modules" : ""}`}>
               {activeTab === "modules" ? (
                 <div className="af-module-review-layout">
-                  <ModuleSidebar
-                    candidates={analysis.moduleCandidates}
-                    selectedModuleId={selectedReviewCandidate?.id ?? null}
-                    onSelectModule={(moduleId) => {
-                      setSelectedReviewModuleId(moduleId);
-                      if (!graphIR) return;
-                      const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
-                      setSelection({ nodeId: node?.id ?? null, edgeId: null });
-                      setActiveTab((currentTab) => nextDesignBottomTabAfterModuleSelect(currentTab));
-                    }}
-                  />
+                  <div className="af-module-review-list-pane">
+                    <ModuleSidebar
+                      candidates={analysis.moduleCandidates}
+                      selectedModuleId={selectedReviewCandidate?.id ?? null}
+                      onSelectModule={(moduleId) => {
+                        setSelectedReviewModuleId(moduleId);
+                        if (!graphIR) return;
+                        const node = graphIR.nodes?.find((n) => n.module_id === moduleId);
+                        setSelection({ nodeId: node?.id ?? null, edgeId: null });
+                        setActiveTab((currentTab) => nextDesignBottomTabAfterModuleSelect(currentTab));
+                      }}
+                    />
+                  </div>
                   <ModuleReviewDetail
                     key={selectedReviewCandidate?.id ?? "none"}
                     candidate={selectedReviewCandidate}
@@ -717,6 +714,7 @@ export default function DesignWorkbench() {
                   graphIR={graphIR}
                   comments={comments}
                   highlights={highlights}
+                  commentAnchor={anchor}
                   authorName={authorName}
                   authorRole={authorRole}
                   isCommentMutating={createComment.isPending}

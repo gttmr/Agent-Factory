@@ -287,14 +287,19 @@
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  min-height: 200px;
-  max-height: 48vh;
+  height: clamp(260px, 48vh, 420px);
+  overflow: hidden;
 }
 
 .af-design-sidebar-body {
   padding: 12px;
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+}
+
+.af-design-sidebar-body--modules {
+  overflow: hidden;
 }
 
 .af-design-bottom > .af-design-sidebar-body > .af-a2a-tab-panel {
@@ -385,13 +390,16 @@
 .af-module-review-layout {
   display: grid;
   grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 
-@media (max-width: 860px) {
-  .af-module-review-layout {
-    grid-template-columns: 1fr;
-  }
+.af-module-review-list-pane {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .af-module-review-detail {
@@ -403,6 +411,32 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+@media (max-width: 860px) {
+  .af-design-bottom {
+    height: auto;
+  }
+
+  .af-design-sidebar-body--modules {
+    overflow-y: auto;
+  }
+
+  .af-module-review-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .af-module-review-list-pane {
+    max-height: 240px;
+  }
+
+  .af-module-review-detail {
+    overflow: visible;
+  }
 }
 
 .af-module-review-detail > .af-module-review-header,

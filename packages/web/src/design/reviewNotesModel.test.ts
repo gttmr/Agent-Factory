@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describeHighlightTarget, reviewNotesBadgeCount } from "./reviewNotesModel.ts";
+import { commentAnchorFromSelection, describeHighlightTarget, reviewNotesBadgeCount } from "./reviewNotesModel.ts";
 import type { HighlightRecord, HighlightTarget } from "../state/useCollaboration.ts";
 
 function highlight(kind: HighlightRecord["kind"], target: HighlightTarget): HighlightRecord {
@@ -58,5 +58,23 @@ assert.equal(
 // reviewNotesBadgeCount — combined comment + highlight count for the tab badge.
 assert.equal(reviewNotesBadgeCount(0, 0), 0);
 assert.equal(reviewNotesBadgeCount(2, 3), 5);
+
+// commentAnchorFromSelection — restores selected Graph IR item as the comment composer anchor.
+assert.deepEqual(
+  commentAnchorFromSelection({ nodeId: "node-a", edgeId: null }),
+  { kind: "node", node_id: "node-a" },
+  "selected node becomes a node comment anchor"
+);
+assert.deepEqual(
+  commentAnchorFromSelection({ nodeId: null, edgeId: "edge-a-b" }),
+  { kind: "edge", edge_id: "edge-a-b" },
+  "selected edge becomes an edge comment anchor"
+);
+assert.deepEqual(
+  commentAnchorFromSelection({ nodeId: "node-a", edgeId: "edge-a-b" }),
+  { kind: "node", node_id: "node-a" },
+  "node selection takes precedence when both ids are present"
+);
+assert.equal(commentAnchorFromSelection({ nodeId: null, edgeId: null }), null);
 
 console.log("reviewNotesModel tests passed");

@@ -2,7 +2,7 @@
 // merges anchored comments and saved path highlights into one review surface.
 // Kept separate from ReviewNotesPanel.tsx so the display/derivation logic is
 // unit-testable without a React renderer.
-import type { HighlightRecord } from "../state/useCollaboration";
+import type { CommentAnchor, HighlightRecord } from "../state/useCollaboration";
 
 /**
  * Human-readable one-line description of what a saved highlight targets. Order
@@ -20,4 +20,13 @@ export function describeHighlightTarget(highlight: HighlightRecord): string {
 /** Combined count surfaced on the 검토 메모 tab badge (comments + highlights). */
 export function reviewNotesBadgeCount(commentCount: number, highlightCount: number): number {
   return commentCount + highlightCount;
+}
+
+export function commentAnchorFromSelection(selection: {
+  nodeId: string | null;
+  edgeId: string | null;
+}): CommentAnchor | null {
+  if (selection.nodeId) return { kind: "node", node_id: selection.nodeId };
+  if (selection.edgeId) return { kind: "edge", edge_id: selection.edgeId };
+  return null;
 }

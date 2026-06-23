@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { insertCatalogWorkflowNode } from "./nestedWorkflowInsert.ts";
+import { insertCatalogWorkflowNode, pruneDetachedCatalogWorkflowCandidates } from "./nestedWorkflowInsert.ts";
 import type { AnalysisResult, GraphIR } from "./types.ts";
 import type { CatalogHubEntry } from "../catalog/catalogIndex.ts";
 
@@ -182,3 +182,57 @@ assert.ok(
 const nullFlowAnalysis = baseAnalysis(null);
 const guarded = insertCatalogWorkflowNode(nullFlowAnalysis, entry, "req-round-b");
 assert.equal(guarded, nullFlowAnalysis);
+
+const prunedInserted = pruneDetachedCatalogWorkflowCandidates({
+  ...inserted,
+  processFlow: {
+    ...inserted.processFlow,
+    nodes: inserted.processFlow.nodes.filter((item) => item.module_id !== candidate.id)
+  }
+});
+assert.equal(
+  prunedInserted.moduleCandidates.some((item) => item.id === candidate.id),
+  false,
+  "detached inserted catalog workflow candidate should be pruned"
+);
+
+const preservedInserted = pruneDetachedCatalogWorkflowCandidates(inserted);
+assert.equal(
+  preservedInserted.moduleCandidates.some((item) => item.id === candidate.id),
+  true,
+  "referenced inserted catalog workflow candidate should be preserved"
+);
+
+const rootOnlyInserted = pruneDetachedCatalogWorkflowCandidates({
+  ...inserted,
+  processFlow: {
+    ...inserted.processFlow,
+    root_workflow_module_id: candidate.id,
+    nodes: inserted.processFlow.nodes.filter((item) => item.module_id !== candidate.id)
+  }
+});
+assert.equal(
+  rootOnlyInserted.moduleCandidates.some((item) => item.id === candidate.id),
+  true,
+  "root workflow candidate should be preserved even without a graph node"
+);
+
+const normalAnalyzerCandidate = {
+  ...candidate,
+  id: "mod-analyzer-workflow",
+  catalog_entry_id: "seed-workflow-common_document_intake_mock_workflow",
+  reuse_candidate: false
+};
+const analyzerCandidatePreserved = pruneDetachedCatalogWorkflowCandidates({
+  ...baseAnalysis(),
+  moduleCandidates: [normalAnalyzerCandidate],
+  processFlow: {
+    ...baseGraph(),
+    nodes: []
+  }
+});
+assert.equal(
+  analyzerCandidatePreserved.moduleCandidates.some((item) => item.id === normalAnalyzerCandidate.id),
+  true,
+  "normal analyzer candidates should not be pruned only because graph nodes are absent"
+);
