@@ -235,6 +235,12 @@
 - **배경**: `Graph IR` 목록은 캔버스 선택을 보조하는 내부 인덱스에 가까워 업무 사용자의 검토 흐름을 분산시켰고, `경로`는 코멘트와 같은 협업 산출물 성격이어서 독립 탭보다 검토 메모 안에서 보는 편이 명확하다.
 - **영향**: `DesignWorkbench.tsx`, `ReviewNotesPanel.tsx`, `designWorkbenchTabs.ts`, `styles/router/design.css`, `styles/router/comments.css`.
 
+## 2026-06-23 · 작업 브랜치 `codex/adk-vllm-runtime-env` — ADK runnable LLM provider를 runtime env에서 선택
+
+- **결정**: runnable runtime-stub의 `LlmAgent`는 Gemini 고정이 아니라 `.agent-factory/runtime.env`를 기준으로 provider를 선택한다. 기본 `AF_LLM_PROVIDER=auto`는 `AF_VLLM_API_BASE` 또는 `AF_VLLM_MODEL`이 있으면 vLLM/OpenAI-compatible `LiteLlm`을 쓰고, 없으면 기존 Gemini fallback을 사용한다.
+- **배경**: 오프라인 외부 환경에서는 vLLM으로 OpenAI-compatible 내부 LLM을 서빙하며, artifact마다 provider 설정을 복사하지 않고 중앙 runtime env 하나로 전환해야 한다.
+- **영향**: `generate-adk-source.mjs`, `requirements/adk-runtime.txt`, `runtimeEnv.ts`, Build 화면 안내 문구, `validation.md`·`agent-factory-harness.md`.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)

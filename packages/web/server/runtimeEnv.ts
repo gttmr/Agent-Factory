@@ -46,6 +46,7 @@ export async function buildRuntimeProcessEnv(input: {
     ...baseEnv,
     ...runtimeEnv,
     PYTHONUNBUFFERED: "1",
+    PYTHONUTF8: "1",
     PYTHONPATH: input.stubDir
   };
 }

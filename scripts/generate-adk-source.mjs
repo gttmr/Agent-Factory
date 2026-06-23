@@ -30,7 +30,8 @@ if (!Array.isArray(scaffoldPlan.modules) || scaffoldPlan.modules.length === 0) {
 }
 const modules = scaffoldPlan.modules;
 const outputMode = scaffoldPlan.output_mode === "runnable" ? "runnable" : "smoke";
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "hosted_vllm/local-model";
+const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 const RUNTIME_MCP_LABEL = "런타임 MCP";
 const RUNTIME_MCP_NOTE = "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다.";
 if (scaffoldPlan.validation?.can_generate_source === false) {
@@ -55,7 +56,7 @@ console.log("Prepare the shared ADK runtime from the repository root:");
 console.log("  python3 -m venv .agent-factory/runtime/.venv");
 console.log("  .agent-factory/runtime/.venv/bin/python -m pip install -r requirements/adk-runtime.txt");
 if (outputMode === "runnable") {
-  console.log("  # .env.example을 <repo>/.agent-factory/runtime.env로 복사하고 GOOGLE_API_KEY를 그 파일에 설정하세요");
+  console.log("  # .env.example을 <repo>/.agent-factory/runtime.env로 복사하고 AF_VLLM_* 또는 GOOGLE_API_KEY를 설정하세요");
 }
 console.log(`Run checks from ${outputRoot}:`);
 console.log(`  python -m compileall ${packageName}`);
@@ -418,13 +419,77 @@ def _agent_cfg(module_id: str, key: str, default: Any) -> Any:
     return _override("agents", module_id, key, default)
 
 
-def _model_for(module_id: str, seed: str) -> str:
-    # Per-agent override wins; then the top-level default_model knob; then the seed.
+def _llm_cfg() -> dict:
+    llm = _CONFIG.get("llm")
+    return llm if isinstance(llm, dict) else {}
+
+
+def _cfg_env(name: str, default: str) -> str:
+    value = _llm_cfg().get(name)
+    return str(value) if value else default
+
+
+def _model_seed(module_id: str, seed: str) -> str:
     per_agent = _override("agents", module_id, "model", None)
     if per_agent:
         return str(per_agent)
-    default_model = _CONFIG.get("default_model")
+    default_model = _llm_cfg().get("default_model") or _CONFIG.get("default_model")
     return str(default_model) if default_model else seed
+
+
+def _selected_llm_provider() -> str:
+    provider = os.environ.get("AF_LLM_PROVIDER", str(_llm_cfg().get("provider") or "auto")).strip().lower()
+    if provider not in {"auto", "vllm", "vllm_openai", "gemini"}:
+        raise RuntimeError(f"Unsupported AF_LLM_PROVIDER={provider!r}; expected auto, vllm, or gemini.")
+    if provider != "auto":
+        return "vllm" if provider == "vllm_openai" else provider
+    api_base_env = _cfg_env("api_base_env", "AF_VLLM_API_BASE")
+    model_env = _cfg_env("model_env", "AF_VLLM_MODEL")
+    if os.environ.get(api_base_env) or os.environ.get(model_env):
+        return "vllm"
+    return "gemini"
+
+
+def _vllm_model_name(model: str) -> str:
+    model = model.strip()
+    if not model:
+        raise RuntimeError("AF_VLLM_MODEL or agents.config.yaml llm.default_model must not be empty for vLLM.")
+    return model if model.startswith("hosted_vllm/") else f"hosted_vllm/{model}"
+
+
+def _vllm_model(module_id: str, seed: str) -> Any:
+    from google.adk.models.lite_llm import LiteLlm
+
+    llm = _llm_cfg()
+    api_base_env = _cfg_env("api_base_env", "AF_VLLM_API_BASE")
+    model_env = _cfg_env("model_env", "AF_VLLM_MODEL")
+    api_key_env = _cfg_env("api_key_env", "AF_VLLM_API_KEY")
+    api_base = os.environ.get(api_base_env) or llm.get("api_base")
+    if not api_base:
+        raise RuntimeError(f"{api_base_env} is required when AF_LLM_PROVIDER resolves to vLLM.")
+    model = os.environ.get(model_env) or _model_seed(module_id, seed)
+    kwargs: dict[str, Any] = {
+        "model": _vllm_model_name(str(model)),
+        "api_base": str(api_base),
+    }
+    api_key = os.environ.get(api_key_env) or llm.get("api_key")
+    if api_key:
+        kwargs["api_key"] = str(api_key)
+    return LiteLlm(**kwargs)
+
+
+def _gemini_model(module_id: str, seed: str) -> str:
+    model = _model_seed(module_id, seed)
+    if str(model).startswith("hosted_vllm/"):
+        return str(_llm_cfg().get("gemini_model") or ${toPyStr(GEMINI_FALLBACK_MODEL)})
+    return str(model)
+
+
+def _model_for(module_id: str, seed: str) -> Any:
+    provider = _selected_llm_provider()
+    if provider == "vllm":
+        return _vllm_model(module_id, seed)
+    return _gemini_model(module_id, seed)
 
 
 def _adapter_cfg(module_id: str, key: str, default: Any) -> Any:
@@ -671,6 +736,13 @@ function buildAgentsConfig() {
   lines.push("# agent.py import 시점에 반영되므로 다음 실행부터 실제 동작이 바뀝니다.");
   lines.push("# 공유 secret은 이 bundle이 아니라 <repo>/.agent-factory/runtime.env에 둡니다.");
   lines.push(`default_model: ${DEFAULT_MODEL}`);
+  lines.push("llm:");
+  lines.push("  provider: auto  # auto: AF_VLLM_*가 있으면 vLLM, 없으면 Gemini fallback");
+  lines.push(`  default_model: ${DEFAULT_MODEL}`);
+  lines.push(`  gemini_model: ${GEMINI_FALLBACK_MODEL}`);
+  lines.push("  api_base_env: AF_VLLM_API_BASE");
+  lines.push("  model_env: AF_VLLM_MODEL");
+  lines.push("  api_key_env: AF_VLLM_API_KEY");
 
   const agents = modules.filter(isAgentModule);
   lines.push("agents:");
@@ -946,9 +1018,14 @@ function sampleConversationTranscript() {
 function buildEnvExample() {
   return `# Agent Factory 공유 runtime env template입니다.
 # 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
-# Gemini key를 각 runtime-stub/.env에 반복해서 복사하지 마세요.
+# AF_LLM_PROVIDER=auto 는 AF_VLLM_*가 있으면 vLLM, 없으면 Gemini fallback을 사용합니다.
 #
+AF_LLM_PROVIDER=auto
+AF_VLLM_API_BASE=http://127.0.0.1:8000/v1
+AF_VLLM_MODEL=hosted_vllm/local-model
+# AF_VLLM_API_KEY=...
 # GOOGLE_API_KEY=...
+# PYTHONUTF8=1
 # AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5173/api/mock-lab/mcp
 `;
 }
@@ -1027,8 +1104,18 @@ function buildManifest() {
     runtime:
       outputMode === "runnable"
         ? {
-            provider: "gemini",
+            provider: "auto",
             default_model: DEFAULT_MODEL,
+            llm_provider_env: "AF_LLM_PROVIDER",
+            vllm: {
+              api_base_env: "AF_VLLM_API_BASE",
+              model_env: "AF_VLLM_MODEL",
+              api_key_env: "AF_VLLM_API_KEY"
+            },
+            gemini: {
+              api_key_env: "GOOGLE_API_KEY",
+              fallback_model: GEMINI_FALLBACK_MODEL
+            },
             connected_adapters: connectedAdapters.map((module) => ({
               module_id: module.id,
               module_name: module.name,
@@ -1172,8 +1259,9 @@ Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-f
 
 ## 이 번들의 역할
 
-- \`root_agent\`는 \`google.adk.workflow.Workflow\` graph입니다. Agent node는 Gemini를 호출하는
-  \`LlmAgent\`이고, adapter node는 deterministic \`FunctionNode\`입니다.
+- \`root_agent\`는 \`google.adk.workflow.Workflow\` graph입니다. Agent node는 runtime env에 따라
+  vLLM(OpenAI-compatible, \`LiteLlm\`) 또는 Gemini fallback을 쓰는 \`LlmAgent\`이고, adapter node는 deterministic
+  \`FunctionNode\`입니다.
 - graph는 **synthetic input만** 사용합니다. private endpoint, credential, 실제 고객 데이터는 포함하지 않습니다.
 - reviewed Agent Factory artifact에서만 생성되었습니다(\`raw_requirement_to_code=false\`).
 
@@ -1183,7 +1271,9 @@ Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-f
 \`agent.py\`가 import 시점에 이 파일을 읽으므로 다음 실행부터 변경이 적용됩니다.
 
 \`.env.example\`을 repository root의 \`.agent-factory/runtime.env\`로 복사하고 공유 runtime secret은 그 파일에 둡니다.
-\`AF_RUNTIME_ENV_FILE\`로 다른 파일을 지정할 수도 있습니다. 각 \`runtime-stub\`마다 \`GOOGLE_API_KEY\`를 반복해서 넣지 마세요.
+\`AF_RUNTIME_ENV_FILE\`로 다른 파일을 지정할 수도 있습니다. \`AF_LLM_PROVIDER=auto\`에서는 \`AF_VLLM_API_BASE\` 또는
+\`AF_VLLM_MODEL\`이 있으면 vLLM을 쓰고, 없으면 \`GOOGLE_API_KEY\` 기반 Gemini fallback을 사용합니다.
+Windows + LiteLLM 실행 환경에서는 \`PYTHONUTF8=1\`을 함께 둡니다.
 
 ${buildMockLabRunMarkdown()}
 
@@ -1338,7 +1428,7 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 
 ## 현재 실행되는 것
 
-- Agent node는 Gemini를 호출하고, 연결된 Adapter node는 실제 실행 시점에 Mock Lab MCP tool을 호출합니다.
+- Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Adapter node는 실제 실행 시점에 Mock Lab MCP tool을 호출합니다.
 - 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
 - 모든 실행은 합성 input만 사용합니다.
 

@@ -7,7 +7,7 @@
 이 문구는 카테고리·output_mode 와 무관한 일괄 메시지라 오해를 준다(테스트 중 사용자 혼동 발생):
 
 - **runnable + remote_a2a**: 실제로는 동작하는 `RemoteA2aAgent`(계약 agent_card 로 호출)가 생성된다 — "TODO boundary" 아님.
-- **runnable + agent**: 실제로는 동작하는 Gemini `LlmAgent` 가 생성된다(instruction 은 검토 placeholder) — inert TODO 아님.
+- **runnable + agent**: 실제로는 runtime env가 선택한 provider(vLLM/OpenAI-compatible 또는 Gemini fallback)를 호출하는 `LlmAgent` 가 생성된다(instruction 은 검토 placeholder) — inert TODO 아님.
 - **smoke** 또는 **unconnected adapter**: 이때만 "TODO/스텁" 표현이 정확.
 
 즉 "catalog 재사용 안 함"(정보)과 "런타임에 동작 안 함"(오해)을 구분해야 한다.

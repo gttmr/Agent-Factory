@@ -96,6 +96,7 @@ assert.ok(runnableModule.instruction?.includes("입력"), "agent instruction mus
 assert.ok(runnableModule.instruction?.includes("출력"), "agent instruction must describe outputs in Korean");
 assert.ok(runnableModule.instruction?.includes("검토된 synthetic 입력"), "guardrail must be Korean-first");
 assert.doesNotMatch(runnableModule.instruction ?? "", /You are|Responsibility|Inputs you receive|Outputs you must produce/);
+assert.equal(runnableModule.model, "hosted_vllm/local-model");
 assert.equal(runnableModule.agent_execution_mode, "single_turn");
 assert.ok(runnablePlan.manifest.new_code_required[0].reason.includes("카탈로그"));
 assert.ok(runnableModule.developer_todos.every((todo) => /검토|구현|매핑|자격|승인/.test(todo)));

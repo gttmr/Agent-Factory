@@ -36,7 +36,7 @@ function baseModules(runnable, { connectedAdapter = false, agentExecutionMode = 
       smoke_spec: { sample_user_message: "hello", synthetic_inputs: {}, expected_output_shape: {}, expected_event_markers: [], mock_sources: [], ready: true },
       runtime_mock: null,
       instruction: null,
-      model: runnable ? "gemini-2.5-flash" : null,
+      model: runnable ? "hosted_vllm/local-model" : null,
       agent_execution_mode: agentExecutionMode,
       access_protocol: null,
       mcp_server: null,
@@ -226,6 +226,12 @@ function assertRunnableBundle(outputRoot) {
   assert.ok(Array.isArray(manifest.runtime.unconnected_adapters));
   assert.match(agentSource, /from google\.adk\.workflow import/);
   assert.match(agentSource, /from google\.adk\.agents import LlmAgent/);
+  assert.match(agentSource, /AF_LLM_PROVIDER/);
+  assert.match(agentSource, /AF_VLLM_API_BASE/);
+  assert.match(agentSource, /AF_VLLM_MODEL/);
+  assert.match(agentSource, /from google\.adk\.models\.lite_llm import LiteLlm/);
+  assert.match(agentSource, /LiteLlm\(/);
+  assert.match(agentSource, /_llm_cfg\(\)\.get\("provider"\)/);
   assert.match(agentSource, /root_agent = Workflow\(/);
   assert.match(agentSource, /mode="single_turn"/);
   assert.match(agentSource, /당신은/);
@@ -264,11 +270,22 @@ function assertRunnableBundle(outputRoot) {
   assert.ok(existsSync(join(outputRoot, ".env.example")), "runnable bundle must emit .env.example");
   assert.ok(existsSync(join(outputRoot, ".gitignore")), "runnable bundle must emit .gitignore");
   assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
+  assert.match(envExample, /AF_LLM_PROVIDER=auto/);
+  assert.match(envExample, /AF_VLLM_API_BASE=http:\/\/127\.0\.0\.1:8000\/v1/);
+  assert.match(envExample, /AF_VLLM_MODEL=hosted_vllm\/local-model/);
   assert.match(envExample, /AF_RUNTIME_ENV_FILE/);
   assert.match(envExample, /\.agent-factory\/runtime\.env/);
+  assert.match(agentsConfig, /provider: auto/);
+  assert.match(agentsConfig, /default_model: hosted_vllm\/local-model/);
+  assert.match(agentsConfig, /api_base_env: AF_VLLM_API_BASE/);
+  assert.match(agentsConfig, /model_env: AF_VLLM_MODEL/);
   assert.match(agentsConfig, /한글 우선/);
   assert.match(agentsConfig, /name: 응답_생성_Agent/);
+  assert.equal(manifest.runtime.provider, "auto");
+  assert.equal(manifest.runtime.default_model, "hosted_vllm/local-model");
   assert.match(readme, /repository root의 `\.agent-factory\/runtime\.env`로 복사/);
+  assert.match(readme, /AF_VLLM_API_BASE/);
+  assert.match(readme, /AF_VLLM_MODEL/);
   assert.match(readme, /npm run dev --prefix packages\/mock-lab -- --host 0\.0\.0\.0 --port 5176 --strictPort/);
   assert.match(readme, /AF_MOCK_LAB_MCP_URL=http:\/\/127\.0\.0\.1:5176\/api\/mock-lab\/mcp/);
   assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
