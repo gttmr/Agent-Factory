@@ -107,6 +107,41 @@ export function insertCatalogWorkflowNode(
   };
 }
 
+export function pruneDetachedCatalogWorkflowCandidates(analysis: AnalysisResult): AnalysisResult {
+  if (!analysis.processFlow) return analysis;
+
+  const referencedModuleIds = moduleIdsReferencedByGraph(analysis.processFlow);
+  const nextCandidates = analysis.moduleCandidates.filter((candidate) => {
+    if (!isInsertedCatalogWorkflowCandidate(candidate)) return true;
+    return referencedModuleIds.has(candidate.id);
+  });
+
+  if (nextCandidates.length === analysis.moduleCandidates.length) return analysis;
+  return { ...analysis, moduleCandidates: nextCandidates };
+}
+
+function moduleIdsReferencedByGraph(processFlow: AnalysisResult["processFlow"]): Set<string> {
+  const referenced = new Set<string>();
+  if (typeof processFlow.root_workflow_module_id === "string" && processFlow.root_workflow_module_id.trim()) {
+    referenced.add(processFlow.root_workflow_module_id);
+  }
+  for (const node of processFlow.nodes ?? []) {
+    if (typeof node.module_id === "string" && node.module_id.trim()) {
+      referenced.add(node.module_id);
+    }
+  }
+  return referenced;
+}
+
+function isInsertedCatalogWorkflowCandidate(candidate: ModuleCandidate): boolean {
+  return (
+    candidate.reuse_candidate === true &&
+    candidate.module_category === "workflow" &&
+    typeof candidate.catalog_entry_id === "string" &&
+    candidate.catalog_entry_id.startsWith("workflow:")
+  );
+}
+
 function normalizeWorkflowKind(value: unknown): WorkflowKind {
   return value === "orchestration" || value === "graph" ? value : "graph";
 }

@@ -17,6 +17,7 @@ interface ReviewNotesPanelProps {
   graphIR: GraphIR | null;
   comments: CommentRecord[];
   highlights: HighlightRecord[];
+  commentAnchor: CommentAnchor | null;
   authorName: string;
   authorRole: AuthorRole;
   isCommentMutating: boolean;
@@ -36,6 +37,7 @@ export function ReviewNotesPanel({
   graphIR,
   comments,
   highlights,
+  commentAnchor,
   authorName,
   authorRole,
   isCommentMutating,
@@ -55,14 +57,14 @@ export function ReviewNotesPanel({
         <div className="af-review-notes-header">
           <div>
             <h4 id="review-notes-comments-title">코멘트</h4>
-            <p>설계 검토 중 남긴 노드, 엣지, 섹션 단위 메모입니다.</p>
+            <p>선택한 노드나 엣지에 코멘트를 남기고 기존 검토 메모를 확인합니다.</p>
           </div>
           <span className="af-review-notes-count">{comments.length}건</span>
         </div>
         <CommentThread
           reqId={reqId}
           comments={comments}
-          anchor={null}
+          anchor={commentAnchor}
           authorName={authorName}
           authorRole={authorRole}
           isMutating={isCommentMutating}
