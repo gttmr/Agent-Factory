@@ -2,7 +2,7 @@
   "mock_id": "wf-page-recommendation-mock",
   "server_name": "WF Page Recommendation Mock Server",
   "protocol": "mcp_stdio",
-  "description": "1-1 페이지 추천 Workflow의 ADK Web smoke test용 synthetic MCP mock server입니다.",
+  "description": "1-1 페이지 추천 Workflow의 ADK Web smoke test용 synthetic MCP mock server입니다. 실제 페이지/상품/목적 분류 샘플 데이터 기반.",
   "source": {
     "prefill_from_catalog": false,
     "catalog_entry_name": null,
@@ -10,46 +10,236 @@
   },
   "tools": [
     {
-      "name": "search_page_candidates",
-      "title": "Search Page Candidates",
-      "description": "Synthetic Page Metadata RAG 결과를 반환합니다.",
+      "name": "get_scenario_taxonomy",
+      "title": "Get Scenario Taxonomy",
+      "description": "시나리오 목적 분류체계(대분류/중분류/소분류) 목록을 반환합니다.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "objective_text": { "type": "string", "minLength": 1 },
-          "product_hint": { "type": "string", "minLength": 1 },
-          "journey_stage": { "type": "string", "minLength": 1 },
-          "event_type": { "type": "string", "minLength": 1 },
-          "keywords": {
-            "type": "array",
-            "items": { "type": "string" }
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "required": ["objective_text", "product_hint", "journey_stage", "event_type", "keywords"],
+        "required": [
+          "objective_text"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "synthetic": { "type": "boolean" },
-          "source": { "type": "string" },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category_large": {
+                  "type": "string"
+                },
+                "category_medium": {
+                  "type": "string"
+                },
+                "category_small": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "category_large",
+                "category_medium",
+                "category_small"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "synthetic",
+          "source",
+          "categories"
+        ],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "categories": [
+          {
+            "category_large": "상품",
+            "category_medium": "IRP",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "ISA",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "노란우산",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "신용대출",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "예금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "외화예금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "요구불",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "적금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "청약",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "펀드",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "혜택",
+            "category_medium": "꿀머니",
+            "category_small": "이탈률분석"
+          }
+        ]
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "auditRequired": true
+    },
+    {
+      "name": "search_page_candidates",
+      "title": "Search Page Candidates",
+      "description": "Page Metadata(실데이터 샘플) 기반 페이지 후보를 score 순으로 반환합니다.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "product_hint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "journey_stage": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "objective_text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
           "page_candidates": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "page_id": { "type": "string" },
-                "page_group_id": { "type": "string" },
-                "page_name": { "type": "string" },
-                "matched_reason": { "type": "string" },
-                "rag_score": { "type": "number" }
+                "page_id": {
+                  "type": "string"
+                },
+                "page_name": {
+                  "type": "string"
+                },
+                "screen_category_large": {
+                  "type": "string"
+                },
+                "screen_category_medium": {
+                  "type": "string"
+                },
+                "action_category_large": {
+                  "type": "string"
+                },
+                "action_category_medium": {
+                  "type": "string"
+                },
+                "page_path": {
+                  "type": "string"
+                },
+                "product_event_area": {
+                  "type": "integer"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "match_reason": {
+                  "type": "string"
+                },
+                "rag_score": {
+                  "type": "number"
+                }
               },
-              "required": ["page_id", "page_group_id", "page_name", "matched_reason", "rag_score"],
+              "required": [
+                "page_id",
+                "page_name",
+                "screen_category_large",
+                "screen_category_medium",
+                "action_category_large",
+                "action_category_medium",
+                "page_path",
+                "product_event_area",
+                "description",
+                "match_reason",
+                "rag_score"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["synthetic", "source", "page_candidates"],
+        "required": [
+          "synthetic",
+          "source",
+          "page_candidates"
+        ],
         "additionalProperties": false
       },
       "successResponse": {
@@ -57,76 +247,415 @@
         "source": "agent-factory-mock-lab",
         "page_candidates": [
           {
-            "page_id": "PAGE_B",
-            "page_group_id": "GROUP_B",
-            "page_name": "적금 가입 입력",
-            "matched_reason": "가입 과정 이탈 구간 후보",
-            "rag_score": 0.82
+            "page_id": "NWDID00019_002M",
+            "page_name": "예금/적금 가입 - 이자 시뮬레이션(STEP01)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션",
+            "product_event_area": 1,
+            "rag_score": 0.93,
+            "description": "상품가입_B 시 이자 시뮬레이션 페이지입니다. 이자 수익을 미리 예측합니다.",
+            "match_reason": "예적금 가입 퍼널 진입 단계로 이탈 고객 재유도 직접 대상"
           },
           {
-            "page_id": "PAGE_C",
-            "page_group_id": "GROUP_C",
-            "page_name": "가입 완료 전 확인",
-            "matched_reason": "전환 직전 이탈 가능 구간",
-            "rag_score": 0.76
+            "page_id": "NWDID00019_003M",
+            "page_name": "예금/적금 가입 - 가입정보 확인(STEP02)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인",
+            "product_event_area": 1,
+            "rag_score": 0.91,
+            "description": "상품가입_B의 가입정보 확인 단계입니다. 입력한 정보를 다시 한번 확인합니다.",
+            "match_reason": "가입 정보 확인 단계 이탈이 잦은 핵심 퍼널 구간"
+          },
+          {
+            "page_id": "NWDID00019_004M",
+            "page_name": "예금/적금 가입 - 약관동의(STEP03)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의",
+            "product_event_area": 1,
+            "rag_score": 0.9,
+            "description": "예금/적금 상품 가입 시, 약관 동의 단계로, 가입 전 필수 확인이 필요해요. 핵심키워드: 약관동의, 상품가입, 예금, 적금, 가입절차",
+            "match_reason": "약관동의 필수 단계로 가입 직전 이탈 방지 대상"
+          },
+          {
+            "page_id": "NWDID00019_005M",
+            "page_name": "예금/적금 가입 - 가입완료/실패(STEP04)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패",
+            "product_event_area": 1,
+            "rag_score": 0.88,
+            "description": "장병내일준비적금 가입 완료 또는 실패 후 안내되는 페이지입니다. 핵심키워드: 가입완료, 실패, 안내",
+            "match_reason": "가입 완료/실패 분기 단계로 실패 이탈 고객 회수 대상"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "page_name": "입출금/예금/적금 상품 상세",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세",
+            "product_event_area": 1,
+            "rag_score": 0.86,
+            "description": "입출금/예금/적금 상품의 상세 정보를 확인하는 페이지입니다. 상품명, 금리, 최소가입금액, 만기일, 이자 지급 방식, 가입 조건 등을 상세히 안내합니다.",
+            "match_reason": "상품 상세 조회 후 미가입 이탈 고객의 가입 전환 유도 대상"
+          },
+          {
+            "page_id": "NWMMH00023_001M",
+            "page_name": "예적금 상품몰 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "메인(상품) > 예적금(입출금, 예금, 적금)",
+            "product_event_area": 0,
+            "rag_score": 0.78,
+            "description": "예금, 적금 상품을 확인하고, 가입할 수 있는 메인 화면입니다. 상품명, 금리, 기간, 이자 계산 방식 등을 확인하며, 선택을 결정합니다.",
+            "match_reason": "예적금 탐색 진입 메인으로 상위 퍼널 후보"
+          },
+          {
+            "page_id": "NWMMH00021_001M",
+            "page_name": "상품몰 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "상품메인",
+            "action_category_medium": "NA",
+            "page_path": "메인(상품)",
+            "product_event_area": 0,
+            "rag_score": 0.62,
+            "description": "상품몰의 메인 화면입니다. 다양한 금융상품(예금, 적금, 펀드, 대출, 보험 등)을 한눈에 확인하고, 원하는 상품으로 이동할 수 있습니다.",
+            "match_reason": "전체 상품 진입 메인으로 광범위 후보"
+          },
+          {
+            "page_id": "NWMMH00057_001M",
+            "page_name": "대출 가입 안내",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "여신상품",
+            "action_category_medium": "NA",
+            "page_path": "금융상품 > 대출 > 가입하기 > 안내",
+            "product_event_area": 1,
+            "rag_score": 0.41,
+            "description": "대출 가입 안내 페이지. 대출 상품, 조건, 신청 절차 설명.",
+            "match_reason": "여신 상품 페이지로 예적금 목적과는 약한 연관"
+          },
+          {
+            "page_id": "NWMMH00034_001M",
+            "page_name": "개인사업자 상품 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "개인사업자상품",
+            "action_category_medium": "개인사업자대출",
+            "page_path": "메인(상품) > 개인사업자",
+            "product_event_area": 0,
+            "rag_score": 0.33,
+            "description": "메인(상품) > 개인사업자 페이지입니다. 개인사업자 전용 상품을 확인할 수 있습니다.",
+            "match_reason": "개인사업자 전용 영역으로 예적금 목적과 연관 낮음"
+          },
+          {
+            "page_id": "NWMMH00040_003M",
+            "page_name": "내 꿀머니",
+            "screen_category_large": "메인",
+            "screen_category_medium": "홈/메뉴",
+            "action_category_large": "꿀머니조회",
+            "action_category_medium": "꿀머니",
+            "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니",
+            "product_event_area": 0,
+            "rag_score": 0.94,
+            "description": "내 꿀머니 메인. 포인트, 캐시백, 혜택을 한 눈에 확인.",
+            "match_reason": "꿀머니 혜택 잔액·포인트 조회 목적과 직접 연결된 페이지로 이탈률 분석 대상"
           }
         ]
       },
       "errorScenarios": [],
       "latencyMs": 0,
-      "riskSignals": ["customer_impact", "audit_required"],
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "auditRequired": true
     },
     {
-      "name": "run_userflow_analysis",
-      "title": "Run UserFlow Analysis",
-      "description": "Synthetic UserFlow 분석 결과를 반환합니다.",
+      "name": "search_page_products",
+      "title": "Search Page Products",
+      "description": "페이지 X 상품 매핑(실데이터 샘플)을 반환합니다. 페이지 메타 검색과 병렬 실행 후 결합합니다.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "selected_page_ids": {
-            "type": "array",
-            "items": { "type": "string" }
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
           },
-          "selected_page_group_ids": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "objective_text": { "type": "string", "minLength": 1 }
+          "product_class": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["selected_page_ids", "selected_page_group_ids", "objective_text"],
+        "required": [
+          "objective_text"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "synthetic": { "type": "boolean" },
-          "source": { "type": "string" },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
+          "base_date": {
+            "type": "string"
+          },
+          "page_products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "type": "string"
+                },
+                "product_code": {
+                  "type": "string"
+                },
+                "product_name": {
+                  "type": "string"
+                },
+                "product_class": {
+                  "type": "string"
+                },
+                "screen_category_large": {
+                  "type": "string"
+                },
+                "screen_category_medium": {
+                  "type": "string"
+                },
+                "page_path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "page_id",
+                "product_code",
+                "product_name",
+                "product_class",
+                "screen_category_large",
+                "screen_category_medium",
+                "page_path"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "synthetic",
+          "source",
+          "base_date",
+          "page_products"
+        ],
+        "additionalProperties": false
+      },
+      "successResponse": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "base_date": "20260526",
+        "page_products": [
+          {
+            "page_id": "NWMMH00040_003M",
+            "product_code": "BENEFIT_KKULMONEY",
+            "product_name": "꿀머니 혜택",
+            "product_class": "혜택",
+            "screen_category_large": "메인",
+            "screen_category_medium": "홈/메뉴",
+            "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002584",
+            "product_name": "우리 빙고 적금",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          },
+          {
+            "page_id": "NWDID00019_002M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+          },
+          {
+            "page_id": "NWDID00019_003M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인"
+          },
+          {
+            "page_id": "NWDID00019_004M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의"
+          },
+          {
+            "page_id": "NWDID00019_005M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패"
+          },
+          {
+            "page_id": "NWDID00019_002M",
+            "product_code": "P010002353",
+            "product_name": "WON 적금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002590",
+            "product_name": "우리 T-WON 적금",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          },
+          {
+            "page_id": "NWMMH00057_001M",
+            "product_code": "P020000121",
+            "product_name": "예금담보대출",
+            "product_class": "여신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 대출 > 가입하기 > 안내"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002562",
+            "product_name": "우월한 월급 통장",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          }
+        ]
+      },
+      "errorScenarios": [],
+      "latencyMs": 0,
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "auditRequired": true
+    },
+    {
+      "name": "run_userflow_analysis",
+      "title": "Run UserFlow Analysis",
+      "description": "Synthetic UserFlow 분석 결과를 반환합니다(참조 page_id는 실데이터).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selected_page_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "selected_page_ids",
+          "objective_text"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
           "funnel_dropoff_pages": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "page_id": { "type": "string" },
-                "page_group_id": { "type": "string" },
-                "dropoff_rate": { "type": "number" },
-                "reason": { "type": "string" }
+                "page_id": {
+                  "type": "string"
+                },
+                "page_name": {
+                  "type": "string"
+                },
+                "dropoff_rate": {
+                  "type": "number"
+                },
+                "reason": {
+                  "type": "string"
+                }
               },
-              "required": ["page_id", "page_group_id", "dropoff_rate", "reason"],
+              "required": [
+                "page_id",
+                "page_name",
+                "dropoff_rate",
+                "reason"
+              ],
               "additionalProperties": false
             }
           },
           "major_previous_pages": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "major_next_pages": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "insight": { "type": "string" }
+          "insight": {
+            "type": "string"
+          }
         },
-        "required": ["synthetic", "source", "funnel_dropoff_pages", "major_previous_pages", "major_next_pages", "insight"],
+        "required": [
+          "synthetic",
+          "source",
+          "funnel_dropoff_pages",
+          "major_previous_pages",
+          "major_next_pages",
+          "insight"
+        ],
         "additionalProperties": false
       },
       "successResponse": {
@@ -134,64 +663,106 @@
         "source": "agent-factory-mock-lab",
         "funnel_dropoff_pages": [
           {
-            "page_id": "PAGE_B",
-            "page_group_id": "GROUP_B",
-            "dropoff_rate": 0.42,
-            "reason": "가입 입력 단계 이탈률 높음"
+            "page_id": "NWMMH00040_003M",
+            "page_name": "내 꿀머니",
+            "dropoff_rate": 0.41,
+            "reason": "꿀머니 혜택 조회 화면에서 이탈률 높음"
           }
         ],
-        "major_previous_pages": ["PAGE_A"],
-        "major_next_pages": ["PAGE_D"],
-        "insight": "PAGE_B가 가입 과정 이탈 고객 푸시 대상 선정에 가장 직접적임"
+        "major_previous_pages": [
+          "NWMMH00021_001M"
+        ],
+        "major_next_pages": [
+          "NWMMH00040_003M"
+        ],
+        "insight": "혜택·이벤트 탭에서 내 꿀머니 화면 진입 후 이탈이 가장 큼"
       },
       "errorScenarios": [],
       "latencyMs": 0,
-      "riskSignals": ["customer_impact", "audit_required"],
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "auditRequired": true
     },
     {
       "name": "recommend_scenario_by_behavior_type",
       "title": "Recommend Scenario By Behavior Type",
-      "description": "Synthetic 행동 유형 기반 시나리오 추천 결과를 반환합니다.",
+      "description": "Synthetic 행동 유형 기반 시나리오 추천 결과를 반환합니다(참조 page_id는 실데이터).",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "objective_text": { "type": "string", "minLength": 1 },
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
+          },
           "selected_page_ids": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "selected_page_group_ids": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "customer_behavior_hint": { "type": "string", "minLength": 1 }
+          "customer_behavior_hint": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["objective_text", "selected_page_ids", "selected_page_group_ids", "customer_behavior_hint"],
+        "required": [
+          "objective_text",
+          "selected_page_ids",
+          "customer_behavior_hint"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "synthetic": { "type": "boolean" },
-          "source": { "type": "string" },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
           "recommended_scenarios": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "scenario_id": { "type": "string" },
-                "scenario_name": { "type": "string" },
-                "related_page_group_id": { "type": "string" },
-                "score": { "type": "number" },
-                "basis": { "type": "string" }
+                "scenario_id": {
+                  "type": "string"
+                },
+                "scenario_name": {
+                  "type": "string"
+                },
+                "related_page_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "score": {
+                  "type": "number"
+                },
+                "basis": {
+                  "type": "string"
+                }
               },
-              "required": ["scenario_id", "scenario_name", "related_page_group_id", "score", "basis"],
+              "required": [
+                "scenario_id",
+                "scenario_name",
+                "related_page_ids",
+                "score",
+                "basis"
+              ],
               "additionalProperties": false
             }
           }
         },
-        "required": ["synthetic", "source", "recommended_scenarios"],
+        "required": [
+          "synthetic",
+          "source",
+          "recommended_scenarios"
+        ],
         "additionalProperties": false
       },
       "successResponse": {
@@ -199,61 +770,103 @@
         "source": "agent-factory-mock-lab",
         "recommended_scenarios": [
           {
-            "scenario_id": "SCN_SAVINGS_DROPOFF_001",
-            "scenario_name": "적금 가입 중단 고객 재유도",
-            "related_page_group_id": "GROUP_B",
+            "scenario_id": "SCN_KKULMONEY_DROPOFF_001",
+            "scenario_name": "꿀머니 혜택 조회 중단 고객 재유도",
+            "related_page_ids": [
+              "NWMMH00040_003M"
+            ],
             "score": 0.88,
-            "basis": "행동유형 기반 추천 mock"
+            "basis": "혜택 조회 중단 행동유형 기반 추천"
+          },
+          {
+            "scenario_id": "SCN_DEPOSIT_DETAIL_REVISIT_002",
+            "scenario_name": "상품 상세 열람 후 미가입 고객 재방문 유도",
+            "related_page_ids": [
+              "NWMMH00051_001M"
+            ],
+            "score": 0.81,
+            "basis": "상품 상세 조회 행동유형 기반 추천"
           }
         ]
       },
       "errorScenarios": [],
       "latencyMs": 0,
-      "riskSignals": ["customer_impact", "audit_required"],
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "auditRequired": true
     },
     {
       "name": "analyze_page_customer_relation",
       "title": "Analyze Page Customer Relation",
-      "description": "Synthetic T2S/Page-Customer 관계 분석 결과를 반환합니다.",
+      "description": "Synthetic T2S/Page-Customer 관계 분석 결과를 반환합니다(참조 page_id는 실데이터).",
       "inputSchema": {
         "type": "object",
         "properties": {
           "selected_page_ids": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "selected_page_group_ids": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "objective_text": { "type": "string", "minLength": 1 }
+          "objective_text": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["selected_page_ids", "selected_page_group_ids", "objective_text"],
+        "required": [
+          "selected_page_ids",
+          "objective_text"
+        ],
         "additionalProperties": false
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "synthetic": { "type": "boolean" },
-          "source": { "type": "string" },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
           "page_customer_relations": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "page_group_id": { "type": "string" },
-                "target_customer_count": { "type": "integer" },
-                "signal": { "type": "string" },
-                "recommendation_score": { "type": "number" }
+                "page_id": {
+                  "type": "string"
+                },
+                "target_customer_count": {
+                  "type": "integer"
+                },
+                "signal": {
+                  "type": "string"
+                },
+                "recommendation_score": {
+                  "type": "number"
+                }
               },
-              "required": ["page_group_id", "target_customer_count", "signal", "recommendation_score"],
+              "required": [
+                "page_id",
+                "target_customer_count",
+                "signal",
+                "recommendation_score"
+              ],
               "additionalProperties": false
             }
           },
-          "insight": { "type": "string" }
+          "insight": {
+            "type": "string"
+          }
         },
-        "required": ["synthetic", "source", "page_customer_relations", "insight"],
+        "required": [
+          "synthetic",
+          "source",
+          "page_customer_relations",
+          "insight"
+        ],
         "additionalProperties": false
       },
       "successResponse": {
@@ -261,17 +874,20 @@
         "source": "agent-factory-mock-lab",
         "page_customer_relations": [
           {
-            "page_group_id": "GROUP_B",
+            "page_id": "NWMMH00040_003M",
             "target_customer_count": 5634,
             "signal": "high_dropoff",
             "recommendation_score": 0.91
           }
         ],
-        "insight": "GROUP_B는 고객 규모와 이탈 신호 기준에서 우선 후보"
+        "insight": "내 꿀머니(NWMMH00040_003M) 페이지가 고객 규모·이탈 신호 기준 우선 분석 대상"
       },
       "errorScenarios": [],
       "latencyMs": 0,
-      "riskSignals": ["customer_impact", "audit_required"],
+      "riskSignals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "auditRequired": true
     }
   ],

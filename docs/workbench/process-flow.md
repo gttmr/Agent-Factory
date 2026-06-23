@@ -73,6 +73,7 @@ MCP, callback, side effect, policy는 category가 아니라 Graph IR 실행 메�
 
 고정 MCP Adapter 호출은 `node_kind: adapter_call`, `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`로 표현한다.
 LLM이 MCP toolset에서 tool을 고르는 경로는 `node_kind: agent`, `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`으로 표현한다.
+`input_mapping`과 `output_mapping`은 module-bound node의 runnable 입력/출력 계약이다. key는 대상 node/module의 field 이름이고 value는 upstream payload, named state channel, 또는 workflow context 안에서 찾을 source field 이름이다. ADK source generator는 connected MCP adapter 입력을 해석할 때 이 reviewed mapping을 `agents.config.yaml input_map`보다 먼저 적용한다.
 `node_kind: workflow_call`은 공식 subworkflow/existing workflow 호출 노드이며 `workflow_ref`, `input_schema`, `output_schema`, `input_mapping`, `output_mapping`, `adk_skeleton_contract`를 가질 수 있다.
 
 ## Container
@@ -119,7 +120,7 @@ Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/
 - `conditional`
 - `boundary_crossing`
 
-`route` edge에는 `route_condition`이 필요하다.
+`route` edge에는 `route_condition`이 필요하다. `route`는 branch 선택 신호이며 업무 payload 전달은 router node의 `Event.output` 또는 별도 state/artifact edge가 담당한다.
 `artifact` edge에는 `artifact_key`가 필요하다.
 `remote_a2a` edge는 `is_remote_boundary_crossing: true`와 `a2a_contract_id`가 필요하고, local graph 복잡도만으로 만들 수 없다.
 

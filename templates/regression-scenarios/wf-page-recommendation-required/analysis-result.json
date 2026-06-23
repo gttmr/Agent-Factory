@@ -2,35 +2,66 @@
   "normalizedRequirement": {
     "id": "req-page-recommendation-required",
     "title": "1-1 페이지 추천(필수)",
-    "raw_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송하기 위한 대상 Page 또는 Page Group 추천 Workflow smoke skeleton.",
+    "raw_text": "꿀머니 혜택 이탈률을 분석하기 위한 대상 Page(다중) 추천 Workflow. 실제 페이지/상품 메타데이터 mock 기반.",
     "domain": "공통",
     "requester": {
       "team": "Agent Factory",
       "role": "reviewer"
     },
-    "business_goal": "사용자 목적과 Page Metadata RAG mock 결과를 바탕으로 1차 Page/Page Group을 추천하고, 사용자 확인형 Gate에서 분석 실행 여부를 받은 뒤 후속 Workflow 1-2 placeholder로 broad handoff payload를 전달한다.",
+    "business_goal": "사용자 목적을 분류체계(대/중/소)로 분류하고, 페이지 메타와 페이지×상품 매핑을 병렬 조회해 1차 다중 Page 후보를 추천한다. 사용자 확인형 Gate에서 분석 실행 여부를 받은 뒤 후속 Workflow 1-2 placeholder로 broad handoff payload를 전달한다.",
     "current_process": [
-      "목적/시나리오 확인",
-      "Page Metadata RAG mock 조회",
-      "1차 Page/Page Group 추천",
+      "목적/시나리오 분류 및 확인",
+      "페이지 메타 + 페이지×상품 병렬 조회",
+      "1차 다중 Page 후보 추천",
       "사용자 확인형 분석 Gate",
       "선택 시 UserFlow/행동유형/T2S 분석 mock 실행",
-      "최종 선택 후 Workflow 1-2 placeholder handoff"
+      "최종 다중 Page 선택 후 Workflow 1-2 placeholder handoff"
     ],
     "inputs": [
-      { "name": "objective_text", "type": "string", "required": true },
-      { "name": "product_hint", "type": "string", "required": true },
-      { "name": "journey_stage", "type": "string", "required": true },
-      { "name": "event_type", "type": "string", "required": true }
+      {
+        "name": "objective_text",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "product_hint",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "journey_stage",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "event_type",
+        "type": "string",
+        "required": true
+      }
     ],
     "outputs": [
-      { "name": "handoff_payload", "type": "object", "required": true }
+      {
+        "name": "handoff_payload",
+        "type": "object",
+        "required": true
+      }
     ],
     "systems": [
-      { "name": "Mock Lab", "access": "read" },
-      { "name": "ADK Web", "access": "read" }
+      {
+        "name": "Mock Lab",
+        "access": "read"
+      },
+      {
+        "name": "ADK Web",
+        "access": "read"
+      }
     ],
-    "risk_signals": ["customer_impact", "external_message", "human_approval_required", "audit_required"],
+    "risk_signals": [
+      "customer_impact",
+      "external_message",
+      "human_approval_required",
+      "audit_required"
+    ],
     "missing_information": [],
     "contradictions": [],
     "status": "approved"
@@ -39,17 +70,34 @@
     "requested_goal": "ADK Web smoke 가능한 1-1 페이지 추천 Workflow skeleton, Mock Lab MCP server/tools, sample input, README를 만든다.",
     "business_domain_hint": "공통",
     "user_role": "reviewer",
-    "input_data": ["objective_text", "product_hint", "journey_stage", "event_type"],
-    "output_data": ["handoff_payload", "selected_page_group_ids", "selected_page_ids"],
-    "systems_mentioned": ["Mock Lab", "ADK Web"],
+    "input_data": [
+      "objective_text",
+      "product_hint",
+      "journey_stage",
+      "event_type"
+    ],
+    "output_data": [
+      "handoff_payload",
+      "selected_page_ids"
+    ],
+    "systems_mentioned": [
+      "Mock Lab",
+      "ADK Web"
+    ],
     "decisions_implied": [
       "Workflow-first Graph IR",
       "Mock Lab MCP test double",
       "A 사용자 확인형 Gate",
       "Workflow 1-2 unresolved placeholder",
-      "Dynamic Workflow 제외"
+      "Dynamic Workflow 제외",
+      "Page Group 제거 · 다중 Page 선택"
     ],
-    "risk_signals": ["customer_impact", "external_message", "human_approval_required", "audit_required"],
+    "risk_signals": [
+      "customer_impact",
+      "external_message",
+      "human_approval_required",
+      "audit_required"
+    ],
     "missing_information": [],
     "contradictions": [],
     "assumptions": [
@@ -80,14 +128,27 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "objective_text", "type": "string", "required": true }
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "broad_handoff_payload", "type": "object", "required": true }
+        {
+          "name": "broad_handoff_payload",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "external_message", "human_approval_required", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "external_message",
+        "human_approval_required",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "none",
@@ -109,7 +170,9 @@
       "audit": "record synthetic ADK Web smoke evidence",
       "data_policy": "synthetic data only",
       "a2a_contract_id": null,
-      "developer_todos": ["실제 업무 로직은 전문 개발자가 별도 구현한다."]
+      "developer_todos": [
+        "실제 업무 로직은 전문 개발자가 별도 구현한다."
+      ]
     },
     {
       "id": "mod-page-candidate-search",
@@ -137,18 +200,45 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "objective_text", "type": "string", "required": true },
-        { "name": "product_hint", "type": "string", "required": true },
-        { "name": "journey_stage", "type": "string", "required": true },
-        { "name": "event_type", "type": "string", "required": true },
-        { "name": "keywords", "type": "array", "required": true }
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "product_hint",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "journey_stage",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "event_type",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "keywords",
+          "type": "array",
+          "required": false
+        }
       ],
       "outputs": [
-        { "name": "page_candidates", "type": "array", "required": true }
+        {
+          "name": "page_candidates",
+          "type": "array",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "read",
@@ -171,26 +261,31 @@
       "data_policy": "synthetic data only",
       "a2a_contract_id": null,
       "smoke_spec": {
-        "sample_user_message": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송할 Page/PageGroup 추천 시작",
+        "sample_user_message": "꿀머니 이탈률 분석 대상 Page 추천 시작",
         "synthetic_inputs": {
-          "objective_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송",
-          "product_hint": "적금",
-          "journey_stage": "가입 과정",
-          "event_type": "이탈",
-          "keywords": ["적금", "가입", "이탈", "푸시"]
+          "objective_text": "꿀머니 이탈률 분석할래"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["mock_lab_mcp_call", "page_candidates"],
-        "mock_sources": ["wf-page-recommendation-mock.search_page_candidates"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "page_candidates"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.search_page_candidates"
+        ],
         "ready": true
       },
-      "developer_todos": ["실제 Page Metadata RAG 계약과 source ACL을 전문 개발자가 검토한다."]
+      "developer_todos": [
+        "실제 Page Metadata RAG 계약과 source ACL을 전문 개발자가 검토한다."
+      ]
     },
     {
       "id": "mod-initial-page-selector",
       "source_requirement_id": "req-page-recommendation-required",
       "catalog_entry_id": null,
-      "name": "1차 Page/Page Group 선택 Agent",
+      "name": "1차 Page 선택 Agent",
       "module_category": "agent",
       "agent_kind": "specialist",
       "workflow_kind": null,
@@ -207,14 +302,30 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "page_candidates", "type": "array", "required": true }
+        {
+          "name": "page_candidates",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "page_products",
+          "type": "array",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "initial_selection", "type": "object", "required": true }
+        {
+          "name": "initial_selection",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "none",
@@ -237,16 +348,27 @@
       "data_policy": "synthetic data only",
       "a2a_contract_id": null,
       "smoke_spec": {
-        "sample_user_message": "PAGE_B / GROUP_B를 1차 후보로 추천해줘.",
+        "sample_user_message": "꿀머니 혜택 페이지를 1차 다중 Page 후보로 추천해줘.",
         "synthetic_inputs": {
-          "page_candidates": ["PAGE_B", "PAGE_C"]
+          "page_candidates": [
+            "NWMMH00040_003M"
+          ],
+          "page_products": [
+            "꿀머니 혜택"
+          ]
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["initial_selection"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "initial_selection"
+        ],
         "mock_sources": [],
         "ready": true
       },
-      "developer_todos": ["실제 추천 기준과 설명 정책을 전문 개발자가 검토한다."]
+      "developer_todos": [
+        "실제 추천 기준과 설명 정책을 전문 개발자가 검토한다."
+      ]
     },
     {
       "id": "mod-analysis-input-builder",
@@ -274,14 +396,24 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "initial_selection", "type": "object", "required": true }
+        {
+          "name": "initial_selection",
+          "type": "object",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "analysis_input_bundle", "type": "object", "required": true }
+        {
+          "name": "analysis_input_bundle",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "low",
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "none",
@@ -306,16 +438,23 @@
       "smoke_spec": {
         "sample_user_message": "분석 입력 번들을 구성해줘.",
         "synthetic_inputs": {
-          "selected_page_ids": ["PAGE_B"],
-          "selected_page_group_ids": ["GROUP_B"],
-          "objective_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송"
+          "selected_page_ids": [
+            "NWMMH00040_003M"
+          ],
+          "objective_text": "꿀머니 이탈률 분석할래"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["analysis_input_bundle"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "analysis_input_bundle"
+        ],
         "mock_sources": [],
         "ready": true
       },
-      "developer_todos": ["실제 분석 입력 schema를 전문 개발자가 확정한다."]
+      "developer_todos": [
+        "실제 분석 입력 schema를 전문 개발자가 확정한다."
+      ]
     },
     {
       "id": "mod-userflow-analysis",
@@ -343,17 +482,35 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "selected_page_ids", "type": "array", "required": true },
-        { "name": "selected_page_group_ids", "type": "array", "required": true },
-        { "name": "objective_text", "type": "string", "required": true }
+        {
+          "name": "selected_page_ids",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "funnel_dropoff_pages", "type": "array", "required": true },
-        { "name": "insight", "type": "string", "required": true }
+        {
+          "name": "funnel_dropoff_pages",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "insight",
+          "type": "string",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "read",
@@ -378,16 +535,26 @@
       "smoke_spec": {
         "sample_user_message": "UserFlow 분석 mock을 실행해줘.",
         "synthetic_inputs": {
-          "selected_page_ids": ["PAGE_B"],
-          "selected_page_group_ids": ["GROUP_B"],
-          "objective_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송"
+          "selected_page_ids": [
+            "NWMMH00040_003M"
+          ],
+          "objective_text": "꿀머니 이탈률 분석할래"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["mock_lab_mcp_call", "userflow"],
-        "mock_sources": ["wf-page-recommendation-mock.run_userflow_analysis"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "userflow"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.run_userflow_analysis"
+        ],
         "ready": true
       },
-      "developer_todos": ["실제 UserFlow connector는 전문 개발자가 별도 구현한다."]
+      "developer_todos": [
+        "실제 UserFlow connector는 전문 개발자가 별도 구현한다."
+      ]
     },
     {
       "id": "mod-scenario-recommendation",
@@ -415,17 +582,35 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "objective_text", "type": "string", "required": true },
-        { "name": "selected_page_ids", "type": "array", "required": true },
-        { "name": "selected_page_group_ids", "type": "array", "required": true },
-        { "name": "customer_behavior_hint", "type": "string", "required": true }
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "selected_page_ids",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "customer_behavior_hint",
+          "type": "string",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "recommended_scenarios", "type": "array", "required": true }
+        {
+          "name": "recommended_scenarios",
+          "type": "array",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "read",
@@ -450,17 +635,27 @@
       "smoke_spec": {
         "sample_user_message": "행동유형 기반 시나리오 추천 mock을 실행해줘.",
         "synthetic_inputs": {
-          "objective_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송",
-          "selected_page_ids": ["PAGE_B"],
-          "selected_page_group_ids": ["GROUP_B"],
-          "customer_behavior_hint": "가입 중단"
+          "objective_text": "꿀머니 이탈률 분석할래",
+          "selected_page_ids": [
+            "NWMMH00040_003M"
+          ],
+          "customer_behavior_hint": "혜택 조회 중단"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["mock_lab_mcp_call", "scenario"],
-        "mock_sources": ["wf-page-recommendation-mock.recommend_scenario_by_behavior_type"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "scenario"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.recommend_scenario_by_behavior_type"
+        ],
         "ready": true
       },
-      "developer_todos": ["실제 행동유형 추천 connector는 전문 개발자가 별도 구현한다."]
+      "developer_todos": [
+        "실제 행동유형 추천 connector는 전문 개발자가 별도 구현한다."
+      ]
     },
     {
       "id": "mod-t2s-analysis",
@@ -488,17 +683,35 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "selected_page_ids", "type": "array", "required": true },
-        { "name": "selected_page_group_ids", "type": "array", "required": true },
-        { "name": "objective_text", "type": "string", "required": true }
+        {
+          "name": "selected_page_ids",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "page_customer_relations", "type": "array", "required": true },
-        { "name": "insight", "type": "string", "required": true }
+        {
+          "name": "page_customer_relations",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "insight",
+          "type": "string",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "read",
@@ -523,16 +736,26 @@
       "smoke_spec": {
         "sample_user_message": "T2S 분석 mock을 실행해줘.",
         "synthetic_inputs": {
-          "selected_page_ids": ["PAGE_B"],
-          "selected_page_group_ids": ["GROUP_B"],
-          "objective_text": "적금 상품 가입 과정 중 이탈 고객에게 푸시 발송"
+          "selected_page_ids": [
+            "NWMMH00040_003M"
+          ],
+          "objective_text": "꿀머니 이탈률 분석할래"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["mock_lab_mcp_call", "t2s"],
-        "mock_sources": ["wf-page-recommendation-mock.analyze_page_customer_relation"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "t2s"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.analyze_page_customer_relation"
+        ],
         "ready": true
       },
-      "developer_todos": ["실제 T2S connector는 전문 개발자가 별도 구현한다."]
+      "developer_todos": [
+        "실제 T2S connector는 전문 개발자가 별도 구현한다."
+      ]
     },
     {
       "id": "mod-analysis-synthesis",
@@ -555,16 +778,35 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "userflow", "type": "object", "required": true },
-        { "name": "scenario", "type": "object", "required": true },
-        { "name": "t2s", "type": "object", "required": true }
+        {
+          "name": "userflow",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "scenario",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "t2s",
+          "type": "object",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "synthesized_page_selection", "type": "object", "required": true }
+        {
+          "name": "synthesized_page_selection",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": false,
       "risk_level": "medium",
-      "risk_signals": ["customer_impact", "audit_required"],
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "none",
@@ -587,18 +829,24 @@
       "data_policy": "synthetic data only",
       "a2a_contract_id": null,
       "smoke_spec": {
-        "sample_user_message": "분석 결과를 종합해 최종 후보를 제안해줘.",
+        "sample_user_message": "분석 결과를 종합해 최종 다중 Page 후보를 제안해줘.",
         "synthetic_inputs": {
-          "userflow": "PAGE_B dropoff high",
-          "scenario": "SCN_SAVINGS_DROPOFF_001",
-          "t2s": "GROUP_B high_dropoff"
+          "userflow": "NWMMH00040_003M dropoff high",
+          "scenario": "SCN_KKULMONEY_DROPOFF_001",
+          "t2s": "NWMMH00040_003M high_dropoff"
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["synthesized_page_selection"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "synthesized_page_selection"
+        ],
         "mock_sources": [],
         "ready": true
       },
-      "developer_todos": ["실제 종합 기준과 후보 노출 정책을 전문 개발자가 확정한다."]
+      "developer_todos": [
+        "실제 종합 기준과 후보 노출 정책을 전문 개발자가 확정한다."
+      ]
     },
     {
       "id": "mod-workflow-1-2-placeholder",
@@ -621,14 +869,24 @@
         "streaming_grounding": null
       },
       "inputs": [
-        { "name": "broad_handoff_payload", "type": "object", "required": true }
+        {
+          "name": "broad_handoff_payload",
+          "type": "object",
+          "required": true
+        }
       ],
       "outputs": [
-        { "name": "broad_handoff_payload", "type": "object", "required": true }
+        {
+          "name": "broad_handoff_payload",
+          "type": "object",
+          "required": true
+        }
       ],
       "reuse_candidate": true,
       "risk_level": "medium",
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "status": "approved",
       "missing_information": [],
       "side_effect": "none",
@@ -651,17 +909,390 @@
       "data_policy": "synthetic data only",
       "a2a_contract_id": null,
       "smoke_spec": {
-        "sample_user_message": "GROUP_B 최종 선택 payload를 Workflow 1-2 placeholder로 전달해줘.",
+        "sample_user_message": "선택한 다중 Page payload를 Workflow 1-2 placeholder로 전달해줘.",
         "synthetic_inputs": {
-          "selected_page_group_ids": ["GROUP_B"],
-          "selected_page_ids": ["PAGE_B"]
+          "selected_page_ids": [
+            "NWMMH00040_003M"
+          ]
         },
-        "expected_output_shape": { "type": "object" },
-        "expected_event_markers": ["workflow_call_placeholder", "broad_handoff_payload"],
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "workflow_call_placeholder",
+          "broad_handoff_payload"
+        ],
         "mock_sources": [],
         "ready": true
       },
-      "developer_todos": ["Workflow 1-2 계약을 확정한 뒤 실제 target Workflow skeleton 연결을 검토한다."]
+      "developer_todos": [
+        "Workflow 1-2 계약을 확정한 뒤 실제 target Workflow skeleton 연결을 검토한다."
+      ]
+    },
+    {
+      "id": "mod-scenario-taxonomy",
+      "source_requirement_id": "req-page-recommendation-required",
+      "catalog_entry_id": null,
+      "name": "시나리오 목적 분류체계 조회 Adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "retrieval",
+      "remote_contract_kind": null,
+      "access_protocol": "mcp",
+      "mcp_server": "wf-page-recommendation-mock",
+      "mcp_tool_name": "get_scenario_taxonomy",
+      "mcp_schema_ref": "scenario_taxonomy_request.v1",
+      "mcp_auth_mode": "none",
+      "legacy_recommended_type": "knowledge_retrieval",
+      "confidence": 0.9,
+      "rationale": "표1 목적 분류체계(대/중/소)를 목적 분류 Agent에 제공하는 retrieval adapter다.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": null,
+        "mcp_a2a": "fixed Mock Lab MCP tool call",
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "categories",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "read",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": true,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "공통",
+      "owner": "Agent Factory",
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": "synthetic local smoke only",
+      "retry": "none",
+      "fallback": "manual TODO",
+      "audit": "record synthetic Mock Lab call",
+      "data_policy": "synthetic data only",
+      "a2a_contract_id": null,
+      "smoke_spec": {
+        "sample_user_message": "목적 분류체계를 조회해줘.",
+        "synthetic_inputs": {
+          "objective_text": "꿀머니 이탈률 분석할래"
+        },
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "categories"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.get_scenario_taxonomy"
+        ],
+        "ready": true
+      },
+      "developer_todos": [
+        "실제 목적 분류체계 마스터(대/중/소) 소스와 갱신 주기를 전문 개발자가 검토한다."
+      ]
+    },
+    {
+      "id": "mod-objective-classifier",
+      "source_requirement_id": "req-page-recommendation-required",
+      "catalog_entry_id": null,
+      "name": "목적 분류 Agent",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.86,
+      "rationale": "get_scenario_taxonomy가 제공한 분류체계를 참고해 objective_text를 대/중/소 분류로 매핑하는 judgment node다.",
+      "adk_hints": {
+        "state_memory": "read synthetic taxonomy output",
+        "callbacks": null,
+        "artifacts_events": null,
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "categories",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "objective_classification",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "공통",
+      "owner": "Agent Factory",
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": "synthetic local smoke only",
+      "retry": "none",
+      "fallback": "manual review",
+      "audit": "record synthetic classification rationale",
+      "data_policy": "synthetic data only",
+      "a2a_contract_id": null,
+      "smoke_spec": {
+        "sample_user_message": "이 목적을 대/중/소 분류로 매핑해줘.",
+        "synthetic_inputs": {
+          "objective_text": "꿀머니 이탈률 분석할래",
+          "categories": [
+            "상품/예금/신규",
+            "상품/적금/신규",
+            "혜택/꿀머니/이탈률분석"
+          ]
+        },
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "objective_classification"
+        ],
+        "mock_sources": [],
+        "ready": true
+      },
+      "developer_todos": [
+        "실제 분류 기준과 다중 분류 매핑 정책을 전문 개발자가 확정한다."
+      ]
+    },
+    {
+      "id": "mod-adapter-argument-planner",
+      "source_requirement_id": "req-page-recommendation-required",
+      "catalog_entry_id": null,
+      "name": "Adapter Arguments 생성 Agent",
+      "module_category": "agent",
+      "agent_kind": "specialist",
+      "workflow_kind": null,
+      "adapter_kind": null,
+      "remote_contract_kind": null,
+      "legacy_recommended_type": "specialist_agent",
+      "confidence": 0.84,
+      "rationale": "목적/시나리오 분류 확인 응답과 이전 objective context를 결합해 후속 MCP Adapter 호출 인자를 구성하는 reasoning node다.",
+      "adk_hints": {
+        "state_memory": "read purpose confirmation and objective classification context",
+        "callbacks": null,
+        "artifacts_events": null,
+        "mcp_a2a": null,
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "objective_classification",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "purpose_confirmation",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "adapter_arguments",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "none",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": false,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "공통",
+      "owner": "Agent Factory",
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": "synthetic local smoke only",
+      "retry": "none",
+      "fallback": "manual review",
+      "audit": "record generated adapter arguments and rationale in LLM output",
+      "data_policy": "synthetic data only",
+      "a2a_contract_id": null,
+      "smoke_spec": {
+        "sample_user_message": "후속 Adapter arguments를 JSON으로 구성해줘.",
+        "synthetic_inputs": {
+          "objective_text": "사용자 목적 텍스트",
+          "objective_classification": {
+            "category_large": "분류 대분류",
+            "category_medium": "분류 중분류",
+            "category_small": "분류 소분류"
+          },
+          "purpose_confirmation": {
+            "response": "확인 또는 수정 입력"
+          }
+        },
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "adapter_arguments"
+        ],
+        "mock_sources": [],
+        "ready": true
+      },
+      "developer_todos": [
+        "실제 adapter argument schema와 누락 필드 처리 정책을 전문 개발자가 검토한다."
+      ]
+    },
+    {
+      "id": "mod-page-product-search",
+      "source_requirement_id": "req-page-recommendation-required",
+      "catalog_entry_id": null,
+      "name": "페이지×상품 매핑 조회 Adapter",
+      "module_category": "adapter",
+      "agent_kind": null,
+      "workflow_kind": null,
+      "adapter_kind": "retrieval",
+      "remote_contract_kind": null,
+      "access_protocol": "mcp",
+      "mcp_server": "wf-page-recommendation-mock",
+      "mcp_tool_name": "search_page_products",
+      "mcp_schema_ref": "page_product_search_request.v1",
+      "mcp_auth_mode": "none",
+      "legacy_recommended_type": "knowledge_retrieval",
+      "confidence": 0.9,
+      "rationale": "표3 페이지×상품 매핑을 조회하는 retrieval adapter. 페이지 메타 검색과 병렬 실행 후 1차 선택 Agent가 결합한다.",
+      "adk_hints": {
+        "state_memory": null,
+        "callbacks": null,
+        "artifacts_events": null,
+        "mcp_a2a": "fixed Mock Lab MCP tool call",
+        "streaming_grounding": null
+      },
+      "inputs": [
+        {
+          "name": "objective_text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "product_class",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "page_products",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "reuse_candidate": false,
+      "risk_level": "medium",
+      "risk_signals": [
+        "customer_impact",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "read",
+      "auth_required": false,
+      "audit_required": true,
+      "citation_required": false,
+      "grounding_required": true,
+      "source_acl_required": false,
+      "versioned": false,
+      "effective_date_required": false,
+      "owner_domain": "공통",
+      "owner": "Agent Factory",
+      "agent_card": null,
+      "auth": null,
+      "task_lifecycle": null,
+      "timeout": "synthetic local smoke only",
+      "retry": "none",
+      "fallback": "manual TODO",
+      "audit": "record synthetic Mock Lab call",
+      "data_policy": "synthetic data only",
+      "a2a_contract_id": null,
+      "smoke_spec": {
+        "sample_user_message": "페이지별 상품 매핑을 조회해줘.",
+        "synthetic_inputs": {
+          "objective_text": "꿀머니 이탈률 분석할래"
+        },
+        "expected_output_shape": {
+          "type": "object"
+        },
+        "expected_event_markers": [
+          "mock_lab_mcp_call",
+          "page_products"
+        ],
+        "mock_sources": [
+          "wf-page-recommendation-mock.search_page_products"
+        ],
+        "ready": true
+      },
+      "developer_todos": [
+        "실제 페이지×상품 매핑 소스(상품 마스터 조인)와 source ACL을 전문 개발자가 검토한다."
+      ]
     }
   ],
   "a2aContracts": [],
@@ -683,9 +1314,14 @@
         "lane_id": "input",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["page_recommendation_request.v1"],
+        "schema_refs": [
+          "page_recommendation_request.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 80, "y": 160 },
+        "position": {
+          "x": 80,
+          "y": 160
+        },
         "invoke_binding": null,
         "decision_owner": null,
         "call_control": null,
@@ -695,7 +1331,7 @@
       {
         "id": "node-confirm-purpose",
         "module_id": null,
-        "label": "목적/시나리오 확인",
+        "label": "목적/시나리오 분류 확인",
         "node_kind": "human_input",
         "execution_kind": "request_input",
         "adk_node_role": "synthetic",
@@ -704,9 +1340,14 @@
         "lane_id": "human_input",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["purpose_confirmation.v1"],
+        "schema_refs": [
+          "purpose_confirmation.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 260, "y": 160 },
+        "position": {
+          "x": 260,
+          "y": 160
+        },
         "runtime_binding": "ui_input",
         "invoke_binding": "ui_input",
         "decision_owner": "human",
@@ -714,6 +1355,41 @@
         "side_effect": "none",
         "policy": "audit_required",
         "output_schema": "purpose_confirmation.v1"
+      },
+      {
+        "id": "node-plan-adapter-arguments",
+        "label": "Adapter Arguments 생성 Agent",
+        "module_id": "mod-adapter-argument-planner",
+        "node_kind": "agent",
+        "invoke_binding": "local_python",
+        "decision_owner": "llm",
+        "call_control": "none",
+        "side_effect": "none",
+        "policy": "audit_required",
+        "execution_kind": "llm_agent",
+        "agent_execution_mode": "single_turn",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-page-recommendation",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [
+          "adapter_arguments.v1"
+        ],
+        "review_status": "approved",
+        "workflow_ref": null,
+        "input_schema": null,
+        "output_schema": "adapter_arguments.v1",
+        "input_mapping": null,
+        "output_mapping": null,
+        "runtime_binding": null,
+        "mock_binding": null,
+        "adk_skeleton_contract": null,
+        "position": {
+          "x": 520,
+          "y": 220
+        }
       },
       {
         "id": "node-search-page-candidates",
@@ -727,9 +1403,15 @@
         "lane_id": "adapter",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["page_candidate_search_request.v1", "page_candidate_search_response.v1"],
+        "schema_refs": [
+          "page_candidate_search_request.v1",
+          "page_candidate_search_response.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 480, "y": 160 },
+        "position": {
+          "x": 480,
+          "y": 160
+        },
         "runtime_binding": "mcp_tool",
         "invoke_binding": "mcp_tool",
         "decision_owner": "workflow_code",
@@ -750,7 +1432,7 @@
       {
         "id": "node-select-initial-page",
         "module_id": "mod-initial-page-selector",
-        "label": "1차 Page/Page Group 선택 Agent",
+        "label": "1차 Page 선택 Agent",
         "node_kind": "agent",
         "execution_kind": "llm_agent",
         "agent_execution_mode": "single_turn",
@@ -760,9 +1442,14 @@
         "lane_id": "local_graph",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["initial_page_selection.v1"],
+        "schema_refs": [
+          "initial_page_selection.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 700, "y": 160 },
+        "position": {
+          "x": 700,
+          "y": 160
+        },
         "invoke_binding": "local_python",
         "decision_owner": "llm",
         "call_control": "none",
@@ -782,9 +1469,14 @@
         "lane_id": "human_input",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["analysis_execution_confirmation.v1"],
+        "schema_refs": [
+          "analysis_execution_confirmation.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 920, "y": 160 },
+        "position": {
+          "x": 920,
+          "y": 160
+        },
         "runtime_binding": "ui_input",
         "invoke_binding": "ui_input",
         "decision_owner": "human",
@@ -805,9 +1497,14 @@
         "lane_id": "local_graph",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["analysis_execution_confirmation.v1"],
+        "schema_refs": [
+          "analysis_execution_confirmation.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 1140, "y": 160 },
+        "position": {
+          "x": 1140,
+          "y": 160
+        },
         "invoke_binding": "local_function",
         "decision_owner": "workflow_code",
         "call_control": "fixed_by_workflow",
@@ -826,9 +1523,14 @@
         "lane_id": "local_graph",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["analysis_input_bundle.v1"],
+        "schema_refs": [
+          "analysis_input_bundle.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 1360, "y": 100 },
+        "position": {
+          "x": 1360,
+          "y": 100
+        },
         "runtime_binding": "local_function",
         "invoke_binding": "local_function",
         "decision_owner": "workflow_code",
@@ -849,9 +1551,15 @@
         "lane_id": "adapter",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["userflow_analysis_request.v1", "userflow_analysis_response.v1"],
+        "schema_refs": [
+          "userflow_analysis_request.v1",
+          "userflow_analysis_response.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 1580, "y": 40 },
+        "position": {
+          "x": 1580,
+          "y": 40
+        },
         "runtime_binding": "mcp_tool",
         "invoke_binding": "mcp_tool",
         "decision_owner": "workflow_code",
@@ -881,9 +1589,15 @@
         "lane_id": "adapter",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["scenario_recommendation_request.v1", "scenario_recommendation_response.v1"],
+        "schema_refs": [
+          "scenario_recommendation_request.v1",
+          "scenario_recommendation_response.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 1580, "y": 160 },
+        "position": {
+          "x": 1580,
+          "y": 160
+        },
         "runtime_binding": "mcp_tool",
         "invoke_binding": "mcp_tool",
         "decision_owner": "workflow_code",
@@ -913,9 +1627,15 @@
         "lane_id": "adapter",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["t2s_analysis_request.v1", "t2s_analysis_response.v1"],
+        "schema_refs": [
+          "t2s_analysis_request.v1",
+          "t2s_analysis_response.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 1580, "y": 280 },
+        "position": {
+          "x": 1580,
+          "y": 280
+        },
         "runtime_binding": "mcp_tool",
         "invoke_binding": "mcp_tool",
         "decision_owner": "workflow_code",
@@ -946,9 +1666,14 @@
         "lane_id": "local_graph",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["synthesized_page_selection.v1"],
+        "schema_refs": [
+          "synthesized_page_selection.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 1800, "y": 160 },
+        "position": {
+          "x": 1800,
+          "y": 160
+        },
         "invoke_binding": "local_python",
         "decision_owner": "llm",
         "call_control": "none",
@@ -959,7 +1684,7 @@
       {
         "id": "node-confirm-final-selection",
         "module_id": null,
-        "label": "사용자 최종 Page/Page Group 선택",
+        "label": "사용자 최종 Page(다중) 선택",
         "node_kind": "human_input",
         "execution_kind": "request_input",
         "adk_node_role": "synthetic",
@@ -968,9 +1693,14 @@
         "lane_id": "human_input",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["final_page_selection.v1"],
+        "schema_refs": [
+          "final_page_selection.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 2020, "y": 160 },
+        "position": {
+          "x": 2020,
+          "y": 160
+        },
         "runtime_binding": "ui_input",
         "invoke_binding": "ui_input",
         "decision_owner": "human",
@@ -991,9 +1721,14 @@
         "lane_id": "local_graph",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["broad_handoff_payload.v1"],
+        "schema_refs": [
+          "broad_handoff_payload.v1"
+        ],
         "review_status": "approved",
-        "position": { "x": 2240, "y": 160 },
+        "position": {
+          "x": 2240,
+          "y": 160
+        },
         "runtime_binding": "workflow_call",
         "invoke_binding": "internal_workflow",
         "decision_owner": "workflow_code",
@@ -1008,8 +1743,12 @@
         },
         "input_schema": "broad_handoff_payload.v1",
         "output_schema": "broad_handoff_payload.v1",
-        "input_mapping": { "payload": "$state.broad_handoff_payload" },
-        "output_mapping": { "handoff_payload": "$result" },
+        "input_mapping": {
+          "payload": "$state.broad_handoff_payload"
+        },
+        "output_mapping": {
+          "handoff_payload": "$result"
+        },
         "adk_skeleton_contract": {
           "scaffold_level": "mock_testable_skeleton",
           "target_runtime": "adk_python_2_x",
@@ -1017,7 +1756,10 @@
           "generation_mode": "deterministic_template",
           "implementation_template": "workflow_call_placeholder_stub",
           "manual_completion_required": true,
-          "developer_todos": ["define_workflow_1_2_contract", "confirm_broad_payload_schema"]
+          "developer_todos": [
+            "define_workflow_1_2_contract",
+            "confirm_broad_payload_schema"
+          ]
         }
       },
       {
@@ -1032,45 +1774,157 @@
         "lane_id": "output",
         "input_ports": [],
         "output_ports": [],
-        "schema_refs": ["broad_handoff_payload.v1"],
+        "schema_refs": [
+          "broad_handoff_payload.v1"
+        ],
         "review_status": "n/a",
-        "position": { "x": 2460, "y": 160 },
+        "position": {
+          "x": 2460,
+          "y": 160
+        },
         "invoke_binding": null,
         "decision_owner": null,
         "call_control": null,
         "side_effect": null,
         "policy": null
+      },
+      {
+        "id": "node-get-scenario-taxonomy",
+        "label": "시나리오 목적 분류체계 조회",
+        "module_id": "mod-scenario-taxonomy",
+        "node_kind": "adapter_call",
+        "execution_kind": "adapter_call",
+        "agent_execution_mode": null,
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-page-recommendation",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [
+          "scenario_taxonomy_request.v1",
+          "scenario_taxonomy_response.v1"
+        ],
+        "review_status": "approved",
+        "workflow_ref": null,
+        "input_schema": null,
+        "output_schema": null,
+        "input_mapping": null,
+        "output_mapping": null,
+        "runtime_binding": "mcp_tool",
+        "invoke_binding": "mcp_tool",
+        "decision_owner": "workflow_code",
+        "call_control": "fixed_by_workflow",
+        "side_effect": "read",
+        "policy": "audit_required",
+        "mock_binding": {
+          "provider": "mock_lab",
+          "package_path": "packages/mock-lab",
+          "mock_server_id": "wf-page-recommendation-mock",
+          "tool_name": "get_scenario_taxonomy",
+          "input_schema": "scenario_taxonomy_request.v1",
+          "output_schema": "scenario_taxonomy_response.v1",
+          "sample_response_ref": "scenario_taxonomy.basic",
+          "status": "linked"
+        },
+        "adk_skeleton_contract": null,
+        "position": {
+          "x": 230,
+          "y": 300
+        }
+      },
+      {
+        "id": "node-classify-objective",
+        "label": "목적 분류 Agent",
+        "module_id": "mod-objective-classifier",
+        "node_kind": "agent",
+        "execution_kind": "llm_agent",
+        "agent_execution_mode": "single_turn",
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-page-recommendation",
+        "lane_id": "local_graph",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [
+          "objective_classification.v1"
+        ],
+        "review_status": "approved",
+        "workflow_ref": null,
+        "input_schema": null,
+        "output_schema": "objective_classification.v1",
+        "input_mapping": null,
+        "output_mapping": null,
+        "runtime_binding": null,
+        "invoke_binding": "local_python",
+        "decision_owner": "llm",
+        "call_control": "none",
+        "side_effect": "none",
+        "policy": "audit_required",
+        "mock_binding": null,
+        "adk_skeleton_contract": null,
+        "position": {
+          "x": 450,
+          "y": 180
+        }
+      },
+      {
+        "id": "node-search-page-products",
+        "label": "페이지×상품 매핑 조회",
+        "module_id": "mod-page-product-search",
+        "node_kind": "adapter_call",
+        "execution_kind": "adapter_call",
+        "agent_execution_mode": null,
+        "adk_node_role": "workflow_node",
+        "owner_scope": "local",
+        "container_id": "container-page-recommendation",
+        "lane_id": "adapter",
+        "input_ports": [],
+        "output_ports": [],
+        "schema_refs": [
+          "page_product_search_request.v1",
+          "page_product_search_response.v1"
+        ],
+        "review_status": "approved",
+        "workflow_ref": null,
+        "input_schema": null,
+        "output_schema": null,
+        "input_mapping": null,
+        "output_mapping": null,
+        "runtime_binding": "mcp_tool",
+        "invoke_binding": "mcp_tool",
+        "decision_owner": "workflow_code",
+        "call_control": "fixed_by_workflow",
+        "side_effect": "read",
+        "policy": "audit_required",
+        "mock_binding": {
+          "provider": "mock_lab",
+          "package_path": "packages/mock-lab",
+          "mock_server_id": "wf-page-recommendation-mock",
+          "tool_name": "search_page_products",
+          "input_schema": "page_product_search_request.v1",
+          "output_schema": "page_product_search_response.v1",
+          "sample_response_ref": "page_products.basic",
+          "status": "linked"
+        },
+        "adk_skeleton_contract": null,
+        "position": {
+          "x": 760,
+          "y": 300
+        }
       }
     ],
     "edges": [
       {
         "id": "edge-001",
         "from": "node-input",
-        "to": "node-confirm-purpose",
+        "to": "node-get-scenario-taxonomy",
         "from_port": null,
         "to_port": null,
         "edge_kind": "event_output",
         "execution_semantics": "normal_transition",
         "data_label": "request",
         "schema_ref": "page_recommendation_request.v1",
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false,
-        "flow_kind": "sequence",
-        "call_control": "selected_by_human"
-      },
-      {
-        "id": "edge-002",
-        "from": "node-confirm-purpose",
-        "to": "node-search-page-candidates",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "purpose_confirmation",
-        "schema_ref": "purpose_confirmation.v1",
         "route_condition": null,
         "state_key": null,
         "artifact_key": null,
@@ -1086,7 +1940,7 @@
         "from_port": null,
         "to_port": null,
         "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
+        "execution_semantics": "fan_in",
         "data_label": "page_candidates",
         "schema_ref": "page_candidate_search_response.v1",
         "route_condition": null,
@@ -1094,7 +1948,7 @@
         "artifact_key": null,
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
-        "flow_kind": "sequence",
+        "flow_kind": "fan_in",
         "call_control": "fixed_by_workflow"
       },
       {
@@ -1330,6 +2184,114 @@
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
         "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-017",
+        "from": "node-get-scenario-taxonomy",
+        "to": "node-classify-objective",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "scenario_taxonomy",
+        "schema_ref": "scenario_taxonomy_response.v1",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "sequence",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-018",
+        "from": "node-classify-objective",
+        "to": "node-confirm-purpose",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "objective_classification",
+        "schema_ref": "objective_classification.v1",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "sequence",
+        "call_control": "selected_by_human"
+      },
+      {
+        "id": "edge-020",
+        "from": "node-search-page-products",
+        "to": "node-select-initial-page",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "fan_in",
+        "data_label": "page_products",
+        "schema_ref": "page_product_search_response.v1",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "fan_in",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-002",
+        "from": "node-confirm-purpose",
+        "to": "node-plan-adapter-arguments",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "event_output",
+        "execution_semantics": "normal_transition",
+        "data_label": "purpose_confirmation",
+        "schema_ref": "purpose_confirmation.v1",
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "sequence",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-019",
+        "from": "node-plan-adapter-arguments",
+        "to": "node-search-page-products",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "session_state",
+        "execution_semantics": "fan_out",
+        "data_label": "adapter_arguments",
+        "schema_ref": "adapter_arguments.v1",
+        "route_condition": null,
+        "state_key": "adapter_arguments",
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "fan_out",
+        "call_control": "fixed_by_workflow"
+      },
+      {
+        "id": "edge-021",
+        "from": "node-plan-adapter-arguments",
+        "to": "node-search-page-candidates",
+        "from_port": null,
+        "to_port": null,
+        "edge_kind": "session_state",
+        "execution_semantics": "fan_out",
+        "data_label": "adapter_arguments",
+        "schema_ref": "adapter_arguments.v1",
+        "route_condition": null,
+        "state_key": "adapter_arguments",
+        "artifact_key": null,
+        "a2a_contract_id": null,
+        "is_remote_boundary_crossing": false,
+        "flow_kind": "fan_out",
+        "call_control": "fixed_by_workflow"
       }
     ],
     "containers": [
@@ -1353,20 +2315,42 @@
           "node-synthesize-analysis",
           "node-confirm-final-selection",
           "node-call-workflow-1-2",
+          "node-output",
+          "node-get-scenario-taxonomy",
+          "node-classify-objective",
+          "node-search-page-products"
+        ],
+        "entry_node_ids": [
+          "node-input"
+        ],
+        "exit_node_ids": [
           "node-output"
         ],
-        "entry_node_ids": ["node-input"],
-        "exit_node_ids": ["node-output"],
         "layout_policy": "dag_with_routes",
         "parent_container_id": null
       }
     ],
     "lanes": [
-      { "id": "input", "label": "Input" },
-      { "id": "local_graph", "label": "Workflow Graph" },
-      { "id": "adapter", "label": "Adapter / Mock Lab" },
-      { "id": "human_input", "label": "Human Input" },
-      { "id": "output", "label": "Output" }
+      {
+        "id": "input",
+        "label": "Input"
+      },
+      {
+        "id": "local_graph",
+        "label": "Workflow Graph"
+      },
+      {
+        "id": "adapter",
+        "label": "Adapter / Mock Lab"
+      },
+      {
+        "id": "human_input",
+        "label": "Human Input"
+      },
+      {
+        "id": "output",
+        "label": "Output"
+      }
     ],
     "validation": {
       "ok": true,

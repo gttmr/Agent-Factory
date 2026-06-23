@@ -500,7 +500,18 @@
     "graph_edge": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "from", "to", "edge_kind", "flow_kind", "call_control"],
+      "required": [
+        "id",
+        "from",
+        "to",
+        "edge_kind",
+        "schema_ref",
+        "route_condition",
+        "state_key",
+        "artifact_key",
+        "flow_kind",
+        "call_control"
+      ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "from": { "type": "string", "minLength": 1 },
@@ -520,6 +531,10 @@
             "remote_a2a"
           ]
         },
+        "schema_ref": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "route_condition": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "state_key": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "artifact_key": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
         "flow_kind": {
           "anyOf": [
             {
