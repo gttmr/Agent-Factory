@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
+import { Codex, type ThreadEvent, type ThreadItem, type Usage } from "@openai/codex-sdk";
 import type {
   AfRunManifest,
   AfRunStageId,
@@ -47,12 +47,16 @@ export interface StageRunRequestBody {
 }
 
 export interface StageRunEvent {
-  phase: "started" | "cli_event" | "proposed" | "validation" | "completed" | "failed";
+  phase: "started" | "codex_event" | "proposed" | "validation" | "completed" | "failed";
   message: string;
   at: string;
   elapsedMs: number;
   title?: string;
   snippet?: string;
+  rawEventType?: string;
+  itemType?: string;
+  status?: string;
+  toolName?: string;
 }
 
 export interface StageRunArtifactDiff {
@@ -72,6 +76,20 @@ export interface StageRunDiffSummary {
   files: StageRunArtifactDiff[];
 }
 
+export interface StageRunCodexUsage {
+  input_tokens: number;
+  cached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens: number;
+}
+
+export interface StageRunCodexMetadata {
+  backend: "sdk" | "fake";
+  thread_id: string | null;
+  event_count: number;
+  usage: StageRunCodexUsage | null;
+}
+
 export interface StageRunSummary {
   run_id: string;
   stage: SkillRunnerStage;
@@ -87,6 +105,7 @@ export interface StageRunSummary {
     errors: string[];
   };
   last_error: string | null;
+  codex?: StageRunCodexMetadata;
 }
 
 export interface StageRunDetail {
@@ -111,6 +130,22 @@ export interface RunStageSkillInput {
   stage: string;
   body: StageRunRequestBody;
   onEvent?: (event: StageRunEvent) => void;
+  codexRunner?: CodexStageRunner;
+}
+
+export interface CodexStageRunnerInput {
+  repoRoot: string;
+  rootDir: string;
+  runDir: string;
+  proposedDir: string;
+  stage: SkillRunnerStage;
+  skillPath: string;
+  model: string;
+  emit: (event: Omit<StageRunEvent, "at" | "elapsedMs">) => Promise<void>;
+}
+
+export interface CodexStageRunner {
+  run(input: CodexStageRunnerInput): Promise<StageRunCodexMetadata>;
 }
 
 export async function runStageSkill(input: RunStageSkillInput): Promise<StageRunSummary> {
@@ -153,6 +188,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
   let status: AfStageRunStatus = "completed";
   let lastError: string | null = null;
   let diagnostics: string | null = null;
+  let codexMetadata = createCodexMetadata(input.body.execution_mode === "fake" ? "fake" : "sdk");
   try {
     if (stage === "design") {
       await assertDesignReady(input.store, input.reqId);
@@ -161,7 +197,17 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     if (input.body.execution_mode === "fake") {
       await runFakeStage({ store: input.store, reqId: input.reqId, stage, body: input.body, proposedDir });
     } else {
-      await runCodexStage({ repoRoot: input.repoRoot, rootDir, runDir, proposedDir, stage, skillPath: skill.skillPath, model });
+      const runner = input.codexRunner ?? new SdkCodexStageRunner();
+      codexMetadata = await runner.run({
+        repoRoot: input.repoRoot,
+        rootDir,
+        runDir,
+        proposedDir,
+        stage,
+        skillPath: skill.skillPath,
+        model,
+        emit
+      });
     }
     await emit({
       phase: "proposed",
@@ -176,7 +222,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
       stage,
       model,
       skillName: skill.skillName,
-      command: input.body.execution_mode === "fake" ? "fake-runner" : "codex exec",
+      command: input.body.execution_mode === "fake" ? "fake-runner" : "codex sdk",
       startedAt,
       finishedAt: new Date(),
       error: lastError
@@ -203,7 +249,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
         stage,
         model,
         skillName: skill.skillName,
-        command: input.body.execution_mode === "fake" ? "fake-runner" : "codex exec",
+        command: input.body.execution_mode === "fake" ? "fake-runner" : "codex sdk",
         startedAt,
         finishedAt: new Date(),
         error: lastError
@@ -239,7 +285,8 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
       ok: status === "completed",
       errors: diffSummary.files.flatMap((file) => file.validation_errors)
     },
-    last_error: lastError
+    last_error: lastError,
+    codex: codexMetadata
   };
   await writeJsonFile(join(runDir, "result-summary.json"), summary);
   await updateStageRunManifest(input.store, input.reqId, stage, summary);
@@ -456,20 +503,12 @@ async function runFakeStage(input: {
   );
 }
 
-async function runCodexStage(input: {
-  repoRoot: string;
-  rootDir: string;
-  runDir: string;
-  proposedDir: string;
-  stage: SkillRunnerStage;
-  skillPath: string;
-  model: string;
-}): Promise<void> {
+function buildCodexStagePrompt(input: Pick<CodexStageRunnerInput, "rootDir" | "runDir" | "stage" | "skillPath">): string {
   const outputInstruction =
     input.stage === "analyze"
       ? "Write the proposed analysis artifact to proposed-artifacts/analysis-result.json only. Do not edit canonical artifacts."
       : "Write proposed-artifacts/analysis-result.json and proposed-artifacts/boundary-design.md only. Do not edit canonical artifacts or approval gates.";
-  const prompt = [
+  return [
     `Read ${input.skillPath} and execute the ${input.stage} stage for this artifact root.`,
     `Artifact root: ${input.rootDir}`,
     `Run folder: ${input.runDir}`,
@@ -478,22 +517,210 @@ async function runCodexStage(input: {
     "Do not write credentials, private endpoints, deployment scripts, or production business logic.",
     "Return a concise final status after files are written."
   ].join("\n");
-  const result = await runProcess(input.repoRoot, "codex", [
-    "exec",
-    "--json",
-    "--model",
-    input.model,
-    "--cd",
-    input.repoRoot,
-    prompt
-  ]);
-  await writeFile(join(input.runDir, "codex-stdout.jsonl"), truncate(result.stdout, 400_000), "utf8");
-  if (result.stderr.trim()) {
-    await writeFile(join(input.runDir, "codex-stderr.txt"), truncate(redactSecrets(result.stderr), 100_000), "utf8");
+}
+
+export class SdkCodexStageRunner implements CodexStageRunner {
+  async run(input: CodexStageRunnerInput): Promise<StageRunCodexMetadata> {
+    const metadata = createCodexMetadata("sdk");
+    const codex = new Codex();
+    const thread = codex.startThread({
+      model: input.model,
+      workingDirectory: input.repoRoot,
+      sandboxMode: "workspace-write",
+      approvalPolicy: "never",
+      networkAccessEnabled: false
+    });
+    const { events } = await thread.runStreamed(buildCodexStagePrompt(input));
+    let turnFailure: string | null = null;
+
+    for await (const event of events) {
+      metadata.event_count += 1;
+      if (event.type === "thread.started") {
+        metadata.thread_id = event.thread_id;
+      } else if (event.type === "turn.completed") {
+        metadata.usage = normalizeCodexUsage(event.usage);
+      } else if (event.type === "turn.failed") {
+        turnFailure = event.error.message;
+      }
+      if (!metadata.thread_id) metadata.thread_id = thread.id;
+      await appendRawCodexEvent(input.runDir, event);
+      await input.emit(mapCodexEvent(event));
+    }
+
+    if (turnFailure) throw new Error(turnFailure);
+    return copyCodexMetadata(metadata);
   }
-  if (result.code !== 0) {
-    throw new Error(`codex exec 실패 (exit ${result.code}): ${truncate(result.stderr || result.stdout, 1000)}`);
+}
+
+function createCodexMetadata(backend: StageRunCodexMetadata["backend"]): StageRunCodexMetadata {
+  return {
+    backend,
+    thread_id: null,
+    event_count: 0,
+    usage: null
+  };
+}
+
+function copyCodexMetadata(metadata: StageRunCodexMetadata): StageRunCodexMetadata {
+  return {
+    backend: metadata.backend,
+    thread_id: metadata.thread_id,
+    event_count: metadata.event_count,
+    usage: metadata.usage ? { ...metadata.usage } : null
+  };
+}
+
+function normalizeCodexUsage(usage: Usage | null | undefined): StageRunCodexUsage | null {
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens,
+    cached_input_tokens: usage.cached_input_tokens,
+    output_tokens: usage.output_tokens,
+    reasoning_output_tokens: usage.reasoning_output_tokens
+  };
+}
+
+async function appendRawCodexEvent(runDir: string, event: ThreadEvent): Promise<void> {
+  await mkdir(runDir, { recursive: true });
+  await appendFile(join(runDir, "codex-events.jsonl"), `${JSON.stringify(redactSecrets(event))}\n`, "utf8");
+}
+
+function mapCodexEvent(event: ThreadEvent): Omit<StageRunEvent, "at" | "elapsedMs"> {
+  switch (event.type) {
+    case "thread.started":
+      return {
+        phase: "codex_event",
+        message: "Codex SDK thread started.",
+        title: "thread started",
+        rawEventType: event.type,
+        status: "started",
+        snippet: event.thread_id
+      };
+    case "turn.started":
+      return {
+        phase: "codex_event",
+        message: "Codex turn started.",
+        title: "turn started",
+        rawEventType: event.type,
+        status: "started"
+      };
+    case "turn.completed":
+      return {
+        phase: "codex_event",
+        message: "Codex turn completed.",
+        title: "turn completed",
+        rawEventType: event.type,
+        status: "completed",
+        snippet: formatUsage(event.usage)
+      };
+    case "turn.failed":
+      return {
+        phase: "codex_event",
+        message: event.error.message,
+        title: "turn failed",
+        rawEventType: event.type,
+        status: "failed"
+      };
+    case "error":
+      return {
+        phase: "codex_event",
+        message: event.message,
+        title: "codex stream error",
+        rawEventType: event.type,
+        status: "failed"
+      };
+    case "item.started":
+    case "item.updated":
+    case "item.completed":
+      return mapCodexItemEvent(event.type, event.item);
   }
+}
+
+function mapCodexItemEvent(rawEventType: "item.started" | "item.updated" | "item.completed", item: ThreadItem): Omit<StageRunEvent, "at" | "elapsedMs"> {
+  const itemStatus = getItemStatus(item) ?? (rawEventType === "item.completed" ? "completed" : undefined);
+  const title = getItemTitle(item);
+  return {
+    phase: "codex_event",
+    message: itemStatus ? `${title} ${itemStatus}` : title,
+    title,
+    rawEventType,
+    itemType: item.type,
+    status: itemStatus,
+    toolName: getItemToolName(item),
+    snippet: getItemSnippet(item)
+  };
+}
+
+function getItemTitle(item: ThreadItem): string {
+  switch (item.type) {
+    case "command_execution":
+      return "command execution";
+    case "file_change":
+      return "file change";
+    case "mcp_tool_call":
+      return "mcp tool call";
+    case "agent_message":
+      return "agent message";
+    case "reasoning":
+      return "reasoning";
+    case "web_search":
+      return "web search";
+    case "todo_list":
+      return "todo list";
+    case "error":
+      return "error";
+  }
+}
+
+function getItemStatus(item: ThreadItem): string | undefined {
+  return "status" in item && typeof item.status === "string" ? item.status : undefined;
+}
+
+function getItemToolName(item: ThreadItem): string | undefined {
+  switch (item.type) {
+    case "command_execution":
+      return "command";
+    case "mcp_tool_call":
+      return `${item.server}.${item.tool}`;
+    case "web_search":
+      return "web_search";
+    default:
+      return undefined;
+  }
+}
+
+function getItemSnippet(item: ThreadItem): string | undefined {
+  switch (item.type) {
+    case "command_execution":
+      return truncate([item.command, item.aggregated_output].filter(Boolean).join("\n"), 1000);
+    case "file_change":
+      return truncate(item.changes.map((change) => `${change.kind} ${change.path}`).join(", "), 1000);
+    case "mcp_tool_call":
+      return truncate(item.error?.message ?? stringifySnippet(item.result ?? item.arguments), 1000);
+    case "agent_message":
+    case "reasoning":
+      return truncate(item.text, 1000);
+    case "web_search":
+      return truncate(item.query, 1000);
+    case "todo_list":
+      return truncate(item.items.map((todo) => `${todo.completed ? "done" : "todo"} ${todo.text}`).join("\n"), 1000);
+    case "error":
+      return truncate(item.message, 1000);
+  }
+}
+
+function stringifySnippet(value: unknown): string {
+  if (typeof value === "string") return value;
+  return JSON.stringify(redactSecrets(value)) ?? "";
+}
+
+function formatUsage(usage: Usage): string {
+  return [
+    `input ${usage.input_tokens}`,
+    `cached ${usage.cached_input_tokens}`,
+    `output ${usage.output_tokens}`,
+    `reasoning ${usage.reasoning_output_tokens}`
+  ].join(" · ");
 }
 
 async function assertDesignReady(store: ArtifactRootStore, reqId: string): Promise<void> {
@@ -678,6 +905,13 @@ async function updateStageRunManifest(
     output_artifacts: summary.output_artifacts,
     last_error: summary.last_error
   };
+  if (summary.codex) {
+    entry.codex = {
+      backend: summary.codex.backend,
+      thread_id: summary.codex.thread_id,
+      event_count: summary.codex.event_count
+    };
+  }
   const next: AfRunManifest = {
     ...manifest,
     stage_runs: {
@@ -702,24 +936,6 @@ async function writeJsonFile(path: string, value: unknown): Promise<void> {
 
 async function readJsonFile<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T;
-}
-
-function runProcess(cwd: string, command: string, args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolvePromise) => {
-    const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-      if (stdout.length > 500_000) stdout = stdout.slice(-500_000);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-      if (stderr.length > 200_000) stderr = stderr.slice(-200_000);
-    });
-    child.on("error", (error) => resolvePromise({ code: -1, stdout, stderr: `${stderr}\n${error.message}` }));
-    child.on("close", (code) => resolvePromise({ code: code ?? -1, stdout, stderr }));
-  });
 }
 
 function formatDiagnostics(input: {

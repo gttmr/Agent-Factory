@@ -201,6 +201,7 @@ const afRunStages = new Set(["analyze", "design", "build", "verify"]);
 const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
 const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
 const afStageRunStatuses = new Set(["running", "completed", "failed", "applied", "canceled"]);
+const afStageRunCodexBackends = new Set(["sdk", "fake"]);
 const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design)-[a-f0-9]{6}$/;
 
 // Required string fields on an A2AContract (top-level scalar string fields).
@@ -629,6 +630,28 @@ function validateAfStageRuns(stageRuns, label) {
     if (entry.last_error !== null && entry.last_error !== undefined && typeof entry.last_error !== "string") {
       errors.push(`${entryLabel}.last_error must be a string or null.`);
     }
+    if (entry.codex !== undefined) {
+      validateAfStageRunCodex(entry.codex, `${entryLabel}.codex`);
+    }
+  }
+}
+
+function validateAfStageRunCodex(codex, label) {
+  if (!codex || typeof codex !== "object" || Array.isArray(codex)) {
+    errors.push(`${label} must be an object when present.`);
+    return;
+  }
+  if (!afStageRunCodexBackends.has(codex.backend)) {
+    errors.push(`${label}.backend must be one of ${Array.from(afStageRunCodexBackends).join(", ")}.`);
+  }
+  if (codex.thread_id !== null && typeof codex.thread_id !== "string") {
+    errors.push(`${label}.thread_id must be a string or null.`);
+  }
+  if (!Number.isInteger(codex.event_count) || codex.event_count < 0) {
+    errors.push(`${label}.event_count must be a non-negative integer.`);
+  }
+  if (codex.usage !== undefined) {
+    errors.push(`${label}.usage must not be recorded in af-run-manifest.json; keep usage in result-summary.json.`);
   }
 }
 

@@ -1,8 +1,8 @@
-import { spawn } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Codex, type ThreadEvent, type ThreadItem } from "@openai/codex-sdk";
 import {
   GRAPH_CONTAINER_KINDS,
   GRAPH_EDGE_KINDS,
@@ -75,12 +75,12 @@ const remoteRequiredFields = [
   "audit",
   "data_policy"
 ];
-const codexMcpOverrides = [
-  "-c",
-  "mcp_servers.chrome-devtools.enabled=false",
-  "-c",
-  "mcp_servers.adk-docs-mcp.enabled=true"
-];
+const codexSdkConfig = {
+  mcp_servers: {
+    "chrome-devtools": { enabled: false },
+    "adk-docs-mcp": { enabled: true }
+  }
+};
 const defaultAnalyzerTimeoutMs = 600_000;
 
 type MiddlewareNext = (error?: unknown) => void;
@@ -130,6 +130,7 @@ interface AnalyzerDiagnostics {
 }
 
 interface ProcessRunResult {
+  outputText: string;
   stdout: string;
   stderr: string;
   diagnostics: AnalyzerDiagnostics;
@@ -140,6 +141,20 @@ interface CodexAnalyzerRun {
   diagnostics: AnalyzerDiagnostics;
   promptChars: number;
   timeoutMs: number;
+}
+
+interface CodexAnalyzerRunnerInput {
+  repoRoot: string;
+  model: string;
+  prompt: string;
+  outputSchema: unknown;
+  timeoutMs: number;
+  startedAt: number;
+  onProgress?: (event: AnalyzerProgressEvent) => void;
+}
+
+export interface CodexAnalyzerRunner {
+  run(input: CodexAnalyzerRunnerInput): Promise<ProcessRunResult>;
 }
 
 type CodexAnalyzerError = Error & {
@@ -179,7 +194,7 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
       }
       const streamProgress = shouldStreamProgress(req, body);
       if (isAnalyzing) {
-        sendJson(res, 409, { error: "이미 Codex CLI 분석이 진행 중입니다. 완료 후 다시 실행하세요." });
+        sendJson(res, 409, { error: "이미 Codex SDK 분석이 진행 중입니다. 완료 후 다시 실행하세요." });
         return;
       }
 
@@ -200,7 +215,7 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
         const errors = validateAnalysisResult(result);
         if (errors.length) {
           console.error("[codex-analyzer] 응답 검증 실패:", errors);
-          sendJson(res, 502, { error: `Codex CLI 응답 검증 실패: ${errors.join("; ")}` });
+          sendJson(res, 502, { error: `Codex SDK 응답 검증 실패: ${errors.join("; ")}` });
           return;
         }
 
@@ -271,7 +286,7 @@ async function runStreamingAnalysis({
       console.error("[codex-analyzer] 응답 검증 실패:", errors);
       writeProgress({
         phase: "failed",
-        message: `Codex CLI 응답 검증 실패: ${errors.join("; ")}`,
+        message: `Codex SDK 응답 검증 실패: ${errors.join("; ")}`,
         at: new Date().toISOString(),
         elapsedMs: run.diagnostics.elapsedMs,
         model,
@@ -291,7 +306,7 @@ async function runStreamingAnalysis({
 
     const completed: AnalyzerProgressEvent & { result: unknown } = {
       phase: "completed",
-      message: "Codex CLI 분석이 완료되었습니다.",
+      message: "Codex SDK 분석이 완료되었습니다.",
       at: new Date().toISOString(),
       elapsedMs: run.diagnostics.elapsedMs,
       model,
@@ -339,14 +354,15 @@ async function runStreamingAnalysis({
   }
 }
 
-async function runCodexAnalyzer({
+export async function runCodexAnalyzer({
   repoRoot,
   schemaPath,
   draftSchemaPath,
   input,
   model,
   catalog,
-  onProgress
+  onProgress,
+  codexRunner
 }: {
   repoRoot: string;
   schemaPath: string;
@@ -355,19 +371,20 @@ async function runCodexAnalyzer({
   model: string;
   catalog: SanitizedCatalogEntry[];
   onProgress?: (event: AnalyzerProgressEvent) => void;
+  codexRunner?: CodexAnalyzerRunner;
 }): Promise<CodexAnalyzerRun> {
   const runDir = join(tmpdir(), `agent-factory-codex-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await mkdir(runDir, { recursive: true });
-  const outputPath = join(runDir, "analysis-result.json");
   const contextIndexPath = join(runDir, "analyzer-context-index.md");
   await writeAnalyzerContextIndex({ repoRoot, resultSchemaPath: schemaPath, draftSchemaPath, catalog, contextIndexPath });
   const prompt = buildPrompt(input, catalog, contextIndexPath);
+  const outputSchema = JSON.parse(await readFile(draftSchemaPath, "utf8"));
   const timeoutMs = getAnalyzerTimeoutMs();
   const startedAt = Date.now();
 
   onProgress?.({
     phase: "started",
-    message: "Codex CLI 분석을 시작했습니다.",
+    message: "Codex SDK 분석을 시작했습니다.",
     at: new Date().toISOString(),
     elapsedMs: 0,
     model,
@@ -380,39 +397,20 @@ async function runCodexAnalyzer({
   });
 
   try {
-    const { stdout, stderr, diagnostics } = await runProcess(
-      "codex",
-      [
-        ...codexMcpOverrides,
-        "-m",
-        model,
-        "--cd",
-        repoRoot,
-        "exec",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "--ephemeral",
-        "--json",
-        "--output-schema",
-        draftSchemaPath,
-        "--output-last-message",
-        outputPath,
-        "-"
-      ],
+    const { outputText, stdout, stderr, diagnostics } = await (codexRunner ?? new SdkCodexAnalyzerRunner()).run({
+      repoRoot,
+      model,
       prompt,
-      {
-        timeoutMs,
-        startedAt,
-        model,
-        onProgress
-      }
-    );
-
-    const outputText = await readFile(outputPath, "utf8").catch(() => stdout);
+      outputSchema,
+      timeoutMs,
+      startedAt,
+      onProgress
+    });
     try {
       const output = hydrateAnalysisDraft(parseJsonObject(outputText), { input, catalog });
       onProgress?.({
         phase: "diagnostic",
-        message: "Codex CLI 실행 계측을 수집했습니다.",
+        message: "Codex SDK 실행 계측을 수집했습니다.",
         at: new Date().toISOString(),
         elapsedMs: diagnostics.elapsedMs,
         model,
@@ -438,7 +436,7 @@ async function runCodexAnalyzer({
       const failure = summarizeProcessFailure(stdout, stderr);
       throw createAnalyzerError(
         "failed",
-        `Codex CLI compact draft를 해석하지 못했습니다. ${parseError instanceof Error ? parseError.message : "unknown parse error"}${failure.message ? ` ${failure.message}` : ""}`.trim(),
+        `Codex SDK compact draft를 해석하지 못했습니다. ${parseError instanceof Error ? parseError.message : "unknown parse error"}${failure.message ? ` ${failure.message}` : ""}`.trim(),
         {
           ...diagnostics,
           timeoutMs,
@@ -1202,132 +1200,67 @@ function buildPrompt(input: Record<string, unknown>, catalog: SanitizedCatalogEn
   return sections.join("\n");
 }
 
-function runProcess(
-  command: string,
-  args: string[],
-  input: string,
-  {
+export class SdkCodexAnalyzerRunner implements CodexAnalyzerRunner {
+  async run({
+    repoRoot,
+    model,
+    prompt,
+    outputSchema,
     timeoutMs,
     startedAt,
-    model,
     onProgress
-  }: {
-    timeoutMs: number;
-    startedAt: number;
-    model: string;
-    onProgress?: (event: AnalyzerProgressEvent) => void;
-  }
-) {
-  return new Promise<ProcessRunResult>((resolvePromise, reject) => {
-    const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
+  }: CodexAnalyzerRunnerInput): Promise<ProcessRunResult> {
+    const controller = new AbortController();
     const eventTypeCounts: Record<string, number> = {};
-    let stdoutBuffer = "";
     let eventCount = 0;
     let lastEventType: string | undefined;
     let lastTraceTitle: string | undefined;
     let lastTraceSnippet: string | undefined;
-    let settled = false;
+    let finalResponse = "";
+    let turnFailure: string | null = null;
+    const rawEvents: string[] = [];
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const emitCliLine = (line: string) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        return;
-      }
-      eventCount += 1;
-      const event = summarizeCliEvent(trimmed, eventCount);
-      lastEventType = event.rawEventType;
-      eventTypeCounts[event.rawEventType] = (eventTypeCounts[event.rawEventType] ?? 0) + 1;
-      if (!event.traceKind) {
-        return;
-      }
-      lastTraceTitle = event.title;
-      lastTraceSnippet = event.snippet;
-      onProgress?.({
-        phase: "cli_event",
-        message: event.message,
-        at: new Date().toISOString(),
-        elapsedMs: Date.now() - startedAt,
+    try {
+      const codex = new Codex({ config: codexSdkConfig });
+      const thread = codex.startThread({
         model,
-        timeoutMs,
-        eventCount,
-        eventType: event.rawEventType,
-        lastEventType,
-        eventTypeCounts: { ...eventTypeCounts },
-        traceKind: event.traceKind,
-        title: event.title,
-        snippet: event.snippet,
-        snippetFull: event.snippetFull,
-        toolName: event.toolName,
-        status: event.status,
-        durationMs: event.durationMs,
-        rawEventType: event.rawEventType,
-        sequence: event.sequence,
-        lastTraceTitle,
-        lastTraceSnippet
+        workingDirectory: repoRoot,
+        sandboxMode: "workspace-write",
+        approvalPolicy: "never",
+        networkAccessEnabled: false
       });
-    };
+      const { events } = await thread.runStreamed(prompt, { outputSchema, signal: controller.signal });
 
-    const flushStdoutBuffer = () => {
-      const remaining = stdoutBuffer.trim();
-      stdoutBuffer = "";
-      if (remaining) {
-        emitCliLine(remaining);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      settled = true;
-      child.kill("SIGTERM");
-      reject(
-        createAnalyzerError(
-          "timeout",
-          `Codex CLI 분석 시간이 초과되었습니다. 제한 ${formatDuration(timeoutMs)}, 경과 ${formatDuration(
-            Date.now() - startedAt
-          )}, 마지막 활동 ${lastTraceTitle ?? lastEventType ?? "없음"}.`,
-          {
-            elapsedMs: Date.now() - startedAt,
-            timeoutMs,
-            eventCount,
-            lastEventType,
-            eventTypeCounts: { ...eventTypeCounts },
+      for await (const event of events) {
+        rawEvents.push(JSON.stringify(redactSecrets(event)));
+        eventCount += 1;
+        lastEventType = event.type;
+        eventTypeCounts[event.type] = (eventTypeCounts[event.type] ?? 0) + 1;
+        if (event.type === "turn.failed") {
+          turnFailure = event.error.message;
+        } else if (event.type === "item.completed" && event.item.type === "agent_message") {
+          finalResponse = event.item.text;
+        }
+        const progress = mapSdkAnalyzerEvent(event, {
+          model,
+          timeoutMs,
+          startedAt,
+          eventCount,
+          lastEventType,
+          eventTypeCounts
+        });
+        if (progress.traceKind) {
+          lastTraceTitle = progress.title;
+          lastTraceSnippet = progress.snippet;
+          onProgress?.({
+            ...progress,
             lastTraceTitle,
             lastTraceSnippet
-          }
-        )
-      );
-    }, timeoutMs);
+          });
+        }
+      }
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdoutChunks.push(chunk);
-      stdoutBuffer += chunk.toString("utf8");
-      let newlineIndex = stdoutBuffer.indexOf("\n");
-      while (newlineIndex !== -1) {
-        const line = stdoutBuffer.slice(0, newlineIndex);
-        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
-        emitCliLine(line);
-        newlineIndex = stdoutBuffer.indexOf("\n");
-      }
-    });
-    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
-    child.on("error", (error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      flushStdoutBuffer();
-      const stdout = Buffer.concat(stdoutChunks).toString("utf8");
-      const stderr = Buffer.concat(stderrChunks).toString("utf8");
       const diagnostics = {
         elapsedMs: Date.now() - startedAt,
         eventCount,
@@ -1336,26 +1269,215 @@ function runProcess(
         lastTraceTitle,
         lastTraceSnippet
       };
-      if (code === 0) {
-        resolvePromise({ stdout, stderr, diagnostics });
-        return;
+      if (turnFailure) {
+        throw createAnalyzerError("failed", `Codex SDK 분석 실패: ${turnFailure}`, {
+          ...diagnostics,
+          timeoutMs
+        });
       }
-      const failure = summarizeProcessFailure(stdout, stderr);
-      reject(
-        createAnalyzerError(
-          "failed",
-          `Codex CLI 분석 실패(code ${code ?? "unknown"}): ${failure.message}`.trim(),
+      return {
+        outputText: finalResponse,
+        stdout: rawEvents.join("\n"),
+        stderr: "",
+        diagnostics
+      };
+    } catch (error) {
+      const diagnostics = {
+        elapsedMs: Date.now() - startedAt,
+        eventCount,
+        lastEventType,
+        eventTypeCounts: { ...eventTypeCounts },
+        lastTraceTitle,
+        lastTraceSnippet
+      };
+      if (controller.signal.aborted) {
+        throw createAnalyzerError(
+          "timeout",
+          `Codex SDK 분석 시간이 초과되었습니다. 제한 ${formatDuration(timeoutMs)}, 경과 ${formatDuration(
+            Date.now() - startedAt
+          )}, 마지막 활동 ${lastTraceTitle ?? lastEventType ?? "없음"}.`,
           {
             ...diagnostics,
-            timeoutMs,
-            lastTraceSnippet: failure.snippet || diagnostics.lastTraceSnippet
+            timeoutMs
           }
-        )
+        );
+      }
+      if (isAnalyzerError(error)) throw error;
+      throw createAnalyzerError(
+        "failed",
+        `Codex SDK 분석 실패: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          ...diagnostics,
+          timeoutMs
+        }
       );
-    });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
 
-    child.stdin.end(input);
-  });
+function mapSdkAnalyzerEvent(
+  event: ThreadEvent,
+  ctx: {
+    model: string;
+    timeoutMs: number;
+    startedAt: number;
+    eventCount: number;
+    lastEventType: string;
+    eventTypeCounts: Record<string, number>;
+  }
+): AnalyzerProgressEvent {
+  const base = {
+    phase: "cli_event" as const,
+    at: new Date().toISOString(),
+    elapsedMs: Date.now() - ctx.startedAt,
+    model: ctx.model,
+    timeoutMs: ctx.timeoutMs,
+    eventCount: ctx.eventCount,
+    eventType: event.type,
+    lastEventType: ctx.lastEventType,
+    eventTypeCounts: { ...ctx.eventTypeCounts },
+    rawEventType: event.type,
+    sequence: ctx.eventCount
+  };
+  switch (event.type) {
+    case "thread.started":
+      return {
+        ...base,
+        message: "Codex SDK thread 를 시작했습니다.",
+        traceKind: "lifecycle",
+        title: "Thread 시작",
+        snippet: event.thread_id,
+        status: "running"
+      };
+    case "turn.started":
+      return {
+        ...base,
+        message: "분석 턴을 시작했습니다.",
+        traceKind: "lifecycle",
+        title: "Turn 시작",
+        status: "running"
+      };
+    case "turn.completed":
+      return {
+        ...base,
+        message: "분석 턴이 완료되었습니다.",
+        traceKind: "diagnostic",
+        title: "Turn 완료",
+        snippet: `input ${event.usage.input_tokens} · output ${event.usage.output_tokens}`,
+        status: "completed"
+      };
+    case "turn.failed":
+      return {
+        ...base,
+        message: event.error.message,
+        traceKind: "diagnostic",
+        title: "Turn 실패",
+        snippet: event.error.message,
+        status: "failed"
+      };
+    case "error":
+      return {
+        ...base,
+        message: event.message,
+        traceKind: "diagnostic",
+        title: "SDK 오류",
+        snippet: event.message,
+        status: "failed"
+      };
+    case "item.started":
+    case "item.updated":
+    case "item.completed":
+      return mapSdkAnalyzerItemEvent(base, event.item);
+  }
+}
+
+function mapSdkAnalyzerItemEvent(
+  base: Omit<AnalyzerProgressEvent, "message"> & { message?: string },
+  item: ThreadItem
+): AnalyzerProgressEvent {
+  switch (item.type) {
+    case "command_execution":
+      return {
+        ...base,
+        message: `명령 실행 ${item.status}`,
+        traceKind: "tool_call",
+        title: "Command",
+        snippet: summarizeText([item.command, item.aggregated_output].filter(Boolean).join("\n")),
+        snippetFull: summarizeFull([item.command, item.aggregated_output].filter(Boolean).join("\n")),
+        toolName: "command",
+        status: item.status === "failed" ? "failed" : item.status === "completed" ? "completed" : "running"
+      };
+    case "mcp_tool_call":
+      return {
+        ...base,
+        message: `MCP tool ${item.server}.${item.tool} ${item.status}`,
+        traceKind: "tool_call",
+        title: "MCP tool",
+        snippet: summarizeText(item.error?.message ?? JSON.stringify(redactSecrets(item.arguments))),
+        snippetFull: summarizeFull(item.error?.message ?? JSON.stringify(redactSecrets(item.result ?? item.arguments))),
+        toolName: `${item.server}.${item.tool}`,
+        status: item.status === "failed" ? "failed" : item.status === "completed" ? "completed" : "running"
+      };
+    case "agent_message":
+      return {
+        ...base,
+        message: "모델 메시지를 수신했습니다.",
+        traceKind: "assistant_message",
+        title: "모델 메시지",
+        snippet: summarizeText(item.text),
+        snippetFull: summarizeFull(item.text),
+        status: "completed"
+      };
+    case "reasoning":
+      return {
+        ...base,
+        message: "Reasoning 요약을 수신했습니다.",
+        traceKind: "reasoning_summary",
+        title: "Reasoning 요약",
+        snippet: summarizeText(item.text),
+        snippetFull: summarizeFull(item.text),
+        status: "info"
+      };
+    case "file_change":
+      return {
+        ...base,
+        message: `파일 변경 ${item.status}`,
+        traceKind: "tool_result",
+        title: "File change",
+        snippet: item.changes.map((change) => `${change.kind} ${change.path}`).join(", "),
+        status: item.status === "failed" ? "failed" : "completed"
+      };
+    case "web_search":
+      return {
+        ...base,
+        message: "Web search 이벤트를 수신했습니다.",
+        traceKind: "tool_call",
+        title: "Web search",
+        snippet: item.query,
+        toolName: "web_search",
+        status: "completed"
+      };
+    case "todo_list":
+      return {
+        ...base,
+        message: "Todo list 이벤트를 수신했습니다.",
+        traceKind: "diagnostic",
+        title: "Todo",
+        snippet: item.items.map((todo) => `${todo.completed ? "done" : "todo"} ${todo.text}`).join("\n"),
+        status: "info"
+      };
+    case "error":
+      return {
+        ...base,
+        message: item.message,
+        traceKind: "diagnostic",
+        title: "Item 오류",
+        snippet: item.message,
+        status: "failed"
+      };
+  }
 }
 
 function summarizeProcessFailure(stdout: string, stderr: string): { message: string; snippet: string } {
@@ -1429,15 +1551,15 @@ function getCliEventType(value: unknown): string {
 
 function getCliEventMessage(eventType: string): string {
   const normalized = eventType.toLowerCase();
-  if (normalized.includes("session") && normalized.includes("start")) return "Codex CLI 세션을 시작했습니다.";
+  if (normalized.includes("session") && normalized.includes("start")) return "Codex 이벤트 세션을 시작했습니다.";
   if (normalized.includes("turn") && normalized.includes("start")) return "분석 턴을 시작했습니다.";
   if (normalized.includes("tool") || normalized.includes("mcp") || normalized.includes("exec")) {
     return "분석에 필요한 도구 이벤트를 처리했습니다.";
   }
   if (normalized.includes("message") || normalized.includes("response")) return "모델 응답 이벤트를 수신했습니다.";
-  if (normalized.includes("complete") || normalized.includes("finish")) return "Codex CLI 이벤트가 완료 상태를 보고했습니다.";
-  if (eventType === "stdout") return "Codex CLI 텍스트 출력을 수신했습니다.";
-  return `Codex CLI 이벤트를 수신했습니다: ${eventType}`;
+  if (normalized.includes("complete") || normalized.includes("finish")) return "Codex 이벤트가 완료 상태를 보고했습니다.";
+  if (eventType === "stdout") return "Codex 텍스트 출력을 수신했습니다.";
+  return `Codex 이벤트를 수신했습니다: ${eventType}`;
 }
 
 function normalizeCliTrace(
@@ -1448,10 +1570,10 @@ function normalizeCliTrace(
     const raw = String(parsed ?? "");
     return {
       traceKind: "diagnostic",
-      title: "CLI 텍스트 출력",
+      title: "Codex 텍스트 출력",
       snippet: summarizeText(raw),
       snippetFull: summarizeFull(raw),
-      message: "Codex CLI 텍스트 출력을 수신했습니다.",
+      message: "Codex 텍스트 출력을 수신했습니다.",
       status: "info"
     };
   }
@@ -1486,10 +1608,10 @@ function normalizeCliTrace(
     const errorRaw = getFirstString(parsed, ["message", "error", "details"]);
     return {
       traceKind: "diagnostic",
-      title: "CLI 오류",
+      title: "Codex 오류",
       snippet: summarizeText(errorRaw),
       snippetFull: summarizeFull(errorRaw),
-      message: "Codex CLI 오류 이벤트를 수신했습니다.",
+      message: "Codex 오류 이벤트를 수신했습니다.",
       status: "failed"
     };
   }
@@ -1498,7 +1620,7 @@ function normalizeCliTrace(
     return {
       traceKind: "lifecycle",
       title: "내부 단계 완료",
-      message: "Codex CLI 내부 단계가 완료되었습니다.",
+      message: "Codex 내부 단계가 완료되었습니다.",
       status: "completed"
     };
   }
@@ -1507,7 +1629,7 @@ function normalizeCliTrace(
     return {
       traceKind: "lifecycle",
       title: "내부 단계 진행 중",
-      message: "Codex CLI 내부 단계가 진행 중입니다.",
+      message: "Codex 내부 단계가 진행 중입니다.",
       status: "running"
     };
   }
@@ -1779,7 +1901,7 @@ function progressFromError(error: unknown, model: string): AnalyzerProgressEvent
   }
   return {
     phase: "failed",
-    message: error instanceof Error ? error.message : "Codex CLI 분석을 완료하지 못했습니다.",
+    message: error instanceof Error ? error.message : "Codex SDK 분석을 완료하지 못했습니다.",
     at: new Date().toISOString(),
     elapsedMs: 0,
     model
@@ -1842,6 +1964,28 @@ function parseJsonObject(value: string): unknown {
     }
     return JSON.parse(trimmed.slice(start, end + 1));
   }
+}
+
+function redactSecrets<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => redactSecrets(item)) as T;
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      if (/token|secret|password|credential|authorization|api[_-]?key|private[_-]?key/i.test(key)) {
+        result[key] = "[redacted]";
+      } else {
+        result[key] = redactSecrets(raw);
+      }
+    }
+    return result as T;
+  }
+  if (typeof value === "string") {
+    return value
+      .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
+      .replace(/(api[_-]?key[\"':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
+      .replace(/(token[\"':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]") as T;
+  }
+  return value;
 }
 
 export function validateAnalysisResult(value: unknown): string[] {
@@ -2237,7 +2381,7 @@ interface A2ANormalizationContext {
 }
 
 /**
- * Run the shared A2A normalization pass after the Codex CLI returns and
+ * Run the shared A2A normalization pass after the Codex SDK returns and
  * before the validator runs. Fills missing remote-A2A contract summary
  * fields with the literal "needs_info", mints a placeholder contract for
  * any remote_a2a candidate that lacks one, and drops orphan contracts.

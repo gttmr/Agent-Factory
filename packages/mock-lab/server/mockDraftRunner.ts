@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { spawn, type ChildProcess } from "node:child_process";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Codex } from "@openai/codex-sdk";
 import type { MockDraftDetail, MockDraftStatus, MockDraftSummary } from "../src/types/mockSpec";
 import { MockLabError, MockSpecStore, readJson, writeJsonFile } from "./mockSpecStore";
 import { validateMockSpec } from "./schemaValidation";
@@ -10,26 +10,32 @@ const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-c
 const DEFAULT_MODEL = "gpt-5.5";
 const DEFAULT_DRAFT_TIMEOUT_MS = 10 * 60 * 1000;
 
-export interface MockDraftCommandSpec {
+export interface MockDraftRunnerResult {
   command: string;
-  args: string[];
-  displayCommand: string;
+  outputText: string;
+  stdout?: string;
+  stderr?: string;
 }
 
-export type MockDraftCommandBuilder = (input: {
+export interface MockDraftRunnerInput {
   repoRoot: string;
   mockId: string;
   prompt: string;
   model: string;
   draftSpecPath: string;
-}) => MockDraftCommandSpec;
+  signal?: AbortSignal;
+}
+
+export interface MockDraftRunner {
+  run(input: MockDraftRunnerInput): Promise<MockDraftRunnerResult>;
+}
 
 interface ActiveDraft {
   mockId: string;
   draftId: string;
   draftDir: string;
   draftSpecPath: string;
-  child: ChildProcess;
+  abortController: AbortController;
   startedAt: Date;
   summary: MockDraftSummary;
   timeout: NodeJS.Timeout | null;
@@ -43,20 +49,20 @@ export class MockDraftRegistry {
   private readonly options: {
     repoRoot: string;
     store: MockSpecStore;
-    commandBuilder: MockDraftCommandBuilder;
+    draftRunner: MockDraftRunner;
     timeoutMs: number;
   };
 
   constructor(options: {
     repoRoot: string;
     store: MockSpecStore;
-    commandBuilder?: MockDraftCommandBuilder;
+    draftRunner?: MockDraftRunner;
     timeoutMs?: number;
   }) {
     this.options = {
       repoRoot: options.repoRoot,
       store: options.store,
-      commandBuilder: options.commandBuilder ?? buildDefaultDraftCommand,
+      draftRunner: options.draftRunner ?? new SdkMockDraftRunner(),
       timeoutMs: options.timeoutMs ?? DEFAULT_DRAFT_TIMEOUT_MS
     };
   }
@@ -73,13 +79,7 @@ export class MockDraftRegistry {
     const draftDir = this.options.store.resolveDraftDir(input.mockId, draftId);
     const draftSpecPath = this.options.store.resolveDraftSpec(input.mockId, draftId);
     const startedAt = new Date();
-    const commandSpec = this.options.commandBuilder({
-      repoRoot: this.options.repoRoot,
-      mockId: input.mockId,
-      prompt,
-      model,
-      draftSpecPath
-    });
+    const abortController = new AbortController();
     const request = {
       mock_id: input.mockId,
       draft_id: draftId,
@@ -90,12 +90,8 @@ export class MockDraftRegistry {
 
     await mkdir(draftDir, { recursive: true });
     await writeJsonFile(join(draftDir, "request.json"), request);
-    await appendEvent(draftDir, "started", "Codex MockSpec draft started.");
+    await appendEvent(draftDir, "started", "Codex SDK MockSpec draft started.");
 
-    const child = spawn(commandSpec.command, commandSpec.args, {
-      cwd: this.options.repoRoot,
-      stdio: ["ignore", "pipe", "pipe"]
-    });
     const summary: MockDraftSummary = {
       draft_id: draftId,
       mock_id: input.mockId,
@@ -104,8 +100,8 @@ export class MockDraftRegistry {
       started_at: startedAt.toISOString(),
       finished_at: null,
       elapsed_ms: 0,
-      pid: child.pid ?? null,
-      command: commandSpec.displayCommand,
+      pid: null,
+      command: "codex sdk mock draft",
       validation: {
         ok: false,
         errors: [],
@@ -118,7 +114,7 @@ export class MockDraftRegistry {
       draftId,
       draftDir,
       draftSpecPath,
-      child,
+      abortController,
       startedAt,
       summary,
       timeout: null,
@@ -128,36 +124,12 @@ export class MockDraftRegistry {
     };
     this.activeByMockId.set(input.mockId, entry);
     await writeJsonFile(join(draftDir, "result-summary.json"), summary);
-    await appendEvent(draftDir, "spawned", `Codex draft process started with pid ${summary.pid ?? "unknown"}.`);
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      void appendOutput(draftDir, "codex-stdout.jsonl", chunk.toString("utf8"));
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      void appendOutput(draftDir, "codex-stderr.txt", chunk.toString("utf8"));
-    });
-    child.on("error", (error) => {
-      void this.finalize(entry, "failed", error.message);
-    });
-    child.on("close", (code) => {
-      const status = entry.cancelRequested ? "cancelled" : code === 0 ? "completed" : "failed";
-      const lastError =
-        status === "cancelled"
-          ? "draft cancelled"
-          : entry.timedOut
-            ? `draft timed out after ${this.options.timeoutMs}ms`
-            : code === 0
-              ? null
-              : `codex exec failed with exit ${code ?? -1}`;
-      void this.finalize(entry, status, lastError);
-    });
+    await appendEvent(draftDir, "sdk_started", "Codex SDK draft run started.");
+    void this.runDraft(entry, { mockId: input.mockId, prompt, model, draftSpecPath });
     entry.timeout = setTimeout(() => {
       entry.timedOut = true;
       void appendEvent(draftDir, "timeout", `Draft timed out after ${this.options.timeoutMs}ms.`);
-      child.kill("SIGTERM");
-      setTimeout(() => {
-        if (!child.killed) child.kill("SIGKILL");
-      }, 2000);
+      abortController.abort();
     }, this.options.timeoutMs);
 
     return { ...summary };
@@ -171,11 +143,41 @@ export class MockDraftRegistry {
     entry.cancelRequested = true;
     entry.summary = await this.writeInterimSummary(entry, "cancelled", "draft cancelled");
     await appendEvent(entry.draftDir, "cancelled", "Draft cancellation requested.");
-    entry.child.kill("SIGTERM");
-    setTimeout(() => {
-      if (!entry.child.killed) entry.child.kill("SIGKILL");
-    }, 2000);
+    entry.abortController.abort();
     return { ...entry.summary };
+  }
+
+  private async runDraft(
+    entry: ActiveDraft,
+    input: { mockId: string; prompt: string; model: string; draftSpecPath: string }
+  ): Promise<void> {
+    try {
+      const result = await this.options.draftRunner.run({
+        repoRoot: this.options.repoRoot,
+        mockId: input.mockId,
+        prompt: input.prompt,
+        model: input.model,
+        draftSpecPath: input.draftSpecPath,
+        signal: entry.abortController.signal
+      });
+      entry.summary = {
+        ...entry.summary,
+        command: result.command
+      };
+      if (result.stdout) await appendOutput(entry.draftDir, "codex-stdout.jsonl", result.stdout);
+      if (result.stderr) await appendOutput(entry.draftDir, "codex-stderr.txt", result.stderr);
+      await writeJsonFile(entry.draftSpecPath, parseJsonCandidate(result.outputText));
+      await this.finalize(entry, entry.cancelRequested ? "cancelled" : "completed", entry.cancelRequested ? "draft cancelled" : null);
+    } catch (error) {
+      const lastError = entry.cancelRequested
+        ? "draft cancelled"
+        : entry.timedOut
+          ? `draft timed out after ${this.options.timeoutMs}ms`
+          : error instanceof Error
+            ? error.message
+            : "Codex SDK draft failed";
+      await this.finalize(entry, entry.cancelRequested ? "cancelled" : "failed", lastError);
+    }
   }
 
   private async finalize(entry: ActiveDraft, status: MockDraftStatus, lastError: string | null): Promise<void> {
@@ -384,29 +386,24 @@ function normalizePrompt(value: unknown): string {
   return prompt;
 }
 
-function buildDefaultDraftCommand(input: {
-  repoRoot: string;
-  mockId: string;
-  prompt: string;
-  model: string;
-  draftSpecPath: string;
-}): MockDraftCommandSpec {
-  const prompt = buildDraftSpecPrompt({ mockId: input.mockId, userPrompt: input.prompt });
-  return {
-    command: "codex",
-    args: [
-      "exec",
-      "--json",
-      "--model",
-      input.model,
-      "--cd",
-      input.repoRoot,
-      "--output-last-message",
-      input.draftSpecPath,
-      prompt
-    ],
-    displayCommand: `codex exec --json --model ${input.model} --cd ${input.repoRoot} --output-last-message ${input.draftSpecPath}`
-  };
+export class SdkMockDraftRunner implements MockDraftRunner {
+  async run(input: MockDraftRunnerInput): Promise<MockDraftRunnerResult> {
+    const prompt = buildDraftSpecPrompt({ mockId: input.mockId, userPrompt: input.prompt });
+    const codex = new Codex();
+    const thread = codex.startThread({
+      model: input.model,
+      workingDirectory: input.repoRoot,
+      sandboxMode: "workspace-write",
+      approvalPolicy: "never",
+      networkAccessEnabled: false
+    });
+    const turn = await thread.run(prompt, { signal: input.signal });
+    return {
+      command: `codex sdk run --model ${input.model}`,
+      outputText: turn.finalResponse,
+      stdout: turn.items.map((item) => JSON.stringify(redactSecrets(item))).join("\n")
+    };
+  }
 }
 
 function parseJsonCandidate(value: string): unknown {
@@ -441,11 +438,26 @@ async function appendOutput(draftDir: string, filename: string, value: string): 
   await appendFile(join(draftDir, filename), truncate(redactSecrets(value), 200_000), "utf8");
 }
 
-function redactSecrets(value: string): string {
-  return value
-    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
-    .replace(/(api[_-]?key["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
-    .replace(/(token["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]");
+function redactSecrets<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => redactSecrets(item)) as T;
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      if (/token|secret|password|credential|authorization|api[_-]?key|private[_-]?key/i.test(key)) {
+        result[key] = "[redacted]";
+      } else {
+        result[key] = redactSecrets(raw);
+      }
+    }
+    return result as T;
+  }
+  if (typeof value === "string") {
+    return value
+      .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
+      .replace(/(api[_-]?key["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
+      .replace(/(token["':=\s]+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]") as T;
+  }
+  return value;
 }
 
 function truncate(value: string, max: number): string {

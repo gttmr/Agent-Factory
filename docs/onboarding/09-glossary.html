@@ -105,7 +105,7 @@
 
           <div class="glossary-entry">
             <h4>실행 (RunSandbox)</h4>
-            <p><code>/af/:reqId/run</code> route. 승인 게이트가 <strong>없는</strong> 도구 화면이다. <code>runtime-stub/</code> 생성 후 <code>runtime-stub/.venv</code>에 ADK dependency를 설치하고, 로컬 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며 상태를 폴링하고, ADK 공식 dev UI(<code>web_url</code>)를 새 탭으로 링크한다. 보조 nav 항목일 뿐이며 <code>afRunStageIds</code>(=manifest 스테이지 스키마/게이트 칩)에 포함되지 않는다.</p>
+            <p><code>/af/:reqId/run</code> route. 승인 게이트가 <strong>없는</strong> 도구 화면이다. <code>runtime-stub/</code> 생성 후 공유 ADK venv(<code>.agent-factory/runtime/.venv</code> 또는 <code>AF_ADK_VENV_DIR</code>)의 <code>adk api_server --with_ui</code>(8765)를 시작/중지하며 상태를 폴링하고, ADK 공식 dev UI(<code>web_url</code>)를 새 탭으로 링크한다. 웹은 Python dependency를 설치하지 않고, 수동 설치 기준은 <code>requirements/adk-runtime.txt</code>다. 보조 nav 항목일 뿐이며 <code>afRunStageIds</code>(=manifest 스테이지 스키마/게이트 칩)에 포함되지 않는다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -114,8 +114,8 @@
           </div>
 
           <div class="glossary-entry">
-            <h4>Codex CLI</h4>
-            <p>분석/설계 Stage Runner가 내부에서 실행할 수 있는 CLI. <code>/api/analyze-requirement</code> SSE endpoint는 direct/internal analyzer primitive로 남아 있지만, 기본 UI 경로는 <code>/api/af/:reqId/stages/analyze/run</code>이다.</p>
+            <h4>Codex SDK</h4>
+            <p>분석/설계 Stage Runner와 direct analyzer primitive가 사용하는 TypeScript SDK 실행 경로. <code>/api/analyze-requirement</code> SSE endpoint는 direct/internal analyzer primitive로 남아 있지만, 기본 UI 경로는 <code>/api/af/:reqId/stages/analyze/run</code>이다.</p>
           </div>
 
           <div class="glossary-entry">

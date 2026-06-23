@@ -1,6 +1,7 @@
 import { execFile, spawn, type ChildProcessByStdio } from "node:child_process";
-import { mkdir, readdir, readFile, readlink, stat, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { createConnection } from "node:net";
+import { delimiter, join, posix, resolve, win32 } from "node:path";
 import type { Readable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -19,8 +20,11 @@ export interface RuntimeChatStatus {
   web_url: string;
   app_name: string;
   installed: boolean;
+  install_supported: boolean;
+  setup_hint: string;
   paths: {
     runtime_stub_dir: string;
+    venv: string;
     python: string;
     adk: string;
   };
@@ -78,17 +82,13 @@ interface RuntimeProcess {
 interface RuntimeContext {
   reqId: string;
   stubDir: string;
+  venvDir: string;
+  venvBinDir: string;
   pythonPath: string;
   adkPath: string;
   appName: string;
   port: number;
   host: string;
-}
-
-interface ProcessResult {
-  code: number;
-  stdout: string;
-  stderr: string;
 }
 
 interface RuntimeProcessRecord {
@@ -101,11 +101,43 @@ interface RuntimeProcessRecord {
 }
 
 interface PortOwner {
-  pid: number;
+  pid: number | null;
   command: string | null;
   cwd: string | null;
   matchesCurrentRuntime: boolean;
   safeToStop: boolean;
+}
+
+export interface AdkRuntimeVenvPaths {
+  venvDir: string;
+  binDir: string;
+  pythonPath: string;
+  adkPath: string;
+}
+
+export function resolveAdkRuntimeVenv({
+  repoRoot,
+  env = process.env,
+  platform = process.platform
+}: {
+  repoRoot: string;
+  env?: Partial<Pick<NodeJS.ProcessEnv, "AF_ADK_VENV_DIR">>;
+  platform?: NodeJS.Platform;
+}): AdkRuntimeVenvPaths {
+  const configured = env.AF_ADK_VENV_DIR?.trim();
+  const pathApi = platform === "win32" ? win32 : posix;
+  const venvDir = configured
+    ? pathApi.isAbsolute(configured)
+      ? configured
+      : pathApi.resolve(repoRoot, configured)
+    : pathApi.join(repoRoot, ".agent-factory", "runtime", ".venv");
+  const binDir = pathApi.join(venvDir, platform === "win32" ? "Scripts" : "bin");
+  return {
+    venvDir,
+    binDir,
+    pythonPath: pathApi.join(binDir, platform === "win32" ? "python.exe" : "python"),
+    adkPath: pathApi.join(binDir, platform === "win32" ? "adk.exe" : "adk")
+  };
 }
 
 export class RuntimeChatManager {
@@ -128,22 +160,11 @@ export class RuntimeChatManager {
 
   async install(reqId: string): Promise<RuntimeChatInstallResult> {
     const ctx = await this.context(reqId);
-    const createVenv = await runProcess(ctx.stubDir, "python3", ["-m", "venv", ".venv"]);
-    if (createVenv.code !== 0) {
-      return {
-        ok: false,
-        command: "python3 -m venv .venv",
-        stdout: createVenv.stdout,
-        stderr: createVenv.stderr,
-        status: await this.buildStatus(ctx)
-      };
-    }
-    const install = await runProcess(ctx.stubDir, ctx.pythonPath, ["-m", "pip", "install", "-r", "requirements.txt"]);
     return {
-      ok: install.code === 0,
-      command: `${ctx.pythonPath} -m pip install -r requirements.txt`,
-      stdout: install.stdout,
-      stderr: install.stderr,
+      ok: false,
+      command: "manual shared ADK runtime setup",
+      stdout: "",
+      stderr: setupHint(ctx),
       status: await this.buildStatus(ctx)
     };
   }
@@ -163,15 +184,20 @@ export class RuntimeChatManager {
     }
     const installed = await isFile(ctx.adkPath);
     if (!installed) {
-      throw new Error("ADK dependency is not installed. Run runtime-chat/install first.");
+      throw new Error(`Shared ADK runtime is not installed. ${setupHint(ctx)}`);
     }
     const command = buildAdkServerCommand(ctx);
     const env = await buildRuntimeProcessEnv({ repoRoot: this.repoRoot, stubDir: ctx.stubDir });
+    const pathValue = env.PATH || process.env.PATH || "";
     const child = spawn(command.command, command.args, {
       cwd: ctx.stubDir,
-      env,
+      env: {
+        ...env,
+        PATH: [ctx.venvBinDir, pathValue].filter(Boolean).join(delimiter),
+        VIRTUAL_ENV: ctx.venvDir
+      },
       stdio: ["ignore", "pipe", "pipe"],
-      detached: true
+      detached: process.platform !== "win32"
     });
     const proc: RuntimeProcess = {
       child,
@@ -211,7 +237,7 @@ export class RuntimeChatManager {
     const proc = this.liveProcess(reqId);
     if (proc) {
       proc.exitCode = 0;
-      if (proc.child.pid) terminatePid(proc.child.pid);
+      if (proc.child.pid) await terminatePid(proc.child.pid);
       else proc.child.kill("SIGTERM");
       proc.child.stdout.destroy();
       proc.child.stderr.destroy();
@@ -227,7 +253,7 @@ export class RuntimeChatManager {
 
     const record = await readProcessRecord(ctx);
     if (record && isPidAlive(record.pid)) {
-      terminatePid(record.pid);
+      await terminatePid(record.pid);
       await waitForPidExit(record.pid);
       await clearProcessRecord(ctx);
       return {
@@ -238,8 +264,8 @@ export class RuntimeChatManager {
     }
 
     const owner = await findPortOwner(ctx);
-    if (owner?.safeToStop) {
-      terminatePid(owner.pid);
+    if (owner?.safeToStop && owner.pid) {
+      await terminatePid(owner.pid);
       await waitForPidExit(owner.pid);
       await clearProcessRecord(ctx);
       return {
@@ -254,7 +280,9 @@ export class RuntimeChatManager {
     if (owner) {
       return {
         ok: false,
-        message: `Port ${ctx.port} is owned by PID ${owner.pid}, but it was not started from this runtime-stub.`,
+        message: owner.pid
+          ? `Port ${ctx.port} is owned by PID ${owner.pid}, but it was not started from this runtime-stub.`
+          : `Port ${ctx.port} is already in use, but the owner cannot be safely identified.`,
         status: await this.status(reqId)
       };
     }
@@ -269,11 +297,14 @@ export class RuntimeChatManager {
     const rootDir = this.store.resolveRootDir(reqId);
     const stubDir = join(rootDir, "runtime-stub");
     const appName = await discoverAppName(stubDir);
+    const venv = resolveAdkRuntimeVenv({ repoRoot: this.repoRoot });
     return {
       reqId,
       stubDir,
-      pythonPath: join(stubDir, ".venv/bin/python"),
-      adkPath: join(stubDir, ".venv/bin/adk"),
+      venvDir: venv.venvDir,
+      venvBinDir: venv.binDir,
+      pythonPath: venv.pythonPath,
+      adkPath: venv.adkPath,
       appName,
       port: this.port,
       host: this.host
@@ -312,8 +343,11 @@ export class RuntimeChatManager {
       web_url: baseUrl(ctx),
       app_name: ctx.appName,
       installed: (await isFile(ctx.pythonPath)) && (await isFile(ctx.adkPath)),
+      install_supported: false,
+      setup_hint: setupHint(ctx),
       paths: {
         runtime_stub_dir: ctx.stubDir,
+        venv: ctx.venvDir,
         python: ctx.pythonPath,
         adk: ctx.adkPath
       },
@@ -339,8 +373,8 @@ export class RuntimeChatManager {
   }
 }
 
-export function buildAdkServerCommand(input: { stubDir: string; host: string; port: number }) {
-  const command = join(input.stubDir, ".venv/bin/adk");
+export function buildAdkServerCommand(input: { adkPath: string; host: string; port: number }) {
+  const command = input.adkPath;
   const args = [
     "api_server",
     "--host",
@@ -386,26 +420,6 @@ async function discoverAppName(stubDir: string): Promise<string> {
     if (await isFile(join(stubDir, entry.name, "agent.py"))) return entry.name;
   }
   throw new Error("runtime-stub agent package was not found.");
-}
-
-function runProcess(cwd: string, command: string, args: string[]): Promise<ProcessResult> {
-  return new Promise((resolvePromise) => {
-    const child = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout = tail(`${stdout}${chunk.toString("utf8")}`, 200_000);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr = tail(`${stderr}${chunk.toString("utf8")}`, 200_000);
-    });
-    child.on("error", (error) => {
-      resolvePromise({ code: -1, stdout, stderr: `${stderr}\n[spawn-error] ${error.message}` });
-    });
-    child.on("close", (code) => {
-      resolvePromise({ code: code ?? -1, stdout, stderr });
-    });
-  });
 }
 
 async function readJson(path: string): Promise<unknown> {
@@ -460,8 +474,12 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
-function terminatePid(pid: number): void {
+async function terminatePid(pid: number): Promise<void> {
   if (!Number.isInteger(pid) || pid <= 0) return;
+  if (process.platform === "win32") {
+    await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"]).catch(() => undefined);
+    return;
+  }
   try {
     process.kill(-pid, "SIGTERM");
     return;
@@ -485,61 +503,30 @@ async function waitForPidExit(pid: number | null, timeoutMs = 2_000): Promise<vo
 }
 
 async function findPortOwner(ctx: RuntimeContext): Promise<PortOwner | null> {
-  const pids = await findListeningPids(ctx.port);
-  for (const pid of pids) {
-    const owner = await inspectProcessOwner(pid, ctx);
-    if (owner) return owner;
-  }
-  return null;
-}
-
-async function findListeningPids(port: number): Promise<number[]> {
-  try {
-    const { stdout } = await execFileAsync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
-      encoding: "utf8"
-    });
-    return stdout
-      .split("\n")
-      .filter((line) => line.startsWith("p"))
-      .map((line) => Number(line.slice(1)))
-      .filter((pid) => Number.isInteger(pid) && pid > 0);
-  } catch {
-    return [];
-  }
-}
-
-async function inspectProcessOwner(pid: number, ctx: RuntimeContext): Promise<PortOwner | null> {
-  if (!isPidAlive(pid)) return null;
-  const cwd = await readlink(`/proc/${pid}/cwd`).catch(() => null);
-  const command = await readFile(`/proc/${pid}/cmdline`, "utf8")
-    .then((value) => value.split("\0").filter(Boolean).join(" "))
-    .catch(() => null);
-  const matchesCurrentRuntime = isCurrentRuntimeProcessOwner({ command, cwd }, ctx);
-  const safeToStop = matchesCurrentRuntime || isAdkRuntimeProcessOwner({ command }, ctx);
+  if (!(await isTcpPortListening(ctx.host, ctx.port))) return null;
   return {
-    pid,
-    command,
-    cwd,
-    matchesCurrentRuntime,
-    safeToStop
+    pid: null,
+    command: null,
+    cwd: null,
+    matchesCurrentRuntime: false,
+    safeToStop: false
   };
 }
 
-function isCurrentRuntimeProcessOwner(owner: { command: string | null; cwd: string | null }, ctx: RuntimeContext): boolean {
-  const cwd = owner.cwd ?? "";
-  const command = owner.command ?? "";
-  if (cwd === ctx.stubDir) return true;
-  return command.includes(ctx.stubDir) && command.includes("api_server") && command.includes(".venv/bin/adk");
-}
-
-function isAdkRuntimeProcessOwner(owner: { command: string | null }, ctx: RuntimeContext): boolean {
-  const command = owner.command ?? "";
-  return (
-    command.includes("api_server") &&
-    command.includes(".venv/bin/adk") &&
-    command.includes("--port") &&
-    command.includes(String(ctx.port))
-  );
+function isTcpPortListening(host: string, port: number): Promise<boolean> {
+  return new Promise((resolvePromise) => {
+    const socket = createConnection({ host, port });
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolvePromise(value);
+    };
+    socket.setTimeout(300, () => settle(false));
+    socket.once("connect", () => settle(true));
+    socket.once("error", () => settle(false));
+  });
 }
 
 function baseUrl(ctx: { host: string; port: number }): string {
@@ -548,6 +535,13 @@ function baseUrl(ctx: { host: string; port: number }): string {
 
 function tail(value: string, max = 20_000): string {
   return value.length > max ? value.slice(-max) : value;
+}
+
+function setupHint(ctx: Pick<RuntimeContext, "venvDir" | "pythonPath">): string {
+  return [
+    `Create the shared ADK runtime venv at ${ctx.venvDir}.`,
+    `Then run: ${ctx.pythonPath} -m pip install -r requirements/adk-runtime.txt.`
+  ].join(" ");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

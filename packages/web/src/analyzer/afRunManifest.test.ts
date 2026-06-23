@@ -33,7 +33,15 @@ const manifest = parseAfRunManifest(
         output_artifacts: [
           "runs/analyze/20260527T130000Z-analyze-a1b2c3/proposed-artifacts/analysis-result.json"
         ],
-        last_error: null
+        last_error: null,
+        codex: {
+          backend: "sdk",
+          thread_id: "thread-001",
+          event_count: 7,
+          usage: {
+            input_tokens: 1
+          }
+        }
       }
     }
   }),
@@ -48,6 +56,11 @@ assert.equal(manifest.approvals.analysis_reviewed, true);
 assert.equal(manifest.validation.last_result, "failed");
 assert.equal(manifest.stage_runs?.analyze?.latest_run_id, "20260527T130000Z-analyze-a1b2c3");
 assert.equal(manifest.stage_runs?.analyze?.status, "completed");
+assert.deepEqual(manifest.stage_runs?.analyze?.codex, {
+  backend: "sdk",
+  thread_id: "thread-001",
+  event_count: 7
+});
 assert.equal(manifest.stage_runs?.design, undefined);
 
 const summary = summarizeAfRunManifest(manifest);
@@ -63,6 +76,7 @@ const serialized = serializeAfRunManifest(manifest);
 assert.ok(serialized.endsWith("\n"));
 assert.equal(JSON.parse(serialized).requirement_id, "req-001");
 assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-analyze-requirement");
+assert.equal(JSON.parse(serialized).stage_runs.analyze.codex.usage, undefined);
 
 assert.throws(() => parseAfRunManifest("[]", "bad.json"), /object/);
 assert.throws(() => parseAfRunManifest(JSON.stringify({ requirement_id: "" }), "bad.json"), /requirement_id/);

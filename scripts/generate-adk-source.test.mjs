@@ -183,6 +183,7 @@ function readBundle(outputRoot) {
 }
 
 function assertCommonBundle(outputRoot, manifest) {
+  const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
   assert.equal(manifest.guardrails.raw_requirement_to_code, false);
   assert.equal(manifest.guardrails.private_data_or_endpoints, false);
   assert.equal(manifest.scaffold_plan.source, "approved_workbench_artifact");
@@ -191,6 +192,10 @@ function assertCommonBundle(outputRoot, manifest) {
   assert.ok(existsSync(join(outputRoot, "scaffold-plan.json")));
   assert.ok(existsSync(join(outputRoot, "implementation-handoff.md")));
   assert.ok(existsSync(join(outputRoot, "runtime-chat-smoke.json")));
+  assert.ok(!existsSync(join(outputRoot, "requirements.txt")), "runtime-stub must not carry artifact-local Python requirements");
+  assert.doesNotMatch(readme, /python3 -m venv \.venv/);
+  assert.doesNotMatch(readme, /pip install -r requirements\.txt/);
+  assert.match(readme, /requirements\/adk-runtime\.txt/);
 }
 
 function assertSmokeBundle(outputRoot) {
@@ -880,8 +885,8 @@ test("runnable lowers a remote_a2a node to RemoteA2aAgent from its A2A contract"
     assert.match(source, /= RemoteA2aAgent\(/, "emits a RemoteA2aAgent node");
     assert.match(source, /agent_card="http:\/\/localhost:8001\/a2a\/test_agent\/\.well-known\/agent-card\.json"/, "agent_card from the contract");
     assert.match(source, /use_legacy=False/);
-    const reqs = readFileSync(join(outputRoot, "requirements.txt"), "utf8");
-    assert.match(reqs, /google-adk\[a2a\]/, "requirements include the a2a extra");
+    const reqs = readFileSync(join(here, "..", "requirements", "adk-runtime.txt"), "utf8");
+    assert.match(reqs, /google-adk\[a2a,mcp\]/, "shared requirements include the ADK extras");
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

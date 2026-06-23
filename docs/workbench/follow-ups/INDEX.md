@@ -43,7 +43,7 @@
 ## 마이그레이션 후 변경된 사실 (브리프 작성 시 가정)
 
 - 라우트: `/`, `/af/:reqId/{analyze,design,build,verify}`, `/catalog` 5개. `/legacy` 는 제거됨.
-- 서버 미들웨어: `/api/af/:reqId/stages/:stage/*` (Analyze/Design Stage Runner), `/api/analyze-requirement` (direct/internal Codex CLI primitive), `/api/af`, `/api/af-collab`, `/api/catalog`.
+- 서버 미들웨어: `/api/af/:reqId/stages/:stage/*` (Analyze/Design Stage Runner), `/api/analyze-requirement` (direct/internal Codex SDK primitive), `/api/af`, `/api/af-collab`, `/api/catalog`.
 - 삭제된 컴포넌트: `RequirementIntake`, `AnalysisTracePanel`, `SavedAnalyses`, `CatalogManager`, legacy `ModuleReview`(+ Inspector), legacy `RuntimeContractReview`, `A2AContractReview`(+ subdir), `AdkRuntimeWorkbench`, `WorkbenchShell`, `ui/review.tsx`. 현재 DesignWorkbench에는 새 Runtime 계약 검토 탭이 있다.
 - 삭제된 analyzer 파일: `exampleRequirement.ts`, `providers.ts`, `savedAnalyses.ts`, `adkSource.ts`, `adkGraph.ts`.
 - 삭제된 서버 미들웨어 파일: `adkRuntime.ts`, `moduleResolution.ts`.

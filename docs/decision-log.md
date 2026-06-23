@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-23 · 작업 브랜치 `codex/shared-venv-sdk` — 공유 ADK venv + Codex SDK 실행 통일
+
+### ADK 실행은 공유 venv, Codex 호출은 SDK 경로로 통일
+- **결정**: RunSandbox는 artifact별 `runtime-stub/.venv`를 만들거나 설치하지 않고, repo-local `.agent-factory/runtime/.venv` 또는 `AF_ADK_VENV_DIR`가 가리키는 공유 ADK venv의 `adk`를 사용한다. Codex Stage Runner, direct analyzer, Mock Lab draft는 외부 `codex exec` 호출 대신 `@openai/codex-sdk` TypeScript SDK 경로를 사용한다.
+- **배경**: offline 패키징에서 artifact별 venv가 불필요하게 커지고, Windows/Linux 이동 시 venv 재사용이 불가능했다. Codex CLI 직접 spawn 의존도 줄여 서버 코드의 실행 계약을 SDK 수준으로 맞춘다.
+- **영향**: `runtimeChat.ts`, `RunSandbox.tsx`, `stageRunner.ts`, `codexAnalyzer.ts`, `mockDraftRunner.ts`, `requirements/adk-runtime.txt`, active runtime docs.
+
 ## 2026-06-21 · 작업 브랜치 `codex/review-followup-taxonomy-graph` — PR #36/#37 리뷰 후속 보완
 
 ### 호출 축 불변식 강제: LLM-선택 toolset은 agent 노드에만

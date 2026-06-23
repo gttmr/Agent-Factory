@@ -229,12 +229,10 @@ async function handleRuntimeChat(
     return;
   }
   if (action === "install") {
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
-      return;
-    }
-    const result = await runtimeChat.install(reqId);
-    sendJson(res, result.ok ? 200 : 422, result);
+    sendJson(res, 405, {
+      error: "웹에서 ADK dependency 설치는 지원하지 않습니다. 공유 venv를 수동으로 준비하세요.",
+      status: await runtimeChat.status(reqId)
+    });
     return;
   }
   if (action === "start") {

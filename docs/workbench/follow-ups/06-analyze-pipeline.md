@@ -1,6 +1,6 @@
 # 06 — Analyze pipeline 결정
 
-상태: 완료 후 brief 09로 흡수. 옵션 B의 `/api/analyze-requirement` SSE 호출 hook은 구현됐고, 현재 기본 UI는 Analyze Skill Runner(`/api/af/:reqId/stages/analyze/run`)가 담당한다. `/api/analyze-requirement`는 direct/internal analyzer primitive로 보존한다.
+상태: 완료 후 brief 09로 흡수. 옵션 B의 `/api/analyze-requirement` SSE 호출 hook은 구현됐고, 현재 기본 UI는 Analyze Skill Runner(`/api/af/:reqId/stages/analyze/run`)가 담당한다. `/api/analyze-requirement`는 direct/internal analyzer primitive로 보존한다. 2026-06-23 이후 direct analyzer와 Stage Runner 구현은 외부 Codex CLI 직접 spawn 대신 `@openai/codex-sdk`를 사용한다.
 
 ## 왜 필요한가
 

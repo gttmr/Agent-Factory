@@ -8,8 +8,11 @@ export interface RuntimeChatStatus {
   web_url: string;
   app_name: string;
   installed: boolean;
+  install_supported: boolean;
+  setup_hint: string;
   paths: {
     runtime_stub_dir: string;
+    venv: string;
     python: string;
     adk: string;
   };
@@ -57,20 +60,6 @@ export function useRuntimeChatStatus(reqId: string | undefined) {
     // stale 해지지 않도록 주기적으로 갱신한다(특히 '실행' 화면의 dev UI 링크).
     refetchInterval: 5000,
     refetchOnWindowFocus: true
-  });
-}
-
-export function useInstallRuntimeChat(reqId: string | undefined) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      if (!reqId) throw new Error("requirement_id 가 없습니다.");
-      const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-chat/install`, { method: "POST" });
-      const body = (await response.json()) as RuntimeChatInstallResult & { error?: string };
-      if (!response.ok) throw new AfApiError(response.status, body.error ?? "ADK dependency 설치 실패", body);
-      return body;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["af", reqId, "runtime-chat"] })
   });
 }
 
