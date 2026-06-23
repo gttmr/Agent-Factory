@@ -319,6 +319,8 @@ const graphSemanticsPlan = buildScaffoldPlan({
         call_control: "fixed_by_workflow",
         side_effect: "read",
         policy: "timeout_retry_required",
+        input_mapping: { query: "agent_query" },
+        output_mapping: { rows: "adapter_rows" },
         review_status: "approved"
       }
     ],
@@ -329,16 +331,16 @@ const graphSemanticsPlan = buildScaffoldPlan({
         to: "node-b",
         from_port: null,
         to_port: null,
-        edge_kind: "event_output",
-        execution_semantics: "normal_transition",
+        edge_kind: "session_state",
+        execution_semantics: "fan_out",
         data_label: "agent_to_adapter",
-        schema_ref: null,
+        schema_ref: "agent_to_adapter.v1",
         route_condition: null,
-        state_key: null,
+        state_key: "agent_query",
         artifact_key: null,
         a2a_contract_id: null,
         is_remote_boundary_crossing: false,
-        flow_kind: "sequence",
+        flow_kind: "fan_out",
         call_control: "fixed_by_workflow"
       }
     ]
@@ -349,8 +351,12 @@ const graphSemanticsPlan = buildScaffoldPlan({
 assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.invoke_binding, "mcp_tool");
 assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.decision_owner, "workflow_code");
 assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.call_control, "fixed_by_workflow");
-assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "sequence");
+assert.deepEqual(graphSemanticsPlan.modules.find((module) => module.id === "mod-b")?.input_mapping, { query: "agent_query" });
+assert.deepEqual(graphSemanticsPlan.modules.find((module) => module.id === "mod-b")?.output_mapping, { rows: "adapter_rows" });
+assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "fan_out");
 assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "fixed_by_workflow");
+assert.equal((graphSemanticsPlan.graph?.edges[0] as { state_key?: string | null } | undefined)?.state_key, "agent_query");
+assert.equal((graphSemanticsPlan.graph?.edges[0] as { schema_ref?: string | null } | undefined)?.schema_ref, "agent_to_adapter.v1");
 
 const selectedToolsetPlan = buildScaffoldPlan({
   normalizedRequirement,

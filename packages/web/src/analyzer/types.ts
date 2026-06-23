@@ -592,6 +592,10 @@ export interface ScaffoldPlanGraph {
     from: string;
     to: string;
     edge_kind: EdgeKind;
+    schema_ref?: string | null;
+    route_condition?: string | null;
+    state_key?: string | null;
+    artifact_key?: string | null;
     flow_kind?: GraphFlowKind | null;
     call_control?: GraphCallControl | null;
   }>;

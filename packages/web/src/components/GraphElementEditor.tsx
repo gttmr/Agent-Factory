@@ -196,6 +196,49 @@ function ReadonlyInput({ value }: { value: ReactNode }) {
   return <input value={typeof value === "string" || typeof value === "number" ? String(value) : ""} readOnly />;
 }
 
+function EditableMappingField({
+  label,
+  value,
+  onCommit
+}: {
+  label: string;
+  value: Record<string, string> | null | undefined;
+  onCommit: (value: Record<string, string> | null) => void;
+}) {
+  const formattedValue = formatMapping(value);
+  const [text, setText] = useState(formattedValue);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setText(formattedValue);
+    setError(null);
+  }, [formattedValue]);
+
+  const commit = () => {
+    const result = parseMapping(text);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    onCommit(result.value);
+    setText(formatMapping(result.value));
+  };
+
+  return (
+    <TextareaField
+      label={label}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={commit}
+      rows={4}
+      spellCheck={false}
+      hint={error ?? 'JSON object: {"tool_input":"source_field"}'}
+      aria-invalid={Boolean(error)}
+    />
+  );
+}
+
 function NodeForm({
   node,
   editState,
@@ -339,11 +382,23 @@ function NodeForm({
                   readOnly
                 />
               </Field>
-              <TextareaField label="input_mapping" value={JSON.stringify(node.input_mapping ?? {}, null, 2)} readOnly rows={4} />
-              <TextareaField label="output_mapping" value={JSON.stringify(node.output_mapping ?? {}, null, 2)} readOnly rows={4} />
             </>
           ) : null}
-          {!schemaRefs.length && !node.input_schema && !node.output_schema && !node.workflow_ref ? (
+          {canLinkModule ? (
+            <>
+              <EditableMappingField
+                label="input_mapping"
+                value={node.input_mapping}
+                onCommit={(value) => editState.updateNodeFields(node.id, { input_mapping: value })}
+              />
+              <EditableMappingField
+                label="output_mapping"
+                value={node.output_mapping}
+                onCommit={(value) => editState.updateNodeFields(node.id, { output_mapping: value })}
+              />
+            </>
+          ) : null}
+          {!schemaRefs.length && !node.input_schema && !node.output_schema && !node.workflow_ref && !canLinkModule ? (
             <EmptyTabMessage>이 노드에 표시할 계약 정보가 없습니다.</EmptyTabMessage>
           ) : null}
         </EditorSection>
@@ -684,6 +739,31 @@ function nullableString(value: string): string | null {
 
 function nullableEnum<T extends string>(value: string): T | null {
   return value === "" ? null : (value as T);
+}
+
+function formatMapping(value: Record<string, string> | null | undefined): string {
+  return JSON.stringify(value ?? {}, null, 2);
+}
+
+function parseMapping(text: string): { ok: true; value: Record<string, string> | null } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: "유효한 JSON object를 입력하세요." };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "mapping은 JSON object여야 합니다." };
+  }
+  const entries = Object.entries(parsed);
+  for (const [key, value] of entries) {
+    if (!key.trim() || typeof value !== "string" || !value.trim()) {
+      return { ok: false, error: "mapping key와 value는 비어 있지 않은 string이어야 합니다." };
+    }
+  }
+  return { ok: true, value: entries.length ? (Object.fromEntries(entries) as Record<string, string>) : {} };
 }
 
 function nodeLabel(nodes: GraphNode[], nodeId: string): string {

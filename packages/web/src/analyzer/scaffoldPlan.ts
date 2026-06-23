@@ -425,6 +425,10 @@ function scaffoldGraphFor(processFlow: ProcessFlow) {
       from: edge.from,
       to: edge.to,
       edge_kind: edge.edge_kind,
+      schema_ref: edge.schema_ref ?? null,
+      route_condition: edge.route_condition ?? null,
+      state_key: edge.state_key ?? null,
+      artifact_key: edge.artifact_key ?? null,
       flow_kind: normalizeFlowKind(edge.flow_kind ?? null),
       call_control: normalizeCallControl(edge.call_control ?? null)
     }))

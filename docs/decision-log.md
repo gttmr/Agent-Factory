@@ -10,6 +10,30 @@
 
 ---
 
+## 2026-06-23 · 작업 브랜치 `main` — ADK route payload와 Graph IR runtime I/O 계약 정합화
+
+### Route는 분기 신호, payload는 Event.output으로 전달한다
+- **결정**: generated router FunctionNode는 `Event(route=..., output=node_input)`을 반환한다. `route`는 ADK Workflow route map 선택에만 쓰고, branch node가 받는 업무 payload는 `Event.output`으로 보존한다.
+- **배경**: ADK 2.x graph route에서 `Event(route=...)`만 반환하면 branch는 선택되지만 downstream `node_input`이 비어 payload가 끊긴다. 화면 Graph IR의 route edge도 이 의미를 명확히 표현해야 한다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/generate-adk-source.test.mjs`, `docs/workbench/validation.md`, `docs/workbench/process-flow.md`.
+
+### Graph IR input/output mapping과 edge data contract를 scaffold-plan에 보존한다
+- **결정**: `scaffold-plan.graph.edges`는 `schema_ref`, `route_condition`, `state_key`, `artifact_key`를 보존하고, Design의 node 계약 탭은 module-bound node의 `input_mapping`/`output_mapping`을 편집 가능한 reviewed runtime I/O 계약으로 취급한다. connected MCP adapter 입력 해석은 reviewed `input_mapping`을 `agents.config.yaml input_map`보다 먼저 적용하고, payload에는 `input_resolution` 감사 요약을 남긴다.
+- **배경**: Build/generator 단계가 `analysis-result.json.processFlow`를 다시 해석하면서 설계 화면에서 검토한 data channel과 입력 mapping이 scaffold-plan 표면에서 불완전하게 보였다.
+- **영향**: `packages/web/src/analyzer/scaffoldPlan.ts`, `packages/web/src/analyzer/types.ts`, `packages/web/src/components/GraphCanvas.tsx`, `packages/web/src/components/GraphElementEditor.tsx`, `schemas/scaffold-plan.schema.json`, regression scaffold-plan fixtures.
+
+## 2026-06-23 · 작업 브랜치 `main` — ADK runnable 입력 전달과 Adapter Arguments Agent
+
+### Adapter 인자는 전용 Agent 출력 channel에서 해석한다
+- **결정**: runnable generator는 connected MCP Adapter 입력을 `input_map`, named state/channel, workflow `node_input`, upstream output, semantic user text(`objective_text` 등), reviewed `smoke_spec.synthetic_inputs` 순서로 해석한다. Agent가 named state channel에 JSON object 문자열을 쓰면 generator가 이를 파싱해 adapter input field를 찾는다. MCP 호출 payload에는 실제 `arguments`를 보존하고, tool result의 `structuredContent`는 `structured_content` 아래에 중첩 보존하며 top-level로 다시 펼치지 않는다.
+- **배경**: 목적 확인 후 다음 Adapter arguments를 모델이 만들려면 `human_input -> Agent -> Adapter` 경로에서 Agent 출력이 일반 state channel로 전달되어야 한다. 시나리오별 값은 generator에 하드코딩하지 않고 reviewed artifact와 runtime LLM output에서만 온다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/generate-adk-source.test.mjs`, `templates/regression-scenarios/wf-page-recommendation-required/*`, `docs/workbench/validation.md`.
+
+### HITL resume은 확인 응답과 이전 context를 함께 전달한다
+- **결정**: generated `human_input` FunctionNode는 `rerun_on_resume=True`로 생성하고, resume 후 downstream output을 `{previous, response}` 형태로 내보낸다.
+- **배경**: 사용자가 확인 단계에서 "확인"처럼 짧게 입력하면 downstream Agent가 이전 목적 분류 결과와 원 목적 텍스트를 잃을 수 있었다.
+- **영향**: `scripts/generate-adk-source.mjs`, `scripts/generate-adk-source.test.mjs`, `docs/workbench/validation.md`.
+
 ## 2026-06-23 · 작업 브랜치 `codex/shared-venv-sdk` — 공유 ADK venv + Codex SDK 실행 통일
 
 ### ADK 실행은 공유 venv, Codex 호출은 SDK 경로로 통일

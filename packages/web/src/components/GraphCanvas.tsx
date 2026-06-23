@@ -73,6 +73,8 @@ export type NodeFieldPatch = Partial<
     | "invoke_binding"
     | "decision_owner"
     | "call_control"
+    | "input_mapping"
+    | "output_mapping"
   >
 >;
 export type EdgeFieldPatch = Partial<

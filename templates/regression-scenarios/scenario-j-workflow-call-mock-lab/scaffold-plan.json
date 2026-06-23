@@ -19,10 +19,25 @@
         "Mock Lab MCP tool binding을 확인하세요.",
         "실제 EAI/API client는 전문 개발자가 수동 보강하세요."
       ],
-      "inputs": [{ "name": "customer_id", "type": "string", "required": true }],
-      "outputs": [{ "name": "profile", "type": "object", "required": true }],
+      "inputs": [
+        {
+          "name": "customer_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "profile",
+          "type": "object",
+          "required": true
+        }
+      ],
       "required_review_fields": [],
-      "risk_signals": ["personal_data", "audit_required"],
+      "risk_signals": [
+        "personal_data",
+        "audit_required"
+      ],
       "runtime_mock": null,
       "instruction": null,
       "model": null,
@@ -59,7 +74,9 @@
         "generation_mode": "deterministic_template",
         "implementation_template": "mcp_mock_adapter_stub",
         "manual_completion_required": true,
-        "developer_todos": ["replace_mock_with_real_eai_client"]
+        "developer_todos": [
+          "replace_mock_with_real_eai_client"
+        ]
       }
     },
     {
@@ -77,10 +94,24 @@
         "workflow_call target skeleton 연결 방식을 확인하세요.",
         "input/output mapping을 검토하세요."
       ],
-      "inputs": [{ "name": "customer_id", "type": "string", "required": true }],
-      "outputs": [{ "name": "risk_result", "type": "object", "required": true }],
+      "inputs": [
+        {
+          "name": "customer_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "risk_result",
+          "type": "object",
+          "required": true
+        }
+      ],
       "required_review_fields": [],
-      "risk_signals": ["audit_required"],
+      "risk_signals": [
+        "audit_required"
+      ],
       "runtime_mock": null,
       "instruction": null,
       "model": null,
@@ -103,8 +134,12 @@
         "source": "catalog",
         "display_name": "이탈위험 판단 Workflow"
       },
-      "input_mapping": { "customer_id": "$state.customer.id" },
-      "output_mapping": { "risk_result": "$result" },
+      "input_mapping": {
+        "customer_id": "$state.customer.id"
+      },
+      "output_mapping": {
+        "risk_result": "$result"
+      },
       "mock_binding": null,
       "adk_skeleton_contract": {
         "scaffold_level": "mock_testable_skeleton",
@@ -113,7 +148,9 @@
         "generation_mode": "deterministic_template",
         "implementation_template": "workflow_call_stub",
         "manual_completion_required": true,
-        "developer_todos": ["confirm_workflow_call_contract"]
+        "developer_todos": [
+          "confirm_workflow_call_contract"
+        ]
       }
     }
   ],
@@ -168,7 +205,11 @@
         "to": "node-customer-profile",
         "edge_kind": "event_output",
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "schema_ref": null,
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null
       },
       {
         "id": "edge-2",
@@ -176,7 +217,11 @@
         "to": "node-risk-workflow",
         "edge_kind": "event_output",
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "schema_ref": null,
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null
       },
       {
         "id": "edge-3",
@@ -184,7 +229,11 @@
         "to": "node-output",
         "edge_kind": "event_output",
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "schema_ref": null,
+        "route_condition": null,
+        "state_key": null,
+        "artifact_key": null
       }
     ]
   },
@@ -196,13 +245,17 @@
         "module_id": "mod-customer-profile",
         "module_name": "고객 프로파일 조회 Adapter",
         "reason": "Mock Lab MCP test double을 실제 EAI/API client로 교체해야 합니다.",
-        "developer_todos": ["replace_mock_with_real_eai_client"]
+        "developer_todos": [
+          "replace_mock_with_real_eai_client"
+        ]
       },
       {
         "module_id": "mod-risk-workflow",
         "module_name": "이탈위험 판단 Workflow 호출",
         "reason": "target workflow skeleton 연결 방식을 확인해야 합니다.",
-        "developer_todos": ["confirm_workflow_call_contract"]
+        "developer_todos": [
+          "confirm_workflow_call_contract"
+        ]
       }
     ]
   },
