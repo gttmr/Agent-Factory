@@ -112,11 +112,13 @@ Mock Lab은 repo 내부 `packages/mock-lab`의 local test double 기능이며, �
 표현 방식:
 
 - 질문 자체는 `node_kind: human_input`, `decision_owner: human`, `call_control: selected_by_human`으로 둔다.
+- ADK `RequestInput` 문구는 `human_input_contract.message`에 reviewer가 직접 확정한다. Runnable skeleton은 `response_schema_ref: null | "str"`만 자동 lower하고, 구조화 응답은 수동 TODO로 남긴다.
 - 사용자의 응답을 branch key로 바꾸는 노드는 `node_kind: router`, `decision_owner: workflow_code`, `call_control: fixed_by_workflow`로 둔다.
 - 각 분기는 `edge_kind: route`, `execution_semantics: conditional`, `route_condition`으로 명시한다.
+- 사용자가 입력할 수 있는 승인/반려 문구는 각 route edge의 `route_aliases`에 넣는다. 기본 fallback branch가 필요하면 같은 router에서 route edge 하나에만 `is_default_route: true`를 둔다.
 - route 이후 분석을 수행하는 경로는 Adapter/Agent node로 이어지고, 건너뛰기 경로는 다음 human confirmation 또는 handoff node로 직접 이어질 수 있다.
 
-Runnable skeleton generator는 이 static user-confirmation route를 ADK `Event(route=...)`와 Workflow route map으로 lower한다. 반복, runtime-computed dynamic dispatch, Python loop는 여전히 `dynamic_workflow` 후속 범위다.
+Runnable skeleton generator는 이 static user-confirmation route를 ADK `RequestInput`, `Event(route=...)`, Workflow route map으로 lower한다. Generator는 업무별 route alias를 하드코딩하지 않고 reviewed Graph IR 필드만 사용한다. 반복, runtime-computed dynamic dispatch, Python loop는 여전히 `dynamic_workflow` 후속 범위다.
 
 ## ADK MCP 사용 주의
 

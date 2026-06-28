@@ -43,6 +43,18 @@ export function assertRunnableGraphSupported(context) {
       `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join/router, and module-bound agent/adapter/workflow/remote_a2a/remote_agent_call nodes (no loop-control or module_id-null intermediary nodes). Use smoke mode.`
     );
   }
+  const unsupportedHumanInputSchemas = nodes
+    .filter((node) => {
+      if (node?.node_kind !== "human_input") return false;
+      const responseSchemaRef = node.human_input_contract?.response_schema_ref;
+      return responseSchemaRef !== undefined && responseSchemaRef !== null && responseSchemaRef !== "str";
+    })
+    .map((node) => `${node.id} (${node.human_input_contract.response_schema_ref})`);
+  if (unsupportedHumanInputSchemas.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower structured human_input response schemas yet: ${unsupportedHumanInputSchemas.join(", ")}. Use response_schema_ref "str" or smoke mode.`
+    );
+  }
 
   const containers = Array.isArray(context.processFlow.containers) ? context.processFlow.containers : [];
   const badContainers = containers
@@ -94,6 +106,19 @@ export function assertRunnableGraphSupported(context) {
     throw new Error(
       `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Supported DAG edges include normal fan-out/fan-in transitions, reviewed router route edges, and genuine remote_a2a edges; use smoke mode or wait for loop/dynamic lowering.`
     );
+  }
+  const defaultRouteEdgesByRouter = new Map();
+  for (const edge of edges) {
+    if (edge?.edge_kind !== "route" || edge.is_default_route !== true) continue;
+    const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
+    defaults.push(edge.id ?? `${edge.from}->${edge.to}`);
+    defaultRouteEdgesByRouter.set(edge.from, defaults);
+  }
+  const duplicateDefaults = [...defaultRouteEdgesByRouter.entries()]
+    .filter(([, defaults]) => defaults.length > 1)
+    .map(([routerId, defaults]) => `${routerId}: ${defaults.join(", ")}`);
+  if (duplicateDefaults.length > 0) {
+    throw new Error(`runnable mode route graph has multiple default route edges: ${duplicateDefaults.join("; ")}.`);
   }
 }
 

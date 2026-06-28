@@ -522,6 +522,7 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     if (toolsetIssue) {
       errors.push(`${label}.nodes[${index}] (${node.id}) ${toolsetIssue}`);
     }
+    validateHumanInputContract(node, `${label}.nodes[${index}] (${node.id})`);
   });
 
   const containerById = new Map();
@@ -608,6 +609,7 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
   });
 
   const edgeIds = new Set();
+  const defaultRouteEdgesByRouter = new Map();
   edges.forEach((edge, index) => {
     if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
       errors.push(`${label}.edges[${index}] must be an object.`);
@@ -651,6 +653,7 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         errors.push(`${label}.edges[${index}] (${edge.id}) route edge requires non-empty route_condition.`);
       }
     }
+    validateRouteReviewContract(edge, `${label}.edges[${index}] (${edge.id})`, defaultRouteEdgesByRouter);
     if (edge.edge_kind === "artifact") {
       if (typeof edge.artifact_key !== "string" || !edge.artifact_key.trim()) {
         errors.push(`${label}.edges[${index}] (${edge.id}) artifact edge requires non-empty artifact_key.`);
@@ -729,6 +732,12 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
       }
     }
   });
+
+  for (const [routerId, defaults] of defaultRouteEdgesByRouter) {
+    if (defaults.length > 1) {
+      errors.push(`${label} router ${routerId} has multiple default route edges: ${defaults.join(", ")}.`);
+    }
+  }
 
   const hasInputLane = nodes.some((node) => node && node.lane_id === "input");
   const hasOutputLane = nodes.some((node) => node && node.lane_id === "output");
@@ -838,6 +847,46 @@ function validateAdkHints(value, label) {
       errors.push(`${label} adk_hints.${key} must be a non-empty string or null.`);
     }
   });
+}
+
+function validateHumanInputContract(node, label) {
+  if (node.node_kind !== "human_input" && node.human_input_contract !== undefined && node.human_input_contract !== null) {
+    errors.push(`${label}.human_input_contract is allowed only on human_input nodes.`);
+    return;
+  }
+  if (node.node_kind !== "human_input" || node.human_input_contract === undefined || node.human_input_contract === null) {
+    return;
+  }
+  const contract = node.human_input_contract;
+  if (typeof contract !== "object" || Array.isArray(contract)) {
+    errors.push(`${label}.human_input_contract must be an object or null.`);
+    return;
+  }
+  if (typeof contract.message !== "string" || !contract.message.trim()) {
+    errors.push(`${label}.human_input_contract.message must be a non-empty reviewed prompt.`);
+  }
+  if (contract.payload_schema_ref !== undefined && contract.payload_schema_ref !== null) {
+    if (typeof contract.payload_schema_ref !== "string" || !contract.payload_schema_ref.trim()) {
+      errors.push(`${label}.human_input_contract.payload_schema_ref must be a non-empty string or null.`);
+    }
+  }
+  const responseSchemaRef = contract.response_schema_ref;
+  if (responseSchemaRef !== null && responseSchemaRef !== undefined && responseSchemaRef !== "str") {
+    errors.push(
+      `${label}.response_schema_ref ${responseSchemaRef} is design-only; runnable currently supports only null or "str".`
+    );
+  }
+  if (contract.response_mapping !== undefined && contract.response_mapping !== null) {
+    if (
+      typeof contract.response_mapping !== "object" ||
+      Array.isArray(contract.response_mapping) ||
+      Object.entries(contract.response_mapping).some(
+        ([key, value]) => !key.trim() || typeof value !== "string" || !value.trim()
+      )
+    ) {
+      errors.push(`${label}.human_input_contract.response_mapping must be an object with non-empty string values or null.`);
+    }
+  }
 }
 
 function validateScaffoldPlan(dir = root) {
@@ -963,8 +1012,10 @@ function validateScaffoldGraph(graph) {
     if (toolsetIssue) {
       errors.push(`${label} ${toolsetIssue}`);
     }
+    validateHumanInputContract(node, label);
   });
 
+  const scaffoldDefaultRouteEdgesByRouter = new Map();
   edges.forEach((edge, index) => {
     const label = `scaffold.graph.edges[${index}]`;
     if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
@@ -993,7 +1044,41 @@ function validateScaffoldGraph(graph) {
     if (edgeToolsetIssue) {
       errors.push(`${label} ${edgeToolsetIssue}`);
     }
+    validateRouteReviewContract(edge, label, scaffoldDefaultRouteEdgesByRouter);
   });
+  for (const [routerId, defaults] of scaffoldDefaultRouteEdgesByRouter) {
+    if (defaults.length > 1) {
+      errors.push(`scaffold.graph router ${routerId} has multiple default route edges: ${defaults.join(", ")}.`);
+    }
+  }
+}
+
+function validateRouteReviewContract(edge, label, defaultRouteEdgesByRouter) {
+  if (Array.isArray(edge.route_aliases)) {
+    if (edge.route_aliases.length > 0 && edge.edge_kind !== "route") {
+      errors.push(`${label} route_aliases is allowed only on route edges.`);
+    }
+    if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
+      errors.push(`${label} route_aliases entries must be non-empty strings.`);
+    }
+  } else if (edge.route_aliases !== undefined && edge.route_aliases !== null) {
+    errors.push(`${label} route_aliases must be an array of strings or null.`);
+  }
+  if (edge.is_default_route === true) {
+    if (edge.edge_kind !== "route") {
+      errors.push(`${label} is_default_route is allowed only on route edges.`);
+    } else if (typeof edge.from === "string") {
+      const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
+      defaults.push(typeof edge.id === "string" ? edge.id : label);
+      defaultRouteEdgesByRouter.set(edge.from, defaults);
+    }
+  } else if (
+    edge.is_default_route !== undefined &&
+    edge.is_default_route !== null &&
+    edge.is_default_route !== false
+  ) {
+    errors.push(`${label} is_default_route must be boolean or null.`);
+  }
 }
 
 // MCP binding consistency for scaffold modules. A partial binding (server or

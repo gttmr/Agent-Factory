@@ -586,6 +586,7 @@ export interface ScaffoldPlanGraph {
     call_control?: GraphCallControl | null;
     side_effect?: GraphSideEffect | null;
     policy?: GraphPolicy | null;
+    human_input_contract?: HumanInputContract | null;
   }>;
   edges: Array<{
     id?: string | null;
@@ -594,6 +595,8 @@ export interface ScaffoldPlanGraph {
     edge_kind: EdgeKind;
     schema_ref?: string | null;
     route_condition?: string | null;
+    route_aliases?: string[] | null;
+    is_default_route?: boolean | null;
     state_key?: string | null;
     artifact_key?: string | null;
     flow_kind?: GraphFlowKind | null;
@@ -800,6 +803,13 @@ export interface GraphPort {
   schema_ref: string | null;
 }
 
+export interface HumanInputContract {
+  message: string;
+  payload_schema_ref: string | null;
+  response_schema_ref: string | null;
+  response_mapping: Record<string, string> | null;
+}
+
 export interface GraphValidationIssue {
   code: string;
   message: string;
@@ -852,6 +862,7 @@ export interface GraphNode {
   output_schema?: string | null;
   input_mapping?: Record<string, string> | null;
   output_mapping?: Record<string, string> | null;
+  human_input_contract?: HumanInputContract | null;
   runtime_binding?: RuntimeBinding | null;
   invoke_binding?: GraphInvokeBinding | null;
   decision_owner?: GraphDecisionOwner | null;
@@ -873,6 +884,8 @@ export interface GraphEdge {
   data_label: string;
   schema_ref: string | null;
   route_condition: string | null;
+  route_aliases?: string[] | null;
+  is_default_route?: boolean | null;
   state_key: string | null;
   artifact_key: string | null;
   a2a_contract_id: string | null;

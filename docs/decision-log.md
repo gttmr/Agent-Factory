@@ -272,6 +272,12 @@
 - **배경**: 오프라인 외부 환경에서는 vLLM으로 OpenAI-compatible 내부 LLM을 서빙하며, artifact마다 provider 설정을 복사하지 않고 중앙 runtime env 하나로 전환해야 한다.
 - **영향**: `generate-adk-source.mjs`, `requirements/adk-runtime.txt`, `runtimeEnv.ts`, Build 화면 안내 문구, `validation.md`·`agent-factory-harness.md`.
 
+## 2026-06-29 · 작업 브랜치 `codex/adk-generator-sdk-refactor` — ADK graph lowering 계약을 reviewed Graph IR 필드로 분리
+
+- **결정**: `human_input` node에 `human_input_contract`를 추가해 ADK `RequestInput` message/payload/response schema를 reviewer가 확정하고, `route` edge에 `route_aliases`와 `is_default_route`를 추가해 route matching alias와 fallback branch를 artifact로 저장한다. Generator는 업무별 route 문자열을 하드코딩하지 않고 reviewed Graph IR/scaffold-plan 필드만 사용한다.
+- **배경**: 기존 user-confirmation route lowering은 generator 내부의 시나리오별 문자열 fallback에 기대어, 사용자가 설계 화면에서 어떤 승인/반려 입력값을 확정해야 하는지 드러나지 않았다.
+- **영향**: Graph IR/process-flow/scaffold-plan schema, soft/export validator, Design GraphElementEditor/Inspector, Build readiness summary, runnable ADK generator와 sample inputs, active docs.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)

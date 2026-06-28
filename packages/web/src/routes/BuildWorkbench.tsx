@@ -33,6 +33,16 @@ interface StreamLogEntry {
   text: string;
 }
 
+interface AdkGraphReadiness {
+  routeEdges: number;
+  defaultRouteEdges: number;
+  humanInputNodes: number;
+  unsupportedHumanInputNodes: string[];
+  joinNodes: number;
+  loopControlNodes: number;
+  dynamicWorkflowModules: number;
+}
+
 type BuildStepId = "run" | "review" | "approve";
 const BUILD_STEP_IDS: BuildStepId[] = ["run", "review", "approve"];
 
@@ -116,6 +126,7 @@ export default function BuildWorkbench() {
       unconnected: adapters.filter((module) => !isMcpBoundAdapter(module))
     };
   }, [effectivePlan]);
+  const adkGraphReadiness = useMemo(() => buildAdkGraphReadiness(effectivePlan), [effectivePlan]);
 
   // The toggle drives the in-memory generatedPlan, but build consumes the saved
   // scaffold-plan.json. Reflect the persisted mode on load and flag unsaved drift.
@@ -393,14 +404,32 @@ export default function BuildWorkbench() {
                 <li>can_generate_source: {effectivePlan.validation.can_generate_source ? "예" : "아니오"}</li>
                 <li>blockers: {effectivePlan.validation.blockers.length}건, warnings: {effectivePlan.validation.warnings.length}건</li>
                 {outputMode === "runnable" ? (
-                  <li>
-                    어댑터 MCP 바인딩(선언): 선언됨 {adapterConnections.connected.length} · 미선언{" "}
-                    {adapterConnections.unconnected.length}
-                    {adapterConnections.unconnected.length > 0
-                      ? ` (미선언: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
-                      : ""}
-                    . 실제 연결 여부는 실행 시 Mock Lab MCP discovery로 확인합니다.
-                  </li>
+                  <>
+                    <li>
+                      ADK route: route edge {adkGraphReadiness.routeEdges}개 · default fallback{" "}
+                      {adkGraphReadiness.defaultRouteEdges}개
+                    </li>
+                    <li>
+                      ADK human input: RequestInput {adkGraphReadiness.humanInputNodes}개 · unsupported response_schema{" "}
+                      {adkGraphReadiness.unsupportedHumanInputNodes.length}개
+                      {adkGraphReadiness.unsupportedHumanInputNodes.length > 0
+                        ? ` (${adkGraphReadiness.unsupportedHumanInputNodes.join(", ")})`
+                        : ""}
+                    </li>
+                    <li>
+                      ADK static control: join {adkGraphReadiness.joinNodes}개 · loop_control{" "}
+                      {adkGraphReadiness.loopControlNodes}개 · dynamic workflow module{" "}
+                      {adkGraphReadiness.dynamicWorkflowModules}개
+                    </li>
+                    <li>
+                      어댑터 MCP 바인딩(선언): 선언됨 {adapterConnections.connected.length} · 미선언{" "}
+                      {adapterConnections.unconnected.length}
+                      {adapterConnections.unconnected.length > 0
+                        ? ` (미선언: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
+                        : ""}
+                      . 실제 연결 여부는 실행 시 Mock Lab MCP discovery로 확인합니다.
+                    </li>
+                  </>
                 ) : null}
               </ul>
             )}
@@ -604,6 +633,26 @@ export default function BuildWorkbench() {
       ) : null}
     </StageShell>
   );
+}
+
+function buildAdkGraphReadiness(plan: ScaffoldPlan | null): AdkGraphReadiness {
+  const graph = plan?.graph;
+  const routeEdges = graph?.edges.filter((edge) => edge.edge_kind === "route") ?? [];
+  const humanInputNodes = graph?.nodes.filter((node) => node.node_kind === "human_input") ?? [];
+  return {
+    routeEdges: routeEdges.length,
+    defaultRouteEdges: routeEdges.filter((edge) => edge.is_default_route === true).length,
+    humanInputNodes: humanInputNodes.length,
+    unsupportedHumanInputNodes: humanInputNodes
+      .filter((node) => {
+        const responseSchema = node.human_input_contract?.response_schema_ref;
+        return responseSchema !== undefined && responseSchema !== null && responseSchema !== "str";
+      })
+      .map((node) => node.id),
+    joinNodes: graph?.nodes.filter((node) => node.node_kind === "join").length ?? 0,
+    loopControlNodes: graph?.nodes.filter((node) => node.node_kind === "loop_control").length ?? 0,
+    dynamicWorkflowModules: plan?.modules.filter((module) => module.workflow_kind === "dynamic").length ?? 0
+  };
 }
 
 function BuildSummaryItem({ label, value }: { label: string; value: string }) {

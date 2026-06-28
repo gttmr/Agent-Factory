@@ -56,6 +56,7 @@ Workbench는 Workflow-first Graph Model이다. 새로 작성되는 업무 그래
 `agent`, `workflow`, `workflow_call`, `adapter`, `adapter_call`, `remote_a2a`, `remote_agent_call`은 module-bound node이며 matching module candidate와 연결한다.
 `adapter`와 `workflow` node kind는 legacy/migration 표현을 위해 남아 있지만, 새 호출 노드는 고정 Adapter 호출에 `adapter_call`, 기존 Workflow 또는 target skeleton 호출에 `workflow_call`을 우선 사용한다.
 사람 승인이나 보완 요청은 workflow subtype이 아니라 `node_kind: human_input`으로 둔다.
+`human_input` node가 ADK `RequestInput`으로 내려갈 때 reviewer가 입력해야 하는 계약은 `human_input_contract`다. `message`는 화면/ADK pause prompt로 쓰이는 reviewed 질문 문구이고, `payload_schema_ref`는 같이 보여줄 payload shape, `response_schema_ref`는 응답 schema ref다. 현재 runnable skeleton은 ADK free-text resume 특성에 맞춰 `null` 또는 `str`만 자동 lower하며, 구조화 응답 변환은 후속 수동 구현 범위다.
 외부 callback을 기다렸다가 resume하는 지점은 새 category가 아니라 `node_kind: callback_wait`과 edge `flow_kind: callback|resume`, `call_control: event_callback|resume`로 표현한다.
 `position`은 선택 필드이며 `{ x: number, y: number }` 또는 `null`이다. 값이 없으면 UI가 dagre로 자동 배치하고, finite position이 있으면 GraphCanvas가 그 좌표를 그대로 사용해 수동 배치를 보존한다.
 `agent_execution_mode`는 `agent` 노드에서만 선택적으로 사용하며 허용값은 `single_turn`, `chat`, `null`이다. 값이 없으면 `single_turn`으로 해석한다. `task`는 static Graph IR node 선택값으로 열지 않고, 별도 workflow reuse나 delegation topology 설계로 다룬다.
@@ -121,6 +122,7 @@ Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/
 - `boundary_crossing`
 
 `route` edge에는 `route_condition`이 필요하다. `route`는 branch 선택 신호이며 업무 payload 전달은 router node의 `Event.output` 또는 별도 state/artifact edge가 담당한다.
+`route_aliases`는 사용자가 실제로 입력할 수 있는 승인/반려 문구, 숫자, 업무 용어 같은 reviewed alias 목록이다. Generator는 hard-coded 업무 문자열을 넣지 않고 `route_condition`에서 뽑은 route key와 이 alias 목록만 비교한다. 같은 router에서 fallback으로 쓸 branch는 `is_default_route: true`로 하나만 지정할 수 있다.
 `artifact` edge에는 `artifact_key`가 필요하다.
 `remote_a2a` edge는 `is_remote_boundary_crossing: true`와 `a2a_contract_id`가 필요하고, local graph 복잡도만으로 만들 수 없다.
 
@@ -166,7 +168,7 @@ Stage는 저장 artifact가 아니라 UI가 Graph IR을 읽어 만든 projection
 7. 추가 모듈: 위 규칙으로 배치되지 않은 잔여 node
 
 같은 stage 내부 edge는 stage가 묶음을 의미하므로 connector로 중복 표시하지 않는다.
-stage 사이 edge는 출발/도착 node, `edge_kind`, `execution_semantics`, `data_label`, `route_condition`, `state_key`, `artifact_key`, `schema_ref`를 보존해야 한다.
+stage 사이 edge는 출발/도착 node, `edge_kind`, `execution_semantics`, `data_label`, `route_condition`, `route_aliases`, `is_default_route`, `state_key`, `artifact_key`, `schema_ref`를 보존해야 한다.
 
 ## Edge 표시 의미
 

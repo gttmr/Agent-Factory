@@ -1469,11 +1469,13 @@ function validateProcessFlow(value: unknown, errors: string[]) {
       if (!Array.isArray(node.input_ports) || !Array.isArray(node.output_ports) || !Array.isArray(node.schema_refs)) {
         errors.push(`processFlow.nodes[${index}] input_ports/output_ports/schema_refs 배열이 필요합니다.`);
       }
+      validateHumanInputContract(node, `processFlow.nodes[${index}]`, errors);
     });
   }
   if (!Array.isArray(value.edges)) {
     errors.push("processFlow.edges 배열이 필요합니다.");
   } else {
+    const defaultRouteEdgesByRouter = new Map<string, string[]>();
     value.edges.forEach((edge, index) => {
       if (!isRecord(edge)) {
         errors.push(`processFlow.edges[${index}] 객체가 필요합니다.`);
@@ -1503,6 +1505,7 @@ function validateProcessFlow(value: unknown, errors: string[]) {
       if (edge.edge_kind === "route" && !truthyString(edge.route_condition)) {
         errors.push(`processFlow.edges[${index}] route edge에는 route_condition이 필요합니다.`);
       }
+      validateRouteReviewContract(edge, `processFlow.edges[${index}]`, { defaultRouteEdgesByRouter, errors });
       if (edge.edge_kind === "artifact" && !truthyString(edge.artifact_key)) {
         errors.push(`processFlow.edges[${index}] artifact edge에는 artifact_key가 필요합니다.`);
       }
@@ -1510,6 +1513,74 @@ function validateProcessFlow(value: unknown, errors: string[]) {
         errors.push(`processFlow.edges[${index}] remote_a2a edge는 is_remote_boundary_crossing=true여야 합니다.`);
       }
     });
+    for (const [routerId, defaults] of defaultRouteEdgesByRouter) {
+      if (defaults.length > 1) {
+        errors.push(`processFlow router ${routerId} has multiple default route edges: ${defaults.join(", ")}.`);
+      }
+    }
+  }
+}
+
+function validateHumanInputContract(node: Record<string, unknown>, label: string, errors: string[]) {
+  const contract = node.human_input_contract;
+  if (node.node_kind !== "human_input" && contract !== undefined && contract !== null) {
+    errors.push(`${label}.human_input_contract is allowed only on human_input nodes.`);
+    return;
+  }
+  if (node.node_kind !== "human_input" || contract === undefined || contract === null) {
+    return;
+  }
+  if (!isRecord(contract)) {
+    errors.push(`${label}.human_input_contract must be an object or null.`);
+    return;
+  }
+  if (typeof contract.message !== "string" || !contract.message.trim()) {
+    errors.push(`${label}.human_input_contract.message must be a non-empty reviewed prompt.`);
+  }
+  if (contract.payload_schema_ref !== undefined && contract.payload_schema_ref !== null && !truthyString(contract.payload_schema_ref)) {
+    errors.push(`${label}.human_input_contract.payload_schema_ref must be a non-empty string or null.`);
+  }
+  if (contract.response_schema_ref !== undefined && contract.response_schema_ref !== null && contract.response_schema_ref !== "str") {
+    errors.push(
+      `${label}.human_input_contract.response_schema_ref ${String(contract.response_schema_ref)} is design-only; runnable currently supports only null or "str".`
+    );
+  }
+  if (contract.response_mapping !== undefined && contract.response_mapping !== null) {
+    if (
+      !isRecord(contract.response_mapping) ||
+      Object.entries(contract.response_mapping).some(([key, value]) => !key.trim() || !truthyString(value))
+    ) {
+      errors.push(`${label}.human_input_contract.response_mapping must be an object with non-empty string values or null.`);
+    }
+  }
+}
+
+interface RouteReviewValidationContext {
+  readonly defaultRouteEdgesByRouter: Map<string, string[]>;
+  readonly errors: string[];
+}
+
+function validateRouteReviewContract(edge: Record<string, unknown>, label: string, context: RouteReviewValidationContext) {
+  if (Array.isArray(edge.route_aliases)) {
+    if (edge.route_aliases.length > 0 && edge.edge_kind !== "route") {
+      context.errors.push(`${label}.route_aliases is allowed only on route edges.`);
+    }
+    if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
+      context.errors.push(`${label}.route_aliases entries must be non-empty strings.`);
+    }
+  } else if (edge.route_aliases !== undefined && edge.route_aliases !== null) {
+    context.errors.push(`${label}.route_aliases must be an array of strings or null.`);
+  }
+  if (edge.is_default_route === true) {
+    if (edge.edge_kind !== "route") {
+      context.errors.push(`${label}.is_default_route is allowed only on route edges.`);
+    } else if (typeof edge.from === "string") {
+      const defaults = context.defaultRouteEdgesByRouter.get(edge.from) ?? [];
+      defaults.push(typeof edge.id === "string" ? edge.id : label);
+      context.defaultRouteEdgesByRouter.set(edge.from, defaults);
+    }
+  } else if (edge.is_default_route !== undefined && edge.is_default_route !== null && edge.is_default_route !== false) {
+    context.errors.push(`${label}.is_default_route must be boolean or null.`);
   }
 }
 

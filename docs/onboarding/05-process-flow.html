@@ -55,7 +55,7 @@
             <tr><td><code>function</code></td><td>function tool</td><td>해당 ModuleCandidate id</td></tr>
             <tr><td><code>tool</code></td><td>tool 노드</td><td>해당 ModuleCandidate id</td></tr>
             <tr><td><code>adapter</code></td><td>adapter 노드</td><td>해당 ModuleCandidate id</td></tr>
-            <tr><td><code>human_input</code></td><td>사람 승인/보완 요청 (일시정지/재개)</td><td>해당 ModuleCandidate id 또는 null</td></tr>
+            <tr><td><code>human_input</code></td><td>사람 승인/보완 요청 (일시정지/재개). ADK prompt/schema는 <code>human_input_contract</code>에 reviewer가 입력한다.</td><td>해당 ModuleCandidate id 또는 null</td></tr>
             <tr><td><code>workflow</code></td><td>nested workflow</td><td>해당 ModuleCandidate id</td></tr>
             <tr><td><code>remote_a2a</code></td><td>원격 에이전트 호출 노드</td><td>해당 ModuleCandidate id</td></tr>
             <tr><td><code>join</code></td><td>병렬 흐름 합류 (synthetic)</td><td><code>null</code></td></tr>
@@ -100,7 +100,7 @@
             <tr><td><code>user_state</code></td><td>ADK State scope: user</td></tr>
             <tr><td><code>app_state</code></td><td>ADK State scope: app</td></tr>
             <tr><td><code>artifact</code></td><td>ADK Artifact 전달 (<code>artifact_key</code> 필수)</td></tr>
-            <tr><td><code>route</code></td><td>명시적 라우팅 (<code>route_condition</code> 필수)</td></tr>
+            <tr><td><code>route</code></td><td>명시적 라우팅 (<code>route_condition</code> 필수, 사용자 입력 별칭은 <code>route_aliases</code>, fallback은 <code>is_default_route</code>)</td></tr>
             <tr><td><code>control</code></td><td>retry, cancel, timeout, loop stop, escalation 같은 제어 시그널</td></tr>
             <tr><td><code>remote_a2a</code></td><td><code>remote_boundary</code>를 건너는 A2A protocol edge (<code>a2a_contract_id</code> + <code>is_remote_boundary_crossing: true</code> 필수)</td></tr>
           </tbody>
@@ -143,9 +143,9 @@ input ──► router ────┤                 ├──► join ──�
         <h3>사람 검토 (container: human_review_region)</h3>
         <div class="graph-mock">input ──► agent ──► human_input ──► router
                                           │
-                          ┌── route_condition="approved" ──► output
+                          ┌── route_condition="approved" · route_aliases=["승인"] ──► output
                           │
-                          └── route_condition="rework"   ──► agent (다시)</div>
+                          └── route_condition="rework" · is_default_route=true ──► agent (다시)</div>
 
         <h3>원격 에이전트 (container: remote_boundary)</h3>
         <div class="graph-mock">input ──► agent ──[edge_kind=remote_a2a, a2a_contract_id=xxx]──► remote_a2a node ──► output
@@ -228,12 +228,12 @@ input ──► router ────┤                 ├──► join ──�
           <div class="quiz-question">Q3. 사람 승인 후 결과에 따라 “approved → output”, “rework → 다시 agent”로 보내는 edge는?</div>
           <div class="quiz-options">
             <button data-value="event_output">edge_kind=event_output</button>
-            <button data-value="route">edge_kind=route (+ route_condition)</button>
+            <button data-value="route">edge_kind=route (+ route_condition/route_aliases)</button>
             <button data-value="control">edge_kind=control</button>
             <button data-value="remote_a2a">edge_kind=remote_a2a</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: route.</strong> 명시적 라우팅은 <code>edge_kind: route</code>이며 <code>route_condition</code>이 필수다.</p>
+            <p><strong>정답: route.</strong> 명시적 라우팅은 <code>edge_kind: route</code>이며 <code>route_condition</code>이 필수다. 사람이 입력할 승인/보완 문구는 <code>route_aliases</code>로 검토하고, fallback branch는 <code>is_default_route</code>로 하나만 둔다.</p>
           </div>
         </div>
 

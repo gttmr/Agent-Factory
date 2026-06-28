@@ -1178,7 +1178,13 @@
         "decision_owner": "human",
         "call_control": "selected_by_human",
         "side_effect": "none",
-        "policy": "audit_required"
+        "policy": "audit_required",
+        "human_input_contract": {
+          "message": "목적/시나리오 분류 확인",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-plan-adapter-arguments",
@@ -1219,7 +1225,13 @@
         "decision_owner": "human",
         "call_control": "selected_by_human",
         "side_effect": "none",
-        "policy": "audit_required"
+        "policy": "audit_required",
+        "human_input_contract": {
+          "message": "추가 분석을 수행할까요? 1. 분석 실행 2. 분석 없이 진행",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-analysis-router",
@@ -1289,7 +1301,13 @@
         "decision_owner": "human",
         "call_control": "selected_by_human",
         "side_effect": "none",
-        "policy": "audit_required"
+        "policy": "audit_required",
+        "human_input_contract": {
+          "message": "사용자 최종 Page(다중) 선택",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-call-workflow-1-2",
@@ -1353,7 +1371,9 @@
         "schema_ref": "page_recommendation_request.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-003",
@@ -1366,7 +1386,9 @@
         "schema_ref": "page_candidate_search_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-004",
@@ -1378,7 +1400,9 @@
         "schema_ref": "initial_page_selection.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-005",
@@ -1390,7 +1414,9 @@
         "schema_ref": "analysis_execution_confirmation.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-006",
@@ -1402,7 +1428,12 @@
         "schema_ref": "analysis_execution_confirmation.v1",
         "route_condition": "choice == run_analysis",
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [
+          "분석 실행",
+          "run analysis"
+        ],
+        "is_default_route": false
       },
       {
         "id": "edge-007",
@@ -1414,7 +1445,12 @@
         "schema_ref": "analysis_execution_confirmation.v1",
         "route_condition": "choice == skip_analysis",
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [
+          "분석 없이 진행",
+          "skip analysis"
+        ],
+        "is_default_route": true
       },
       {
         "id": "edge-008",
@@ -1426,7 +1462,9 @@
         "schema_ref": "analysis_input_bundle.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-009",
@@ -1438,7 +1476,9 @@
         "schema_ref": "analysis_input_bundle.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-010",
@@ -1450,7 +1490,9 @@
         "schema_ref": "analysis_input_bundle.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-011",
@@ -1462,7 +1504,9 @@
         "schema_ref": "userflow_analysis_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-012",
@@ -1474,7 +1518,9 @@
         "schema_ref": "scenario_recommendation_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-013",
@@ -1486,7 +1532,9 @@
         "schema_ref": "t2s_analysis_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-014",
@@ -1498,7 +1546,9 @@
         "schema_ref": "synthesized_page_selection.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-015",
@@ -1510,7 +1560,9 @@
         "schema_ref": "final_page_selection.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-016",
@@ -1522,7 +1574,9 @@
         "schema_ref": "broad_handoff_payload.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-017",
@@ -1534,7 +1588,9 @@
         "schema_ref": "scenario_taxonomy_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-018",
@@ -1546,7 +1602,9 @@
         "schema_ref": "objective_classification.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-020",
@@ -1558,7 +1616,9 @@
         "schema_ref": "page_product_search_response.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-002",
@@ -1571,7 +1631,9 @@
         "schema_ref": "purpose_confirmation.v1",
         "route_condition": null,
         "state_key": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-019",
@@ -1584,7 +1646,9 @@
         "state_key": "adapter_arguments",
         "schema_ref": "adapter_arguments.v1",
         "route_condition": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-021",
@@ -1597,7 +1661,9 @@
         "state_key": "adapter_arguments",
         "schema_ref": "adapter_arguments.v1",
         "route_condition": null,
-        "artifact_key": null
+        "artifact_key": null,
+        "route_aliases": [],
+        "is_default_route": false
       }
     ]
   },

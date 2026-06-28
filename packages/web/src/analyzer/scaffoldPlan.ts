@@ -414,7 +414,8 @@ function scaffoldGraphFor(processFlow: ProcessFlow) {
       decision_owner: normalizeDecisionOwner(node.decision_owner ?? null),
       call_control: normalizeCallControl(node.call_control ?? null),
       side_effect: normalizeGraphSideEffect(node.side_effect ?? null),
-      policy: normalizeGraphPolicy(node.policy ?? null)
+      policy: normalizeGraphPolicy(node.policy ?? null),
+      human_input_contract: node.human_input_contract ?? null
     })),
     edges: (processFlow?.edges ?? []).map((edge) => ({
       id: edge.id,
@@ -423,6 +424,8 @@ function scaffoldGraphFor(processFlow: ProcessFlow) {
       edge_kind: edge.edge_kind,
       schema_ref: edge.schema_ref ?? null,
       route_condition: edge.route_condition ?? null,
+      route_aliases: edge.route_aliases ?? [],
+      is_default_route: edge.is_default_route === true,
       state_key: edge.state_key ?? null,
       artifact_key: edge.artifact_key ?? null,
       flow_kind: normalizeFlowKind(edge.flow_kind ?? null),

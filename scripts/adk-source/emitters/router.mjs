@@ -1,6 +1,6 @@
 import { routeCasesFor } from "../graph/routes.mjs";
 import { pyGraphNodeName, routeFuncName, syntheticNodeSymbol } from "../naming.mjs";
-import { toPyStr, toPythonLiteral } from "../python-literals.mjs";
+import { toPyStr } from "../python-literals.mjs";
 
 export function emitRouteFunc(node, context) {
   const routeCases = routeCasesFor(context.processFlow, node.id);
@@ -9,12 +9,12 @@ export function emitRouteFunc(node, context) {
   }
   const checks = routeCases
     .map(({ value, aliases }) => {
-      const aliasLiteral = toPythonLiteral(aliases);
+      const aliasLiteral = `[${aliases.map((alias) => toPyStr(alias)).join(", ")}]`;
       return `    if any(alias and alias in text for alias in ${aliasLiteral}):
         return Event(route=${toPyStr(value)}, output=node_input)`;
     })
     .join("\n");
-  const fallback = routeCases.find((route) => route.value.includes("skip")) ?? routeCases[0];
+  const fallback = routeCases.find((route) => route.isDefault) ?? routeCases[0];
   return `def ${routeFuncName(node)}(node_input=None):
     text = str(node_input or "").strip().lower()
 ${checks}

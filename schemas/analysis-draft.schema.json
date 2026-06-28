@@ -353,6 +353,7 @@
         "output_schema",
         "input_mapping",
         "output_mapping",
+        "human_input_contract",
         "runtime_binding",
         "invoke_binding",
         "decision_owner",
@@ -407,6 +408,7 @@
         "output_schema": { "$ref": "#/$defs/nullableString" },
         "input_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
         "output_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
+        "human_input_contract": { "anyOf": [{ "$ref": "#/$defs/humanInputContract" }, { "type": "null" }] },
         "runtime_binding": {
           "anyOf": [
             { "type": "string", "enum": ["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
@@ -494,6 +496,19 @@
       "required": [],
       "properties": {}
     },
+    "humanInputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 },
+        "payload_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_mapping": {
+          "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }]
+        }
+      }
+    },
     "graphMockBinding": {
       "type": "object",
       "additionalProperties": false,
@@ -543,6 +558,8 @@
         "data_label",
         "schema_ref",
         "route_condition",
+        "route_aliases",
+        "is_default_route",
         "state_key",
         "artifact_key",
         "a2a_contract_id",
@@ -576,6 +593,15 @@
         "data_label": { "type": "string" },
         "schema_ref": { "$ref": "#/$defs/nullableString" },
         "route_condition": { "$ref": "#/$defs/nullableString" },
+        "route_aliases": {
+          "anyOf": [
+            { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            { "type": "null" }
+          ]
+        },
+        "is_default_route": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+        },
         "state_key": { "$ref": "#/$defs/nullableString" },
         "artifact_key": { "$ref": "#/$defs/nullableString" },
         "a2a_contract_id": { "$ref": "#/$defs/nullableString" },

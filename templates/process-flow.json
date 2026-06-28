@@ -16,7 +16,8 @@
       "input_ports": [],
       "output_ports": [],
       "schema_refs": [],
-      "review_status": "approved"
+      "review_status": "approved",
+      "human_input_contract": null
     },
     {
       "id": "mod-001",
@@ -31,7 +32,8 @@
       "input_ports": [],
       "output_ports": [],
       "schema_refs": [],
-      "review_status": "approved"
+      "review_status": "approved",
+      "human_input_contract": null
     },
     {
       "id": "mod-002",
@@ -46,7 +48,8 @@
       "input_ports": [],
       "output_ports": [],
       "schema_refs": [],
-      "review_status": "approved"
+      "review_status": "approved",
+      "human_input_contract": null
     },
     {
       "id": "output_payload",
@@ -61,7 +64,8 @@
       "input_ports": [],
       "output_ports": [],
       "schema_refs": [],
-      "review_status": "approved"
+      "review_status": "approved",
+      "human_input_contract": null
     }
   ],
   "edges": [
@@ -79,7 +83,9 @@
       "state_key": null,
       "artifact_key": null,
       "a2a_contract_id": null,
-      "is_remote_boundary_crossing": false
+      "is_remote_boundary_crossing": false,
+      "route_aliases": [],
+      "is_default_route": false
     },
     {
       "id": "edge-002",
@@ -95,7 +101,9 @@
       "state_key": null,
       "artifact_key": null,
       "a2a_contract_id": null,
-      "is_remote_boundary_crossing": false
+      "is_remote_boundary_crossing": false,
+      "route_aliases": [],
+      "is_default_route": false
     },
     {
       "id": "edge-003",
@@ -111,7 +119,9 @@
       "state_key": null,
       "artifact_key": null,
       "a2a_contract_id": null,
-      "is_remote_boundary_crossing": false
+      "is_remote_boundary_crossing": false,
+      "route_aliases": [],
+      "is_default_route": false
     }
   ],
   "containers": [
@@ -121,17 +131,35 @@
       "label": "Root graph workflow",
       "container_kind": "graph_workflow",
       "adk_mapping": "GraphWorkflow",
-      "contains_node_ids": ["input_payload", "mod-001", "mod-002", "output_payload"],
-      "entry_node_ids": ["input_payload"],
-      "exit_node_ids": ["output_payload"],
+      "contains_node_ids": [
+        "input_payload",
+        "mod-001",
+        "mod-002",
+        "output_payload"
+      ],
+      "entry_node_ids": [
+        "input_payload"
+      ],
+      "exit_node_ids": [
+        "output_payload"
+      ],
       "layout_policy": "dag_with_routes",
       "parent_container_id": null
     }
   ],
   "lanes": [
-    { "id": "input", "label": "input" },
-    { "id": "local_graph", "label": "local_graph" },
-    { "id": "output", "label": "output" }
+    {
+      "id": "input",
+      "label": "input"
+    },
+    {
+      "id": "local_graph",
+      "label": "local_graph"
+    },
+    {
+      "id": "output",
+      "label": "output"
+    }
   ],
   "validation": {
     "ok": true,

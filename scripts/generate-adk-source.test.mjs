@@ -160,7 +160,18 @@ test("runnable lowers a user-confirmation route without joining branch convergen
       nodes: [
         { id: "in1", node_kind: "input" },
         { id: "a", node_kind: "agent", module_id: "mod-a" },
-        { id: "confirm", node_kind: "human_input", module_id: null, label: "추가 분석을 수행할까요?" },
+        {
+          id: "confirm",
+          node_kind: "human_input",
+          module_id: null,
+          label: "Legacy HITL label",
+          human_input_contract: {
+            message: "추가 분석을 수행할까요?",
+            payload_schema_ref: null,
+            response_schema_ref: "str",
+            response_mapping: null
+          }
+        },
         { id: "analysis-router", node_kind: "router", module_id: null, label: "분석 실행 여부 route" },
         { id: "analysis", node_kind: "adapter", module_id: "mod-analysis" },
         { id: "final", node_kind: "adapter", module_id: "mod-final" },
@@ -175,14 +186,18 @@ test("runnable lowers a user-confirmation route without joining branch convergen
           to: "analysis",
           edge_kind: "route",
           execution_semantics: "conditional",
-          route_condition: "choice == run_analysis"
+          route_condition: "choice == run_analysis",
+          route_aliases: ["담당자 승인", "run analysis"],
+          is_default_route: false
         },
         {
           from: "analysis-router",
           to: "final",
           edge_kind: "route",
           execution_semantics: "conditional",
-          route_condition: "choice == skip_analysis"
+          route_condition: "choice == skip_analysis",
+          route_aliases: ["분석 생략"],
+          is_default_route: true
         },
         { from: "analysis", to: "final" },
         { from: "final", to: "out1" }
@@ -195,18 +210,23 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.match(source, /from google\.adk\.events import Event, RequestInput/);
     assert.match(source, /def _hitl_confirm\(ctx: Context, node_input=None\):/);
     assert.match(source, /_hitl_response = _first_resume_input\(ctx\)/);
-    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\?", payload=node_input\)/);
+    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\?", payload=node_input, response_schema=str\)/);
     assert.match(source, /"previous": node_input/);
     assert.match(source, /"response": _hitl_response/);
     assert.match(source, /node_confirm = FunctionNode\(func=_hitl_confirm, name="confirm", rerun_on_resume=True\)/);
     assert.match(source, /def _route_analysis_router\(node_input=None\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "담당자 승인"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "분석 생략"\]\):/);
     assert.match(source, /Event\(route="run_analysis", output=node_input\)/);
+    assert.match(source, /return Event\(route="skip_analysis", output=node_input\)/);
+    assert.doesNotMatch(source, /"분석 실행"/);
+    assert.doesNotMatch(source, /"분석 없이 진행"/);
     assert.match(source, /\(node_analysis_router,\s*\{\s*"run_analysis": node_mod_analysis,\s*"skip_analysis": node_mod_final,\s*\}\s*\)/s);
     assert.doesNotMatch(source, /join_1 = JoinNode\(name="join_1"\)/);
     assert.match(sampleInputs, /workflow_chat_smoke:/);
     assert.match(sampleInputs, /conversation:/);
     assert.match(sampleInputs, /추가 분석을 수행할까요\?/);
-    assert.match(sampleInputs, /"1"/);
+    assert.doesNotMatch(sampleInputs, /"1"/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

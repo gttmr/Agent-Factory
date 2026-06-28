@@ -175,7 +175,12 @@
 
           <div class="glossary-entry">
             <h4>human_input</h4>
-            <p>사람 승인/보완 요청을 graph 안의 일시정지/재개 노드로 표현. <code>human_review_region</code> container 안에 둔다.</p>
+            <p>사람 승인/보완 요청을 graph 안의 일시정지/재개 노드로 표현. <code>human_review_region</code> container 안에 둔다. ADK Web에 표시할 질문 문구와 응답 schema는 reviewed <code>human_input_contract</code>에 둔다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>human_input_contract</h4>
+            <p><code>human_input</code> node의 reviewed ADK 계약. <code>message</code>는 <code>RequestInput</code> prompt, <code>payload_schema_ref</code>는 함께 전달되는 payload schema, <code>response_schema_ref</code>는 응답 schema다. Runnable skeleton은 현재 <code>null</code> 또는 <code>str</code> 응답만 자동 lower한다.</p>
           </div>
 
           <div class="glossary-entry">
@@ -275,7 +280,12 @@
 
           <div class="glossary-entry">
             <h4>route_condition</h4>
-            <p><code>edge_kind: route</code>의 필수 metadata. 어떤 조건일 때 이 edge가 선택되는지 적는다.</p>
+            <p><code>edge_kind: route</code>의 필수 metadata. 어떤 조건일 때 이 edge가 선택되는지 적는다. 사용자가 입력할 수 있는 별칭은 <code>route_aliases</code>, 기본 fallback branch는 <code>is_default_route</code>로 같은 router에서 하나만 지정한다.</p>
+          </div>
+
+          <div class="glossary-entry">
+            <h4>route_aliases</h4>
+            <p>Route edge의 reviewed 사용자 입력 별칭 목록. Generator는 업무별 문자열을 하드코딩하지 않고 <code>route_condition</code>의 route key와 이 목록만 비교한다.</p>
           </div>
 
           <div class="glossary-entry">

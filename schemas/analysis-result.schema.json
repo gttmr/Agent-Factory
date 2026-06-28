@@ -839,6 +839,7 @@
         "output_schema": { "$ref": "#/$defs/nullableString" },
         "input_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
         "output_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
+        "human_input_contract": { "anyOf": [{ "$ref": "#/$defs/humanInputContract" }, { "type": "null" }] },
         "runtime_binding": {
           "anyOf": [
             { "type": "string", "enum": ["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
@@ -923,6 +924,19 @@
     "stringMapping": {
       "type": "object",
       "additionalProperties": { "type": "string" }
+    },
+    "humanInputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 },
+        "payload_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_mapping": {
+          "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }]
+        }
+      }
     },
     "graphMockBinding": {
       "type": "object",
@@ -1017,6 +1031,15 @@
         "data_label": { "type": "string" },
         "schema_ref": { "$ref": "#/$defs/nullableString" },
         "route_condition": { "$ref": "#/$defs/nullableString" },
+        "route_aliases": {
+          "anyOf": [
+            { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            { "type": "null" }
+          ]
+        },
+        "is_default_route": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+        },
         "state_key": { "$ref": "#/$defs/nullableString" },
         "artifact_key": { "$ref": "#/$defs/nullableString" },
         "a2a_contract_id": { "$ref": "#/$defs/nullableString" },

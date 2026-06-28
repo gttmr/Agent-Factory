@@ -61,7 +61,7 @@
             <tr>
               <td><code>graph</code></td>
               <td>결정적 route, branch, fan-out/fan-in, join, loop가 보인다. human input이 graph 내부의 일시정지/재개 node로 들어간다. nested workflow가 parent graph의 일부로 동작한다.</td>
-              <td><code>normal_transition</code>, <code>parallel_region + fan_out + join + fan_in</code>, <code>loop_region + loop_control + loop_back + loop_exit</code>, <code>human_review_region + human_input + route</code>, <code>router + edge_kind: route + route_condition</code>.</td>
+              <td><code>normal_transition</code>, <code>parallel_region + fan_out + join + fan_in</code>, <code>loop_region + loop_control + loop_back + loop_exit</code>, <code>human_review_region + human_input</code>(reviewed <code>human_input_contract</code>) + <code>route</code>, <code>router + edge_kind: route + route_condition + route_aliases</code>.</td>
             </tr>
             <tr>
               <td><code>dynamic</code></td>
@@ -87,7 +87,7 @@
             <tr><td>고정 순서 실행</td><td><code>graph</code> 또는 상위 조율이면 <code>orchestration</code></td><td><code>normal_transition</code> edge</td></tr>
             <tr><td>독립 작업 병렬 실행 후 병합</td><td><code>graph</code></td><td><code>parallel_region</code>, <code>fan_out</code>, <code>join</code>, <code>fan_in</code></td></tr>
             <tr><td>품질 충족 또는 재시도 반복</td><td>static이면 <code>graph</code>, 코드 중심이면 <code>dynamic</code></td><td><code>loop_region</code>, <code>loop_control</code>, <code>loop_back</code>, <code>loop_exit</code></td></tr>
-            <tr><td>사람 승인 또는 보완 요청</td><td><code>graph</code> 안의 human input</td><td><code>human_review_region</code>, <code>human_input</code>, <code>route</code></td></tr>
+            <tr><td>사람 승인 또는 보완 요청</td><td><code>graph</code> 안의 human input</td><td><code>human_review_region</code>, <code>human_input</code>, <code>human_input_contract.message</code>, <code>route_aliases</code>, 필요 시 <code>is_default_route</code></td></tr>
             <tr><td>매 호출마다 코드가 경로 결정</td><td><code>dynamic</code></td><td><code>dynamic_workflow</code> container</td></tr>
             <tr><td>독립 remote agent 호출</td><td>충분한 계약 증거 있을 때만 <code>remote_a2a</code></td><td><code>remote_boundary</code>, <code>remote_a2a</code> edge</td></tr>
           </tbody>
@@ -146,7 +146,7 @@
             <button data-value="unknown">unknown</button>
           </div>
           <div class="quiz-feedback">
-            <p><strong>정답: graph</strong> — fan-out + join + human_input + route가 모두 명시적이다.</p>
+            <p><strong>정답: graph</strong> — fan-out + join + human_input + route가 모두 명시적이다. 이때 사람에게 보여줄 문구는 <code>human_input_contract.message</code>, 승인/보완 입력 별칭은 route edge의 <code>route_aliases</code>로 확정한다.</p>
           </div>
         </div>
 

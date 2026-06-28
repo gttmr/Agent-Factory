@@ -367,6 +367,153 @@ const callbackWaitWithControl = validateGraphIRSoft(
 );
 assert.equal(callbackWaitWithControl.errors.filter((issue) => issue.code === "callback_wait_missing_control_metadata").length, 0);
 
+const graphWithReviewedAdkFields: GraphIR = {
+  requirement_id: "req-reviewed-adk-fields",
+  graph_id: "graph-001",
+  root_workflow_module_id: null,
+  nodes: [
+    node({ id: "node-input", node_kind: "input", lane_id: "input" }),
+    node({
+      id: "node-human-input",
+      label: "Legacy label",
+      node_kind: "human_input",
+      lane_id: "human_input",
+      human_input_contract: {
+        message: "담당자 승인 여부를 입력하세요.",
+        payload_schema_ref: null,
+        response_schema_ref: "str",
+        response_mapping: null
+      }
+    } as Partial<GraphNode>),
+    node({ id: "node-router", node_kind: "router", lane_id: "local_graph" }),
+    node({ id: "node-output", node_kind: "output", lane_id: "output" })
+  ],
+  edges: [
+    edge({
+      id: "edge-001",
+      from: "node-router",
+      to: "node-output",
+      edge_kind: "route",
+      execution_semantics: "conditional",
+      route_condition: "choice == approve",
+      route_aliases: ["승인", "approve"],
+      is_default_route: true
+    } as Partial<GraphEdge>)
+  ],
+  containers: [],
+  lanes: [],
+  validation: { ok: true, errors: [], warnings: [] }
+};
+
+const normalizedReviewedAdkFields = normalizeGraphIRForRuntime(graphWithReviewedAdkFields, "req-reviewed-adk-fields");
+assert.deepEqual(normalizedReviewedAdkFields.nodes[1]?.human_input_contract, {
+  message: "담당자 승인 여부를 입력하세요.",
+  payload_schema_ref: null,
+  response_schema_ref: "str",
+  response_mapping: null
+});
+assert.deepEqual(normalizedReviewedAdkFields.edges[0]?.route_aliases, ["승인", "approve"]);
+assert.equal(normalizedReviewedAdkFields.edges[0]?.is_default_route, true);
+
+const humanInputBackfill = normalizeGraphIRForRuntime(
+  graphWithNodes([node({ id: "node-human-input", label: "사람 승인", node_kind: "human_input", lane_id: "human_input" })]),
+  "req-human-backfill"
+);
+assert.equal(humanInputBackfill.nodes[0]?.human_input_contract?.message, "사람 승인");
+assert.equal(humanInputBackfill.nodes[0]?.human_input_contract?.response_schema_ref, "str");
+
+const explicitNullHumanInputContract = normalizeGraphIRForRuntime(
+  graphWithNodes([
+    node({
+      id: "node-human-input",
+      label: "사람 승인",
+      node_kind: "human_input",
+      lane_id: "human_input",
+      human_input_contract: {
+        message: "담당자 승인 여부를 입력하세요.",
+        payload_schema_ref: null,
+        response_schema_ref: null,
+        response_mapping: null
+      }
+    } as Partial<GraphNode>)
+  ]),
+  "req-human-null-contract"
+);
+assert.equal(explicitNullHumanInputContract.nodes[0]?.human_input_contract?.response_schema_ref, null);
+
+const invalidHumanInputContractShape = validateGraphIRSoft(
+  graphWithNodes([
+    node({
+      id: "node-human-input",
+      label: "사람 승인",
+      node_kind: "human_input",
+      lane_id: "human_input",
+      human_input_contract: {
+        message: "담당자 승인 여부를 입력하세요.",
+        payload_schema_ref: {} as never,
+        response_schema_ref: null,
+        response_mapping: [] as never
+      }
+    } as Partial<GraphNode>)
+  ])
+);
+assert.equal(
+  invalidHumanInputContractShape.errors.filter((issue) => issue.code === "human_input_payload_schema_invalid").length,
+  1
+);
+assert.equal(
+  invalidHumanInputContractShape.errors.filter((issue) => issue.code === "human_input_response_mapping_invalid").length,
+  1
+);
+
+const invalidRouteContractFields = validateGraphIRSoft(
+  graphWithRemoteEdge(
+    [
+      node({ id: "node-router", node_kind: "router", lane_id: "local_graph" }),
+      node({ id: "node-a", node_kind: "output", lane_id: "output" }),
+      node({ id: "node-b", node_kind: "output", lane_id: "output" })
+    ],
+    [
+      edge({
+        id: "edge-001",
+        from: "node-router",
+        to: "node-a",
+        edge_kind: "route",
+        execution_semantics: "conditional",
+        route_condition: "choice == a",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        is_default_route: true
+      } as Partial<GraphEdge>),
+      edge({
+        id: "edge-002",
+        from: "node-router",
+        to: "node-b",
+        edge_kind: "route",
+        execution_semantics: "conditional",
+        route_condition: "choice == b",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        route_aliases: ["", "B"],
+        is_default_route: true
+      } as Partial<GraphEdge>),
+      edge({
+        id: "edge-003",
+        from: "node-a",
+        to: "node-b",
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        route_aliases: ["not allowed"]
+      } as Partial<GraphEdge>)
+    ]
+  )
+);
+assert.equal(invalidRouteContractFields.errors.filter((issue) => issue.code === "route_alias_empty").length, 1);
+assert.equal(invalidRouteContractFields.errors.filter((issue) => issue.code === "route_aliases_on_non_route").length, 1);
+assert.equal(invalidRouteContractFields.errors.filter((issue) => issue.code === "multiple_default_routes").length, 1);
+
 const invalidControlMetadata = validateGraphIRSoft(
   graphWithRemoteEdge(
     [

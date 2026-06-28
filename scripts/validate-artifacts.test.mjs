@@ -117,6 +117,94 @@ test("validate-artifacts rejects edge call_control selected_by_llm (analysis gra
   assert.match(result.stderr, /call_control selected_by_llm; LLM-selected toolset selection is agent node metadata/);
 });
 
+test("validate-artifacts rejects invalid reviewed route defaults and aliases", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-route-contract-");
+  const analysis = readScenarioAnalysis();
+  analysis.processFlow = processFlowWithReviewedRoutes({
+    edges: [
+      routeEdge("edge-001", "node-a", {
+        route_condition: "choice == a",
+        route_aliases: ["", "run"],
+        is_default_route: true
+      }),
+      routeEdge("edge-002", "node-b", {
+        route_condition: "choice == b",
+        is_default_route: true
+      }),
+      graphEdge("edge-003", "node-a", "node-b", {
+        edge_kind: "event_output",
+        execution_semantics: "normal_transition",
+        route_aliases: ["not allowed"]
+      })
+    ]
+  });
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /route_aliases entries must be non-empty strings/);
+  assert.match(result.stderr, /route_aliases is allowed only on route edges/);
+  assert.match(result.stderr, /router .* has multiple default route edges/);
+});
+
+test("validate-artifacts rejects human input contracts without reviewed message", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-human-input-contract-");
+  const analysis = readScenarioAnalysis();
+  analysis.processFlow = processFlowWithReviewedRoutes({
+    nodes: [
+      graphNode("node-input", "input", "input"),
+      graphNode("node-human", "human_input", "human_input", {
+        human_input_contract: {
+          message: " ",
+          payload_schema_ref: null,
+          response_schema_ref: "AddressForm",
+          response_mapping: null
+        }
+      }),
+      graphNode("node-output", "output", "output")
+    ],
+    edges: [
+      graphEdge("edge-001", "node-input", "node-human"),
+      graphEdge("edge-002", "node-human", "node-output")
+    ]
+  });
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /human_input_contract\.message must be a non-empty reviewed prompt/);
+  assert.match(result.stderr, /response_schema_ref .* runnable currently supports only null or "str"/);
+});
+
+test("validate-artifacts rejects malformed human input contract shape", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-human-input-contract-shape-");
+  const analysis = readScenarioAnalysis();
+  analysis.processFlow = processFlowWithReviewedRoutes({
+    nodes: [
+      graphNode("node-input", "input", "input"),
+      graphNode("node-human", "human_input", "human_input", {
+        human_input_contract: {
+          message: "담당자 승인 여부를 입력하세요.",
+          payload_schema_ref: { schema: "AddressForm" },
+          response_schema_ref: null,
+          response_mapping: []
+        }
+      }),
+      graphNode("node-output", "output", "output")
+    ],
+    edges: [
+      graphEdge("edge-001", "node-input", "node-human"),
+      graphEdge("edge-002", "node-human", "node-output")
+    ]
+  });
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /human_input_contract\.payload_schema_ref must be a non-empty string or null/);
+  assert.match(result.stderr, /human_input_contract\.response_mapping must be an object with non-empty string values or null/);
+});
+
 test("validate-artifacts accepts remote_agent_call as a Remote A2A graph endpoint", () => {
   const artifactRoot = tempArtifactRoot("af-validator-remote-agent-call-");
   const analysis = readJson(join(remoteScenarioRoot, "analysis-result.json"));
@@ -137,6 +225,77 @@ function tempArtifactRoot(prefix) {
 
 function readScenarioAnalysis() {
   return readJson(join(scenarioRoot, "analysis-result.json"));
+}
+
+function processFlowWithReviewedRoutes({ nodes = null, edges }) {
+  return {
+    requirement_id: "req-reviewed-route-contract",
+    graph_id: "graph-001",
+    root_workflow_module_id: null,
+    nodes:
+      nodes ?? [
+        graphNode("node-input", "input", "input"),
+        graphNode("node-router", "router", "local_graph"),
+        graphNode("node-a", "output", "output"),
+        graphNode("node-b", "output", "output")
+      ],
+    edges: nodes ? edges : [graphEdge("edge-000", "node-input", "node-router"), ...edges],
+    containers: [],
+    lanes: [
+      { id: "input", label: "input" },
+      { id: "human_input", label: "human_input" },
+      { id: "local_graph", label: "local_graph" },
+      { id: "output", label: "output" }
+    ],
+    validation: { ok: true, errors: [], warnings: [] }
+  };
+}
+
+function graphNode(id, nodeKind, laneId, patch = {}) {
+  return {
+    id,
+    label: id,
+    module_id: null,
+    node_kind: nodeKind,
+    execution_kind: null,
+    adk_node_role: null,
+    owner_scope: "local",
+    container_id: null,
+    lane_id: laneId,
+    input_ports: [],
+    output_ports: [],
+    schema_refs: [],
+    review_status: "n/a",
+    ...patch
+  };
+}
+
+function graphEdge(id, from, to, patch = {}) {
+  return {
+    id,
+    from,
+    to,
+    from_port: null,
+    to_port: null,
+    edge_kind: "event_output",
+    execution_semantics: "normal_transition",
+    data_label: "",
+    schema_ref: null,
+    route_condition: null,
+    state_key: null,
+    artifact_key: null,
+    a2a_contract_id: null,
+    is_remote_boundary_crossing: false,
+    ...patch
+  };
+}
+
+function routeEdge(id, to, patch = {}) {
+  return graphEdge(id, "node-router", to, {
+    edge_kind: "route",
+    execution_semantics: "conditional",
+    ...patch
+  });
 }
 
 function readJson(path) {

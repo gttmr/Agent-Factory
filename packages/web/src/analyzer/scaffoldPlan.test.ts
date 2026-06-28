@@ -322,6 +322,21 @@ const graphSemanticsPlan = buildScaffoldPlan({
         input_mapping: { query: "agent_query" },
         output_mapping: { rows: "adapter_rows" },
         review_status: "approved"
+      },
+      {
+        id: "node-router",
+        label: "Route",
+        module_id: null,
+        node_kind: "router",
+        execution_kind: null,
+        adk_node_role: "synthetic",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "local_graph",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        review_status: "n/a"
       }
     ],
     edges: [
@@ -342,6 +357,26 @@ const graphSemanticsPlan = buildScaffoldPlan({
         is_remote_boundary_crossing: false,
         flow_kind: "fan_out",
         call_control: "fixed_by_workflow"
+      },
+      {
+        id: "edge-route",
+        from: "node-router",
+        to: "node-b",
+        from_port: null,
+        to_port: null,
+        edge_kind: "route",
+        execution_semantics: "conditional",
+        data_label: "",
+        schema_ref: null,
+        route_condition: "choice == approve",
+        state_key: null,
+        artifact_key: null,
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false,
+        flow_kind: "route",
+        call_control: "fixed_by_workflow",
+        route_aliases: ["승인"],
+        is_default_route: true
       }
     ]
   },
@@ -357,6 +392,11 @@ assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "fan_out");
 assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "fixed_by_workflow");
 assert.equal((graphSemanticsPlan.graph?.edges[0] as { state_key?: string | null } | undefined)?.state_key, "agent_query");
 assert.equal((graphSemanticsPlan.graph?.edges[0] as { schema_ref?: string | null } | undefined)?.schema_ref, "agent_to_adapter.v1");
+const graphSemanticsRouteEdge = graphSemanticsPlan.graph?.edges.find((edge) => edge.id === "edge-route");
+assert.deepEqual((graphSemanticsRouteEdge as { route_aliases?: string[] | null } | undefined)?.route_aliases, [
+  "승인"
+]);
+assert.equal((graphSemanticsRouteEdge as { is_default_route?: boolean | null } | undefined)?.is_default_route, true);
 
 const selectedToolsetPlan = buildScaffoldPlan({
   normalizedRequirement,

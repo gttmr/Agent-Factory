@@ -1354,7 +1354,13 @@
         "call_control": "selected_by_human",
         "side_effect": "none",
         "policy": "audit_required",
-        "output_schema": "purpose_confirmation.v1"
+        "output_schema": "purpose_confirmation.v1",
+        "human_input_contract": {
+          "message": "목적/시나리오 분류 확인",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-plan-adapter-arguments",
@@ -1483,7 +1489,13 @@
         "call_control": "selected_by_human",
         "side_effect": "none",
         "policy": "audit_required",
-        "output_schema": "analysis_execution_confirmation.v1"
+        "output_schema": "analysis_execution_confirmation.v1",
+        "human_input_contract": {
+          "message": "추가 분석을 수행할까요? 1. 분석 실행 2. 분석 없이 진행",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-analysis-router",
@@ -1707,7 +1719,13 @@
         "call_control": "selected_by_human",
         "side_effect": "none",
         "policy": "audit_required",
-        "output_schema": "final_page_selection.v1"
+        "output_schema": "final_page_selection.v1",
+        "human_input_contract": {
+          "message": "사용자 최종 Page(다중) 선택",
+          "payload_schema_ref": null,
+          "response_schema_ref": "str",
+          "response_mapping": null
+        }
       },
       {
         "id": "node-call-workflow-1-2",
@@ -1931,7 +1949,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-003",
@@ -1949,7 +1969,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_in",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-004",
@@ -1967,7 +1989,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "selected_by_human"
+        "call_control": "selected_by_human",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-005",
@@ -1985,7 +2009,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-006",
@@ -2003,7 +2029,12 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "route",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [
+          "분석 실행",
+          "run analysis"
+        ],
+        "is_default_route": false
       },
       {
         "id": "edge-007",
@@ -2021,7 +2052,12 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "route",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [
+          "분석 없이 진행",
+          "skip analysis"
+        ],
+        "is_default_route": true
       },
       {
         "id": "edge-008",
@@ -2039,7 +2075,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_out",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-009",
@@ -2057,7 +2095,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_out",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-010",
@@ -2075,7 +2115,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_out",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-011",
@@ -2093,7 +2135,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_in",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-012",
@@ -2111,7 +2155,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_in",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-013",
@@ -2129,7 +2175,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_in",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-014",
@@ -2147,7 +2195,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "selected_by_human"
+        "call_control": "selected_by_human",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-015",
@@ -2165,7 +2215,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-016",
@@ -2183,7 +2235,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-017",
@@ -2201,7 +2255,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-018",
@@ -2219,7 +2275,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "selected_by_human"
+        "call_control": "selected_by_human",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-020",
@@ -2237,7 +2295,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_in",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-002",
@@ -2255,7 +2315,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-019",
@@ -2273,7 +2335,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_out",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       },
       {
         "id": "edge-021",
@@ -2291,7 +2355,9 @@
         "a2a_contract_id": null,
         "is_remote_boundary_crossing": false,
         "flow_kind": "fan_out",
-        "call_control": "fixed_by_workflow"
+        "call_control": "fixed_by_workflow",
+        "route_aliases": [],
+        "is_default_route": false
       }
     ],
     "containers": [
