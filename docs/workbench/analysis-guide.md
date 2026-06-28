@@ -66,9 +66,9 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 ## Live analyzer 실행 계약
 
 Analyze Stage Runner는 raw requirement 입력 경로에서 Codex TypeScript SDK 실행을 요청할 수 있다. Skill-led 운영에서는 외부 `af-analyze-requirement` 실행 결과를 import할 수도 있고, workbench는 후속 preview/apply, 시각화, guided edit의 보조 표면이 된다.
-단, direct live analyzer CLI가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다는 기존 계약은 유지한다.
+단, direct live analyzer primitive가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다는 기존 계약은 유지한다.
 
-- CLI에는 `schemas/analysis-draft.schema.json` compact draft schema를 `--output-schema`로 전달한다.
+- Codex TypeScript SDK에는 `schemas/analysis-draft.schema.json` compact draft schema를 `outputSchema` turn option으로 전달한다.
 - 실행 시 `/tmp/agent-factory-codex-*/analyzer-context-index.md`를 만들어 active docs, schema, catalog 위치와 주요 section을 안내한다.
 - 모델은 index를 지도처럼 사용하고, 정확한 판단이 필요하면 원본 `docs/`, `schemas/`, `catalog/` 파일을 `rg`나 bounded `sed`로 직접 확인한다.
 - Compact draft에는 분류 판단, rationale, `catalog_entry_id`, Graph IR topology 같은 결정 정보를 담는다.

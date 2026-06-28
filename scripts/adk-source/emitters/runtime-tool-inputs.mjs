@@ -1,0 +1,213 @@
+export function buildRuntimeToolInputsSection() {
+  return `
+
+def _user_text_from_context(ctx: Context) -> str:
+    content = getattr(ctx, "user_content", None)
+    parts = getattr(content, "parts", None) or []
+    text = "".join(getattr(part, "text", "") or "" for part in parts)
+    return text.strip()
+
+
+USER_TEXT_INPUT_NAMES = {
+    "query",
+    "user_query",
+    "user_request",
+    "request",
+    "message",
+    "prompt",
+    "objective",
+    "objective_text",
+    "goal",
+    "goal_text",
+    "input_text",
+}
+
+PAYLOAD_WRAPPER_KEYS = (
+    "previous",
+    "arguments",
+    "structured_content",
+    "structuredContent",
+    "result",
+    "output",
+    "input",
+    "payload",
+    "data",
+    "response",
+)
+
+
+def _content_text(value: Any) -> str:
+    parts = getattr(value, "parts", None)
+    if not parts:
+        return ""
+    return "".join(getattr(part, "text", "") or "" for part in parts).strip()
+
+
+def _json_payload(value: Any) -> Any:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if text.startswith("\`\`\`"):
+        lines = text.splitlines()
+        if lines and lines[0].strip().startswith("\`\`\`"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("\`\`\`"):
+            lines = lines[:-1]
+        text = "\\n".join(lines).strip()
+    if not text or text[0] not in "{[":
+        return None
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return None
+    return parsed if isinstance(parsed, (dict, list)) else None
+
+
+def _payload_value(payload: Any, source_key: str, depth: int = 0) -> Any:
+    if payload is None or depth > 6:
+        return None
+    if isinstance(payload, dict):
+        if payload.get(source_key) is not None:
+            return payload.get(source_key)
+        for wrapper_key in PAYLOAD_WRAPPER_KEYS:
+            if wrapper_key not in payload:
+                continue
+            value = _payload_value(payload.get(wrapper_key), source_key, depth + 1)
+            if value is not None:
+                return value
+    if isinstance(payload, list):
+        for item in payload:
+            value = _payload_value(item, source_key, depth + 1)
+            if value is not None:
+                return value
+    content_text = _content_text(payload)
+    if content_text:
+        value = _payload_value(content_text, source_key, depth + 1)
+        if value is not None:
+            return value
+    _value = _json_payload(payload)
+    if _value is not None:
+        return _payload_value(_value, source_key, depth + 1)
+    return None
+
+
+def _payload_user_text(payload: Any, depth: int = 0) -> str:
+    if payload is None or depth > 6:
+        return ""
+    if isinstance(payload, str):
+        parsed = _json_payload(payload)
+        if parsed is not None:
+            parsed_text = _payload_user_text(parsed, depth + 1)
+            if parsed_text:
+                return parsed_text
+        return payload.strip()
+    content_text = _content_text(payload)
+    if content_text:
+        return _payload_user_text(content_text, depth + 1)
+    if isinstance(payload, dict):
+        for key in USER_TEXT_INPUT_NAMES:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        for wrapper_key in PAYLOAD_WRAPPER_KEYS:
+            if wrapper_key not in payload:
+                continue
+            value = _payload_user_text(payload.get(wrapper_key), depth + 1)
+            if value:
+                return value
+    if isinstance(payload, list):
+        text_items = [item.strip() for item in payload if isinstance(item, str) and item.strip()]
+        if text_items:
+            return "\\n".join(text_items)
+        for item in payload:
+            value = _payload_user_text(item, depth + 1)
+            if value:
+                return value
+    return ""
+
+
+def _first_resume_input(ctx: Context) -> Any:
+    resume_inputs = getattr(ctx, "resume_inputs", None) or {}
+    if not isinstance(resume_inputs, dict):
+        return None
+    for value in resume_inputs.values():
+        if isinstance(value, dict):
+            for key in ("response", "text", "message", "value"):
+                if value.get(key) is not None:
+                    return value.get(key)
+        return value
+    return None
+
+
+def _collect_tool_inputs(
+    ctx: Context, module_id: str, input_names: list[str], required_names: list[str],
+    channel_keys: list[str] | None = None, extra_payloads: list[dict] | None = None,
+    node_input: Any = None,
+) -> tuple[dict, dict]:
+    # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
+    # input_map (tool_input -> state/output key), (2) reviewed state/channel
+    # payloads, (3) this workflow edge's node_input, (4) matching fields inside
+    # upstream *_output payloads, (5) user text for semantic text inputs, or (6)
+    # the reviewed smoke_spec.synthetic_inputs seed. The fallback keeps runnable
+    # scaffolds executable without inventing private data or hard-coding business
+    # values in generated code.
+    contract = COMPONENT_CONTRACTS.get(module_id, {})
+    reviewed_mapping = contract.get("input_mapping") if isinstance(contract.get("input_mapping"), dict) else {}
+    overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    smoke_spec = contract.get("smoke_spec") if isinstance(contract, dict) else {}
+    synthetic_inputs = smoke_spec.get("synthetic_inputs", {}) if isinstance(smoke_spec, dict) else {}
+    channel_payloads = [
+        ctx.state.get(channel_key)
+        for channel_key in (channel_keys or [])
+        if ctx.state.get(channel_key) is not None
+    ]
+    channel_payloads.extend(payload for payload in (extra_payloads or []) if isinstance(payload, dict))
+    args: dict = {}
+    input_resolution: dict = {}
+    for name in input_names:
+        source_key = reviewed_mapping.get(name) or overrides.get(name, name)
+        if not isinstance(source_key, str) or not source_key.strip():
+            source_key = name
+        if ctx.state.get(source_key) is not None:
+            args[name] = ctx.state.get(source_key)
+            input_resolution[name] = {"source": "state", "source_key": source_key}
+            continue
+        # Prefer a field named source_key from an explicitly-named incoming data channel.
+        for payload in channel_payloads:
+            value = _payload_value(payload, source_key)
+            if value is not None:
+                args[name] = value
+                input_resolution[name] = {"source": "channel", "source_key": source_key}
+                break
+        if name in args:
+            continue
+        value = _payload_value(node_input, source_key)
+        if value is not None:
+            args[name] = value
+            input_resolution[name] = {"source": "node_input", "source_key": source_key}
+            continue
+        # Fall back to a field named source_key inside any upstream *_output dict.
+        # ADK's State object is not a dict (no .items()); to_dict() merges base + delta.
+        for key, value in ctx.state.to_dict().items():
+            resolved = _payload_value(value, source_key) if key.endswith("_output") else None
+            if resolved is not None:
+                args[name] = resolved
+                input_resolution[name] = {"source": "upstream_output", "source_key": source_key, "state_key": key}
+                break
+        if name not in args and (source_key in USER_TEXT_INPUT_NAMES or source_key.endswith("_text")):
+            user_text = _payload_user_text(node_input) or _user_text_from_context(ctx)
+            if user_text:
+                args[name] = user_text
+                input_resolution[name] = {"source": "user_text", "source_key": source_key}
+        if name not in args and isinstance(synthetic_inputs, dict) and synthetic_inputs.get(source_key) is not None:
+            args[name] = synthetic_inputs.get(source_key)
+            input_resolution[name] = {"source": "synthetic_inputs", "source_key": source_key}
+    missing = [name for name in required_names if name not in args]
+    if missing:
+        raise RuntimeError(
+            f"{module_id}: required MCP tool inputs missing from node input / session state / upstream outputs: {missing}. "
+            "Set an input_map for this adapter in agents.config.yaml."
+        )
+    return args, input_resolution
+`;
+}

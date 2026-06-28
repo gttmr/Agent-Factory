@@ -1,0 +1,75 @@
+import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
+import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
+import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
+import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
+import { usesRoutes } from "./graph/routes.mjs";
+import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
+import { assertRemoteA2aSupported, usesRemoteA2a } from "./remote-a2a.mjs";
+import { componentContracts } from "./agent-contracts.mjs";
+import { emitRunnableNodeBlocks } from "./emitters/node-registry.mjs";
+import { buildRuntimeHelperSection } from "./emitters/runtime-helpers.mjs";
+
+export function buildRunnableAgentPy(context) {
+  const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName, processFlow } =
+    context;
+  assertRunnableGraphSupported(graphContext);
+  assertDataChannelsSupported(graphContext);
+  assertRemoteA2aSupported({ analysisResult, modules });
+  const { edges, joins } = buildRunnableGraph(graphContext);
+  const graph = graphIndexes(graphContext);
+  const orderedModules = orderedGraphModules(graphContext);
+  const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
+  const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
+  const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
+  const autoJoins = joins.filter((join) => join.explicit === false);
+  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes });
+
+  const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
+  const edgeLiteral = workflowEdgeLiteral(edges);
+  const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.1 워크플로우입니다: ${truncate(
+    normalizedRequirement.title || packageName
+  )}.`;
+
+  // Artifact channels need json (serialize the payload) + google.genai.types
+  // (wrap as a Part); Remote A2A nodes need RemoteA2aAgent. Gated so bundles
+  // without those features keep an unchanged import block.
+  const usesArtifacts = usesArtifactChannels(graphContext);
+  const usesRouteNodes = usesRoutes(processFlow);
+  const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
+  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+  const remoteImport = usesRemoteA2a(modules)
+    ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
+    : "";
+  const eventImport = usesRouteNodes ? "Event, RequestInput" : "RequestInput";
+
+  return `from __future__ import annotations
+
+import os
+${jsonStdlibImport}from pathlib import Path
+from typing import Any
+
+import yaml
+
+from google.adk import Context
+from google.adk.agents import LlmAgent
+${remoteImport}from google.adk.events import ${eventImport}
+from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
+${artifactGenaiImport}
+
+${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)) })}
+
+${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}# ---------------------------------------------------------------------------
+# Graph nodes
+# ---------------------------------------------------------------------------
+
+${nodeBlocks.join("\n\n")}
+${joinDecls.length ? `\n${joinDecls.join("\n")}\n` : ""}
+
+root_agent = Workflow(
+    name=${toPyStr(packageName)},
+    description=${toPyStr(description)},
+    edges=${edgeLiteral},
+)
+`;
+}
