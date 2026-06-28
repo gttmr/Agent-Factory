@@ -77,6 +77,9 @@ const graphEdgeKinds = new Set([
   "control",
   "remote_a2a"
 ]);
+const graphStateEdgeKinds = new Set(["session_state", "temp_state", "user_state", "app_state"]);
+const graphStateScopePrefixByKind = { temp_state: "temp:", user_state: "user:", app_state: "app:" };
+const graphStateScopePrefixPattern = /^(temp:|user:|app:)/;
 const graphLaneIds = new Set([
   "input",
   "local_graph",
@@ -749,7 +752,6 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
   if (!containers) errors.push(`${label}.containers must be an array.`);
   if (!lanes) errors.push(`${label}.lanes must be an array.`);
 
-  // validation block presence
   if (!graph.validation || typeof graph.validation !== "object" || Array.isArray(graph.validation)) {
     errors.push(`${label}.validation must be an object with ok/errors/warnings.`);
   } else {
@@ -912,7 +914,6 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
   });
 
-  // Edges.
   const edgeIds = new Set();
   edges.forEach((edge, index) => {
     if (!edge || typeof edge !== "object" || Array.isArray(edge)) {
@@ -962,8 +963,7 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         errors.push(`${label}.edges[${index}] (${edge.id}) artifact edge requires non-empty artifact_key.`);
       }
     }
-    const stateEdgeKinds = ["session_state", "temp_state", "user_state", "app_state"];
-    if (stateEdgeKinds.includes(edge.edge_kind)) {
+    if (graphStateEdgeKinds.has(edge.edge_kind)) {
       if (typeof edge.state_key !== "string" || !edge.state_key.trim()) {
         errors.push(`${label}.edges[${index}] (${edge.id}) ${edge.edge_kind} edge requires non-empty state_key.`);
       } else {
@@ -971,9 +971,8 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         // name. A leading scope prefix is allowed only when it matches edge_kind,
         // so a wrong-scope prefix is caught instead of being silently re-scoped by
         // the generator. (Bare keys are the canonical form the picker authors.)
-        const scopePrefixByKind = { temp_state: "temp:", user_state: "user:", app_state: "app:" };
-        const expected = scopePrefixByKind[edge.edge_kind] ?? null; // null for session_state
-        const present = (edge.state_key.match(/^(temp:|user:|app:)/) || [])[1] ?? null;
+        const expected = graphStateScopePrefixByKind[edge.edge_kind] ?? null; // null for session_state
+        const present = (edge.state_key.match(graphStateScopePrefixPattern) || [])[1] ?? null;
         if (present && present !== expected) {
           errors.push(
             `${label}.edges[${index}] (${edge.id}) ${edge.edge_kind} state_key has scope prefix "${present}" that does not match the edge kind; use a bare key (scope comes from the data-passing method)${expected ? ` or the "${expected}" prefix` : ""}.`
@@ -1038,7 +1037,6 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
     }
   });
 
-  // At least one input-laned and one output-laned node.
   const hasInputLane = nodes.some((node) => node && node.lane_id === "input");
   const hasOutputLane = nodes.some((node) => node && node.lane_id === "output");
   if (!hasInputLane) errors.push(`${label} requires at least one node with lane_id "input".`);

@@ -128,10 +128,6 @@ export function buildScaffoldPlan({
   return scaffoldPlan;
 }
 
-export function approvedScaffoldModuleIds(scaffoldPlan: ScaffoldPlan): Set<string> {
-  return new Set(scaffoldPlan.modules.map((module) => module.id));
-}
-
 function buildScaffoldModule(
   candidate: ModuleCandidate,
   catalogEntries: CatalogEntry[],

@@ -135,7 +135,7 @@ export function GraphCanvas({
   const edgeCreationGuardRef = useRef<string | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const isControlled = selectionProp !== undefined;
-  const selection = isControlled ? selectionProp! : internalSelection;
+  const selection = selectionProp ?? internalSelection;
   const setSelection = (next: Selection) => {
     if (!isControlled) setInternalSelection(next);
     onSelectionChange?.(next);
@@ -186,12 +186,13 @@ export function GraphCanvas({
         setEditNotice(result.message);
         return;
       }
+      const edge = result.edge;
       updateDraft((graph) => ({
         ...graph,
-        edges: [...(graph.edges ?? []), result.edge!]
+        edges: [...(graph.edges ?? []), edge]
       }));
       setEditNotice(result.message);
-      setSelection({ nodeId: null, edgeId: result.edge.id });
+      setSelection({ nodeId: null, edgeId: edge.id });
       cancelConnectMode();
     },
     [cancelConnectMode, draftGraphIR, updateDraft]

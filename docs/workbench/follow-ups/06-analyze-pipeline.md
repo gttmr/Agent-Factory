@@ -2,11 +2,13 @@
 
 상태: 완료 후 brief 09로 흡수. 옵션 B의 `/api/analyze-requirement` SSE 호출 hook은 구현됐고, 현재 기본 UI는 Analyze Skill Runner(`/api/af/:reqId/stages/analyze/run`)가 담당한다. `/api/analyze-requirement`는 direct/internal analyzer primitive로 보존한다. 2026-06-23 이후 direct analyzer와 Stage Runner 구현은 외부 Codex CLI 직접 spawn 대신 `@openai/codex-sdk`를 사용한다.
 
-## 왜 필요한가
+아래 내용은 당시 선택지와 검증 기준을 남긴 기록이다. 현재 구현 계약은 [`STATUS.md`](./STATUS.md)와 [`INDEX.md`](./INDEX.md)를 우선한다.
 
-PR6 에서 `/legacy` 가 제거되며 워크벤치 UI 안에서 분석을 직접 실행할 수단이 사라졌다. 현재는 외부 `af-analyze-requirement` skill 이 `analysis-result.json` 을 생성하고 사용자가 import 해야 한다. 이게 의도된 운영 모델인지, 아니면 `/af/:reqId/analyze` 에서 "분석 실행" 버튼 한 번으로 Codex CLI 를 호출하는 게 맞는지 사용자가 결정해야 한다.
+## 당시 필요했던 이유
 
-PR2 의 AnalyzeWorkbench 코드에 남아있는 `handleRerun` 함수는 현재 안내 메시지만 출력한다.
+PR6 에서 `/legacy` 가 제거되며 워크벤치 UI 안에서 분석을 직접 실행할 수단이 사라졌다. 당시에는 외부 `af-analyze-requirement` skill 이 `analysis-result.json` 을 생성하고 사용자가 import 해야 했다. 이게 의도된 운영 모델인지, 아니면 `/af/:reqId/analyze` 에서 "분석 실행" 버튼 한 번으로 Codex CLI 를 호출하는 게 맞는지 결정해야 했다.
+
+당시 PR2 의 AnalyzeWorkbench 코드에 남아있던 `handleRerun` 함수는 안내 메시지만 출력했다.
 
 ## 현재 상태
 
@@ -23,7 +25,7 @@ C. **외부 import + skill 트리거.** UI 가 직접 Codex 를 호출하지는 
 
 선택은 B로 진행됐고, 이후 brief 09에서 Stage Runner 실행 모델로 흡수됐다. `/api/analyze-requirement`는 삭제하지 않고 direct/internal primitive로 보존한다.
 
-## 작업 정의 (선택지별 Done means)
+## 당시 작업 정의 (선택지별 Done means)
 
 ### A 선택 시
 1. `packages/web/server/codexAnalyzer.ts` 와 `vite.config.ts` 의 `/api/analyze-requirement` 등록 제거.
@@ -41,9 +43,9 @@ C. **외부 import + skill 트리거.** UI 가 직접 Codex 를 호출하지는 
 1. Landing 또는 AnalyzeWorkbench 에 "af-analyze-requirement skill 실행 명령" 을 alert / clipboard copy 로 노출.
 2. 코드 변경 최소.
 
-## 권장
+## 당시 권장
 
-(B) 가 사용 경험상 가장 자연스럽다. (A) 는 안전하지만 분석을 위해 매번 별도 도구를 켜야 한다. (C) 는 어중간하다. 사용자에게 한 번 확인 후 선택.
+당시에는 (B) 가 사용 경험상 가장 자연스럽다고 판단했다. (A) 는 안전하지만 분석을 위해 매번 별도 도구를 켜야 했고, (C) 는 어중간했다.
 
 ## 파일 / 디렉터리 (B 기준)
 
@@ -61,17 +63,17 @@ C. **외부 import + skill 트리거.** UI 가 직접 Codex 를 호출하지는 
 cd packages/web && npm run build && npm run test:analyzer
 ```
 
-MCP 스모크 (B 기준):
+당시 MCP 스모크 (B 기준):
 1. req-pr-analyze 새 root + raw_text 있는 minimal analysis-result import (또는 빈 root 에서 안내 EmptyState 가 뜨는지).
 2. "재분석" 클릭 → progress SSE event 가 화면에 흐름 → 결과 PUT → analysis-result.json 갱신.
 3. 갱신 후 분석 모듈/처리흐름이 새 결과로 교체되는지 확인.
 
-## Out of scope
+## 당시 Out of scope
 
 - Codex CLI 자체의 성능 / 모델 선택 — 기존 `codexAnalyzer.ts` 가 이미 가진 옵션 활용.
 - analyzer provider 다중화 (OpenAI 직접 호출 등) — 1차 (B) 에서는 Codex CLI 만.
 
-## 위험 / 메모
+## 당시 위험 / 메모
 
 - 분석은 수십초~수분 걸린다. SSE progress 가 보이지 않으면 UX 가 깨진다.
 - raw_text 에 PII / 비밀이 들어가면 그대로 Codex 에 전송됨. 운영 정책상 분석 입력의 sensitivity 가이드를 docs 에 명시.

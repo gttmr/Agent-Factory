@@ -27,5 +27,3 @@ assert.equal(
   "reviewNotes",
   "module selection should preserve the review notes tab when it is active"
 );
-
-console.log("designWorkbenchTabs tests passed");

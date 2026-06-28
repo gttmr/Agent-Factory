@@ -76,5 +76,3 @@ assert.deepEqual(
   "node selection takes precedence when both ids are present"
 );
 assert.equal(commentAnchorFromSelection({ nodeId: null, edgeId: null }), null);
-
-console.log("reviewNotesModel tests passed");

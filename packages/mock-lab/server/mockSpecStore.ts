@@ -148,7 +148,7 @@ export class MockSpecStore {
         drafts.push(summary);
         continue;
       }
-      const request = await readJson<Record<string, any>>(join(draftDir, "request.json")).catch(() => null);
+      const request = await readJson<Record<string, unknown>>(join(draftDir, "request.json")).catch(() => null);
       if (request) {
         drafts.push({
           draft_id: entry.name,
@@ -213,6 +213,6 @@ function inferDraftStartedAt(draftId: string): string | null {
   return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`;
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

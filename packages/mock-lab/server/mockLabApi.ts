@@ -218,7 +218,7 @@ function readTools(response: JsonRpcEnvelope): Array<Record<string, unknown>> {
   return Array.isArray(result.tools) ? result.tools.filter(isRecord) : [];
 }
 
-function readResult(response: JsonRpcEnvelope): Record<string, any> {
+function readResult(response: JsonRpcEnvelope): Record<string, unknown> {
   if (response.error) throw new MockLabError(422, response.error.message);
   return isRecord(response.result) ? response.result : {};
 }
@@ -278,6 +278,6 @@ function handleError(error: unknown, res: ServerResponse, next: MiddlewareNext):
   next(error);
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

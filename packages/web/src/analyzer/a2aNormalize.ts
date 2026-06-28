@@ -346,30 +346,3 @@ function dedupe(list: string[]): string[] {
   }
   return out;
 }
-
-// Lightweight non-production sanity checks. These run once at module import
-// time when NODE_ENV !== "production". They do not require a test framework.
-if (typeof process !== "undefined" && process.env && process.env.NODE_ENV !== "production") {
-  // mintNextContractId picks 001 when nothing is used.
-  const empty = new Set<string>();
-  if (mintNextContractId(empty) !== "a2a-001") {
-    console.warn("[a2aNormalize] sanity: mintNextContractId(empty) should be a2a-001");
-  }
-  // mintNextContractId skips over taken ids.
-  const taken = new Set<string>(["a2a-001", "a2a-002"]);
-  if (mintNextContractId(taken) !== "a2a-003") {
-    console.warn("[a2aNormalize] sanity: mintNextContractId should skip taken ids");
-  }
-  // normalizeA2A on empty result returns an empty array.
-  const baseline = normalizeA2A({
-    normalizedRequirement: {} as never,
-    evidence: {} as never,
-    moduleCandidates: [],
-    a2aContracts: [],
-    runtimeContracts: [],
-    processFlow: {} as never
-  });
-  if (!Array.isArray(baseline.result.a2aContracts) || baseline.result.a2aContracts.length !== 0) {
-    console.warn("[a2aNormalize] sanity: empty input should produce empty contracts array");
-  }
-}

@@ -17,10 +17,3 @@ export function ensureRuntimeBinding(entry: CatalogEntry): CatalogEntry {
   if (entry.runtime_binding) return entry;
   return { ...entry, runtime_binding: deriveRuntimeBinding(entry) };
 }
-
-export function refreshRuntimeBinding(entry: CatalogEntry): CatalogEntry {
-  if (entry.runtime_binding && entry.runtime_binding !== "unresolved") return entry;
-  const derived = deriveRuntimeBinding(entry);
-  if (entry.runtime_binding === derived) return entry;
-  return { ...entry, runtime_binding: derived };
-}

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { dedupeKeepLatestPublished } from "../catalog/catalogVersioning";
-import type { CatalogCategory, CatalogEntryRaw, CatalogHubEntry, CatalogIO, CatalogIndex } from "../catalog/catalogIndex";
+import type { CatalogCategory, CatalogEntryRaw, CatalogHubEntry, CatalogIndex } from "../catalog/catalogIndex";
 import { AfApiError } from "./apiClient";
 
 export type { CatalogCategory, CatalogEntryRaw, CatalogHubEntry, CatalogIO, CatalogIndex } from "../catalog/catalogIndex";
@@ -50,100 +50,4 @@ export function useCatalog() {
     },
     staleTime: 60_000
   });
-}
-
-export interface RecommendationScore {
-  entry: CatalogHubEntry;
-  score: number;
-  reasons: string[];
-}
-
-interface CandidateForRecommendation {
-  id: string;
-  module_category: string;
-  agent_kind?: string | null;
-  workflow_kind?: string | null;
-  adapter_kind?: string | null;
-  remote_contract_kind?: string | null;
-  owner_domain?: string | null;
-  name: string;
-  inputs?: CatalogIO[];
-  outputs?: CatalogIO[];
-  risk_signals?: string[];
-}
-
-function tokenize(value: string): string[] {
-  return value
-    .toLowerCase()
-    .split(/[\s_/]+/)
-    .filter((token) => token.length > 1);
-}
-
-function jaccard(a: string[], b: string[]): number {
-  if (!a.length || !b.length) return 0;
-  const setA = new Set(a);
-  const setB = new Set(b);
-  let intersection = 0;
-  setA.forEach((value) => {
-    if (setB.has(value)) intersection += 1;
-  });
-  const union = setA.size + setB.size - intersection;
-  return union === 0 ? 0 : intersection / union;
-}
-
-export function recommendCatalogForCandidate(candidate: CandidateForRecommendation, index: CatalogIndex): RecommendationScore[] {
-  const pool: CatalogHubEntry[] = (() => {
-    switch (candidate.module_category) {
-      case "agent":
-        return index.agents;
-      case "workflow":
-        return index.workflows;
-      case "adapter":
-        return index.adapters;
-      case "remote_a2a":
-        return index.remoteA2A;
-      default:
-        return [];
-    }
-  })();
-  const candidateSubtype =
-    candidate.agent_kind ?? candidate.workflow_kind ?? candidate.adapter_kind ?? candidate.remote_contract_kind ?? null;
-  const candidateInputNames = (candidate.inputs ?? []).map((field) => field.name);
-  const candidateOutputNames = (candidate.outputs ?? []).map((field) => field.name);
-  const candidateTokens = tokenize(candidate.name);
-
-  const scored = pool.map((entry) => {
-    let score = 0;
-    const reasons: string[] = [];
-    if (candidateSubtype && entry.subtype && candidateSubtype === entry.subtype) {
-      score += 0.5;
-      reasons.push(`subtype 일치 (${entry.subtype})`);
-    }
-    if (candidate.owner_domain && entry.owner_domain && candidate.owner_domain === entry.owner_domain) {
-      score += 0.15;
-      reasons.push(`owner_domain 일치 (${entry.owner_domain})`);
-    }
-    const entryInputs = (entry.inputs ?? []).map((field) => field.name);
-    const entryOutputs = (entry.outputs ?? []).map((field) => field.name);
-    const ioScore = (jaccard(candidateInputNames, entryInputs) + jaccard(candidateOutputNames, entryOutputs)) / 2;
-    if (ioScore > 0) {
-      score += ioScore * 0.2;
-      reasons.push(`I/O 시그니처 유사 (${ioScore.toFixed(2)})`);
-    }
-    const riskOverlap = (candidate.risk_signals ?? []).filter((signal) => (entry.risk_signals ?? []).includes(signal));
-    if (riskOverlap.length > 0) {
-      score += Math.min(0.1, 0.05 * riskOverlap.length);
-      reasons.push(`risk 신호 교집합: ${riskOverlap.join(", ")}`);
-    }
-    const nameScore = jaccard(candidateTokens, tokenize(entry.name));
-    if (nameScore > 0) {
-      score += nameScore * 0.05;
-    }
-    return { entry, score, reasons };
-  });
-
-  return scored
-    .filter((scored) => scored.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
 }

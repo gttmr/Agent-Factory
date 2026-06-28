@@ -68,7 +68,6 @@ export default function BuildWorkbench() {
   const manifestEtag = manifestData?.etag ?? null;
   const analysis = analysisData?.data ?? null;
 
-  // catalog for buildScaffoldPlan
   const catalog = useCatalog();
   const catalogEntries = useMemo(() => (catalog.data ? catalogIndexToScaffoldCatalog(catalog.data) : []), [catalog.data]);
   const mockLabDiscovery = useMockLabDiscovery(outputMode === "runnable");
@@ -155,7 +154,8 @@ export default function BuildWorkbench() {
   const runtimeApproved = manifest?.approvals.runtime_contracts_approved ?? false;
   const designGatesReady = boundariesApproved && runtimeApproved;
   const planReady = scaffoldPlan?.validation?.can_generate_source === true;
-  const stubReady = (runtimeStub?.files?.length ?? 0) > 0;
+  const runtimeStubFiles = runtimeStub?.files ?? [];
+  const stubReady = runtimeStubFiles.length > 0;
   const stubApproved = manifest?.approvals.stub_ready_for_followup ?? false;
 
   const defaultStep: BuildStepId = !stubReady ? "run" : !stubApproved ? "review" : "approve";
@@ -505,7 +505,7 @@ export default function BuildWorkbench() {
             ) : (
               <div className="af-build-stub-grid">
                 <ul className="af-build-file-list">
-                  {runtimeStub!.files.map((file) => (
+                  {runtimeStubFiles.map((file) => (
                     <li key={file.path}>
                       <button
                         type="button"

@@ -86,5 +86,3 @@ assert.equal(isNodeRuntimeControlEditable(node({ node_kind: "input" })), false);
 assert.equal(isEdgeKindEditable(edge("router", "target", { edge_kind: "route" })), false);
 assert.equal(isEdgeKindEditable(edge("source", "remote", { edge_kind: "remote_a2a" })), false);
 assert.equal(isEdgeKindEditable(edge("source", "target", { edge_kind: "event_output" })), true);
-
-console.log("graphElementEditorModel tests passed");

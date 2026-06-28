@@ -36,8 +36,8 @@ export function findSimplePaths(graphIR: GraphIR, fromId: string, toId: string, 
   const queue: QueueItem[] = [{ nodeId: fromId, nodeIds: [fromId], edgeIds: [], visited: new Set([fromId]) }];
   const maxDepth = Math.max((graphIR.nodes ?? []).length, 1);
 
-  while (queue.length > 0 && paths.length < limit) {
-    const item = queue.shift()!;
+  for (let cursor = 0; cursor < queue.length && paths.length < limit; cursor += 1) {
+    const item = queue[cursor];
     if (item.nodeIds.length > maxDepth) continue;
 
     for (const edge of bySource.get(item.nodeId) ?? []) {

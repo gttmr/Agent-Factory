@@ -90,8 +90,3 @@ export function useStopRuntimeChat(reqId: string | undefined) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["af", reqId, "runtime-chat"] })
   });
 }
-
-// NOTE: AF 자체 간이 챗(세션/메시지)은 제거됐다 — 실행 화면이 ADK 공식 dev UI 로 링크한다.
-// 클라이언트 훅(useCreateRuntimeChatSession / useSendRuntimeChatMessage)과 서버
-// /runtime-chat/{session,message} 엔드포인트(RuntimeChatManager.createSession/sendMessage)도
-// 함께 삭제했다. status/install/start/stop 만 남는다.

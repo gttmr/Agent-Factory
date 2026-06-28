@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createA2AContractForCandidate } from "./a2aNormalize.ts";
+import { createA2AContractForCandidate, mintNextContractId, normalizeA2A } from "./a2aNormalize.ts";
 import type { AnalysisResult, ModuleCandidate } from "./types.ts";
 
 const remoteCandidate: ModuleCandidate = {
@@ -55,3 +55,16 @@ assert.equal(next.a2aContracts[1]?.contract_id, "a2a-003");
 assert.equal(next.a2aContracts[1]?.remote_module_id, "mod-remote");
 assert.equal(next.a2aContracts[1]?.target_agent_name, "needs_info");
 assert.equal(analysis.moduleCandidates[0]?.a2a_contract_id, null);
+
+assert.equal(mintNextContractId(new Set()), "a2a-001");
+assert.equal(mintNextContractId(new Set(["a2a-001", "a2a-002"])), "a2a-003");
+
+const baseline = normalizeA2A({
+  normalizedRequirement: {} as AnalysisResult["normalizedRequirement"],
+  evidence: {} as AnalysisResult["evidence"],
+  moduleCandidates: [],
+  a2aContracts: [],
+  runtimeContracts: [],
+  processFlow: {} as AnalysisResult["processFlow"]
+});
+assert.deepEqual(baseline.result.a2aContracts, []);
