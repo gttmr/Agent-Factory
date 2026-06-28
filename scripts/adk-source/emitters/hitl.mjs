@@ -3,10 +3,11 @@ import { toPyStr } from "../python-literals.mjs";
 
 export function emitHumanInputFunc(node) {
   const prompt = toPyStr(humanInputPrompt(node));
+  const responseSchema = humanInputResponseSchema(node);
   return `def ${hitlFuncName(node)}(ctx: Context, node_input=None):
     _hitl_response = _first_resume_input(ctx)
     if _hitl_response is None:
-        yield RequestInput(message=${prompt}, payload=node_input)
+        yield RequestInput(message=${prompt}, payload=node_input${responseSchema})
         return
     yield {
         "node_kind": "human_input",
@@ -21,8 +22,16 @@ export function emitHumanInputNodeDecl(node) {
 }
 
 function humanInputPrompt(node) {
+  const reviewedPrompt = node?.human_input_contract?.message;
+  if (typeof reviewedPrompt === "string" && reviewedPrompt.trim()) return reviewedPrompt.trim();
   // Only a reviewed, human-readable label is fit as the runtime prompt; do not
   // fall back to execution_kind (technical, e.g. "request_input").
   if (typeof node.label === "string" && node.label.trim()) return node.label.trim();
   return "사람의 입력이 필요합니다:";
+}
+
+function humanInputResponseSchema(node) {
+  const responseSchemaRef = node?.human_input_contract?.response_schema_ref;
+  if (responseSchemaRef === "str") return ", response_schema=str";
+  return "";
 }

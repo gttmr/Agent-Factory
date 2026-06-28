@@ -1,4 +1,5 @@
 import { yamlScalar } from "../python-literals.mjs";
+import { routeValue } from "../graph/routes.mjs";
 
 export function buildSampleInputsYaml({ modules, normalizedRequirement, packageName, processFlow, terminalOutputIds }) {
   const lines = buildWorkflowChatSampleYaml({ modules, normalizedRequirement, packageName, processFlow, terminalOutputIds });
@@ -90,16 +91,41 @@ function humanInputSamples({ processFlow, modules }) {
   return (Array.isArray(processFlow.nodes) ? processFlow.nodes : [])
     .filter((node) => node?.node_kind === "human_input")
     .map((node, index) => ({
-      prompt: typeof node.label === "string" && node.label.trim() ? node.label.trim() : node.id,
-      response: suggestedHumanInputReply(node, index, { modules }),
+      prompt: humanInputPrompt(node),
+      response: suggestedHumanInputReply(node, index, { modules, processFlow }),
     }));
 }
 
 function suggestedHumanInputReply(node, index, context) {
-  const label = typeof node.label === "string" ? node.label : "";
-  if (/분석/.test(label) && /(수행|실행|1)/.test(label)) return "1";
+  const routeReply = reviewedRouteReplyAfterNode(node, context.processFlow);
+  if (routeReply) return routeReply;
+  const label = humanInputPrompt(node);
   if (/목적|시나리오/.test(label)) return inferredPurposeText(context);
   return index === 0 ? firstSmokeSample(context) || "확인" : "확인";
+}
+
+function humanInputPrompt(node) {
+  const reviewedPrompt = node?.human_input_contract?.message;
+  if (typeof reviewedPrompt === "string" && reviewedPrompt.trim()) return reviewedPrompt.trim();
+  return typeof node.label === "string" && node.label.trim() ? node.label.trim() : node.id;
+}
+
+function reviewedRouteReplyAfterNode(node, processFlow) {
+  const edges = Array.isArray(processFlow?.edges) ? processFlow.edges : [];
+  const nodes = Array.isArray(processFlow?.nodes) ? processFlow.nodes : [];
+  const outgoing = edges.filter((edge) => edge?.from === node.id);
+  const routerIds = new Set(
+    outgoing
+      .map((edge) => edge.to)
+      .filter((id) => nodes.some((candidate) => candidate?.id === id && candidate.node_kind === "router"))
+  );
+  const routes = edges.filter((edge) => routerIds.has(edge?.from) && edge.edge_kind === "route");
+  const selected = routes.find((edge) => edge.is_default_route === true) ?? routes[0];
+  if (!selected) return "";
+  const reviewedAlias = Array.isArray(selected.route_aliases)
+    ? selected.route_aliases.find((alias) => typeof alias === "string" && alias.trim())
+    : "";
+  return reviewedAlias || routeValue(selected);
 }
 
 function inferredPurposeText({ modules }) {

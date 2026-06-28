@@ -12,7 +12,7 @@ export function routeCasesFor(processFlow, nodeId) {
     const value = routeValue(edge);
     if (seen.has(value)) continue;
     seen.add(value);
-    routes.push({ value, aliases: routeAliases(value) });
+    routes.push({ value, aliases: routeAliases(value, edge), isDefault: edge.is_default_route === true });
   }
   return routes;
 }
@@ -25,17 +25,11 @@ export function routeValue(edge) {
   return toPythonIdentifier(condition || edge?.id || "route").toLowerCase();
 }
 
-export function routeAliases(value) {
+export function routeAliases(value, edge = null) {
   const normalized = String(value).trim().toLowerCase();
   const aliases = new Set([normalized, normalized.replace(/_/g, " ")]);
-  // LEGACY_ROUTE_ALIAS_COMPAT: existing route labels kept until Graph IR carries reviewed aliases.
-  if (normalized === "run_analysis") {
-    aliases.add("분석 실행");
-    aliases.add("1");
-  }
-  if (normalized === "skip_analysis") {
-    aliases.add("분석 없이 진행");
-    aliases.add("2");
+  for (const alias of Array.isArray(edge?.route_aliases) ? edge.route_aliases : []) {
+    if (typeof alias === "string" && alias.trim()) aliases.add(alias.trim().toLowerCase());
   }
   return [...aliases].filter(Boolean);
 }

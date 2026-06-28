@@ -387,6 +387,22 @@
         }
       }
     },
+    "human_input_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 },
+        "payload_schema_ref": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "response_schema_ref": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "response_mapping": {
+          "anyOf": [
+            { "type": "object", "additionalProperties": { "type": "string" } },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
     "graph_node": {
       "type": "object",
       "additionalProperties": false,
@@ -494,6 +510,9 @@
             },
             { "type": "null" }
           ]
+        },
+        "human_input_contract": {
+          "anyOf": [{ "$ref": "#/$defs/human_input_contract" }, { "type": "null" }]
         }
       }
     },
@@ -533,6 +552,15 @@
         },
         "schema_ref": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
         "route_condition": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "route_aliases": {
+          "anyOf": [
+            { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            { "type": "null" }
+          ]
+        },
+        "is_default_route": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+        },
         "state_key": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
         "artifact_key": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
         "flow_kind": {

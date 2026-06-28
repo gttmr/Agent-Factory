@@ -114,7 +114,6 @@ export function GraphInspector(props: GraphInspectorProps) {
         : "single_turn"
       : null;
     const schemaRefs = selectedNode.schema_refs ?? [];
-    const inputPorts = selectedNode.input_ports ?? [];
 
     return (
       <aside className="graph-inspector">
@@ -183,16 +182,20 @@ export function GraphInspector(props: GraphInspectorProps) {
               </>
             ) : null}
             {selectedNode.node_kind === "human_input" ? (
-              <Row label="입력 포트">
-                <div className="graph-inspector-chips">
-                  {inputPorts.map((port) => (
-                    <span key={port.id} className="chip">
-                      {port.label}
-                    </span>
-                  ))}
-                  {inputPorts.length === 0 ? <EmptyValue /> : null}
-                </div>
-              </Row>
+              <>
+                <Row label="RequestInput">
+                  {selectedNode.human_input_contract?.message ?? selectedNode.label}
+                </Row>
+                <Row label="payload_schema">
+                  {selectedNode.human_input_contract?.payload_schema_ref ?? <EmptyValue />}
+                </Row>
+                <Row label="response_schema">
+                  {selectedNode.human_input_contract?.response_schema_ref ?? "str"}
+                </Row>
+                <Row label="response_mapping">
+                  <code>{JSON.stringify(selectedNode.human_input_contract?.response_mapping ?? {})}</code>
+                </Row>
+              </>
             ) : null}
           </Section>
         ) : null}
@@ -322,6 +325,7 @@ export function GraphInspector(props: GraphInspectorProps) {
             <Row label="data_label">{edge.data_label || <EmptyValue />}</Row>
             {edge.schema_ref ? <Row label="schema">{edge.schema_ref}</Row> : null}
             {edge.route_condition ? <Row label="route">{edge.route_condition}</Row> : null}
+            {edge.route_aliases?.length ? <Row label="route_aliases">{edge.route_aliases.join(", ")}</Row> : null}
             {edge.state_key ? <Row label="state_key">{edge.state_key}</Row> : null}
             {edge.artifact_key ? <Row label="artifact_key">{edge.artifact_key}</Row> : null}
             {edge.a2a_contract_id ? <Row label="A2A 계약">{edge.a2a_contract_id}</Row> : null}
@@ -332,6 +336,7 @@ export function GraphInspector(props: GraphInspectorProps) {
           <Section title="실행">
             <Row label="flow_kind">{edge.flow_kind ?? <EmptyValue />}</Row>
             <Row label="call_control">{edge.call_control ?? <EmptyValue />}</Row>
+            {edge.edge_kind === "route" ? <Row label="default_route">{edge.is_default_route ? "예" : "아니오"}</Row> : null}
           </Section>
         ) : null}
 

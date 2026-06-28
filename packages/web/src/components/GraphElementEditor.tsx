@@ -239,6 +239,43 @@ function EditableMappingField({
   );
 }
 
+function HumanInputContractFields({
+  node,
+  onChange
+}: {
+  node: GraphNode;
+  onChange: (value: NonNullable<GraphNode["human_input_contract"]>) => void;
+}) {
+  const contract = humanInputContractFor(node);
+  return (
+    <>
+      <Field label="RequestInput message" hint="ADK Web에서 사람에게 표시할 문구">
+        <input
+          value={contract.message}
+          onChange={(event) => onChange({ ...contract, message: event.target.value })}
+        />
+      </Field>
+      <Field label="payload_schema_ref" hint="payload=node_input의 검토용 schema ref">
+        <input
+          value={contract.payload_schema_ref ?? ""}
+          onChange={(event) => onChange({ ...contract, payload_schema_ref: nullableString(event.target.value) })}
+        />
+      </Field>
+      <Field label="response_schema_ref" hint='runnable은 현재 null 또는 "str"만 낮춥니다'>
+        <input
+          value={contract.response_schema_ref ?? ""}
+          onChange={(event) => onChange({ ...contract, response_schema_ref: nullableString(event.target.value) })}
+        />
+      </Field>
+      <EditableMappingField
+        label="response_mapping"
+        value={contract.response_mapping}
+        onCommit={(value) => onChange({ ...contract, response_mapping: value })}
+      />
+    </>
+  );
+}
+
 function NodeForm({
   node,
   editState,
@@ -384,6 +421,14 @@ function NodeForm({
               </Field>
             </>
           ) : null}
+          {node.node_kind === "human_input" ? (
+            <HumanInputContractFields
+              node={node}
+              onChange={(humanInputContract) =>
+                editState.updateNodeFields(node.id, { human_input_contract: humanInputContract })
+              }
+            />
+          ) : null}
           {canLinkModule ? (
             <>
               <EditableMappingField
@@ -398,7 +443,12 @@ function NodeForm({
               />
             </>
           ) : null}
-          {!schemaRefs.length && !node.input_schema && !node.output_schema && !node.workflow_ref && !canLinkModule ? (
+          {!schemaRefs.length &&
+          !node.input_schema &&
+          !node.output_schema &&
+          !node.workflow_ref &&
+          !canLinkModule &&
+          node.node_kind !== "human_input" ? (
             <EmptyTabMessage>이 노드에 표시할 계약 정보가 없습니다.</EmptyTabMessage>
           ) : null}
         </EditorSection>
@@ -616,13 +666,30 @@ function EdgeForm({
         </Field>
 
         {edge.edge_kind === "route" ? (
-          <TextareaField
-            label="route_condition"
-            rows={2}
-            value={edge.route_condition ?? ""}
-            onChange={(event) => editState.updateEdgeFields(edgeId, { route_condition: nullableString(event.target.value) })}
-            hint="route 엣지는 route_condition이 필요합니다"
-          />
+          <>
+            <TextareaField
+              label="route_condition"
+              rows={2}
+              value={edge.route_condition ?? ""}
+              onChange={(event) => editState.updateEdgeFields(edgeId, { route_condition: nullableString(event.target.value) })}
+              hint="ADK Event(route=...) 값으로 낮아갑니다"
+            />
+            <TextareaField
+              label="route_aliases"
+              rows={3}
+              value={formatStringList(edge.route_aliases)}
+              onChange={(event) => editState.updateEdgeFields(edgeId, { route_aliases: parseStringList(event.target.value) })}
+              hint="사용자가 입력할 수 있는 별칭을 한 줄에 하나씩 입력하세요"
+            />
+            <label className="graph-element-editor-check">
+              <input
+                type="checkbox"
+                checked={edge.is_default_route === true}
+                onChange={(event) => editState.updateEdgeFields(edgeId, { is_default_route: event.target.checked })}
+              />
+              <span>router fallback route</span>
+            </label>
+          </>
         ) : null}
 
         {isStateEdge ? (
@@ -739,6 +806,27 @@ function nullableString(value: string): string | null {
 
 function nullableEnum<T extends string>(value: string): T | null {
   return value === "" ? null : (value as T);
+}
+
+function humanInputContractFor(node: GraphNode): NonNullable<GraphNode["human_input_contract"]> {
+  const reviewedContract = node.human_input_contract;
+  return {
+    message: reviewedContract?.message ?? node.label,
+    payload_schema_ref: reviewedContract?.payload_schema_ref ?? null,
+    response_schema_ref: reviewedContract ? reviewedContract.response_schema_ref : "str",
+    response_mapping: reviewedContract?.response_mapping ?? null
+  };
+}
+
+function formatStringList(value: string[] | null | undefined): string {
+  return (value ?? []).join("\n");
+}
+
+function parseStringList(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function formatMapping(value: Record<string, string> | null | undefined): string {

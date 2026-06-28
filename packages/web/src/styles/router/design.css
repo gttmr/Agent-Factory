@@ -219,6 +219,18 @@
   resize: vertical;
 }
 
+.af-design-sidebar > .graph-element-editor .graph-element-editor-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.af-design-sidebar > .graph-element-editor .graph-element-editor-check input {
+  width: auto;
+}
+
 .af-design-sidebar > .graph-element-editor input[readonly] {
   color: var(--text-muted);
   background: var(--surface-muted);

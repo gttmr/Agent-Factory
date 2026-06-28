@@ -25,6 +25,8 @@ export interface ModuleConnectionDraft {
   data_label: string;
   schema_ref: string | null;
   route_condition: string | null;
+  route_aliases?: string[] | null;
+  is_default_route?: boolean | null;
   state_key: string | null;
   artifact_key: string | null;
   a2a_contract_id: string | null;
@@ -80,6 +82,8 @@ export function buildConnectionDraftsFromGraphIR(
         data_label: edge.data_label || defaultEdgeLabel(fromModuleId, toModuleId, moduleCandidates),
         schema_ref: edge.schema_ref ?? null,
         route_condition: edge.route_condition ?? null,
+        route_aliases: edge.route_aliases ?? [],
+        is_default_route: edge.is_default_route === true,
         state_key: edge.state_key ?? null,
         artifact_key: edge.artifact_key ?? null,
         a2a_contract_id: edge.a2a_contract_id ?? null
@@ -126,6 +130,8 @@ export function buildLinearConnectionDrafts(moduleCandidates: ModuleCandidate[])
       data_label: defaultEdgeLabel(fromModuleId, toModuleId, moduleCandidates),
       schema_ref: firstSchemaRef(fromModuleId, toModuleId, moduleCandidates),
       route_condition: null,
+      route_aliases: [],
+      is_default_route: false,
       state_key: null,
       artifact_key: null,
       a2a_contract_id: null
@@ -217,6 +223,8 @@ export function buildGraphIRFromModuleReview({
         data_label: draft.data_label.trim() || defaultEdgeLabel(draft.fromModuleId, draft.toModuleId, activeCandidates),
         schema_ref: emptyToNull(draft.schema_ref),
         route_condition: edgeKind === "route" ? emptyToNull(draft.route_condition) : emptyToNull(draft.route_condition),
+        route_aliases: draft.route_aliases ?? [],
+        is_default_route: draft.is_default_route === true,
         state_key: isStateEdge(edgeKind) ? emptyToNull(draft.state_key) : emptyToNull(draft.state_key),
         artifact_key: edgeKind === "artifact" ? emptyToNull(draft.artifact_key) : emptyToNull(draft.artifact_key),
         a2a_contract_id: edgeKind === "remote_a2a" ? emptyToNull(draft.a2a_contract_id) : emptyToNull(draft.a2a_contract_id),
@@ -300,6 +308,8 @@ function ensureConnectionCoverage(
       data_label: defaultEdgeLabel(fromModuleId, toModuleId, activeCandidates),
       schema_ref: firstSchemaRef(fromModuleId, toModuleId, activeCandidates),
       route_condition: null,
+      route_aliases: [],
+      is_default_route: false,
       state_key: null,
       artifact_key: null,
       a2a_contract_id: null

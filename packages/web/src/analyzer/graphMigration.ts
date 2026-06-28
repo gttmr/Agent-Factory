@@ -29,6 +29,7 @@ import type {
   GraphDecisionOwner,
   GraphFlowKind,
   GraphInvokeBinding,
+  HumanInputContract,
   GraphPolicy,
   GraphValidation,
   GraphValidationIssue,
@@ -93,6 +94,11 @@ function asNullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
+}
+
 function optionalNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
   return typeof value === "string" && value.trim() ? value : undefined;
@@ -128,6 +134,39 @@ function graphEdgeControlMetadata(raw: Record<string, unknown>): Pick<GraphEdge,
   if (flowKind !== undefined) metadata.flow_kind = flowKind as GraphFlowKind | null;
   if (callControl !== undefined) metadata.call_control = callControl as GraphCallControl | null;
   return metadata;
+}
+
+function normalizeResponseSchemaRef(value: unknown, fallback: string | null): string | null {
+  if (value === undefined) return fallback;
+  if (value === null) return null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeHumanInputContract(raw: Record<string, unknown>, label: string, nodeKind: NodeKind): HumanInputContract | null {
+  if (nodeKind !== "human_input") return null;
+  const reviewedContract = raw.human_input_contract;
+  const hasReviewedContract = isRecord(reviewedContract);
+  const contract: Record<string, unknown> = hasReviewedContract ? reviewedContract : {};
+  const message = typeof contract.message === "string" && contract.message.trim() ? contract.message.trim() : label;
+  const responseMapping = isRecord(contract.response_mapping)
+    ? Object.fromEntries(
+        Object.entries(contract.response_mapping).filter(
+          (entry): entry is [string, string] => Boolean(entry[0].trim()) && typeof entry[1] === "string" && Boolean(entry[1].trim())
+        )
+      )
+    : null;
+  return {
+    message,
+    payload_schema_ref: asNullableString(contract.payload_schema_ref),
+    response_schema_ref: normalizeResponseSchemaRef(contract.response_schema_ref, hasReviewedContract ? null : "str"),
+    response_mapping: responseMapping && Object.keys(responseMapping).length ? responseMapping : null
+  };
+}
+
+function hasInvalidResponseMappingShape(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (!isRecord(value)) return true;
+  return Object.entries(value).some(([key, mapping]) => !key.trim() || typeof mapping !== "string" || !mapping.trim());
 }
 
 function isRemoteAgentNode(node: GraphNode | undefined): node is GraphNode {
@@ -284,6 +323,7 @@ const SOFT_VALIDATION_CODES = new Set([
   "invalid_edge_id",
   "dangling_edge_endpoint",
   "route_missing_condition",
+  "human_input_contract_on_non_human",
   "artifact_missing_key",
   "state_missing_key",
   "remote_missing_contract",
@@ -294,7 +334,10 @@ const SOFT_VALIDATION_CODES = new Set([
   "parallel_region_needs_two_entries",
   "parallel_region_missing_join",
   "loop_region_missing_back",
-  "loop_region_missing_exit"
+  "loop_region_missing_exit",
+  "human_input_payload_schema_invalid",
+  "human_input_response_mapping_invalid",
+  "human_input_contract_invalid"
 ]);
 
 function keepNonSoftIssue(issue: GraphValidationIssue): boolean {
@@ -595,9 +638,10 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
             ? (legacyType as NodeKind)
             : "function";
       const position = normalizeNodePosition(nodeRecord.position);
+      const label = asString(node.label, asString(node.id, "node"));
       return {
         id: asString(node.id, "node-unknown"),
-        label: asString(node.label, asString(node.id, "node")),
+        label,
         module_id: asNullableString(node.module_id),
         node_kind: nodeKind,
         execution_kind: asNullableString(node.execution_kind),
@@ -615,6 +659,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         output_schema: asNullableString(nodeRecord.output_schema),
         input_mapping: isRecord(nodeRecord.input_mapping) ? structuredClone(nodeRecord.input_mapping) : null,
         output_mapping: isRecord(nodeRecord.output_mapping) ? structuredClone(nodeRecord.output_mapping) : null,
+        human_input_contract: normalizeHumanInputContract(nodeRecord, label, nodeKind),
         runtime_binding: asNullableString(nodeRecord.runtime_binding) as GraphNode["runtime_binding"],
         ...graphNodeControlMetadata(nodeRecord),
         mock_binding: isRecord(nodeRecord.mock_binding) ? structuredClone(nodeRecord.mock_binding) : null,
@@ -643,6 +688,8 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         data_label: typeof edge.data_label === "string" ? edge.data_label : typeof edgeRecord.data === "string" ? edgeRecord.data : "",
         schema_ref: asNullableString(edge.schema_ref),
         route_condition: asNullableString(edge.route_condition),
+        route_aliases: asStringArray(edgeRecord.route_aliases),
+        is_default_route: edgeRecord.is_default_route === true,
         state_key: asNullableString(edge.state_key),
         artifact_key: asNullableString(edge.artifact_key),
         a2a_contract_id: asNullableString(edge.a2a_contract_id),
@@ -830,9 +877,63 @@ export function validateGraphIRSoft(
         target_id: node.id
       });
     }
+    if (node.node_kind !== "human_input" && node.human_input_contract !== undefined && node.human_input_contract !== null) {
+      errors.push({
+        code: "human_input_contract_on_non_human",
+        message: `Node ${node.id} human_input_contract is allowed only on human_input nodes.`,
+        target_kind: "node",
+        target_id: node.id
+      });
+    }
+    if (node.node_kind === "human_input" && node.human_input_contract) {
+      if (typeof node.human_input_contract !== "object" || Array.isArray(node.human_input_contract)) {
+        errors.push({
+          code: "human_input_contract_invalid",
+          message: `Node ${node.id} human_input_contract must be an object or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+        continue;
+      }
+      if (typeof node.human_input_contract.message !== "string" || !node.human_input_contract.message.trim()) {
+        errors.push({
+          code: "human_input_message_missing",
+          message: `Node ${node.id} human_input_contract.message must be a non-empty reviewed prompt.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      const payloadSchemaRef = node.human_input_contract.payload_schema_ref;
+      if (payloadSchemaRef !== undefined && payloadSchemaRef !== null && (typeof payloadSchemaRef !== "string" || !payloadSchemaRef.trim())) {
+        errors.push({
+          code: "human_input_payload_schema_invalid",
+          message: `Node ${node.id} human_input_contract.payload_schema_ref must be a non-empty string or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      const responseSchemaRef = node.human_input_contract.response_schema_ref;
+      if (responseSchemaRef !== undefined && responseSchemaRef !== null && responseSchemaRef !== "str") {
+        errors.push({
+          code: "human_input_response_schema_unsupported",
+          message: `Node ${node.id} response_schema_ref ${responseSchemaRef} is design-only; runnable currently supports only null or "str".`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      if (hasInvalidResponseMappingShape(node.human_input_contract.response_mapping)) {
+        errors.push({
+          code: "human_input_response_mapping_invalid",
+          message: `Node ${node.id} human_input_contract.response_mapping must be an object with non-empty string values or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+    }
   }
 
   const edgeIds = new Set<string>();
+  const defaultRouteEdgesByRouter = new Map<string, string[]>();
   for (const edge of edges) {
     if (!edge) continue;
     if (typeof edge.id === "string") {
@@ -878,6 +979,38 @@ export function validateGraphIRSoft(
         target_kind: "edge",
         target_id: edge.id ?? null
       });
+    }
+    if (Array.isArray(edge.route_aliases) && edge.route_aliases.length > 0) {
+      if (edge.edge_kind !== "route") {
+        errors.push({
+          code: "route_aliases_on_non_route",
+          message: `Edge ${edge.id ?? ""} route_aliases is allowed only on route edges.`,
+          target_kind: "edge",
+          target_id: edge.id ?? null
+        });
+      }
+      if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
+        errors.push({
+          code: "route_alias_empty",
+          message: `Route edge ${edge.id ?? ""} route_aliases entries must be non-empty strings.`,
+          target_kind: "edge",
+          target_id: edge.id ?? null
+        });
+      }
+    }
+    if (edge.is_default_route === true) {
+      if (edge.edge_kind !== "route") {
+        errors.push({
+          code: "default_route_on_non_route",
+          message: `Edge ${edge.id ?? ""} is_default_route is allowed only on route edges.`,
+          target_kind: "edge",
+          target_id: edge.id ?? null
+        });
+      } else if (typeof edge.from === "string") {
+        const current = defaultRouteEdgesByRouter.get(edge.from) ?? [];
+        current.push(edge.id ?? `${edge.from}->${edge.to}`);
+        defaultRouteEdgesByRouter.set(edge.from, current);
+      }
     }
     if (edge.edge_kind === "artifact" && !edge.artifact_key) {
       errors.push({
@@ -955,6 +1088,17 @@ export function validateGraphIRSoft(
           target_id: edge.id ?? null
         });
       }
+    }
+  }
+
+  for (const [routerId, defaults] of defaultRouteEdgesByRouter) {
+    if (defaults.length > 1) {
+      errors.push({
+        code: "multiple_default_routes",
+        message: `Router ${routerId} has multiple default route edges: ${defaults.join(", ")}.`,
+        target_kind: "node",
+        target_id: routerId
+      });
     }
   }
 

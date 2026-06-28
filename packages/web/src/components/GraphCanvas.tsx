@@ -75,6 +75,7 @@ export type NodeFieldPatch = Partial<
     | "call_control"
     | "input_mapping"
     | "output_mapping"
+    | "human_input_contract"
   >
 >;
 export type EdgeFieldPatch = Partial<
@@ -84,6 +85,8 @@ export type EdgeFieldPatch = Partial<
     | "execution_semantics"
     | "data_label"
     | "route_condition"
+    | "route_aliases"
+    | "is_default_route"
     | "state_key"
     | "artifact_key"
     | "schema_ref"
@@ -880,6 +883,16 @@ function buildEditableNode(
     schema_refs: [],
     review_status: "n/a",
     position: { x: position.x, y: position.y },
+    ...(kind === "human_input"
+      ? {
+          human_input_contract: {
+            message: label,
+            payload_schema_ref: null,
+            response_schema_ref: "str",
+            response_mapping: null
+          }
+        }
+      : {}),
     ...defaultNodeControlMetadata(kind)
   };
 }
@@ -958,6 +971,8 @@ function buildEditableEdge(
     data_label: "",
     schema_ref: null,
     route_condition: null,
+    route_aliases: [],
+    is_default_route: false,
     state_key: null,
     artifact_key: null,
     a2a_contract_id: null,
