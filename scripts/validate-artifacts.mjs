@@ -1,303 +1,67 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import {
+  a2aContractRequiredArrayFields,
+  a2aContractRequiredObjectFields,
+  a2aContractRequiredStringFields,
+  a2aContractStatuses,
+  a2aHttpPaths,
+  a2aOperationNames,
+  a2aPartFields,
+  a2aRoles,
+  a2aStaleAllowlist,
+  a2aStaleNames,
+  a2aStreamWrappers,
+  a2aTaskStates,
+  accessProtocols,
+  adapterKinds,
+  adkHintKeys,
+  afRunStageStatuses,
+  afRunStages,
+  afRunValidationResults,
+  afStageRunCodexBackends,
+  afStageRunIdPattern,
+  afStageRunStatuses,
+  agentExecutionModes,
+  agentKinds,
+  callbackCallControls,
+  callbackFlowKinds,
+  callbackInvokeBindings,
+  categories,
+  graphCallControls,
+  graphContainerKinds,
+  graphDecisionOwners,
+  graphEdgeKinds,
+  graphExecutionSemantics,
+  graphFlowKinds,
+  graphInvokeBindings,
+  graphLaneIds,
+  graphLayoutPolicies,
+  graphNodeKinds,
+  graphPolicies,
+  graphSideEffects,
+  graphStateEdgeKinds,
+  graphStateScopePrefixByKind,
+  graphStateScopePrefixPattern,
+  remoteAgentNodeKinds,
+  remoteKinds,
+  remoteRequiredFields,
+  runtimeBindings,
+  runtimeContractKinds,
+  runtimeContractStatuses,
+  scaffoldOutputModes,
+  smokeScaffoldOutputs,
+  syntheticNodeKindsLenient,
+  syntheticNodeKindsStrict,
+  workflowKinds
+} from "./artifact-validation/constants.mjs";
+import { collectTargets, findJsonFiles, readJson } from "./artifact-validation/files.mjs";
 
 const rawArg = process.argv[2] ?? "templates";
 const root = resolve(rawArg);
 const errors = [];
-
-const categories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
-const adapterKinds = new Set([
-  "legacy_api",
-  "retrieval",
-  "rule_registry",
-  "data_query",
-  "template",
-  "computation",
-  "external_service",
-  "unknown"
-]);
-const agentKinds = new Set(["specialist", "shared"]);
-const workflowKinds = new Set([
-  "orchestration",
-  "graph",
-  "dynamic",
-  "unknown"
-]);
-const remoteKinds = new Set(["a2a", "unknown"]);
-const accessProtocols = new Set(["local", "http_rest", "mcp", "grpc", "message_queue", "unknown"]);
-const runtimeBindings = new Set(["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"]);
-const scaffoldOutputModes = new Set(["smoke", "runnable"]);
-const smokeScaffoldOutputs = {
-  adapter: "contract_or_stub_only",
-  agent: "agent_shell_only",
-  workflow: "orchestration_shell_only",
-  remote_a2a: "contract_placeholder_only"
-};
-// Graph IR (ADK 2.0). Mirrors the GRAPH_* constant exports in
-// packages/web/src/analyzer/types.ts. The validator must stay
-// dependency-free, so the lists are duplicated here.
-const graphNodeKinds = new Set([
-  "input",
-  "output",
-  "agent",
-  "function",
-  "tool",
-  "adapter",
-  "adapter_call",
-  "human_input",
-  "callback_wait",
-  "workflow",
-  "workflow_call",
-  "remote_a2a",
-  "remote_agent_call",
-  "join",
-  "router",
-  "loop_control"
-]);
-const agentExecutionModes = new Set(["single_turn", "chat"]);
-const graphContainerKinds = new Set([
-  "graph_workflow",
-  "dynamic_workflow",
-  "parallel_region",
-  "loop_region",
-  "human_review_region",
-  "remote_boundary"
-]);
-const graphEdgeKinds = new Set([
-  "event_output",
-  "event_message",
-  "session_state",
-  "temp_state",
-  "user_state",
-  "app_state",
-  "artifact",
-  "route",
-  "control",
-  "remote_a2a"
-]);
-const graphStateEdgeKinds = new Set(["session_state", "temp_state", "user_state", "app_state"]);
-const graphStateScopePrefixByKind = { temp_state: "temp:", user_state: "user:", app_state: "app:" };
-const graphStateScopePrefixPattern = /^(temp:|user:|app:)/;
-const graphLaneIds = new Set([
-  "input",
-  "local_graph",
-  "adapter",
-  "human_input",
-  "output",
-  "remote_boundary"
-]);
-const graphLayoutPolicies = new Set([
-  "dag_with_routes",
-  "fan_out_fan_in",
-  "loop",
-  "linear",
-  "free"
-]);
-const graphExecutionSemantics = new Set([
-  "normal_transition",
-  "fan_out",
-  "fan_in",
-  "loop_back",
-  "loop_exit",
-  "conditional",
-  "boundary_crossing"
-]);
-const graphInvokeBindings = new Set([
-  "unresolved",
-  "local_python",
-  "direct_api",
-  "mcp_tool",
-  "mcp_toolset",
-  "local_function",
-  "internal_workflow",
-  "ui_input",
-  "remote_a2a",
-  "callback_wait",
-  "unknown"
-]);
-const graphDecisionOwners = new Set(["workflow_code", "llm", "human", "remote_agent", "system", "unknown"]);
-const graphCallControls = new Set(["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"]);
-const graphFlowKinds = new Set(["sequence", "route", "fan_out", "fan_in", "loop_back", "loop_exit", "fallback", "error", "resume", "callback", "unknown"]);
-const graphSideEffects = new Set(["none", "read", "write", "external_message", "transaction", "unknown"]);
-const graphPolicies = new Set([
-  "none",
-  "auth_required",
-  "approval_required",
-  "audit_required",
-  "idempotency_required",
-  "timeout_retry_required",
-  "data_policy_required",
-  "manual_fallback_required",
-  "callback_resume_required",
-  "compensation_required",
-  "unknown"
-]);
-const callbackInvokeBindings = new Set(["callback_wait"]);
-const callbackCallControls = new Set(["event_callback", "resume"]);
-const callbackFlowKinds = new Set(["callback", "resume"]);
-// Synthetic / graph-semantics node kinds that MUST NOT bind to a module candidate.
-const syntheticNodeKindsStrict = new Set(["input", "output", "join", "router", "loop_control", "human_input", "callback_wait"]);
-// Synthetic-ish kinds that MAY optionally bind to a candidate without erroring.
-const syntheticNodeKindsLenient = new Set(["function", "tool"]);
-const remoteAgentNodeKinds = new Set(["remote_a2a", "remote_agent_call"]);
-const adkHintKeys = new Set(["state_memory", "callbacks", "artifacts_events", "mcp_a2a", "streaming_grounding"]);
-const remoteRequiredFields = [
-  "owner",
-  "agent_card",
-  "auth",
-  "task_lifecycle",
-  "timeout",
-  "retry",
-  "fallback",
-  "audit",
-  "data_policy"
-];
-
-// ---------------------------------------------------------------------------
-// A2A 1.0 contract constants. Kept in lockstep with
-// packages/web/src/analyzer/types.ts (A2A_OPERATION_NAMES, A2A_HTTP_PATHS,
-// A2A_TASK_STATES, A2A_PART_FIELDS, A2A_ROLES, A2A_STREAM_WRAPPERS,
-// A2A_STALE_NAMES, A2A_CONTRACT_STATUSES). Validator must stay dependency-free,
-// so the lists are duplicated here. If you change one, change the other.
-// ---------------------------------------------------------------------------
-const a2aOperationNames = new Set([
-  "SendMessage",
-  "SendStreamingMessage",
-  "GetTask",
-  "SubscribeToTask",
-  "CancelTask",
-  "ListTasks"
-]);
-const a2aHttpPaths = new Set([
-  "/message:send",
-  "/message:stream",
-  "/tasks/{id}",
-  "/tasks/{id}:subscribe",
-  "/tasks/{id}:cancel"
-]);
-const a2aTaskStates = new Set([
-  "TASK_STATE_SUBMITTED",
-  "TASK_STATE_WORKING",
-  "TASK_STATE_INPUT_REQUIRED",
-  "TASK_STATE_AUTH_REQUIRED",
-  "TASK_STATE_COMPLETED",
-  "TASK_STATE_FAILED",
-  "TASK_STATE_CANCELED",
-  "TASK_STATE_REJECTED"
-]);
-const a2aPartFields = new Set(["text", "raw", "url", "data"]);
-const a2aRoles = new Set(["ROLE_USER", "ROLE_AGENT"]);
-const a2aStreamWrappers = new Set(["task", "message", "taskStatusUpdate", "taskArtifactUpdate"]);
-const a2aContractStatuses = new Set(["draft", "needs_info", "approved"]);
-const runtimeContractKinds = new Set([
-  "mcp_legacy_adapter",
-  "eai_legacy_adapter",
-  "context_manager",
-  "callback_broker",
-  "adk_callback",
-  "async_resume"
-]);
-const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rejected"]);
-const afRunStages = new Set(["analyze", "design", "build", "verify"]);
-const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
-const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
-const afStageRunStatuses = new Set(["running", "completed", "failed", "applied", "canceled"]);
-const afStageRunCodexBackends = new Set(["sdk", "fake"]);
-const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design)-[a-f0-9]{6}$/;
-
-// Required string fields on an A2AContract (top-level scalar string fields).
-// Nested object fields are validated separately.
-const a2aContractRequiredStringFields = [
-  "contract_id",
-  "remote_module_id",
-  "target_agent_name",
-  "target_agent_purpose",
-  "adk_host_mapping",
-  "timeout",
-  "retry",
-  "fallback",
-  "cancellation",
-  "unsupported_operation",
-  "get_task_fallback",
-  "auth",
-  "token_handling",
-  "audit",
-  "data_policy"
-];
-const a2aContractRequiredArrayFields = [
-  "supported_interfaces",
-  "input_modes",
-  "output_modes",
-  "security_schemes",
-  "security_requirements",
-  "skills",
-  "extensions",
-  "operations",
-  "http_paths"
-];
-const a2aContractRequiredObjectFields = [
-  "agent_card",
-  "message_contract",
-  "task_lifecycle",
-  "streaming",
-  "artifact_contract"
-];
-
-// Stale terminology that must never appear inside a serialized contract.
-const a2aStaleNames = [
-  "tasks/send",
-  "tasks/sendSubscribe",
-  "tasks/get",
-  "tasks/cancel",
-  "tasks/pushNotification/set",
-  "tasks/pushNotification/get",
-  "tasks/resubscribe",
-  "tasks/list",
-  "SendTaskRequest",
-  "SendTaskResponse",
-  "SendTaskStreamingRequest",
-  "SendTaskStreamingResponse",
-  "GetTaskRequest",
-  "GetTaskResponse",
-  "CancelTaskRequest",
-  "CancelTaskResponse",
-  "TaskSendParams",
-  "TaskQueryParams",
-  "TaskIdParams",
-  "submitted",
-  "working",
-  "input-required",
-  "completed",
-  "failed",
-  "canceled",
-  "rejected",
-  "auth-required",
-  "SUBMITTED",
-  "WORKING",
-  "INPUT_REQUIRED",
-  "AUTH_REQUIRED",
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "REJECTED",
-  "final",
-  "TaskStatusUpdateEvent",
-  "TaskArtifactUpdateEvent",
-  "isFinal",
-  "lastChunk",
-  "TextPart",
-  "FilePart",
-  "DataPart",
-  "file"
-];
-// A small allowlist of substrings that legitimately match stale tokens but
-// are not themselves stale usage. The stale scan ignores any contract whose
-// JSON contains *only* allowlisted occurrences. We keep this list narrow.
-const a2aStaleAllowlist = new Set([
-  // none today; populate only if a real contract surfaces a false positive
-]);
 
 // Determine the set of directories to validate. If the supplied path itself
 // contains an analysis-result.json (or any of the other recognized artifact
@@ -306,7 +70,7 @@ const a2aStaleAllowlist = new Set([
 // analysis-result.json. This lets a parent like
 // `templates/regression-scenarios` validate every scenario in one command
 // while preserving the legacy single-directory behaviour for `templates/`.
-const targets = collectTargets(root);
+const targets = collectTargets(root, errors);
 validateCodexOutputSchema(resolve("schemas/analysis-draft.schema.json"));
 
 for (const target of targets) {
@@ -328,7 +92,7 @@ console.log("Artifact validation OK");
 
 function validateCodexOutputSchema(path) {
   if (!existsSync(path)) return;
-  const schema = readJson(path);
+  const schema = readJson(path, errors);
   walkCodexOutputSchema(schema, "codex_output_schema");
 }
 
@@ -355,84 +119,13 @@ function walkCodexOutputSchema(schema, label) {
   }
 }
 
-function collectTargets(start) {
-  if (!existsSync(start)) {
-    errors.push(`Path does not exist: ${start}.`);
-    return [];
-  }
-  let stat;
-  try {
-    stat = statSync(start);
-  } catch (error) {
-    errors.push(`Cannot stat ${start}: ${error.message}`);
-    return [];
-  }
-  if (stat.isFile()) {
-    const parent = dirname(start);
-    if (looksLikeArtifactDir(parent)) {
-      return [parent];
-    }
-    errors.push(`Path is not a recognized artifact file: ${start}.`);
-    return [];
-  }
-  if (!stat.isDirectory()) {
-    errors.push(`Path is not a directory or artifact file: ${start}.`);
-    return [];
-  }
-
-  // If this directory itself looks like a leaf artifact directory, validate
-  // it directly. We treat the presence of analysis-result.json,
-  // module-candidates.json, process-flow.json, scaffold-plan(.template).json,
-  // or af-run-manifest.json
-  // as the leaf signal so the existing templates/ smoke check still works.
-  if (looksLikeArtifactDir(start)) {
-    return [start];
-  }
-
-  // Otherwise walk one level deep and pick up every subdirectory that looks
-  // like an artifact leaf.
-  const found = [];
-  let entries;
-  try {
-    entries = readdirSync(start, { withFileTypes: true });
-  } catch (error) {
-    errors.push(`Cannot read directory ${start}: ${error.message}`);
-    return [];
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const child = join(start, entry.name);
-    if (looksLikeArtifactDir(child)) {
-      found.push(child);
-    }
-  }
-  if (found.length === 0) {
-    // Nothing to walk: fall back to validating the directory itself, so
-    // pre-existing callers that pass a leaf-shaped directory without
-    // canonical files still get the legacy "no-op success" behaviour.
-    return [start];
-  }
-  return found;
-}
-
-function looksLikeArtifactDir(dir) {
-  return (
-    existsSync(join(dir, "analysis-result.json")) ||
-    existsSync(join(dir, "module-candidates.json")) ||
-    existsSync(join(dir, "process-flow.json")) ||
-    existsSync(join(dir, "scaffold-plan.json")) ||
-    existsSync(join(dir, "scaffold-plan.template.json")) ||
-    existsSync(join(dir, "af-run-manifest.json"))
-  );
-}
-
 function validateModuleCandidates(dir = root) {
   const path = join(dir, "module-candidates.json");
   if (!existsSync(path)) {
     return;
   }
 
-  const candidates = readJson(path);
+  const candidates = readJson(path, errors);
   if (!Array.isArray(candidates)) {
     errors.push("module-candidates.json must contain an array.");
     return;
@@ -497,7 +190,7 @@ function validateProcessFlow(dir = root) {
   if (!existsSync(path)) {
     return;
   }
-  const flow = readJson(path);
+  const flow = readJson(path, errors);
   validateGraphIR(flow, "process-flow.json", new Map(), new Map());
 }
 
@@ -506,7 +199,7 @@ function validateAfRunManifest(dir = root) {
   if (!existsSync(path)) {
     return;
   }
-  const manifest = readJson(path);
+  const manifest = readJson(path, errors);
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     errors.push("af-run-manifest.json must contain an object.");
     return;
@@ -1155,7 +848,7 @@ function validateScaffoldPlan(dir = root) {
     return;
   }
 
-  const plan = readJson(selectedPath);
+  const plan = readJson(selectedPath, errors);
   if (plan.source !== "approved_workbench_artifact") {
     errors.push("scaffold plan source must be approved_workbench_artifact.");
   }
@@ -1337,7 +1030,7 @@ function validateScaffoldMcpBinding(module, label) {
 
 function validateSavedAnalysisFixtures(dir = root) {
   for (const path of findJsonFiles(dir)) {
-    const record = readJson(path);
+    const record = readJson(path, errors);
     if (!isSavedAnalysisFixture(record)) continue;
     validateSavedAnalysisRecord(record, relative(root, path) || path);
   }
@@ -1568,7 +1261,7 @@ function validateContractRegistry(dir = root) {
   for (const path of findJsonFiles(dir)) {
     const normalizedPath = path.replace(/\\/g, "/");
     if (!normalizedPath.includes("/catalog/contracts/")) continue;
-    const contract = readJson(path);
+    const contract = readJson(path, errors);
     if (isMcpContract(contract)) {
       validateMcpContract(contract, relative(root, path) || path);
     } else if (isA2ARegistryContract(contract)) {
@@ -1709,42 +1402,10 @@ function collectMcpSchemaRefs(dir) {
   const refs = new Set();
   if (!existsSync(dir)) return refs;
   for (const path of findJsonFiles(dir)) {
-    const contract = readJson(path);
+    const contract = readJson(path, errors);
     if (isMcpContract(contract)) refs.add(contract.schema_ref);
   }
   return refs;
-}
-
-function findJsonFiles(dir) {
-  if (!existsSync(dir)) return [];
-  let stat;
-  try {
-    stat = statSync(dir);
-  } catch {
-    return [];
-  }
-  if (!stat.isDirectory()) {
-    return dir.endsWith(".json") ? [dir] : [];
-  }
-  const files = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...findJsonFiles(path));
-    } else if (entry.isFile() && entry.name.endsWith(".json")) {
-      files.push(path);
-    }
-  }
-  return files;
-}
-
-function readJson(path) {
-  try {
-    return JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    errors.push(`${path} is not valid JSON: ${error.message}`);
-    return {};
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1758,7 +1419,7 @@ function validateAnalysisResult(dir = root) {
   if (!existsSync(path)) {
     return;
   }
-  const result = readJson(path);
+  const result = readJson(path, errors);
   if (typeof result !== "object" || result === null || Array.isArray(result)) {
     errors.push("analysis-result.json must contain an object.");
     return;
@@ -1788,7 +1449,7 @@ function validateAnalysisResult(dir = root) {
   const candidatesPath = join(dir, "module-candidates.json");
   let candidates = [];
   if (existsSync(candidatesPath)) {
-    const loaded = readJson(candidatesPath);
+    const loaded = readJson(candidatesPath, errors);
     if (Array.isArray(loaded)) {
       candidates = loaded;
     }

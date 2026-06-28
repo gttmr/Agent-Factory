@@ -1,0 +1,118 @@
+import { nodeFunctionName, nodeSymbol } from "../naming.mjs";
+
+export function graphIndexes({ modules, processFlow }) {
+  const moduleById = new Map(modules.map((module) => [module.id, module]));
+  const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
+  const nodesById = new Map(nodes.filter((node) => node && typeof node.id === "string").map((node) => [node.id, node]));
+  const moduleNodes = nodes.filter(
+    (node) => node && typeof node.module_id === "string" && moduleById.has(node.module_id)
+  );
+  return { moduleById, moduleNodes, nodes, nodesById };
+}
+
+export function startNodeIds(context) {
+  const graph = graphIndexes(context);
+  const moduleNodeIds = new Set(graph.moduleNodes.map((node) => node.id));
+  const moduleTargets = new Set(
+    (Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [])
+      .filter((edge) => moduleNodeIds.has(edge.from) && moduleNodeIds.has(edge.to))
+      .map((edge) => edge.to)
+  );
+  return [...moduleNodeIds].filter((id) => !moduleTargets.has(id));
+}
+
+export function terminalOutputIds({ processFlow }) {
+  if (!Array.isArray(processFlow.nodes)) return [];
+  return processFlow.nodes
+    .filter((node) => node && node.node_kind === "output" && typeof node.id === "string")
+    .map((node) => node.id);
+}
+
+export function validateGraphCoverage(context) {
+  const graph = graphIndexes(context);
+  const graphModuleIds = new Set(graph.moduleNodes.map((node) => node.module_id));
+  const missing = context.modules.filter((module) => !graphModuleIds.has(module.id)).map((module) => module.id);
+  if (missing.length > 0) {
+    throw new Error(`processFlow is missing Graph IR nodes for scaffold-plan modules: ${missing.join(", ")}`);
+  }
+}
+
+export function buildGraphWorkflowEdges(context) {
+  const graph = graphIndexes(context);
+  const rows = [];
+  const seen = new Set();
+  const push = (from, to) => {
+    if (!from || !to || from === to) return;
+    const key = `${from}->${to}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push([from, to]);
+  };
+
+  if (Array.isArray(context.processFlow.edges)) {
+    for (const edge of context.processFlow.edges) {
+      push(graphEndpoint(edge.from, "from", graph), graphEndpoint(edge.to, "to", graph));
+    }
+  }
+
+  const incoming = new Set(rows.map(([, to]) => to));
+  const outgoing = new Set(rows.map(([from]) => from));
+  for (const node of graph.moduleNodes) {
+    const fn = nodeFunctionName(graph.moduleById.get(node.module_id));
+    if (!incoming.has(fn)) push("START", fn);
+    if (!outgoing.has(fn)) push(fn, "emit_workflow_result");
+  }
+
+  if (rows.length === 0) {
+    throw new Error("processFlow does not provide any usable Graph IR edges for runtime stub generation.");
+  }
+  return rows;
+}
+
+function graphEndpoint(nodeId, side, graph) {
+  const node = graph.nodesById.get(nodeId);
+  if (!node) return null;
+  if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
+    return nodeFunctionName(graph.moduleById.get(node.module_id));
+  }
+  if (side === "from" && node.node_kind === "input") return "START";
+  if (side === "to" && node.node_kind === "output") return "emit_workflow_result";
+  return null;
+}
+
+export function orderedGraphModules(context) {
+  const graph = graphIndexes(context);
+  const ordered = graph.moduleNodes.map((node) => graph.moduleById.get(node.module_id)).filter(Boolean);
+  const seen = new Set(ordered.map((module) => module.id));
+  for (const module of context.modules) {
+    if (!seen.has(module.id)) {
+      ordered.push(module);
+      seen.add(module.id);
+    }
+  }
+  return ordered;
+}
+
+export function graphNodeSemantics({ processFlow }) {
+  return (Array.isArray(processFlow.nodes) ? processFlow.nodes : []).map((node) => ({
+    id: node.id ?? null,
+    module_id: node.module_id ?? null,
+    node_kind: node.node_kind ?? null,
+    invoke_binding: node.invoke_binding ?? null,
+    decision_owner: node.decision_owner ?? null,
+    call_control: node.call_control ?? null,
+    side_effect: node.side_effect ?? null,
+    policy: node.policy ?? null
+  }));
+}
+
+export function graphEdgeSemantics({ processFlow }) {
+  return (Array.isArray(processFlow.edges) ? processFlow.edges : []).map((edge) => ({
+    id: edge.id ?? null,
+    from: edge.from ?? null,
+    to: edge.to ?? null,
+    edge_kind: edge.edge_kind ?? null,
+    flow_kind: edge.flow_kind ?? null,
+    call_control: edge.call_control ?? null
+  }));
+}

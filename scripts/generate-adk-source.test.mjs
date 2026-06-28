@@ -2,342 +2,33 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const generator = join(here, "generate-adk-source.mjs");
-
-// ---------------------------------------------------------------------------
-// Minimal hermetic fixture: input -> agent -> adapter -> output.
-// ---------------------------------------------------------------------------
-
-function baseModules(runnable, { connectedAdapter = false, agentExecutionMode = null } = {}) {
-  return [
-    {
-      id: "mod-gen-agent",
-      name: "응답_생성_Agent",
-      module_category: "agent",
-      agent_kind: "specialist",
-      workflow_kind: null,
-      adapter_kind: null,
-      remote_contract_kind: null,
-      scaffold_output: runnable ? "runnable" : "agent_shell_only",
-      no_runnable_business_logic: !runnable,
-      catalog_binding: null,
-      developer_todos: ["review"],
-      inputs: [{ name: "question", type: "string", required: true }],
-      outputs: [{ name: "answer", type: "string" }],
-      risk_signals: [],
-      required_review_fields: [],
-      smoke_spec: { sample_user_message: "hello", synthetic_inputs: {}, expected_output_shape: {}, expected_event_markers: [], mock_sources: [], ready: true },
-      runtime_mock: null,
-      instruction: null,
-      model: runnable ? "hosted_vllm/local-model" : null,
-      agent_execution_mode: agentExecutionMode,
-      access_protocol: null,
-      mcp_server: null,
-      mcp_tool_name: null,
-      mcp_schema_ref: null,
-      mcp_auth_mode: null,
-      runtime_binding: null
-    },
-    {
-      id: "mod-gen-adapter",
-      name: "데이터_조회_Adapter",
-      module_category: "adapter",
-      agent_kind: null,
-      workflow_kind: null,
-      adapter_kind: "data_query",
-      remote_contract_kind: null,
-      scaffold_output: runnable ? "runnable" : "contract_or_stub_only",
-      no_runnable_business_logic: !runnable,
-      catalog_binding: null,
-      developer_todos: ["review"],
-      inputs: [{ name: "key", type: "string", required: true }],
-      outputs: [{ name: "value", type: "object" }],
-      risk_signals: [],
-      required_review_fields: [],
-      runtime_mock: { value: { demo: true } },
-      instruction: null,
-      model: null,
-      access_protocol: connectedAdapter ? "mcp" : null,
-      mcp_server: connectedAdapter ? "test-mcp" : null,
-      mcp_tool_name: connectedAdapter ? "lookup_test_data" : null,
-      mcp_schema_ref: connectedAdapter ? "catalog/contracts/mcp/test.lookup.v1.json" : null,
-      mcp_auth_mode: connectedAdapter ? "none" : null,
-      runtime_binding: connectedAdapter ? "mcp_tool" : null,
-      node_kind: "adapter_call",
-      mock_binding: connectedAdapter
-        ? {
-            provider: "mock_lab",
-            package_path: "packages/mock-lab",
-            mock_server_id: "test-mcp",
-            tool_name: "lookup_test_data",
-            input_schema: "catalog/contracts/mcp/test.lookup.v1.json",
-            output_schema: "catalog/contracts/mcp/test.lookup.output.v1.json",
-            sample_response_ref: "mock_samples.test.lookup",
-            status: "linked"
-          }
-        : {
-            provider: "mock_lab",
-            package_path: "packages/mock-lab",
-            mock_server_id: null,
-            tool_name: null,
-            input_schema: null,
-            output_schema: null,
-            sample_response_ref: null,
-            status: "missing"
-          },
-      adk_skeleton_contract: {
-        scaffold_level: runnable && connectedAdapter ? "mock_testable_skeleton" : "handoff",
-        target_runtime: "adk_python_2_x",
-        implementation_template: connectedAdapter ? "mcp_mock_adapter_stub" : "adapter_placeholder_stub",
-        manual_completion_required: true,
-        developer_todos: ["replace_mock_with_real_eai_client"]
-      }
-    }
-  ];
-}
-
-function writeFixture(dir, { runnable, connectedAdapter = false, agentExecutionMode = null }) {
-  writeJson(join(dir, "normalized-requirement.json"), {
-    id: "req-gen-test",
-    title: "Generator test workflow",
-    status: "approved"
-  });
-  writeJson(join(dir, "process-flow.json"), {
-    nodes: [
-      { id: "in1", node_kind: "input" },
-      {
-        id: "mod-gen-agent",
-        node_kind: "agent",
-        module_id: "mod-gen-agent",
-        ...(agentExecutionMode ? { agent_execution_mode: agentExecutionMode } : {})
-      },
-      { id: "mod-gen-adapter", node_kind: "adapter", module_id: "mod-gen-adapter" },
-      { id: "out1", node_kind: "output" }
-    ],
-    edges: [
-      { from: "in1", to: "mod-gen-agent" },
-      { from: "mod-gen-agent", to: "mod-gen-adapter" },
-      { from: "mod-gen-adapter", to: "out1" }
-    ],
-    validation: { errors: [] }
-  });
-  writeJson(join(dir, "module-candidates.json"), [
-    { id: "mod-gen-agent", status: "approved", missing_information: [] },
-    { id: "mod-gen-adapter", status: "approved", missing_information: [] }
-  ]);
-  writeJson(join(dir, "af-run-manifest.json"), {
-    requirement_id: "req-gen-test",
-    approvals: { analysis_reviewed: true, boundaries_approved: true, runtime_contracts_approved: true },
-    stages: { design: { status: "complete" } }
-  });
-  writeJson(join(dir, "scaffold-plan.json"), {
-    requirement_id: "req-gen-test",
-    source: "approved_workbench_artifact",
-    raw_requirement_to_code: false,
-    output_mode: runnable ? "runnable" : "smoke",
-    modules: baseModules(runnable, { connectedAdapter, agentExecutionMode }),
-    runtime_contracts: [],
-    excluded_modules: [],
-    manifest: { catalog_bound_modules: [], new_code_required: [] },
-    validation: { can_generate_source: true, blockers: [], warnings: [] }
-  });
-}
-
-function generate({ runnable, connectedAdapter = false, agentExecutionMode = null }) {
-  const artifactRoot = mkdtempSync(join(tmpdir(), `af-gen-${runnable ? "runnable" : "smoke"}-`));
-  try {
-    writeFixture(artifactRoot, { runnable, connectedAdapter, agentExecutionMode });
-    const outputRoot = join(artifactRoot, "runtime-stub");
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
-    return { artifactRoot, outputRoot };
-  } catch (error) {
-    rmSync(artifactRoot, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-function discoverGeneratedPackage(root) {
-  const packages = readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((entry) => existsSync(join(root, entry, "workflow_manifest.json")));
-  assert.equal(packages.length, 1, `expected one generated ADK package, found ${packages.join(", ") || "none"}`);
-  return packages[0];
-}
-
-function readBundle(outputRoot) {
-  const packageName = discoverGeneratedPackage(outputRoot);
-  return {
-    packageName,
-    manifest: JSON.parse(readFileSync(join(outputRoot, packageName, "workflow_manifest.json"), "utf8")),
-    agentSource: readFileSync(join(outputRoot, packageName, "agent.py"), "utf8"),
-    contractTest: readFileSync(join(outputRoot, packageName, "tests", "test_workflow_contract.py"), "utf8")
-  };
-}
-
-function assertCommonBundle(outputRoot, manifest) {
-  const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
-  assert.equal(manifest.guardrails.raw_requirement_to_code, false);
-  assert.equal(manifest.guardrails.private_data_or_endpoints, false);
-  assert.equal(manifest.scaffold_plan.source, "approved_workbench_artifact");
-  assert.equal(manifest.scaffold_plan.raw_requirement_to_code, false);
-  assert.ok(manifest.graph_ir, "manifest must include graph_ir");
-  assert.ok(existsSync(join(outputRoot, "scaffold-plan.json")));
-  assert.ok(existsSync(join(outputRoot, "implementation-handoff.md")));
-  assert.ok(existsSync(join(outputRoot, "runtime-chat-smoke.json")));
-  assert.ok(!existsSync(join(outputRoot, "requirements.txt")), "runtime-stub must not carry artifact-local Python requirements");
-  assert.doesNotMatch(readme, /python3 -m venv \.venv/);
-  assert.doesNotMatch(readme, /pip install -r requirements\.txt/);
-  assert.match(readme, /requirements\/adk-runtime\.txt/);
-}
-
-function assertSmokeBundle(outputRoot) {
-  const { packageName, manifest, agentSource } = readBundle(outputRoot);
-  assertCommonBundle(outputRoot, manifest);
-  assert.equal(manifest.output_mode, "smoke");
-  assert.equal(manifest.guardrails.generated_business_logic, false);
-  assert.match(agentSource, /from google\.adk\.agents import BaseAgent/);
-  assert.match(agentSource, /class SyntheticRuntimeSmokeAgent\(BaseAgent\)/);
-  assert.match(agentSource, /runtime_mock_smoke/);
-  assert.match(agentSource, /GRAPH_EDGES = \[/);
-  assert.match(agentSource, /\("START", "node_/);
-  assert.doesNotMatch(agentSource, /root_agent = Workflow\(/);
-  assert.ok(!existsSync(join(outputRoot, "agents.config.yaml")), "smoke bundle must not emit agents.config.yaml");
-  return packageName;
-}
-
-function assertRunnableBundle(outputRoot) {
-  const { packageName, manifest, agentSource } = readBundle(outputRoot);
-  const envExample = readFileSync(join(outputRoot, ".env.example"), "utf8");
-  const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
-  const agentsConfig = readFileSync(join(outputRoot, "agents.config.yaml"), "utf8");
-  assertCommonBundle(outputRoot, manifest);
-  assert.equal(manifest.output_mode, "runnable");
-  assert.equal(manifest.guardrails.runnable_synthetic_wiring, true);
-  assert.ok(manifest.runtime, "runnable manifest must include a runtime block");
-  assert.ok(Array.isArray(manifest.runtime.connected_adapters));
-  assert.ok(Array.isArray(manifest.runtime.unconnected_adapters));
-  assert.match(agentSource, /from google\.adk\.workflow import/);
-  assert.match(agentSource, /from google\.adk\.agents import LlmAgent/);
-  assert.match(agentSource, /AF_LLM_PROVIDER/);
-  assert.match(agentSource, /AF_VLLM_API_BASE/);
-  assert.match(agentSource, /AF_VLLM_MODEL/);
-  assert.match(agentSource, /from google\.adk\.models\.lite_llm import LiteLlm/);
-  assert.match(agentSource, /LiteLlm\(/);
-  assert.match(agentSource, /_llm_cfg\(\)\.get\("provider"\)/);
-  assert.match(agentSource, /root_agent = Workflow\(/);
-  assert.match(agentSource, /mode="single_turn"/);
-  assert.match(agentSource, /당신은/);
-  assert.doesNotMatch(agentSource, /You are gen_agent/);
-  assert.match(agentSource, /name="응답_생성_Agent"/);
-  assert.match(agentSource, /name="데이터_조회_Adapter"/);
-  assert.match(agentSource, /http:\/\/127\.0\.0\.1:5173\/api\/mock-lab\/mcp/);
-  assert.match(agentSource, /AF_RUNTIME_ENV_FILE/);
-  assert.match(agentSource, /\.agent-factory\/runtime\.env/);
-  assert.match(agentSource, /if key not in os\.environ:/);
-  assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
-  // The fixture adapter is unconnected → emitted as a FunctionNode stub and
-  // classified as unconnected in the manifest.
-  assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context\)/);
-  assert.match(agentSource, /node_mod_gen_adapter = FunctionNode\(func=_fn_mod_gen_adapter/);
-  assert.ok(
-    manifest.runtime.unconnected_adapters.some((adapter) => adapter.module_id === "mod-gen-adapter"),
-    "fixture adapter must be reported as unconnected"
-  );
-  assert.equal(manifest.runtime.connected_adapters.length, 0);
-  assert.ok(existsSync(join(outputRoot, "agents.config.yaml")), "runnable bundle must emit agents.config.yaml");
-  assert.ok(existsSync(join(outputRoot, packageName, "workflow.py")), "bundle must include workflow.py for developer handoff");
-  assert.ok(existsSync(join(outputRoot, packageName, "schemas.py")), "bundle must include schemas.py");
-  assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")), "bundle must include mock_config.yaml");
-  assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
-  assert.ok(existsSync(join(outputRoot, packageName, "README.md")), "bundle must include package-local README.md");
-  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "adapters.py")), "bundle must include nodes/adapters.py");
-  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "gates.py")), "bundle must include nodes/gates.py");
-  assert.ok(existsSync(join(outputRoot, packageName, "nodes", "workflow_calls.py")), "bundle must include nodes/workflow_calls.py");
-  assert.ok(existsSync(join(outputRoot, "README.md")), "bundle must include README.md");
-  assert.match(
-    readFileSync(join(outputRoot, "implementation-handoff.md"), "utf8"),
-    /TODO/,
-    "bundle must keep a TODO handoff"
-  );
-  assert.ok(existsSync(join(outputRoot, ".env.example")), "runnable bundle must emit .env.example");
-  assert.ok(existsSync(join(outputRoot, ".gitignore")), "runnable bundle must emit .gitignore");
-  assert.doesNotMatch(envExample, /^GOOGLE_API_KEY=/m, "per-bundle .env.example must not ask developers to repeat Gemini secrets");
-  assert.match(envExample, /AF_LLM_PROVIDER=auto/);
-  assert.match(envExample, /AF_VLLM_API_BASE=http:\/\/127\.0\.0\.1:8000\/v1/);
-  assert.match(envExample, /AF_VLLM_MODEL=hosted_vllm\/local-model/);
-  assert.match(envExample, /AF_RUNTIME_ENV_FILE/);
-  assert.match(envExample, /\.agent-factory\/runtime\.env/);
-  assert.match(agentsConfig, /provider: auto/);
-  assert.match(agentsConfig, /default_model: hosted_vllm\/local-model/);
-  assert.match(agentsConfig, /api_base_env: AF_VLLM_API_BASE/);
-  assert.match(agentsConfig, /model_env: AF_VLLM_MODEL/);
-  assert.match(agentsConfig, /한글 우선/);
-  assert.match(agentsConfig, /name: 응답_생성_Agent/);
-  assert.equal(manifest.runtime.provider, "auto");
-  assert.equal(manifest.runtime.default_model, "hosted_vllm/local-model");
-  assert.match(readme, /repository root의 `\.agent-factory\/runtime\.env`로 복사/);
-  assert.match(readme, /AF_VLLM_API_BASE/);
-  assert.match(readme, /AF_VLLM_MODEL/);
-  assert.match(readme, /npm run dev --prefix packages\/mock-lab -- --host 0\.0\.0\.0 --port 5176 --strictPort/);
-  assert.match(readme, /AF_MOCK_LAB_MCP_URL=http:\/\/127\.0\.0\.1:5176\/api\/mock-lab\/mcp/);
-  assert.doesNotMatch(readme, /cp \.env\.example \.env\s+# then set GOOGLE_API_KEY/);
-  // Regression guard: the generator must stay domain-neutral. A synthetic,
-  // domain-free fixture must never surface requirement-specific literals that a
-  // previous version hardcoded into sample output (banking / page-recommendation).
-  // Data echoed FROM a scenario's own artifacts is legitimate; this fixture has
-  // none of these tokens, so any occurrence is a generator-authored leak.
-  const sampleInputs = readFileSync(join(outputRoot, packageName, "sample_inputs.yaml"), "utf8");
-  const generatorAuthoredLeaks = [
-    "wf-page-recommendation-mock",
-    "WORKFLOW_INSTRUCTION",
-    "Page Metadata RAG",
-    "적금",
-    "T2S",
-    "UserFlow",
-    "행동유형",
-    "PAGE_B"
-  ];
-  for (const token of generatorAuthoredLeaks) {
-    for (const [label, text] of [["README.md", readme], ["agent.py", agentSource], ["sample_inputs.yaml", sampleInputs]]) {
-      assert.ok(!text.includes(token), `domain-neutral bundle leaked generator-authored literal "${token}" into ${label}`);
-    }
-  }
-  return packageName;
-}
-
-function assertConnectedMcpRuntimeLabels(outputRoot) {
-  const { manifest, agentSource } = readBundle(outputRoot);
-  const mockConfig = readFileSync(join(outputRoot, discoverGeneratedPackage(outputRoot), "mock_config.yaml"), "utf8");
-  assert.equal(manifest.runtime.connected_adapters.length, 1);
-  assert.equal(manifest.runtime.connected_adapters[0].runtime_mcp_label, "런타임 MCP");
-  assert.equal(manifest.runtime.connected_adapters[0].mock_binding.provider, "mock_lab");
-  assert.match(manifest.runtime.connected_adapters[0].runtime_mcp_note, /실행 시점/);
-  assert.match(agentSource, /"runtime_mcp_label": "런타임 MCP"/);
-  assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
-  assert.match(agentSource, /"connection_status": "mcp_connected"/);
-  assert.match(agentSource, /def _user_text_from_context\(ctx: Context\) -> str:/);
-  assert.match(agentSource, /USER_TEXT_INPUT_NAMES = \{/);
-  assert.match(agentSource, /"objective_text"/);
-  assert.match(mockConfig, /provider: mock_lab/);
-  assert.match(mockConfig, /package_path: packages\/mock-lab/);
-  assert.match(mockConfig, /tool_name: "?lookup_test_data"?/);
-}
-
-function assertManifestStageUpdated(artifactRoot) {
-  const runManifest = JSON.parse(readFileSync(join(artifactRoot, "af-run-manifest.json"), "utf8"));
-  assert.equal(runManifest.current_stage, "build");
-  assert.equal(runManifest.stages.build.status, "complete");
-  assert.ok(runManifest.stages.build.outputs.includes("runtime-stub/"));
-  assert.ok(runManifest.validation.commands.some((command) => command.includes("python3 -m compileall")));
-}
+import {
+  assertConnectedMcpRuntimeLabels,
+  assertGeneratorSourcesStayDomainNeutral,
+  assertManifestStageUpdated,
+  assertPregeneratedRunnableBundle,
+  assertRunnableBundle,
+  assertSmokeBundle
+} from "./adk-source-test/assertions.mjs";
+import {
+  baseModules,
+  channelModules,
+  discoverGeneratedPackage,
+  generate,
+  generator,
+  readBundle,
+  remoteGraph,
+  remoteModule,
+  repoRoot,
+  writeChannelFixture,
+  writeFixture,
+  writeJson,
+  writeRemoteFixture
+} from "./adk-source-test/fixtures.mjs";
 
 // ---------------------------------------------------------------------------
 // Hermetic both-mode tests (run via `node --test`).
@@ -385,6 +76,10 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   }
 });
 
+test("generator source keeps hardcoded scenario literals out of generator modules", () => {
+  assertGeneratorSourcesStayDomainNeutral();
+});
+
 test("runnable honors an explicit scaffold package_name", () => {
   const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-package-name-"));
   try {
@@ -403,8 +98,37 @@ test("runnable honors an explicit scaffold package_name", () => {
   }
 });
 
+test("runnable omitted package_name fallback preserves requirement id casing", () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-package-fallback-"));
+  try {
+    writeFixture(artifactRoot, { runnable: true });
+    const requirementPath = join(artifactRoot, "normalized-requirement.json");
+    const requirement = JSON.parse(readFileSync(requirementPath, "utf8"));
+    requirement.id = "Agent Factory";
+    writeJson(requirementPath, requirement);
+
+    const planPath = join(artifactRoot, "scaffold-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    plan.requirement_id = "Agent Factory";
+    delete plan.package_name;
+    writeJson(planPath, plan);
+
+    const manifestPath = join(artifactRoot, "af-run-manifest.json");
+    const runManifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    runManifest.requirement_id = "Agent Factory";
+    writeJson(manifestPath, runManifest);
+
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    assert.ok(existsSync(join(outputRoot, "Agent_Factory_adk", "agent.py")));
+    assert.equal(discoverGeneratedPackage(outputRoot), "Agent_Factory_adk");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test("runnable README uses an env file path relative to the generated output root", () => {
-  const artifactRoot = join(here, "..", "artifacts", "af", `req-gen-env-${process.pid}`);
+  const artifactRoot = join(repoRoot, "artifacts", "af", `req-gen-env-${process.pid}`);
   try {
     const outputRoot = join(artifactRoot, "runtime-stub");
     mkdirSync(artifactRoot, { recursive: true });
@@ -412,7 +136,7 @@ test("runnable README uses an env file path relative to the generated output roo
     // Pin cwd to the repo root so runtimeEnvRelativePath() (which anchors on
     // process.cwd()) is deterministic whether this runs standalone or via the
     // packages/web `test:analyzer` runner.
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe", cwd: join(here, "..") });
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe", cwd: repoRoot });
 
     const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
     assert.match(readme, /AF_RUNTIME_ENV_FILE=\.\.\/\.\.\/\.\.\/\.\.\/\.agent-factory\/runtime\.env/);
@@ -601,6 +325,67 @@ test("runnable preserves workflow_call stubs and handoff files", () => {
   }
 });
 
+test("runnable contract test does not require LlmAgent mode when no LlmAgent node is emitted", () => {
+  const { unconnectedAdapter } = channelModules();
+  const workflowModule = {
+    id: "mod-risk-workflow",
+    name: "Risk Workflow",
+    module_category: "workflow",
+    agent_kind: null,
+    workflow_kind: "graph",
+    adapter_kind: null,
+    remote_contract_kind: null,
+    scaffold_output: "runnable",
+    no_runnable_business_logic: false,
+    catalog_binding: null,
+    developer_todos: ["confirm_workflow_call_contract"],
+    inputs: [{ name: "customer_id", type: "string", required: true }],
+    outputs: [{ name: "risk_result", type: "object", required: true }],
+    risk_signals: [],
+    required_review_fields: [],
+    runtime_mock: null,
+    instruction: null,
+    model: null,
+    agent_execution_mode: null,
+    access_protocol: null,
+    mcp_server: null,
+    mcp_tool_name: null,
+    mcp_schema_ref: null,
+    mcp_auth_mode: null,
+    runtime_binding: "workflow_call",
+    node_kind: "workflow_call",
+    workflow_ref: { id: "wf-risk-check", version: "v1", source: "catalog", display_name: "Risk Workflow" },
+    input_mapping: { customer_id: "$state.customer.id" },
+    output_mapping: { risk_result: "$result" },
+    mock_binding: null,
+    adk_skeleton_contract: {
+      scaffold_level: "mock_testable_skeleton",
+      target_runtime: "adk_python_2_x",
+      implementation_template: "workflow_call_stub",
+      manual_completion_required: true,
+      developer_todos: ["confirm_workflow_call_contract"]
+    }
+  };
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-no-agent-workflow-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules: [{ ...unconnectedAdapter, id: "mod-source-adapter", name: "Source Adapter" }, workflowModule],
+      nodes: [
+        { id: "adapter", node_kind: "adapter", module_id: "mod-source-adapter" },
+        { id: "wf", node_kind: "workflow_call", module_id: "mod-risk-workflow" }
+      ],
+      edges: [{ from: "adapter", to: "wf" }]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const { agentSource, contractTest } = readBundle(outputRoot);
+    assert.doesNotMatch(agentSource, / = LlmAgent\(/);
+    assert.doesNotMatch(contractTest, /mode="single_turn"/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/fan-in)", () => {
   const cases = [
     { name: "module-bound human_input node", mutate: (pf) => pf.nodes.push({ id: "h1", node_kind: "human_input", module_id: "mod-gen-agent" }) },
@@ -611,6 +396,23 @@ test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/f
     { name: "remote boundary edge", mutate: (pf) => { pf.edges[0].is_remote_boundary_crossing = true; } },
     { name: "input->output passthrough", mutate: (pf) => pf.edges.push({ from: "in1", to: "out1", edge_kind: "event_output", execution_semantics: "normal_transition" }) },
     { name: "dangling edge endpoint", mutate: (pf) => pf.edges.push({ from: "mod-gen-agent", to: "ghost", edge_kind: "event_output", execution_semantics: "normal_transition" }) },
+    {
+      name: "router route to output terminal",
+      mutate: (pf) => {
+        pf.nodes.push({ id: "done-router", node_kind: "router", module_id: null });
+        pf.edges = [
+          { from: "in1", to: "mod-gen-agent" },
+          { from: "mod-gen-agent", to: "done-router" },
+          {
+            from: "done-router",
+            to: "out1",
+            edge_kind: "route",
+            execution_semantics: "conditional",
+            route_condition: "choice == done"
+          }
+        ];
+      }
+    },
     { name: "loop_region container", mutate: (pf) => { (pf.containers ||= []).push({ id: "container-loop", container_kind: "loop_region" }); } }
   ];
   for (const testCase of cases) {
@@ -635,29 +437,6 @@ test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/f
 // ---------------------------------------------------------------------------
 // Per-edge data-passing channels (state).
 // ---------------------------------------------------------------------------
-
-function writeChannelFixture(dir, { modules, nodes, edges }) {
-  writeJson(join(dir, "normalized-requirement.json"), { id: "req-ch", title: "Channel workflow", status: "approved" });
-  writeJson(join(dir, "process-flow.json"), { nodes, edges, validation: { errors: [] } });
-  writeJson(join(dir, "module-candidates.json"), modules.map((m) => ({ id: m.id, status: "approved", missing_information: [] })));
-  writeJson(join(dir, "af-run-manifest.json"), {
-    requirement_id: "req-ch",
-    approvals: { analysis_reviewed: true, boundaries_approved: true, runtime_contracts_approved: true },
-    stages: { design: { status: "complete" } }
-  });
-  writeJson(join(dir, "scaffold-plan.json"), {
-    requirement_id: "req-ch", source: "approved_workbench_artifact", raw_requirement_to_code: false,
-    output_mode: "runnable", modules, runtime_contracts: [], excluded_modules: [],
-    manifest: { catalog_bound_modules: [], new_code_required: [] },
-    validation: { can_generate_source: true, blockers: [], warnings: [] }
-  });
-}
-
-function channelModules() {
-  const [agentBase, unconnectedAdapter] = baseModules(true);
-  const [, connectedAdapter] = baseModules(true, { connectedAdapter: true });
-  return { agentBase, unconnectedAdapter, connectedAdapter };
-}
 
 test("runnable lowers per-edge state channels (agent output_key, function mirror, consumer read)", () => {
   const { agentBase, unconnectedAdapter, connectedAdapter } = channelModules();
@@ -970,53 +749,6 @@ test("runnable rejects a state channel written by multiple producers (same state
 // remote_a2a (A2A) lowering.
 // ---------------------------------------------------------------------------
 
-function remoteModule(overrides = {}) {
-  return {
-    id: "mod-r", name: "remote_partner_agent", module_category: "remote_a2a",
-    agent_kind: null, workflow_kind: null, adapter_kind: null, remote_contract_kind: "a2a",
-    scaffold_output: "runnable", no_runnable_business_logic: false, catalog_binding: null,
-    developer_todos: ["review"], inputs: [], outputs: [{ name: "result", type: "object" }],
-    risk_signals: [], required_review_fields: [],
-    runtime_mock: null, instruction: null, model: null,
-    access_protocol: "remote_a2a", mcp_server: null, mcp_tool_name: null, mcp_schema_ref: null,
-    mcp_auth_mode: null, runtime_binding: "remote_a2a", a2a_contract_id: "a2a-001",
-    smoke_spec: { sample_user_message: "go", synthetic_inputs: {}, expected_output_shape: {}, expected_event_markers: [], mock_sources: [], ready: true },
-    ...overrides
-  };
-}
-
-function writeRemoteFixture(dir, { modules, nodes, edges, a2aContracts }) {
-  writeJson(join(dir, "normalized-requirement.json"), { id: "req-remote", title: "Remote A2A", status: "approved" });
-  writeJson(join(dir, "process-flow.json"), { nodes, edges, validation: { errors: [] } });
-  writeJson(join(dir, "module-candidates.json"), modules.map((m) => ({ id: m.id, status: "approved", missing_information: [] })));
-  writeJson(join(dir, "analysis-result.json"), { a2aContracts });
-  writeJson(join(dir, "af-run-manifest.json"), {
-    requirement_id: "req-remote",
-    approvals: { analysis_reviewed: true, boundaries_approved: true, runtime_contracts_approved: true },
-    stages: { design: { status: "complete" } }
-  });
-  writeJson(join(dir, "scaffold-plan.json"), {
-    requirement_id: "req-remote", source: "approved_workbench_artifact", raw_requirement_to_code: false,
-    output_mode: "runnable", modules, runtime_contracts: [], excluded_modules: [],
-    manifest: { catalog_bound_modules: [], new_code_required: [] },
-    validation: { can_generate_source: true, blockers: [], warnings: [] }
-  });
-}
-
-const remoteGraph = {
-  nodes: [
-    { id: "in1", node_kind: "input" },
-    { id: "a", node_kind: "agent", module_id: "mod-a" },
-    { id: "r", node_kind: "remote_a2a", module_id: "mod-r", owner_scope: "remote" },
-    { id: "out1", node_kind: "output" }
-  ],
-  edges: [
-    { from: "in1", to: "a", edge_kind: "event_output", execution_semantics: "normal_transition" },
-    { from: "a", to: "r", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true },
-    { from: "r", to: "out1", edge_kind: "remote_a2a", execution_semantics: "boundary_crossing", a2a_contract_id: "a2a-001", is_remote_boundary_crossing: true }
-  ]
-};
-
 test("runnable lowers a remote_a2a node to RemoteA2aAgent from its A2A contract", () => {
   const [agentBase] = baseModules(true);
   const modules = [{ ...agentBase, id: "mod-a", name: "local_dispatcher_agent" }, remoteModule()];
@@ -1035,7 +767,7 @@ test("runnable lowers a remote_a2a node to RemoteA2aAgent from its A2A contract"
     assert.match(source, /= RemoteA2aAgent\(/, "emits a RemoteA2aAgent node");
     assert.match(source, /agent_card="http:\/\/localhost:8001\/a2a\/test_agent\/\.well-known\/agent-card\.json"/, "agent_card from the contract");
     assert.match(source, /use_legacy=False/);
-    const reqs = readFileSync(join(here, "..", "requirements", "adk-runtime.txt"), "utf8");
+    const reqs = readFileSync(join(repoRoot, "requirements", "adk-runtime.txt"), "utf8");
     assert.match(reqs, /google-adk\[a2a,mcp\]/, "shared requirements include the ADK extras");
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
@@ -1127,11 +859,7 @@ const cliOutputRoot = process.argv[2];
 if (cliOutputRoot) {
   test(`pre-generated bundle at ${cliOutputRoot} is consistent`, () => {
     const { manifest } = readBundle(cliOutputRoot);
-    if (manifest.output_mode === "runnable") assertRunnableBundle(cliOutputRoot);
+    if (manifest.output_mode === "runnable") assertPregeneratedRunnableBundle(cliOutputRoot);
     else assertSmokeBundle(cliOutputRoot);
   });
-}
-
-function writeJson(path, value) {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
