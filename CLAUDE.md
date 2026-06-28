@@ -139,6 +139,8 @@ Then in MCP or Playwright: drive route navigation / button clicks and save scree
 - Keep changes scoped to the requested workbench behavior. No drive-by abstractions, configuration, or extensibility.
 - Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
 - Treat `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active source of truth.
+- When the user asks to modify an artifact or generated ADK behavior, do not solve it by hard-coding domain terms, route aliases, product names, scenario names, or workflow-specific literals into `scripts/generate-adk-source.mjs` or another generator. First decide whether the Graph IR/scaffold-plan/schema can express the needed behavior; if not, add a reviewed generic contract field across schema/types/validator/UI/generator as needed, then update artifact data to use that field.
+- Generator defaults must stay framework/runtime-neutral. Workflow-specific choices such as router labels, human choice aliases, adapter argument hints, prompt rules, and business terms belong in reviewed artifacts or catalog/mock specs, not in generator code.
 - Edit `.agents/skills` only when the task explicitly asks for skill, DLC workflow, or skill-sync work.
 - Preserve `legacy_recommended_type` migration data; do not promote it back into a primary classifier.
 - The UI labels are in Korean (`App.tsx`, components). Preserve that when editing copy.

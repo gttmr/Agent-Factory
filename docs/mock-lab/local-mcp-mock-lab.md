@@ -4,13 +4,24 @@ Mock Lab은 ADK Agent가 `McpToolset`(또는 stdio)으로 소비하는 MCP mock 
 
 ## 실행
 
+통합 사용자 경로는 main workbench route다.
+
+```bash
+cd packages/web
+npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
+```
+
+기본 URL은 `http://127.0.0.1:5173/mock-lab` 이다.
+
+standalone package 개발이 필요할 때만 별도 앱을 띄운다.
+
 ```bash
 cd packages/mock-lab
 npm install
 npm run dev
 ```
 
-기본 URL은 `http://127.0.0.1:5173/mock-lab` 이다. standalone 개발 앱을 직접 확인할 때만 `http://127.0.0.1:5176/` 을 사용한다.
+standalone 개발 앱 URL은 `http://127.0.0.1:5176/` 이다.
 
 ## Catalog Prefill
 
@@ -41,7 +52,7 @@ Smoke test는 다음을 확인한다.
 - `tools/list`: tool name, description, inputSchema, outputSchema 존재
 - `tools/call`: sample input 검증, `structuredContent` 존재, outputSchema 검증, text content 존재, synthetic marker 존재, audit log 기록
 
-실행된 MCP stdio server는 local test double이다. 같은 runtime process를 network MCP로도 노출한다(아래). A2A mock server는 v0.1 범위가 아니다.
+실행된 MCP stdio server는 local test double이다. 같은 runtime process를 network MCP로도 노출한다(아래). Mock Lab 자체는 A2A mock server를 만들지 않는다. A2A smoke가 필요하면 `templates/regression-scenarios/scenario-i-remote-a2a/mock_remote/` 같은 scenario-local synthetic server를 사용한다.
 
 ## Network MCP (Streamable HTTP)
 
@@ -52,9 +63,15 @@ Smoke test는 다음을 확인한다.
 
 생성된 runnable 번들은 `AF_MOCK_LAB_MCP_URL`(기본 `http://127.0.0.1:5173/api/mock-lab/mcp`) + `<mcp_server>`로 `streamablehttp_client`를 연결하거나, `agents.config.yaml`의 adapter `mcp_url`로 override한다. BuildWorkbench의 runnable mode에서는 reviewer가 running Mock Lab tool을 명시적으로 선택해 `scaffold-plan.json`의 adapter MCP binding을 저장한다. 모든 호출은 synthetic Mock Lab 한정이며 private endpoint/credential/실데이터를 담지 않는다.
 
+## Local Input Sensitivity
+
+Mock specs, Codex draft prompts, event logs, smoke inputs, and audit logs are stored under ignored `artifacts/mock-lab/<mock-id>/`. They are local development artifacts, but they can still be copied into screenshots, logs, or generated bundles. Use synthetic or masked values only.
+
+Do not paste private endpoint URLs, credentials, real customer data, or production business logic into Mock Lab prompts/specs. Runtime secrets belong in ignored local env files such as `.agent-factory/runtime.env`, never in `mock-spec.json`, catalog YAML, fixtures, or docs.
+
 ## Non-goals
 
-- 기존 workbench route 통합
+- Reuse Hub catalog governance를 Mock Lab으로 이전
 - `catalog/*.yaml` 직접 수정
 - `catalog-delta.yaml` 생성
 - 실제 은행 endpoint 연결

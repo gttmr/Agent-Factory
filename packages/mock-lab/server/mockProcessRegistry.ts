@@ -24,7 +24,10 @@ interface ProcessEntry {
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const runtimePath = fileURLToPath(new URL("./mockSpecRuntime.ts", import.meta.url));
-const loaderPath = fileURLToPath(new URL("../scripts/ts-extension-loader.mjs", import.meta.url));
+// `--loader` needs a URL, not a filesystem path. On Windows an absolute path
+// like `C:\...` is parsed as a URL with scheme `c:` and rejected
+// (ERR_UNSUPPORTED_ESM_URL_SCHEME), so pass the file:// URL form.
+const loaderArg = new URL("../scripts/ts-extension-loader.mjs", import.meta.url).href;
 
 export class MockProcessRegistry {
   private readonly processes = new Map<string, ProcessEntry>();
@@ -43,7 +46,7 @@ export class MockProcessRegistry {
 
     const startedAt = new Date().toISOString();
     const command = "saved mock spec runtime";
-    const child = spawn(process.execPath, ["--experimental-strip-types", "--loader", loaderPath, runtimePath], {
+    const child = spawn(process.execPath, ["--experimental-strip-types", "--loader", loaderArg, runtimePath], {
       cwd: packageRoot,
       stdio: ["pipe", "pipe", "pipe"],
       env: {

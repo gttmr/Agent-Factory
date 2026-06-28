@@ -22,8 +22,8 @@ artifacts/af/<req-id>/
 - `a2a-contracts.json`: Remote A2A contracts when present.
 - `boundary-design.md`: human-readable design review.
 - `scaffold-plan.json`: approved Runtime Handoff contract.
-- `implementation-handoff.md`: TODO/runtime wiring handoff.
-- `runtime-stub/`: generated TODO-only source bundle.
+- `implementation-handoff.md`: TODO/runtime wiring and production non-goals.
+- `runtime-stub/`: generated Runtime Handoff bundle; smoke mode is TODO/runtime wiring, runnable mode is reviewed synthetic ADK Workflow wiring.
 - `validation-report.md`: command evidence.
 - `catalog-delta.yaml`: proposed catalog feedback only.
 

@@ -14,6 +14,13 @@ const repoRoot = resolve(webRoot, "../..");
 
 export default defineConfig({
   plugins: [react(), agentFactoryServerPlugin()],
+  // The /mock-lab route imports MockLabApp from packages/mock-lab/src, which
+  // resolves React from packages/mock-lab/node_modules — a different physical
+  // copy than packages/web's. Two React instances break hooks at runtime
+  // ("Cannot read properties of null (reading 'useState')"). Dedupe to one copy.
+  resolve: {
+    dedupe: ["react", "react-dom"]
+  },
   server: {
     host: true,
     allowedHosts: true
