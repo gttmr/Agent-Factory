@@ -20,7 +20,7 @@ Default output:
 artifacts/af/<req-id>/runtime-stub/
 ```
 
-The generated bundle must carry `scaffold-plan.json`, a workflow manifest, TODO-only source, and tests that prove the contract is wired without pretending business logic exists.
+The generated bundle must carry `scaffold-plan.json`, a workflow manifest, generated source, and tests that prove the contract is wired without pretending production business logic exists. Smoke mode keeps TODO/runtime-wiring stubs explicit. Reviewed runnable mode may emit synthetic ADK Workflow wiring for local smoke review.
 
 ## Preferred Command
 
@@ -36,6 +36,13 @@ Then run structural verification where dependencies are available:
 
 ```bash
 python3 -m compileall artifacts/af/<req-id>/runtime-stub
+```
+
+For runnable bundles, run the generated package tests from inside the runtime-stub root when dependencies are available:
+
+```bash
+cd artifacts/af/<req-id>/runtime-stub
+python3 -m pytest -q
 ```
 
 If installing ADK dependencies is required, ask before network or package installation.

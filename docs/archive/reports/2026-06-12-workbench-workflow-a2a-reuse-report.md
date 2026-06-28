@@ -3,6 +3,17 @@
 Date: 2026-06-12
 Scope: read-only architecture analysis of the current Workbench code, schemas, catalog, ADK runtime handoff path, and latest ADK documentation fetched through `adk-docs-mcp`.
 
+> Status note (2026-06-28): this report is a historical evidence snapshot, not
+> current behavior spec. Since it was written, Reuse Hub gained an
+> approval-gated `POST /api/catalog/publish` path, Design gained active bottom
+> tab Remote A2A contract editing and catalog workflow insertion, and runnable
+> Runtime Handoff gained reviewed `RemoteA2aAgent` lowering when an approved A2A
+> contract supplies an Agent Card URL. Use active specs in
+> `docs/workbench/agent-factory-harness.md`, `docs/workbench/validation.md`,
+> `docs/workbench/taxonomy.md`, and `docs/workbench/process-flow.md` for current
+> implementation work. The analysis below remains useful for historical context
+> and for understanding why Workflow reuse is separate from Remote A2A.
+
 ## Executive Summary
 
 현재 Workbench에서 새로 만든 Workflow를 다른 Workbench session에서 재사용하는 일은 first-class 기능이 아니다. 가능한 경로는 전체 `analysis-result.json` import, Reuse Hub의 active-root pin, active root의 `catalog-delta.yaml` 등록 제안뿐이다. 전역 catalog에 승인/버전 관리된 reusable workflow를 publish하고 다른 root에서 graph로 import하거나 runtime으로 consume하는 흐름은 아직 없다.

@@ -21,6 +21,23 @@
 - `templates`: generic artifact and scaffold-plan templates.
 - `docs`: active workbench analysis, taxonomy, workflow-decision, validation, and reference notes.
 
+## Local AGENTS.md Hierarchy
+
+This root file carries repository-wide policy. More specific guidance now lives
+near the active ownership boundaries:
+
+- `.agents/skills/AGENTS.md`: DLC skill authoring and shared references.
+- `packages/web/AGENTS.md`: web workbench package, routes, UI, server middleware,
+  and verification entrypoints.
+- `packages/mock-lab/AGENTS.md`: standalone Mock Lab package and MCP runtime.
+- `docs/AGENTS.md`: active docs versus historical/status snapshots.
+- `schemas/AGENTS.md`, `catalog/AGENTS.md`, `templates/AGENTS.md`,
+  `scripts/AGENTS.md`: artifact contracts, seed catalogs, fixtures, and root
+  generators/validators.
+
+When editing inside one of those trees, read the nearest child `AGENTS.md`
+after this root file. Child files specialize this policy; they do not relax it.
+
 ## Markdown Documentation Ownership
 
 - `docs/README.md` indexes human-facing workbench documentation under `docs/`.

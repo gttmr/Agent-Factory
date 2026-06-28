@@ -3,14 +3,21 @@
 이 파일 하나만 보면 어디까지 했고 무엇이 남았는지 알 수 있도록 정리한 진입점이다.
 브리프 목록 자체는 `INDEX.md`, 마이그레이션 전체 설계는 `/home/ilmaswsl/.claude/plans/agent-factory-synthetic-hummingbird.md`.
 
-마지막 갱신: 2026-06-23 (KST 기준).
+마지막 갱신: 2026-06-28 (KST 기준).
 
 2026-06-23 현재 실행 계약 메모: Stage Runner와 direct analyzer, Mock Lab draft는 더 이상 repo 코드에서 `codex exec` 또는 외부 Codex CLI 프로세스를 직접 spawn하지 않는다. 서버는 `@openai/codex-sdk` TypeScript SDK를 사용하고, 아래 과거 브리프의 Codex CLI 표현은 당시 설계/구현 기록으로만 읽는다.
 
-## 현재 브랜치 상태
+## 현재 사용 규칙
 
-- 로컬 `main` = `origin/main` (`8ed9f42`). 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)이 모두 머지·동기화됨.
-- 작업 트리 clean (단, `docs/workbench/reports/` 는 세션 이전부터 있던 untracked — 본 작업과 무관).
+- 이 파일은 follow-up backlog/status 진입점이다. live branch cleanliness나 HEAD SHA는 매번 `git status`와 `git log`로 확인한다.
+- 현재 남은 브리프는 10-14다. 아래 "남은 후속" 표가 canonical backlog이고, 과거 완료 오판 문구는 제거됐다.
+- detailed brief가 이 파일, `INDEX.md`, active docs, 현재 코드와 충돌하면 현재 코드와 active docs를 먼저 확인한다.
+
+## 2026-06-23 브랜치 상태 기록
+
+- 아래 항목은 2026-06-23 당시 기록이며 live checkout 상태가 아니다.
+- 당시 로컬 `main` = `origin/main` (`8ed9f42`). 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)이 모두 머지·동기화됨.
+- 당시 작업 트리 clean (단, 현재는 historical report snapshots를 `docs/archive/reports/` 아래로 보관).
 - 머지된 PR:
   - #30 — runnable human-in-the-loop(`RequestInput`) + `scenario-g`
   - #31 (PR-A) — 엣지별 "데이터 전달 방식" 피커 + 제너레이터 node/output dispatch 구조화 + session/temp/user/app **state 채널** + **artifact 채널** lowering + `scenario-h` + Codex 리뷰 반영
@@ -43,7 +50,7 @@ git log --oneline -8
 | 11 | agent/비-connected consumer 의 명명 채널 읽기 | 中 |
 | 12 | A2A 계약 정책(auth/timeout/retry/fallback) → `RemoteA2aAgent` config 매핑 | 中 |
 | 13 | scaffold-plan 워닝 문구 카테고리/모드 인식화 | 小 |
-| 14 | 실행(RunSandbox)/Build 런타임 UX(venv 재설치·stale 로드·adapter 없는 Mock Lab 패널) | 中 |
+| 14 | 실행(RunSandbox)/Build 런타임 UX(shared venv 안내·stale 로드·adapter 없는 Mock Lab 패널) | 中 |
 
 권장 순서: **13(작고 빠름) → 14 → 11 → 12 → 10(가장 큼).** 13/11 은 PR-A 연장, 12 는 PR-B 연장, 10(dynamic)은 독립 큰 작업.
 
@@ -170,7 +177,15 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 ## 미구현 브리프
 
-현재 `docs/workbench/follow-ups` 에 남은 미구현/부분 구현 브리프는 없다. 새 후속 작업은 별도 브리프로 추가한다.
+현재 `docs/workbench/follow-ups` 에 남은 미구현/부분 구현 브리프는 10-14다.
+
+| 번호 | 상태 | 현재 판단 |
+|---|---|---|
+| 10 | 미구현 | dynamic-workflow lowering(route/loop/dynamic). generator 대규모 개편. |
+| 11 | 미구현(부분) | agent/비-connected consumer 의 명명 state/artifact 채널 읽기. 현재 connected MCP adapter consumer 중심. |
+| 12 | 미구현(부분) | A2A 계약 auth/timeout/retry/fallback 을 `RemoteA2aAgent` config/interceptor로 매핑. |
+| 13 | 미구현 | scaffold-plan warning 문구를 category/output_mode 인식형으로 정리. |
+| 14 | 미구현(부분 대체) | RunSandbox/Build runtime UX: shared venv/manual runtime prep 안내, 재생성 후 stale 로드, adapter 없는 시나리오 Mock Lab 패널 숨김. |
 
 ## 남은 잔무 (브리프 외)
 
