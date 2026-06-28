@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -132,9 +132,7 @@ test("validate-artifacts accepts remote_agent_call as a Remote A2A graph endpoin
 });
 
 function tempArtifactRoot(prefix) {
-  const root = mkdtempSync(join(tmpdir(), prefix));
-  mkdirSync(root, { recursive: true });
-  return root;
+  return mkdtempSync(join(tmpdir(), prefix));
 }
 
 function readScenarioAnalysis() {

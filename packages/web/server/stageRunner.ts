@@ -925,8 +925,7 @@ async function updateStageRunManifest(
 async function appendEvent(runDir: string, event: StageRunEvent): Promise<void> {
   await mkdir(runDir, { recursive: true });
   const path = join(runDir, "events.jsonl");
-  const existing = await readFile(path, "utf8").catch(() => "");
-  await writeFile(path, `${existing}${JSON.stringify(redactSecrets(event))}\n`, "utf8");
+  await appendFile(path, `${JSON.stringify(redactSecrets(event))}\n`, "utf8");
 }
 
 async function writeJsonFile(path: string, value: unknown): Promise<void> {

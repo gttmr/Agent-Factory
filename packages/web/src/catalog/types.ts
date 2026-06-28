@@ -58,9 +58,3 @@ export interface CatalogEntry {
 }
 
 export type CatalogEntrySnapshot = Omit<CatalogEntry, "provenance" | "originalSnapshot">;
-
-export interface CatalogChangeSet {
-  added: CatalogEntry[];
-  updated: Array<{ before: CatalogEntrySnapshot; after: CatalogEntry }>;
-  removed: CatalogEntrySnapshot[];
-}

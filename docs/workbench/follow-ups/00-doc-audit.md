@@ -4,7 +4,7 @@
 
 아래 목록은 당시 확인한 감사 스냅샷이다. 새 작업의 현재 진입점으로 쓰지 말고 [`STATUS.md`](./STATUS.md)와 [`INDEX.md`](./INDEX.md)의 최신 브리프 상태를 먼저 본다.
 
-## 왜 필요한가
+## 당시 필요했던 이유
 
 PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으로 전면 전환했지만, 당시 문서 일부가 9-step flow / `useWorkbenchState` / `AdkRuntimeWorkbench` / `예시 불러오기` 등 사라진 surface 를 전제로 작성돼 있었다. 새 onboarding 사용자가 docs 만 보고 워크벤치를 켜면 화면과 설명이 어긋나서 신뢰가 깎이는 상태였다.
 
@@ -40,14 +40,14 @@ PR1–PR6 은 코드 측면에서 라우터 셸 + artifact-root-first 흐름으�
 - `docs/archive/**` 는 archived. 손대지 않는다.
 - `packages/web/server/codexAnalyzer.ts` 와 `/api/analyze-requirement` SSE endpoint 자체는 유지 (해체 결정은 06-analyze-pipeline.md 에서 다룸). 따라서 문서에서 "이 endpoint 가 존재한다" 는 서술은 사실 그대로 둔다.
 
-## 작업 정의 (Done means)
+## 당시 작업 정의 (Done means)
 
 1. `docs/workbench/follow-ups/INDEX.md` 의 "마이그레이션 후 변경된 사실" 섹션과 100% 정합한 상태로 위 의심 위치들을 갱신.
 2. 의도된 잔존 (Codex SSE endpoint 존재 사실, archive 디렉터리) 은 그대로 두되, 필요한 곳에 "워크벤치 UI 에서 직접 호출하지 않음" 한 줄을 추가.
 3. `docs/onboarding/*.html` 가 새 흐름 (Landing → import → `/af/:id/analyze` → … → `/af/:id/verify` → Reuse Hub) 를 따라가도록 본문/스크린샷/캡션 갱신. 스크린샷이 옛 화면이라면 적어도 placeholder 텍스트로 교체하고 별도 브리프(07) 에서 새 스크린샷 확보.
 4. 갱신 자체로 schema/code 가 함께 바뀔 일은 없어야 한다. 코드가 바뀌어야 하는 점이 발견되면 그 항목은 적절한 다른 브리프(03–08)로 옮긴다.
 
-## 작업 절차 (권장)
+## 당시 작업 절차
 
 ```bash
 cd /home/ilmaswsl/work/Agent-Factory
@@ -57,17 +57,17 @@ grep -rn "wizard\|useWorkbenchState\|LegacyWizard\|exampleRequirement\|예시 �
 # 3. 변경 후 docs 만 변경이므로 빌드는 불필요. 단 onboarding html 스크린샷을 추가하면 chrome-devtools MCP 로 다시 캡처
 ```
 
-## 검증
+## 당시 검증
 
 - `grep -rn "wizard\|useWorkbenchState\|LegacyWizard\|exampleRequirement\|예시 불러오기\|AdkRuntimeWorkbench" docs/ CLAUDE.md AGENTS.md README.md` 결과가 archive 외 0건 (또는 의도된 잔존만 남음).
 - `cd packages/web && npm run build` 통과 (TS 파일은 만지지 않으므로 사실상 무영향이지만 안전망).
 
-## Out of scope
+## 당시 Out of scope
 
 - 새 onboarding 스크린샷 캡처 → `07-onboarding-html-refresh.md` 로 분리.
 - Codex CLI endpoint 자체를 제거할지 결정 → `06-analyze-pipeline.md` 로 분리.
 
-## 위험 / 메모
+## 당시 위험 / 메모
 
 - onboarding HTML 은 사람-읽기용 문서다. 본문 내 코드 블록의 변수 이름이 옛 컴포넌트 (예: `useWorkbenchState`, `acceptedMissing`) 를 직접 참조하면 모두 갱신해야 한다.
 - `acceptedMissing` 은 PR6 후 router shell 의 `AnalyzeWorkbench` 내부 state 로 살아있다. 단어 자체가 잔존하지만 위치만 달라졌다 — 문서에 위치를 명시할 때는 "현재는 `AnalyzeWorkbench` 컴포넌트 in-memory state" 로 적는다.

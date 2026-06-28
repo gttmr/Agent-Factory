@@ -14,7 +14,7 @@ export async function resolve(specifier, context, nextResolve) {
       try {
         return await nextResolve(`${specifier}${extension}`, context);
       } catch {
-        // Try the next extension.
+        continue;
       }
     }
     throw error;

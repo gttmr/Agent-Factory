@@ -71,7 +71,7 @@ export function createAfCatalogMiddleware(repoRoot: string) {
         return;
       }
 
-      if (trimmed === "" || trimmed === "/") {
+      if (trimmed === "") {
         return await handleCatalogIndex(catalogDir, res);
       }
       sendJson(res, 404, { error: `알 수 없는 카탈로그 경로입니다: ${trimmed}` });

@@ -29,7 +29,7 @@ artifacts/af/<req-id>/
 
 ## Lightweight Manifest Shape
 
-Keep the manifest simple unless a formal schema is added later:
+Use this lightweight manifest shape:
 
 ```json
 {

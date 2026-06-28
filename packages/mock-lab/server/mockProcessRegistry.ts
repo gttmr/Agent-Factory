@@ -211,8 +211,8 @@ export class MockProcessRegistry {
           return { ...parsed, status: "stopped", pid: null };
         }
         return parsed;
-      } catch {
-        // Fall through to default status.
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
       }
     }
     return {

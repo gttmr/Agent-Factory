@@ -240,9 +240,9 @@ function parseSse(body: string): SseEntry[] {
     .trim()
     .split("\n\n")
     .map((block) => {
-      const eventLine = block.split("\n").find((line) => line.startsWith("event: "));
-      const dataLines = block
-        .split("\n")
+      const lines = block.split("\n");
+      const eventLine = lines.find((line) => line.startsWith("event: "));
+      const dataLines = lines
         .filter((line) => line.startsWith("data: "))
         .map((line) => line.slice("data: ".length));
       assert.ok(eventLine, `missing event line in ${block}`);

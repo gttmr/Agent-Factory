@@ -42,6 +42,7 @@ validateRunInputs();
 const packageName = scaffoldPackageName();
 const connectedAdapters = modules.filter((module) => adapterConnection(module) === "mcp_connected");
 const unconnectedAdapters = modules.filter((module) => adapterConnection(module) === "unconnected");
+let moduleDataChannelsCache = null;
 const files = buildFiles();
 
 Object.entries(files).forEach(([relativePath, content]) => {
@@ -2407,6 +2408,7 @@ function edgeDataChannel(edge) {
 // Build per-module incoming/outgoing data channels by resolving Graph IR edge
 // endpoints to their bound modules. Deduplicated by (kind,key).
 function moduleDataChannels() {
+  if (moduleDataChannelsCache) return moduleDataChannelsCache;
   const graph = graphIndexes();
   const moduleIdOf = (nodeId) => {
     const node = graph.nodesById.get(nodeId);
@@ -2431,7 +2433,8 @@ function moduleDataChannels() {
     if (fromId) pushUnique(outgoing, fromId, channel);
     if (toId) pushUnique(incoming, toId, channel);
   }
-  return { outgoing, incoming };
+  moduleDataChannelsCache = { outgoing, incoming };
+  return moduleDataChannelsCache;
 }
 
 function outgoingStateChannelKeys(moduleId) {

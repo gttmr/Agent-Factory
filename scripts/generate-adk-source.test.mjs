@@ -654,9 +654,8 @@ function writeChannelFixture(dir, { modules, nodes, edges }) {
 }
 
 function channelModules() {
-  const [agentBase] = baseModules(true);
-  const unconnectedAdapter = baseModules(true)[1];
-  const connectedAdapter = baseModules(true, { connectedAdapter: true })[1];
+  const [agentBase, unconnectedAdapter] = baseModules(true);
+  const [, connectedAdapter] = baseModules(true, { connectedAdapter: true });
   return { agentBase, unconnectedAdapter, connectedAdapter };
 }
 
@@ -1089,8 +1088,7 @@ test("runnable rejects a mislabeled remote_a2a edge between two local nodes", ()
   // Two LOCAL nodes joined by a remote_a2a edge with boundary crossing — must be
   // rejected (it would otherwise bypass the boundary-crossing gate). There is no
   // remote_a2a module, so assertRemoteA2aSupported passes; the edge gate must catch it.
-  const [agentBase] = baseModules(true);
-  const unconnectedAdapter = baseModules(true)[1];
+  const [agentBase, unconnectedAdapter] = baseModules(true);
   const modules = [{ ...agentBase, id: "mod-a", name: "A_agent" }, { ...unconnectedAdapter, id: "mod-b", name: "B_adapter" }];
   const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-mislabeled-"));
   try {

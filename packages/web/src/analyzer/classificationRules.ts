@@ -88,13 +88,3 @@ export function getCandidateSubtype(candidate: ModuleCandidate): string | null {
   }
   return null;
 }
-
-export function getCandidateSubtypeValue(candidate: ModuleCandidate): string | null {
-  return (
-    candidate.adapter_kind ??
-    candidate.agent_kind ??
-    candidate.workflow_kind ??
-    candidate.remote_contract_kind ??
-    null
-  );
-}

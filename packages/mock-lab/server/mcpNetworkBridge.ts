@@ -7,7 +7,6 @@ import type { JsonRpcEnvelope } from "../src/types/mockSpec";
 import type { MockProcessRegistry } from "./mockProcessRegistry";
 import type { MockSpecStore } from "./mockSpecStore";
 
-// ---------------------------------------------------------------------------
 // Network MCP exposure for the Mock Lab.
 //
 // Each Mock Lab mock already runs as a stdio JSON-RPC MCP child keyed by
@@ -16,7 +15,6 @@ import type { MockSpecStore } from "./mockSpecStore";
 // via `streamablehttp_client(url)` and call tools. tools/list and tools/call are
 // proxied verbatim to the running child (single source of truth + existing audit
 // log); the bridge adds no business logic of its own. Synthetic Mock Lab only.
-// ---------------------------------------------------------------------------
 
 const MCP_BASE_PATH = "/api/mock-lab/mcp";
 // Abandoned clients (that never DELETE/close) would otherwise leak transports.

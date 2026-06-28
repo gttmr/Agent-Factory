@@ -326,16 +326,16 @@ export class RuntimeChatManager {
     const runningPid = live?.child.pid ?? recordedLive?.pid ?? (portOwner?.matchesCurrentRuntime ? portOwner.pid : null);
     const managed = Boolean(live || recordedLive);
     const canStop = Boolean(live || recordedLive || portOwner?.safeToStop || proc);
-    const serverStatus =
-      live || recordedLive || portOwner?.matchesCurrentRuntime
-        ? "running"
-        : portOwner
-          ? "failed"
-          : proc?.exitCode === null || proc?.exitCode === undefined
-            ? "stopped"
-            : proc.exitCode === 0
-              ? "stopped"
-              : "failed";
+    let serverStatus: RuntimeChatStatus["server"]["status"];
+    if (live || recordedLive || portOwner?.matchesCurrentRuntime) {
+      serverStatus = "running";
+    } else if (portOwner) {
+      serverStatus = "failed";
+    } else if (proc?.exitCode === null || proc?.exitCode === undefined || proc.exitCode === 0) {
+      serverStatus = "stopped";
+    } else {
+      serverStatus = "failed";
+    }
     return {
       port: ctx.port,
       host: ctx.host,
@@ -397,7 +397,8 @@ export function buildAdkServerCommand(input: { adkPath: string; host: string; po
 }
 
 export function extractFinalTextFromAdkEvents(events: unknown[]): string {
-  for (const event of [...events].reverse()) {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
     if (!isRecord(event) || !isRecord(event.content) || !Array.isArray(event.content.parts)) continue;
     const text = event.content.parts
       .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text : ""))
