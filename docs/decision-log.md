@@ -285,6 +285,12 @@
 - **배경**: 기존 user-confirmation route lowering은 generator 내부의 시나리오별 문자열 fallback에 기대어, 사용자가 설계 화면에서 어떤 승인/반려 입력값을 확정해야 하는지 드러나지 않았다.
 - **영향**: Graph IR/process-flow/scaffold-plan schema, soft/export validator, Design GraphElementEditor/Inspector, Build readiness summary, runnable ADK generator와 sample inputs, active docs.
 
+## 2026-06-29 · 작업 브랜치 `stage-shell-hierarchy-redesign` — StageShell compact hierarchy와 desktop QA 기준
+
+- **결정**: `StageShell`의 내부 `실행/검토/승인` navigation을 220px 좌측 레일에서 compact header stepper로 옮긴다. Stage header 아래에는 summary strip과 "다음에 할 일" guidance strip을 두고, Analyze/Design/Build/Verify 각 route가 stage-specific work surface를 소유한다.
+- **배경**: 기존 좌측 레일은 stage navigation, approval chip, Graph canvas, Build/Verify 도구면과 폭을 경쟁해 desktop workbench에서도 실제 검토/실행 surface를 좁혔다. 사용 환경은 desktop으로 확정되어 mobile/tablet QA를 acceptance 기준으로 유지할 필요가 없다.
+- **영향**: `StageShell`, Analyze/Design/Build/Verify route composition, `stage-shell.css`, route-specific CSS, `docs/visualization/design-system.md`. Approval gate source of truth, schema, analyzer, catalog, server API, generator 계약은 변경하지 않는다.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)

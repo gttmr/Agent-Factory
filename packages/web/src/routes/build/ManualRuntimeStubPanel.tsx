@@ -33,7 +33,7 @@ export function ManualRuntimeStubPanel({
   stubReady
 }: ManualRuntimeStubPanelProps) {
   return (
-    <Panel>
+    <Panel tone="muted" className="af-build-manual-panel">
       <SectionHeader
         eyebrow="advanced/manual"
         title="Runtime stub 수동 생성"

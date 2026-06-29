@@ -11,21 +11,78 @@
 .af-design-split {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-lg);
+}
+
+.af-design-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-2xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+}
+
+.af-design-review-head .eyebrow,
+.af-design-review-head h2,
+.af-design-review-head p {
+  margin: 0;
+}
+
+.af-design-review-head h2 {
+  margin-top: var(--space-3xs);
+  color: var(--text-strong);
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+}
+
+.af-design-review-head p {
+  margin-top: var(--space-xs);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+
+.af-design-review-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.af-design-review-metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-height: var(--space-5xl);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-tight);
+}
+
+.af-design-review-metrics strong {
+  color: var(--text-strong);
+  font-weight: var(--fw-semibold);
 }
 
 .af-design-grid {
   display: grid;
-  grid-template-columns: 338px minmax(0, 1fr) 320px;
-  gap: 12px;
-  min-height: 70vh;
+  grid-template-columns: minmax(18rem, 0.28fr) minmax(0, 1fr) minmax(18rem, 0.25fr);
+  gap: var(--space-lg);
+  min-height: clamp(24rem, 42vh, 28rem);
 }
 
 /* Inspector 비활성 시(DesignWorkbench INSPECTOR_ENABLED=false): 우측 320px Inspector
    열을 없애고 캔버스(1fr)가 그 영역까지 차지한다. 아래 1100px collapse 규칙이
    소스 순서상 뒤에 있어 좁은 화면에서는 동일하게 1열로 접힌다. */
 .af-design-grid--no-inspector {
-  grid-template-columns: 338px minmax(0, 1fr);
+  grid-template-columns: minmax(18rem, 0.26fr) minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {
@@ -51,22 +108,67 @@
   overflow-y: auto;
 }
 
+.af-design-context-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.af-design-context-head span,
+.af-design-canvas-title span {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.af-design-context-head strong,
+.af-design-canvas-title strong {
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+
 .af-design-canvas-pane {
-  min-height: 480px;
+  min-height: 24rem;
   overflow: hidden;
   min-width: 0;
 }
 
 .af-design-canvas-pane > .af-design-canvas-toolbar {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
   border-bottom: 1px solid var(--line);
 }
 
+.af-design-canvas-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.af-design-canvas-toolbar .ui-button {
+  flex: 0 0 auto;
+}
+
+.af-design-canvas-pane .graph-canvas-stage {
+  height: clamp(24rem, 40vh, 32rem);
+}
+
 .af-design-canvas-loading {
-  min-height: 480px;
+  min-height: 24rem;
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -79,6 +181,7 @@
   gap: 4px;
   padding: 8px;
   border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .af-design-tab {
@@ -119,7 +222,7 @@
   max-height: none;
   overflow: visible;
   background: transparent;
-  padding: 12px;
+  padding: var(--space-lg);
 }
 
 .af-design-sidebar > .graph-element-editor {
@@ -299,7 +402,7 @@
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  height: clamp(260px, 48vh, 420px);
+  height: clamp(16rem, 30vh, 20rem);
   overflow: hidden;
 }
 

@@ -16,14 +16,18 @@
 
 - 상단(`WorkbenchLayout`): `Agent Factory` 이름, artifact root 전환, approval gate chip 4개, stage navigation.
 - stage navigation은 `/af/:reqId/analyze`, `/design`, `/build`, `/verify`로 4개 승인 스테이지를 나누고, 그 뒤에 **게이트 없는 보조 nav `실행`(`/af/:reqId/run`)**, `Reuse Hub`(`/catalog`), `Mock Lab`(`/mock-lab`)을 둔다. `실행`과 `Mock Lab`은 `afRunStageIds`(= manifest 스키마/게이트 칩의 원천)에 넣지 않는다 — 보조 nav 링크일 뿐이다.
-- 스테이지 내부(`StageShell`): CLI 스킬 한 단계를 **좌측 스텝 레일(1실행·2검토·3승인)** 로 더 잘게 나눠, 선택된 스텝의 작업면만 중앙에 보인다. 한 화면에 실행+검토+승인을 한꺼번에 쌓지 않는다.
-  - 좌측 레일: 스텝별 상태 글리프(`done ✓` / `current ●` / `todo ○` / `blocked ⚠`)와 활성 스텝 강조(accent 테두리·좌측 바·채운 index), 그리고 하단의 "다음에 할 일" 가이드 블록.
-  - 중앙 상단: 항상 보이는 요약 strip(핵심 산출물 한 줄 요약). 그 아래 활성 스텝 콘텐츠. 하단: 다음 단계로 가는 next-action CTA(강한 가이드).
+- 스테이지 내부(`StageShell`): CLI 스킬 한 단계를 **compact header stepper(실행·검토·승인)** 로 더 잘게 나눠, 선택된 스텝의 작업면만 본문에 보인다. 한 화면에 실행+검토+승인을 한꺼번에 쌓지 않는다.
+  - header stepper: 스텝별 상태 글리프(`done ✓` / `current ●` / `todo ○` / `blocked ⚠`)와 활성 스텝 강조(accent 테두리·채운 index)를 stage header 안에 둔다. StageShell은 더 이상 220px 좌측 컬럼을 예약하지 않는다.
+  - summary/guidance: stage header 아래에 항상 보이는 요약 strip(핵심 산출물 한 줄 요약)과 compact "다음에 할 일" guidance strip을 둔다. 하단에는 다음 단계로 가는 next-action CTA(강한 가이드)를 유지한다.
   - 활성 스텝은 얕은 `?step=run|review|approve` 쿼리 파라미터로 관리하고(`useStageStep`), 파라미터가 없으면 첫 미완료 스텝으로 착지한다. 스텝 status는 manifest.approvals + 산출물 존재에서 **읽기만** 하고 게이트를 재계산하지 않는다.
   - 게이트 토글(승인 스텝)은 `useApprovalGate` 경유다. Skill Runner 성공이 게이트를 자동으로 켜지 않는다.
-- Design 검토 스텝은 **상/하 분할**(`af-design-split`)이다. **상단**은 `[선택 노드/엣지 정보 패널 │ 넓은 그래프 캔버스]` 2열이고, 좌측 패널은 선택한 노드/엣지 상세(재사용 `GraphInspector`)만 표시한다(선택이 없으면 안내 문구). **하단**은 신규 전체폭 패널(`af-design-bottom`)로, 모듈·Runtime 계약·Remote A2A·검토 메모 탭 목록을 담는다(상단 캔버스+좌측 패널 아래로 화면이 확장된다). 경로 하이라이트는 별도 탭이 아니라 `검토 메모` 탭 안의 섹션으로(코멘트와 함께) 들어간다. 우측 Inspector 패널은 그래프 뷰에 폭을 양보하려고 비활성화돼 있다(`DesignWorkbench`의 `INSPECTOR_ENABLED=false`, `GraphCanvas`는 `hideInspector`로 `.graph-canvas-root--no-inspector` 1열). 플래그를 `true`로 되돌리면 상단 grid 에 Inspector 열이 복원된다. 비활성 동안 우측 Runtime 계약 편집기와 노드/엣지 앵커 코멘트 작성은 휴면이다. Remote A2A 계약 편집은 하단 `Remote A2A` 탭에서 활성화되어 목록 아래에 편집 surface를 둔다. Verify는 승인 게이트가 없어 2스텝(실행·기록)만 쓴다. `실행` 화면은 스텝 레일 없는 단일 도구 화면으로, ADK 런타임 연결 제어 + ADK 공식 dev UI(`web_url`, :8765)로의 링크 버튼만 둔다(AF 자체 간이 챗은 제거).
+- Analyze는 분석 결과가 있으면 review/evidence/missing-information/approval path가 주 작업면이 되고, run 스텝은 입력 보강·재분석·JSON import를 위한 refresh path로 읽힌다.
+- Design 검토 스텝은 **상/하 분할**(`af-design-split`)이다. **상단**은 `[선택 노드/엣지 정보 패널 │ 넓은 그래프 캔버스]` 2열이고, 좌측 패널은 선택한 노드/엣지 상세(재사용 `GraphInspector`)만 표시한다(선택이 없으면 안내 문구). **하단**은 신규 전체폭 패널(`af-design-bottom`)로, 모듈·Runtime 계약·Remote A2A·검토 메모 탭 목록을 담는다(상단 캔버스+좌측 패널 아래로 화면이 확장된다). 경로 하이라이트는 별도 탭이 아니라 `검토 메모` 탭 안의 섹션으로(코멘트와 함께) 들어간다. 우측 Inspector 패널은 그래프 뷰에 폭을 양보하려고 비활성화돼 있다(`DesignWorkbench`의 `INSPECTOR_ENABLED=false`, `GraphCanvas`는 `hideInspector`로 `.graph-canvas-root--no-inspector` 1열). 플래그를 `true`로 되돌리면 상단 grid 에 Inspector 열이 복원된다. 비활성 동안 우측 Runtime 계약 편집기와 노드/엣지 앵커 코멘트 작성은 휴면이다. Remote A2A 계약 편집은 하단 `Remote A2A` 탭에서 활성화되어 목록 아래에 편집 surface를 둔다.
+- Build 실행 스텝은 `계약 동기화 + runtime-stub 재생성` compound action, 상태 요약, stream log를 primary scan path에 둔다. 수동 scaffold/runtime-stub 버튼은 advanced manual controls로 내려 secondary path로 표시한다.
+- Verify는 승인 게이트가 없어 2스텝(실행·기록)만 쓴다. 실행 화면은 allow-list 검증 명령과 stream log가 한 화면에서 읽히고, 기록 화면은 `validation-report.md`와 `catalog-delta.yaml` 편집 surface를 나란히 둔다.
+- 게이트 없는 보조 nav `실행` 화면은 StageShell stepper를 쓰지 않는 단일 도구 화면으로, ADK 런타임 연결 제어 + ADK 공식 dev UI(`web_url`, :8765)로의 링크 버튼만 둔다(AF 자체 간이 챗은 제거).
 
-980px 이하에서는 stage navigation과 gate chip이 줄바꿈되어도 본문을 밀어내지 않도록 간격을 줄이고, 860px 이하에서는 StageShell 좌측 레일이 가로 탭으로 접힌다.
+현재 workbench 운영/QA 기준은 desktop viewport다. StageShell은 desktop에서 compact stepper, summary/guidance strip, stage-specific workspace가 겹치지 않고 읽히는 것을 우선 계약으로 삼는다. 좁은 viewport에서는 header stepper와 gate chip이 줄바꿈되어도 본문을 밀어내지 않도록 간격을 줄이지만, mobile/tablet 화면은 이 문서의 acceptance baseline이 아니다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
 
 ## 스타일시트 구조와 캐스케이드 레이어
@@ -207,6 +211,7 @@ LLM 초안은 바로 적용하지 않고, 누락 항목 답변, patch preview, `
 
 `packages/web/src/components/GraphCanvas.tsx` 와 `packages/web/src/components/graph/*`(렌더링 레이어: layout·nodeTypes·edgeTypes·containerOverlay·validationBanner) 가 Graph IR 로부터 노드, 엣지, 컨테이너 overlay 를 만든다. `packages/web/src/graph/` 는 순수 graph-IR 엔진 헬퍼(`containerMembership.ts`)만 남는다.
 node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md`의 Graph IR 규칙을 따른다.
+Design 검토 화면의 GraphCanvas stage는 desktop review 기준으로 24rem-32rem 높이를 유지해 그래프가 후보 목록 아래에서 과하게 눌리지 않게 한다.
 
 **Marker / overlay 스타일**
 - `parallel_region`, `loop_region`, `human_review_region`, `remote_boundary`는 `ContainerOverlay`의 점선 region으로 표시한다.

@@ -45,6 +45,13 @@ const stepGlyph: Record<StageStepStatus, string> = {
   blocked: "⚠"
 };
 
+const stepStatusLabel: Record<StageStepStatus, string> = {
+  done: "완료",
+  current: "현재",
+  todo: "대기",
+  blocked: "잠김"
+};
+
 /**
  * `?step=` 쿼리 파라미터로 활성 스텝을 얕게 관리한다. 파라미터가 없거나
  * 유효하지 않으면 `fallback`(보통 첫 미완료 스텝)으로 착지한다 — 강한 가이드.
@@ -81,59 +88,68 @@ export function StageShell({
 }: StageShellProps) {
   return (
     <div className="af-stage-shell">
-      <aside className="af-step-rail" aria-label="단계">
-        <ol className="af-step-list">
-          {steps.map((step, index) => {
-            const isActive = step.id === activeStep;
-            const locked = step.available === false;
-            return (
-              <li key={step.id}>
-                <button
-                  type="button"
-                  className={[
-                    "af-step",
-                    `af-step-${step.status}`,
-                    isActive ? "af-step-active" : "",
-                    locked ? "af-step-locked" : ""
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-current={isActive ? "step" : undefined}
-                  disabled={locked}
-                  onClick={() => onStepChange(step.id)}
-                >
-                  <span className="af-step-index" aria-hidden="true">
-                    {step.status === "done" ? stepGlyph.done : index + 1}
-                  </span>
-                  <span className="af-step-body">
-                    <span className="af-step-label">{step.label}</span>
-                    {step.hint ? <span className="af-step-hint">{step.hint}</span> : null}
-                  </span>
-                  <span className="af-step-glyph" aria-hidden="true">
-                    {stepGlyph[step.status]}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        {nextAction?.hint ? (
-          <div className="af-step-guide">
-            <span className="af-step-guide-eyebrow">다음에 할 일</span>
-            <p>{nextAction.hint}</p>
-          </div>
-        ) : null}
-      </aside>
-
       <section className="af-stage-main">
-        <header className="af-stage-main-head">
-          <div>
-            {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-            <h1>{title}</h1>
-          </div>
-        </header>
+        <header className="af-stage-header">
+          <div className="af-stage-header-row">
+            <div className="af-stage-title">
+              {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+              <h1>{title}</h1>
+            </div>
 
-        {summary ? <div className="af-stage-summary">{summary}</div> : null}
+            <nav className="af-stage-stepper" aria-label="단계">
+              <ol className="af-step-list">
+                {steps.map((step, index) => {
+                  const isActive = step.id === activeStep;
+                  const locked = step.available === false;
+                  return (
+                    <li key={step.id}>
+                      <button
+                        type="button"
+                        className={[
+                          "af-step",
+                          `af-step-${step.status}`,
+                          isActive ? "af-step-active" : "",
+                          locked ? "af-step-locked" : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        aria-current={isActive ? "step" : undefined}
+                        disabled={locked}
+                        onClick={() => onStepChange(step.id)}
+                      >
+                        <span className="af-step-index" aria-hidden="true">
+                          {step.status === "done" ? stepGlyph.done : index + 1}
+                        </span>
+                        <span className="af-step-body">
+                          <span className="af-step-label">{step.label}</span>
+                          {step.hint ? <span className="af-step-hint">{step.hint}</span> : null}
+                        </span>
+                        <span className="af-step-state">
+                          <span className="af-step-glyph" aria-hidden="true">
+                            {stepGlyph[step.status]}
+                          </span>
+                          <span>{stepStatusLabel[step.status]}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+          </div>
+
+          {summary || nextAction?.hint ? (
+            <div className="af-stage-context">
+              {summary ? <div className="af-stage-summary">{summary}</div> : null}
+              {nextAction?.hint ? (
+                <div className="af-stage-guidance">
+                  <span className="af-stage-guidance-eyebrow">다음에 할 일</span>
+                  <p>{nextAction.hint}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </header>
 
         <div className="af-stage-step-content">{children}</div>
 

@@ -1,90 +1,110 @@
-/* =====================================================================
-   Stage shell — shared scaffold for skill stages (분석/설계/개발/검증).
-   Left vertical step rail (1실행·2검토·3승인) + main pane:
-   always-visible summary strip → active step content → next-action CTA.
-   Loaded into @layer router from ./index.css.
-   ===================================================================== */
+.af-stage-shell { min-width: 0; }
 
-.af-stage-shell {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: var(--space-5xl);
-  align-items: start;
-}
-
-/* ---- step rail ---- */
-.af-step-rail {
-  position: sticky;
-  top: var(--space-5xl);
+.af-stage-main {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xl);
+  min-width: 0;
 }
+
+.af-stage-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.af-stage-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg) var(--space-3xl);
+  min-width: 0;
+}
+
+.af-stage-title { flex: 1 1 16rem; min-width: 0; }
+
+.af-stage-title h1 {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  color: var(--text-strong);
+}
+
+.af-stage-title .eyebrow {
+  margin: 0 0 var(--space-3xs);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.af-stage-stepper { flex: 1 1 32rem; min-width: 0; }
 
 .af-step-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: var(--space-xs);
 }
 
 .af-step {
   width: 100%;
-  display: flex;
+  min-height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-button);
   background: var(--surface);
   cursor: pointer;
   text-align: left;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-.af-step:hover:not(:disabled) {
-  background: var(--surface-muted);
+.af-step:hover:not(:disabled) { background: var(--surface-muted); }
+
+.af-step:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: var(--space-3xs);
 }
 
 .af-step-active {
   border-color: var(--accent);
-  border-left-width: 3px;
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.af-step-active .af-step-label {
-  font-weight: var(--fw-semibold);
-  color: var(--text-strong);
-}
-
-.af-step-locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.af-step-locked { cursor: not-allowed; opacity: 0.58; }
 
 .af-step-index {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: var(--space-5xl);
+  height: var(--space-5xl);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
-  border: 1px solid var(--line-strong);
-  color: var(--text-muted);
-  background: var(--surface);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
 }
 
-.af-step-active .af-step-index {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--surface);
-}
+.af-step-active .af-step-index { border-color: var(--accent); background: var(--accent); color: var(--surface); }
 
 .af-step-done .af-step-index {
   border-color: var(--success-line);
@@ -93,97 +113,66 @@
 }
 
 .af-step-body {
-  flex: 1 1 auto;
   display: flex;
-  flex-direction: column;
   min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3xs);
 }
 
 .af-step-label {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
   color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
 }
+
+.af-step-active .af-step-label { color: var(--text-strong); }
 
 .af-step-hint {
-  font-size: var(--fs-2xs);
+  overflow-wrap: anywhere;
   color: var(--text-subtle);
-}
-
-.af-step-glyph {
-  flex: 0 0 auto;
-  font-size: var(--fs-sm);
-  color: var(--text-subtle);
-}
-
-.af-step-done .af-step-glyph {
-  color: var(--success-line);
-}
-
-.af-step-current .af-step-glyph {
-  color: var(--accent);
-}
-
-.af-step-blocked .af-step-glyph {
-  color: var(--danger-text);
-}
-
-/* ---- "다음에 할 일" guide block (strong guidance) ---- */
-.af-step-guide {
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
-  padding: var(--space-lg);
-}
-
-.af-step-guide-eyebrow {
-  display: block;
   font-size: var(--fs-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: var(--fw-semibold);
-  color: var(--accent-strong);
-  margin-bottom: var(--space-2xs);
+  line-height: var(--lh-tight);
 }
 
-.af-step-guide p {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  line-height: var(--lh-normal);
+.af-step-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3xs);
+  color: var(--text-subtle);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
 }
 
-/* ---- main pane ---- */
-.af-stage-main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xl);
+.af-step-done .af-step-state { color: var(--success-text); }
+
+.af-step-current .af-step-state { color: var(--accent-strong); }
+
+.af-step-blocked .af-step-state { color: var(--danger-text); }
+
+.af-stage-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.42fr);
+  gap: var(--space-lg);
+  align-items: stretch;
   min-width: 0;
 }
 
-.af-stage-main-head h1 {
-  margin: 0;
-  font-size: var(--fs-2xl);
-  font-weight: var(--fw-bold);
-  color: var(--text-strong);
-}
+.af-stage-context > .af-stage-summary:only-child,
+.af-stage-context > .af-stage-guidance:only-child { grid-column: 1 / -1; }
 
-.af-stage-main-head .eyebrow {
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0 0 var(--space-3xs);
-}
-
-/* ---- always-visible summary strip ---- */
 .af-stage-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2xl);
-  padding: var(--space-lg) var(--space-2xl);
+  gap: var(--space-md) var(--space-2xl);
+  min-width: 0;
+  padding: var(--space-md) var(--space-2xl);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-button);
   background: var(--surface);
 }
 
@@ -191,28 +180,62 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3xs);
+  min-width: min-content;
 }
 
 .af-stage-summary-item > span {
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .af-stage-summary-item > strong {
+  color: var(--text-strong);
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+
+.af-stage-guidance {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2xs);
+  min-width: 0;
+  padding: var(--space-md) var(--space-2xl);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-button);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.af-stage-guidance-eyebrow {
+  color: var(--accent-strong);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.af-stage-guidance p {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  overflow-wrap: anywhere;
 }
 
 .af-stage-step-content {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xl);
+  min-width: 0;
 }
 
-/* compact inline notice (import/save/manifest messages) */
 .af-stage-notice {
   display: flex;
   flex-wrap: wrap;
@@ -221,15 +244,12 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-button);
   background: var(--surface-muted);
-  font-size: var(--fs-sm);
   color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 
-.af-stage-notice .is-error {
-  color: var(--danger-text);
-}
+.af-stage-notice .is-error { color: var(--danger-text); }
 
-/* ---- next-action CTA (strong guidance) ---- */
 .af-stage-cta {
   display: flex;
   justify-content: flex-end;
@@ -237,27 +257,35 @@
   padding-top: var(--space-sm);
 }
 
-.af-stage-cta .ui-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.af-stage-cta .ui-button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+@media (max-width: 980px) {
+  .af-stage-header-row { align-items: stretch; }
+
+  .af-stage-title,
+  .af-stage-stepper { flex-basis: 100%; }
+
+  .af-stage-context { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ---- narrow width: rail becomes a horizontal tab strip ---- */
-@media (max-width: 860px) {
-  .af-stage-shell {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 520px) {
+  .af-step-list { grid-template-columns: minmax(0, 1fr); }
+
+  .af-step { grid-template-columns: auto minmax(0, 1fr); }
+
+  .af-step-state {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: calc(var(--space-5xl) + var(--space-sm));
   }
 
-  .af-step-rail {
-    position: static;
+  .af-stage-summary,
+  .af-stage-guidance,
+  .af-stage-notice {
+    padding-inline: var(--space-lg);
   }
 
-  .af-step-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
+  .af-stage-cta { justify-content: stretch; }
 
-  .af-step {
-    flex: 1 1 auto;
-  }
+  .af-stage-cta .ui-button { width: 100%; }
 }

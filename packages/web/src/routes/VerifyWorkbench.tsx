@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { EmptyState, Panel } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
-import { useRunVerify, VERIFY_COMMANDS, type VerifyRunResult } from "../state/useVerify";
+import { useRunVerify, type VerifyRunResult } from "../state/useVerify";
 import type { ProcessStreamEvent } from "../state/useStreamingProcess";
-
-interface StreamLogEntry {
-  id: number;
-  text: string;
-}
+import { VerifyReviewStep } from "./verify/VerifyReviewStep";
+import { VerifyRunStep } from "./verify/VerifyRunStep";
+import { formatProcessStreamLogLine, type StreamLogEntry } from "./verify/verifyStreamLog";
 
 type VerifyStepId = "run" | "review";
 const VERIFY_STEP_IDS: VerifyStepId[] = ["run", "review"];
@@ -111,13 +109,13 @@ export default function VerifyWorkbench() {
   const steps: StageStep[] = [
     {
       id: "run",
-      label: "1. 실행",
-      hint: "검증 명령",
+      label: "실행",
+      hint: "명령·로그",
       status: ranSomething ? "done" : activeStep === "run" ? "current" : "todo"
     },
     {
       id: "review",
-      label: "2. 기록",
+      label: "기록",
       hint: "report·delta",
       status: activeStep === "review" ? "current" : "todo"
     }
@@ -164,146 +162,59 @@ export default function VerifyWorkbench() {
       {notice}
 
       {activeStep === "run" ? (
-        <Panel>
-          <SectionHeader
-            title="검증 명령 실행"
-            description="검증 명령은 허용 목록으로만 child_process 로 실행됩니다. catalog/*.yaml 은 직접 편집하지 않습니다."
-          />
-          <div className="af-verify-grid">
-            {VERIFY_COMMANDS.map((command) => (
-              <article key={command.key} className="af-verify-card">
-                <header>
-                  <strong>{command.label}</strong>
-                  <code>{command.key}</code>
-                </header>
-                <p>{command.description}</p>
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={runVerify.isPending}
-                  onClick={() => handleRun(command.key)}
-                >
-                  {runVerify.isPending && runningCommand === command.key ? "실행 중…" : "실행"}
-                </Button>
-              </article>
-            ))}
-          </div>
-          {verifyStreamLog.length > 0 ? (
-            <div className="af-stream-log-panel">
-              <div className="af-stream-log-header">
-                <strong>실시간 로그</strong>
-                <span>{runVerify.isPending ? "실행 중" : "마지막 실행"}</span>
-              </div>
-              <pre ref={verifyStreamLogRef} className="af-stream-log">
-                {verifyStreamLog.map((entry) => entry.text).join("")}
-              </pre>
-            </div>
-          ) : null}
-          {lastRun ? (
-            <div className="af-verify-result">
-              <p>
-                <strong>{lastRun.command_key}</strong> · exit {lastRun.exit_code} · {lastRun.ok ? "통과" : "실패"}
-              </p>
-              <p>
-                <code>{lastRun.command}</code>
-              </p>
-              {lastRun.stdout ? (
-                <details open>
-                  <summary>stdout</summary>
-                  <pre>{lastRun.stdout}</pre>
-                </details>
-              ) : null}
-              {lastRun.stderr ? (
-                <details open>
-                  <summary>stderr</summary>
-                  <pre>{lastRun.stderr}</pre>
-                </details>
-              ) : null}
-            </div>
-          ) : null}
-        </Panel>
+        <VerifyRunStep
+          isPending={runVerify.isPending}
+          lastRun={lastRun}
+          onRun={handleRun}
+          runningCommand={runningCommand}
+          streamLog={verifyStreamLog}
+          streamLogRef={verifyStreamLogRef}
+        />
       ) : null}
 
       {activeStep === "review" ? (
-        <>
-          <Panel>
-            <SectionHeader
-              title="validation-report.md"
-              description="검증 명령 결과와 잔존 위험을 markdown 으로 정리합니다."
-              action={
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={!reportDirty || saveReport.isPending}
-                  onClick={() =>
-                    saveReport.mutate(
-                      { content: reportDraft, etag: reportArtifact.data?.etag ?? null },
-                      {
-                        onSuccess: () => {
-                          setActionMessage("validation-report.md 저장 완료");
-                          setReportDirty(false);
-                        },
-                        onError: (error) =>
-                          setActionMessage(error instanceof Error ? error.message : "validation-report 저장 실패")
-                      }
-                    )
-                  }
-                >
-                  {saveReport.isPending ? "저장 중…" : "저장"}
-                </Button>
+        <VerifyReviewStep
+          deltaDraft={deltaDraft}
+          deltaDirty={deltaDirty}
+          deltaExists={Boolean(deltaArtifact.data)}
+          isDeltaSaving={saveDelta.isPending}
+          isReportSaving={saveReport.isPending}
+          onDeltaChange={(value) => {
+            setDeltaDraft(value);
+            setDeltaDirty(true);
+          }}
+          onDeltaSave={() =>
+            saveDelta.mutate(
+              { content: deltaDraft, etag: deltaArtifact.data?.etag ?? null },
+              {
+                onSuccess: () => {
+                  setActionMessage("catalog-delta.yaml 저장 완료");
+                  setDeltaDirty(false);
+                },
+                onError: (error) => setActionMessage(error instanceof Error ? error.message : "catalog-delta 저장 실패")
               }
-            />
-            <textarea
-              value={reportDraft}
-              onChange={(event) => {
-                setReportDraft(event.target.value);
-                setReportDirty(true);
-              }}
-              rows={10}
-              className="af-markdown-editor"
-              placeholder="# Validation report&#10;&#10;- 명령: …&#10;- 결과: …&#10;- 잔존 위험: …"
-            />
-          </Panel>
-
-          <Panel>
-            <SectionHeader
-              title="catalog-delta.yaml"
-              description="catalog 변경 제안만 기록합니다 (실제 catalog/*.yaml 은 절대 직접 편집하지 않습니다)."
-              action={
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={!deltaDirty || saveDelta.isPending}
-                  onClick={() =>
-                    saveDelta.mutate(
-                      { content: deltaDraft, etag: deltaArtifact.data?.etag ?? null },
-                      {
-                        onSuccess: () => {
-                          setActionMessage("catalog-delta.yaml 저장 완료");
-                          setDeltaDirty(false);
-                        },
-                        onError: (error) =>
-                          setActionMessage(error instanceof Error ? error.message : "catalog-delta 저장 실패")
-                      }
-                    )
-                  }
-                >
-                  {saveDelta.isPending ? "저장 중…" : "저장"}
-                </Button>
+            )
+          }
+          onReportChange={(value) => {
+            setReportDraft(value);
+            setReportDirty(true);
+          }}
+          onReportSave={() =>
+            saveReport.mutate(
+              { content: reportDraft, etag: reportArtifact.data?.etag ?? null },
+              {
+                onSuccess: () => {
+                  setActionMessage("validation-report.md 저장 완료");
+                  setReportDirty(false);
+                },
+                onError: (error) => setActionMessage(error instanceof Error ? error.message : "validation-report 저장 실패")
               }
-            />
-            <textarea
-              value={deltaDraft}
-              onChange={(event) => {
-                setDeltaDraft(event.target.value);
-                setDeltaDirty(true);
-              }}
-              rows={10}
-              className="af-markdown-editor af-yaml-editor"
-              placeholder={`proposed_additions:\n  - category: adapter\n    name: …\n    rationale: …\n`}
-            />
-          </Panel>
-        </>
+            )
+          }
+          reportDraft={reportDraft}
+          reportDirty={reportDirty}
+          reportExists={Boolean(reportArtifact.data)}
+        />
       ) : null}
     </StageShell>
   );
@@ -316,29 +227,4 @@ function VerifySummaryItem({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function formatProcessStreamLogLine(event: ProcessStreamEvent): string {
-  const data = event.data;
-  if (event.event === "stdout" || event.event === "stderr") {
-    return `[${event.event}] ${withTrailingNewline(valueToString(data.chunk))}`;
-  }
-  if (event.event === "start") {
-    return `[start] ${valueToString(data.command ?? data.command_key ?? "process")}\n`;
-  }
-  if (event.event === "done") {
-    return `[done] exit ${valueToString(data.exit_code ?? 0)}\n`;
-  }
-  if (event.event === "error") {
-    return `[error] ${valueToString(data.error ?? data.message ?? "실패")}\n`;
-  }
-  return `[${event.event}] ${JSON.stringify(data)}\n`;
-}
-
-function valueToString(value: unknown): string {
-  return typeof value === "string" ? value : String(value);
-}
-
-function withTrailingNewline(value: string): string {
-  return value.endsWith("\n") ? value : `${value}\n`;
 }
