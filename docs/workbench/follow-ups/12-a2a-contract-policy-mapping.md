@@ -1,31 +1,39 @@
 # 12 — A2A 계약 정책 매핑 (auth / timeout / retry / fallback)
 
-상태: **미구현(부분).** PR-B 에서 `remote_a2a` 노드는 `RemoteA2aAgent(name, description, agent_card=<승인된 계약의 agent_card_url>, use_legacy=False)` 로 생성된다. 그러나 승인된 A2A 계약의 운영 정책 필드(auth, timeout, retry, fallback 등)는 생성 코드에 반영되지 않는다.
+상태: **완료.** `A2AContract.adk_runtime_policy`가 schema/type/UI/validator/generator에 추가됐다. Generator는 ADK가 직접 지원하는 범위만 lower한다: `RemoteA2aAgent(timeout=...)`와 `A2aRemoteAgentConfig(request_interceptors=[...])` 기반 env-backed auth 주입. `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 남기며 generated retry/fallback runtime wrapper는 만들지 않는다.
 
 ## 왜 필요한가
 
 `A2AContract` 는 high-friction 계약으로 `auth`, `token_handling`, `timeout`, `retry`, `fallback`, `cancellation`, `audit`, `data_policy`, `security_schemes`/`security_requirements`, `push_notification_policy` 등을 담는다(`schemas/a2a-contract.schema.json`, `analyzer/types.ts:A2AContract`). 현재 `emitRemoteA2aNode` 는 그중 `agent_card.agent_card_url` 만 사용한다. 운영-충실 번들이 되려면 계약의 auth/timeout/retry/fallback 이 실제 호출 동작에 반영돼야 한다.
 
-ADK 의 `RemoteA2aAgent` 는 `config=A2aRemoteAgentConfig(...)` 로 converter/`request_interceptors`(`before_request`/`after_request`)·`request_metadata`·`client_call_context` 를 주입할 수 있다(adk.dev/a2a/quickstart-consuming). auth 헤더 주입, timeout, retry/fallback 정책이 여기 매핑된다.
+ADK 의 `RemoteA2aAgent` 는 `timeout`과 `config=A2aRemoteAgentConfig(...)`의 `request_interceptors`를 지원한다. 이번 구현은 이 두 표면만 생성 코드로 사용한다. 재시도와 fallback 동작은 ADK 문서/소스에서 안정적인 wrapper contract를 확인하지 못했으므로 명시적 handoff policy로만 기록한다.
 
 ## 무엇을 해야 하는가
 
-1. **매핑 설계**: 계약 필드 → `A2aRemoteAgentConfig`/interceptor 매핑 표 정의. 예: `auth`/`security_requirements` → `before_request` 에서 헤더/토큰(단, **실 자격증명 금지** — `.agent-factory/runtime.env` 또는 env 참조만, 코드 하드코딩 금지), `timeout` → client call context, `retry`/`fallback` → interceptor 재시도/대체 이벤트.
-2. **생성기**: `emitRemoteA2aNode` 가 계약에서 위 값을 읽어 `RemoteA2aAgent(..., config=A2aRemoteAgentConfig(...))` 를 emit. 정책이 없으면 현행처럼 기본 생성 + 명시적 TODO 주석.
-3. **경계 준수**: private endpoint/credential/실데이터 금지(저장소 정책). auth 는 참조(secret 파일/env)로만, agent_card_url 은 reviewed 계약 값만.
-4. **회귀 + 검증**: 계약에 auth/timeout/retry 가 있는 fixture 로 생성 → config/interceptor 코드 포함 확인(`generate-adk-source.test.mjs`) + 실 ADK import/construct. mock A2A 서버(`scenario-i/mock_remote`)로 라이브 호출 시 헤더/타임아웃 동작 스모크(가능 범위).
+1. **완료 — 구조화 필드**: `adk_runtime_policy.timeout_seconds`, `auth.{mode,env_var,metadata_key}`, `retry_handoff`, `fallback_handoff`를 `A2AContract`에 추가했다.
+2. **완료 — 생성기**: `emitRemoteA2aNode`가 timeout과 env-backed auth interceptor만 Python source로 emit한다.
+3. **완료 — 경계 준수**: auth는 `AF_A2A_*` env var 이름만 artifact/source에 남기고 secret 값은 생성하지 않는다.
+4. **완료 — 회귀 + 검증**: generator regression이 source import/interceptor/manifest/env/readme/handoff 출력을 확인한다.
 
 ## 건드릴 파일
 
-- `scripts/generate-adk-source.mjs` (`emitRemoteA2aNode`, import 추가 시 게이팅)
+- `scripts/adk-source/remote-a2a.mjs`, `scripts/adk-source/agent-runnable.mjs`, `scripts/adk-source/support/*`
+- `schemas/a2a-contract.schema.json`, `schemas/analysis-result.schema.json`
+- `packages/web/src/analyzer/a2aNormalize.ts`, `packages/web/src/analyzer/types.ts`
+- `packages/web/src/design/A2AContractPanel.tsx`, `packages/web/src/design/a2aContractValidator.ts`
 - `scripts/generate-adk-source.test.mjs`
-- 문서: `docs/workbench/validation.md`, `CLAUDE.md`, `docs/decision-log.md`
+- 문서: `docs/workbench/validation.md`, `CLAUDE.md`, `docs/decision-log.md`, follow-up status/index
 
 ## 검증
 
-`node --test scripts/generate-adk-source.test.mjs`; 생성 번들 `ast.parse` + 실 `google-adk[a2a]` 2.2.0 import/construct; `scenario-i` mock 으로 라이브 round-trip(인증 헤더가 mock 에 도달하는지 로그 확인).
+완료 시점 검증:
+
+- `node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/analyzer/a2aNormalize.test.ts`
+- `node --experimental-strip-types --loader ./scripts/ts-extension-loader.mjs src/design/a2aContractValidator.test.ts`
+- `node --test scripts/generate-adk-source.test.mjs`
+- `node scripts/validate-artifacts.mjs templates/regression-scenarios/scenario-i-remote-a2a`
 
 ## 기반/주의
 
-- PR-B 의 remote lowering(`docs/decision-log.md` 2026-06-18 항목)과 `scenario-i-remote-a2a` 가 출발점.
-- ADK A2A 통합은 실험적(EXPERIMENTAL warning) — config/converter API 변경 가능성에 유의.
+- PR-B 의 remote lowering(`docs/decision-log.md` 2026-06-18 항목)과 `scenario-i-remote-a2a` 가 출발점이다.
+- ADK A2A 통합은 실험적(EXPERIMENTAL warning)이다. retry/fallback wrapper는 ADK-supported contract가 다시 확인될 때 별도 작업으로 다룬다.

@@ -95,6 +95,8 @@ export const A2A_ROLES = ["ROLE_USER", "ROLE_AGENT"] as const;
 export const A2A_STREAM_WRAPPERS = ["task", "message", "taskStatusUpdate", "taskArtifactUpdate"] as const;
 
 export const A2A_CONTRACT_STATUSES = ["draft", "needs_info", "approved"] as const;
+export const A2A_RUNTIME_AUTH_MODES = ["none", "bearer_env", "metadata_env"] as const;
+export const A2A_RUNTIME_FALLBACK_MODES = ["none", "manual_review", "local_event"] as const;
 
 export const RUNTIME_CONTRACT_KINDS = [
   "mcp_legacy_adapter",
@@ -188,6 +190,8 @@ export type A2APartField = (typeof A2A_PART_FIELDS)[number];
 export type A2ARole = (typeof A2A_ROLES)[number];
 export type A2AStreamWrapper = (typeof A2A_STREAM_WRAPPERS)[number];
 export type A2AContractStatus = (typeof A2A_CONTRACT_STATUSES)[number];
+export type A2ARuntimeAuthMode = (typeof A2A_RUNTIME_AUTH_MODES)[number];
+export type A2ARuntimeFallbackMode = (typeof A2A_RUNTIME_FALLBACK_MODES)[number];
 export type RuntimeContractKind = (typeof RUNTIME_CONTRACT_KINDS)[number];
 export type RuntimeContractStatus = (typeof RUNTIME_CONTRACT_STATUSES)[number];
 
@@ -425,6 +429,24 @@ export interface ModuleResolutionDraft {
   reviewer_note: string;
 }
 
+export interface A2ARuntimePolicy {
+  timeout_seconds: number | null;
+  auth: {
+    mode: A2ARuntimeAuthMode;
+    env_var: string | null;
+    metadata_key: string | null;
+  };
+  retry_handoff: {
+    max_attempts: number | null;
+    backoff_seconds: number | null;
+    retry_on: string[];
+  };
+  fallback_handoff: {
+    mode: A2ARuntimeFallbackMode;
+    message: string | null;
+  };
+}
+
 /**
  * A2A 1.0/latest interaction contract for a single remote_a2a candidate.
  * Spec §5. String fields use the runtime convention that the literal
@@ -479,6 +501,7 @@ export interface A2AContract {
     chunking_policy: string;
   };
   adk_host_mapping: string;
+  adk_runtime_policy: A2ARuntimePolicy;
   timeout: string;
   retry: string;
   fallback: string;

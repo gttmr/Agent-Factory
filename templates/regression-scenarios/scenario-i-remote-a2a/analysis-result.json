@@ -322,6 +322,25 @@
         "chunking_policy": "no chunking expected for the analysis result payload"
       },
       "adk_host_mapping": "ADK host treats this peer as a remote A2A peer mapped through the partner Agent Card",
+      "adk_runtime_policy": {
+        "timeout_seconds": 60,
+        "auth": {
+          "mode": "bearer_env",
+          "env_var": "AF_A2A_CREDITINSIGHTCO_TOKEN",
+          "metadata_key": null
+        },
+        "retry_handoff": {
+          "max_attempts": 2,
+          "backoff_seconds": 5,
+          "retry_on": [
+            "transient_transport_error"
+          ]
+        },
+        "fallback_handoff": {
+          "mode": "manual_review",
+          "message": "Route to local human reviewer when no terminal outcome arrives within timeout."
+        }
+      },
       "timeout": "60s overall budget; 10s connect timeout",
       "retry": "max 2 attempts with exponential backoff on transient transport errors only",
       "fallback": "route to local human reviewer when no terminal outcome arrives within timeout",

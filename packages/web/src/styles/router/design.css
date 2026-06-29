@@ -534,6 +534,12 @@
 @media (max-width: 860px) {
   .af-design-bottom {
     height: auto;
+    overflow: visible;
+  }
+
+  .af-design-sidebar-body {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .af-design-sidebar-body--modules {

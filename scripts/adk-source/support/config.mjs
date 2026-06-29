@@ -1,6 +1,7 @@
 import { DEFAULT_MODEL, GEMINI_FALLBACK_MODEL, RUNTIME_MCP_LABEL, RUNTIME_MCP_NOTE } from "../context.mjs";
 import { pyNodeName } from "../naming.mjs";
 import { toPyStr, toPythonLiteral, yamlScalar } from "../python-literals.mjs";
+import { remoteA2aEnvVars } from "../remote-a2a.mjs";
 
 export function buildAgentsConfig({ modules, defaultAgentInstruction, adapterConnection }) {
   const lines = [];
@@ -166,7 +167,8 @@ export function buildMockConfigYaml({ modules, adapterConnection }) {
   return `${lines.join("\n")}\n`;
 }
 
-export function buildEnvExample() {
+export function buildEnvExample({ analysisResult, modules }) {
+  const remoteEnvLines = remoteA2aEnvVars({ analysisResult, modules }).map((envVar) => `# ${envVar}=...`);
   return `# Agent Factory 공유 runtime env template입니다.
 # 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
 # AF_LLM_PROVIDER=auto 는 AF_VLLM_*가 있으면 vLLM, 없으면 Gemini fallback을 사용합니다.
@@ -178,6 +180,7 @@ AF_VLLM_MODEL=hosted_vllm/local-model
 # GOOGLE_API_KEY=...
 # PYTHONUTF8=1
 # AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5173/api/mock-lab/mcp
+${remoteEnvLines.length ? `\n# Remote A2A auth env vars\n${remoteEnvLines.join("\n")}\n` : ""}
 `;
 }
 

@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
 import { RUNTIME_MCP_LABEL } from "../context.mjs";
+import { remoteA2aEnvVars, remoteA2aRuntimeRows } from "../remote-a2a.mjs";
 import { sampleConversationTranscript } from "./samples.mjs";
 
 export function buildReadme(context) {
@@ -46,6 +47,8 @@ Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-f
 Windows + LiteLLM 실행 환경에서는 \`PYTHONUTF8=1\`을 함께 둡니다.
 
 ${buildMockLabRunMarkdown(context)}
+
+${buildRemoteA2aRuntimePolicyMarkdown(context)}
 
 ${buildSampleDialogueMarkdown(context)}
 
@@ -98,7 +101,8 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 `;
 }
 
-export function buildImplementationHandoff({ scaffoldPlan, normalizedRequirement, outputMode, unconnectedAdapters }) {
+export function buildImplementationHandoff(context) {
+  const { scaffoldPlan, normalizedRequirement, outputMode, unconnectedAdapters } = context;
   const todoLines = scaffoldPlan.modules.flatMap((module) =>
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
@@ -123,6 +127,8 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 ## 미연결 adapter
 
 ${unconnected.length ? unconnected.join("\n") : "- none"}
+
+${buildRemoteA2aHandoffMarkdown(context)}
 
 ## 검토된 TODO
 
@@ -165,6 +171,37 @@ function mockSpecRelativePath({ outputRoot, artifactRoot }) {
 
 function buildSampleDialogueMarkdown(context) {
   return ["## Sample ADK Web messages", "", "```text", sampleConversationTranscript(context), "```"].join("\n");
+}
+
+function buildRemoteA2aRuntimePolicyMarkdown(context) {
+  const rows = remoteA2aRuntimeRows(context);
+  if (!rows.length) return "";
+  const lines = rows.map((row) => {
+    const auth = row.adk_runtime_policy?.auth;
+    const timeout = row.adk_runtime_policy?.timeout_seconds ?? "null";
+    const authText = auth?.mode === "none" ? "none" : `${auth?.mode ?? "missing"} via ${auth?.env_var ?? "missing env"}`;
+    return `- ${row.module_name} (${row.contract_id}): timeout_seconds=${timeout}, auth=${authText}`;
+  });
+  return `## Remote A2A runtime policy
+
+${lines.join("\n")}
+
+retry_handoff and fallback_handoff are reviewed handoff policy; this generator does not emit retry/fallback wrappers.
+`;
+}
+
+function buildRemoteA2aHandoffMarkdown(context) {
+  const rows = remoteA2aRuntimeRows(context);
+  if (!rows.length) return "";
+  const envVars = remoteA2aEnvVars(context);
+  return `## Remote A2A runtime policy
+
+${rows
+  .map((row) => `- ${row.module_name} (${row.contract_id}): set reviewed env-backed auth before smoke runs.`)
+  .join("\n")}
+${envVars.length ? `- Required env vars: ${envVars.join(", ")}` : "- Required env vars: none"}
+- Remote A2A retry/fallback policy is not generated as an ADK retry wrapper; keep it in operator handoff until an ADK-supported runtime policy is reviewed.
+`;
 }
 
 function buildMockLabRunMarkdown(context) {

@@ -14,7 +14,7 @@
 // - Drop orphan contracts whose `remote_module_id` does not match any
 //   candidate, and report each removal.
 
-import type { AnalysisResult, A2AContract, ModuleCandidate } from "./types";
+import type { AnalysisResult, A2AContract, A2ARuntimePolicy, ModuleCandidate } from "./types";
 
 // Required candidate fields that must carry a non-empty string per spec §5.
 // `a2a_contract_id` is included so candidates link to their contract.
@@ -50,6 +50,9 @@ export const A2A_CONTRACT_REQUIRED_STRING_FIELDS = [
   "data_policy"
 ] as const;
 
+const A2A_RUNTIME_AUTH_MODES = ["none", "bearer_env", "metadata_env"] as const;
+const A2A_RUNTIME_FALLBACK_MODES = ["none", "manual_review", "local_event"] as const;
+
 export interface A2ANormalizationDiagnostic {
   /** "candidate_filled" | "contract_filled" | "contract_minted" | "contract_orphan_removed" */
   kind: "candidate_filled" | "contract_filled" | "contract_minted" | "contract_orphan_removed";
@@ -64,6 +67,26 @@ export interface A2ANormalizationDiagnostic {
 export interface A2ANormalizationResult {
   result: AnalysisResult;
   diagnostics: A2ANormalizationDiagnostic[];
+}
+
+export function buildDefaultA2ARuntimePolicy(): A2ARuntimePolicy {
+  return {
+    timeout_seconds: null,
+    auth: {
+      mode: "bearer_env",
+      env_var: null,
+      metadata_key: null
+    },
+    retry_handoff: {
+      max_attempts: null,
+      backoff_seconds: null,
+      retry_on: []
+    },
+    fallback_handoff: {
+      mode: "manual_review",
+      message: null
+    }
+  };
 }
 
 /**
@@ -118,6 +141,7 @@ export function buildPlaceholderContract(contractId: string, remoteModuleId: str
       chunking_policy: "needs_info"
     },
     adk_host_mapping: "needs_info",
+    adk_runtime_policy: buildDefaultA2ARuntimePolicy(),
     timeout: "needs_info",
     retry: "needs_info",
     fallback: "needs_info",
@@ -267,7 +291,6 @@ export function normalizeA2A(input: AnalysisResult | null | undefined): A2ANorma
     }
   }
 
-  // Pass 3: fill required string fields on contracts (do not overwrite real values).
   for (const contract of keptContracts) {
     const filled: string[] = [];
     const contractRecord = contract as unknown as Record<string, unknown>;
@@ -277,6 +300,11 @@ export function normalizeA2A(input: AnalysisResult | null | undefined): A2ANorma
         contractRecord[field] = "needs_info";
         filled.push(field);
       }
+    }
+    const normalizedPolicy = normalizeA2ARuntimePolicy(contractRecord.adk_runtime_policy);
+    if (normalizedPolicy.changed) {
+      contractRecord.adk_runtime_policy = normalizedPolicy.policy;
+      filled.push("adk_runtime_policy");
     }
     if (filled.length > 0) {
       diagnostics.push({
@@ -317,6 +345,79 @@ export function createA2AContractForCandidate(analysis: AnalysisResult, candidat
     ),
     a2aContracts: [...(analysis.a2aContracts ?? []), contract]
   };
+}
+
+function normalizeA2ARuntimePolicy(value: unknown): { policy: A2ARuntimePolicy; changed: boolean } {
+  const defaults = buildDefaultA2ARuntimePolicy();
+  if (!isRecord(value)) return { policy: defaults, changed: true };
+
+  let changed = false;
+  const authSource = isRecord(value.auth) ? value.auth : {};
+  const retrySource = isRecord(value.retry_handoff) ? value.retry_handoff : {};
+  const fallbackSource = isRecord(value.fallback_handoff) ? value.fallback_handoff : {};
+
+  const authMode = isOneOf(authSource.mode, A2A_RUNTIME_AUTH_MODES) ? authSource.mode : defaults.auth.mode;
+  const fallbackMode = isOneOf(fallbackSource.mode, A2A_RUNTIME_FALLBACK_MODES)
+    ? fallbackSource.mode
+    : defaults.fallback_handoff.mode;
+  const policy: A2ARuntimePolicy = {
+    timeout_seconds: finiteNumberOrNull(value.timeout_seconds),
+    auth: {
+      mode: authMode,
+      env_var: stringOrNull(authSource.env_var),
+      metadata_key: stringOrNull(authSource.metadata_key)
+    },
+    retry_handoff: {
+      max_attempts: finiteNumberOrNull(retrySource.max_attempts),
+      backoff_seconds: finiteNumberOrNull(retrySource.backoff_seconds),
+      retry_on: stringArrayOrEmpty(retrySource.retry_on)
+    },
+    fallback_handoff: {
+      mode: fallbackMode,
+      message: stringOrNull(fallbackSource.message)
+    }
+  };
+
+  changed =
+    value.timeout_seconds !== policy.timeout_seconds ||
+    value.auth !== authSource ||
+    authSource.mode !== policy.auth.mode ||
+    authSource.env_var !== policy.auth.env_var ||
+    authSource.metadata_key !== policy.auth.metadata_key ||
+    value.retry_handoff !== retrySource ||
+    retrySource.max_attempts !== policy.retry_handoff.max_attempts ||
+    retrySource.backoff_seconds !== policy.retry_handoff.backoff_seconds ||
+    !sameStringArray(retrySource.retry_on, policy.retry_handoff.retry_on) ||
+    value.fallback_handoff !== fallbackSource ||
+    fallbackSource.mode !== policy.fallback_handoff.mode ||
+    fallbackSource.message !== policy.fallback_handoff.message;
+
+  return { policy, changed };
+}
+
+function finiteNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function stringArrayOrEmpty(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function sameStringArray(left: unknown, right: string[]): boolean {
+  return Array.isArray(left) && left.length === right.length && left.every((entry, index) => entry === right[index]);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isOneOf<T extends readonly string[]>(value: unknown, values: T): value is T[number] {
+  return typeof value === "string" && values.includes(value);
 }
 
 /** Mint the next free `a2a-NNN` id given a set of used ids. */

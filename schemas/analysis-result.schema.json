@@ -529,6 +529,7 @@
         "http_paths",
         "artifact_contract",
         "adk_host_mapping",
+        "adk_runtime_policy",
         "timeout",
         "retry",
         "fallback",
@@ -669,6 +670,58 @@
           }
         },
         "adk_host_mapping": { "type": "string", "minLength": 1 },
+        "adk_runtime_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timeout_seconds", "auth", "retry_handoff", "fallback_handoff"],
+          "properties": {
+            "timeout_seconds": {
+              "anyOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "null" }]
+            },
+            "auth": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "env_var", "metadata_key"],
+              "properties": {
+                "mode": { "type": "string", "enum": ["none", "bearer_env", "metadata_env"] },
+                "env_var": {
+                  "anyOf": [{ "type": "string", "minLength": 1, "pattern": "^AF_A2A_[A-Z0-9_]+$" }, { "type": "null" }]
+                },
+                "metadata_key": {
+                  "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+                }
+              }
+            },
+            "retry_handoff": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["max_attempts", "backoff_seconds", "retry_on"],
+              "properties": {
+                "max_attempts": {
+                  "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+                },
+                "backoff_seconds": {
+                  "anyOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "null" }]
+                },
+                "retry_on": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "fallback_handoff": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode", "message"],
+              "properties": {
+                "mode": { "type": "string", "enum": ["none", "manual_review", "local_event"] },
+                "message": {
+                  "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+                }
+              }
+            }
+          }
+        },
         "timeout": { "type": "string", "minLength": 1 },
         "retry": { "type": "string", "minLength": 1 },
         "fallback": { "type": "string", "minLength": 1 },

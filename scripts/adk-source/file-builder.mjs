@@ -43,6 +43,7 @@ export function buildFiles({
   const supportContext = {
     artifactRoot,
     outputRoot,
+    analysisResult,
     normalizedRequirement,
     processFlow,
     mockLabSpec,
@@ -85,9 +86,11 @@ export function buildFiles({
         outputMode,
         packageName,
         normalizedRequirement,
+        analysisResult,
         connectedAdapters,
         unconnectedAdapters,
         scaffoldPlan,
+        modules,
         processFlow,
         graphContext,
         mockBindingFromModule
@@ -104,7 +107,7 @@ export function buildFiles({
   };
   if (outputMode === "runnable") {
     files["agents.config.yaml"] = buildAgentsConfig({ modules, defaultAgentInstruction, adapterConnection });
-    files[".env.example"] = buildEnvExample();
+    files[".env.example"] = buildEnvExample({ analysisResult, modules });
     files[".gitignore"] = buildGitignore();
   }
   return files;
@@ -114,9 +117,11 @@ function buildManifest({
   outputMode,
   packageName,
   normalizedRequirement,
+  analysisResult,
   connectedAdapters,
   unconnectedAdapters,
   scaffoldPlan,
+  modules,
   processFlow,
   graphContext,
   mockBindingFromModule
@@ -125,9 +130,11 @@ function buildManifest({
     outputMode,
     packageName,
     normalizedRequirement,
+    analysisResult,
     connectedAdapters,
     unconnectedAdapters,
     scaffoldPlan,
+    modules,
     processFlow,
     startNodeIds: () => startNodeIds(graphContext),
     terminalOutputIds: () => terminalOutputIds(graphContext),

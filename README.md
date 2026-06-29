@@ -72,6 +72,8 @@ Catalog entries are runtime-oriented contracts. For the local MVP they may also 
 
 Remote A2A is separate from Adapter. It should be proposed only when the requirement indicates an independent remote agent boundary with its own owner, lifecycle, contract, auth, timeout, retry, fallback, and audit details. Multi-step workflow alone is not enough to create Remote A2A.
 
+Reviewed Remote A2A contracts carry structured `adk_runtime_policy`. Runnable handoff maps only ADK-supported timeout and env-backed auth interceptor behavior into generated source; retry and fallback remain reviewed handoff policy, not generated retry wrappers.
+
 ## Development
 
 ```bash

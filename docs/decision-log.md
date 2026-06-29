@@ -305,6 +305,11 @@
 
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
+### Remote A2A runtime policy는 ADK-supported timeout/auth만 생성한다
+- **결정**: `A2AContract.adk_runtime_policy`를 추가하고, runnable generator는 `timeout_seconds`를 `RemoteA2aAgent(timeout=...)`로, `bearer_env`/`metadata_env` auth를 `A2aRemoteAgentConfig(request_interceptors=[...])`로만 lower한다. Auth 값은 `AF_A2A_*` env var 이름만 artifact/source에 저장한다. `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 기록하고 generated retry/fallback runtime wrapper는 만들지 않는다.
+- **배경**: ADK current source/docs에서 timeout과 request interceptor는 안정적인 생성 대상이지만, Remote A2A retry/fallback wrapper는 문서화된 runtime contract가 아니었다. 과거 prose `auth/timeout/retry/fallback` 문자열을 파싱하면 reviewer가 승인하지 않은 동작을 생성할 위험이 있다.
+- **영향**: A2A schema/types/normalizer, Remote A2A edit surface/readiness gate, artifact validator, runnable generator imports/source, manifest/env/README/handoff output, `scenario-i`/`scenario-e` fixtures, active validation docs.
+
 - **결정**: `RequestInput -> router` lowering은 human-input output dict 전체가 아니라 `response` / `choice` / `value`를 우선 route decision으로 읽는다. 숫자 alias가 있는 route-choice `RequestInput`은 ADK Web의 numeric 입력을 허용하도록 `response_schema=str`를 생략하고 router에서 문자열로 정규화한다. Workbench router node/inspector는 route value, aliases, default, target을 표시한다. Stage Runner는 caller가 catalog payload를 생략하면 active server catalog를 hydrate하고 source/count/diagnostics를 기록한다.
 - **배경**: `req-page-recommendation-required` catalog-first ADK Web QA에서 `skip_analysis` 입력이 prompt 전체 문자열의 `run_analysis`에 먼저 매칭되어 분석 branch가 실행됐고, route map과 catalog/runtime contract provenance가 UI와 artifact contract에 충분히 드러나지 않았다.
 - **영향**: ADK generator router/human-input emitters, Graph IR schemas and editor/inspector UI, runtime contract normalization/hydration, scaffold catalog binding, Stage Runner request snapshot and summary UI, validation/generator regressions.
