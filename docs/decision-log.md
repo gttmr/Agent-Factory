@@ -10,6 +10,13 @@
 
 ---
 
+## 2026-06-29 · 작업 브랜치 `artifact-root-sync-regeneration-ux` — artifact sync/regeneration 계약
+
+### Build의 기본 산출물 순서를 server-owned compound path로 고정한다
+- **결정**: Workbench의 기본 Build 실행 경로를 `POST /api/af/:reqId/artifact-sync/run`으로 정하고, operator-facing action label은 `계약 동기화 + runtime-stub 재생성`으로 둔다. 순서는 1. reviewed Graph IR을 `analysis-result.json.processFlow`에 저장, 2. `analysis-result.json`에서 split artifacts 동기화, 3. `scaffold-plan.json` 도출/쓰기, 4. `runtime-stub/` 재생성, 5. `validate-artifacts.mjs` 실행, 6. reviewer가 approval gate를 별도로 판단하는 흐름이다.
+- **배경**: Design에서 Graph IR을 저장한 뒤 split `process-flow.json`, `scaffold-plan.json`, generated `runtime-stub/`이 서로 다른 시점의 artifact를 반영할 수 있었다. client-only Build와 manual Verify를 조합하면 사용자가 어떤 순서가 canonical인지 판단해야 했고, stale state가 reviewer approval과 혼동될 위험이 있었다.
+- **영향**: `docs/workbench/validation.md`, `docs/workbench/agent-factory-harness.md`, `docs/visualization/design-system.md`. `artifact-sync/run`은 derived artifact sync, generation, validation을 수행하지만 `analysis_reviewed`, `boundaries_approved`, `runtime_contracts_approved`, `stub_ready_for_followup`은 자동 변경하지 않는다. 기존 `runtime-stub/build`와 Verify controls는 separate/advanced paths로 유지된다.
+
 ## 2026-06-23 · 작업 브랜치 `codex/adk-graph-runtime-arguments` — artifact-first generator contract 명문화
 
 ### 생성기 하드코딩보다 Graph IR/scaffold-plan 계약을 먼저 확장한다

@@ -82,6 +82,8 @@ src/styles/
 - `af-run-manifest.json` 의 `approvals.*` 가 모든 게이트 UI 의 source of truth 이다. 후보 status 로부터 다시 계산하지 않는다.
 - `af-run-manifest.json` 의 optional `stage_runs` 는 Stage Runner 실행 요약일 뿐 approval source of truth 가 아니다.
 - `localStorage` 는 최근 root 목록과 코멘트 작성자 이름/역할 캐시에만 사용한다. 단계 상태나 분석 결과는 절대 `localStorage` 에 두지 않는다.
+- Graph IR 편집 저장 후 Build 산출물은 stale 할 수 있다. Design은 `analysis-result.json.processFlow`만 저장하고, Build의 primary action `계약 동기화 + runtime-stub 재생성`이 `POST /api/af/:reqId/artifact-sync/run`으로 split artifacts, `scaffold-plan.json`, `runtime-stub/`, validation을 순서대로 맞춘다.
+- `artifact-sync/run`, manual `runtime-stub/build`, manual Verify 실행은 `analysis_reviewed`, `boundaries_approved`, `runtime_contracts_approved`, `stub_ready_for_followup`을 자동 변경하지 않는다. 게이트 UI는 reviewer action으로만 바뀌어야 한다.
 
 새 기능을 추가할 때는 우선 어느 artifact 가 source of truth 인지 확인하고, 필요한 hook 을 `state/` 에 둔 다음 화면 component 가 그 hook 만 호출하도록 연결한다. analysis-result, scaffold-plan, manifest 의 schema 는 UI refactor 때문에 바꾸지 않는다.
 
@@ -214,7 +216,7 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 
 **편집 모드**
 - `GraphCanvas`는 기본적으로 읽기 전용이다. `editable` prop이 전달된 Design 검토 스텝에서만 `편집 모드` 토글과 노드/엣지 추가, 선택 삭제, 드래그 이동, 저장/취소 컨트롤을 노출한다.
-- 편집 중에는 로컬 draft Graph IR만 바꾸고, `저장` 시 `analysis-result.json.processFlow`만 PUT 한다. `manifest.approvals.*` 게이트는 자동으로 바꾸지 않는다.
+- 편집 중에는 로컬 draft Graph IR만 바꾸고, `저장` 시 `analysis-result.json.processFlow`만 PUT 한다. `manifest.approvals.*` 게이트는 자동으로 바꾸지 않는다. 저장 성공 후 copy/next action은 Build 단계의 `계약 동기화 + runtime-stub 재생성`으로 이어져야 하며, Design save가 generator나 validator를 직접 실행하면 안 된다.
 - `카탈로그 워크플로우 삽입` 버튼은 편집 모드 draft와 별개다. picker modal은 `/api/catalog`의 workflow 항목을 이름, owner domain, version/status, responsibility로 보여주고, 선택 시 단일 `workflow` 노드와 matching `ModuleCandidate`를 `analysis-result.json`에 즉시 저장한다. 이 기능은 catalog workflow fragment를 확장하지 않고 재사용 workflow를 하나의 Graph IR node로 추가한다.
 - 편집 모드에서 선택된 노드/엣지는 좌측 정보 패널이 `GraphElementEditor`로 바뀌어 field-level 편집을 제공한다. 모듈 연결 picker는 `agent`/`workflow`/`adapter`/`remote_a2a` 노드에만 표시하고, `candidate.module_category === node.node_kind`인 후보만 연결한다. `input`/`output`/`function`/`tool`/`human_input` 등 synthetic 또는 비모듈 노드는 모듈 picker 대상에서 제외한다.
 - 새 그래프 설계의 1차 노드 메뉴는 taxonomy가 아니라 실행 흐름 중심이다: 판단, API/도구 호출, 조건 분기, 사람 입력/승인, 병합, 반복 제어, 서브워크플로우 호출, 외부 Agent 호출, 대기/callback. 내부 `node_kind`는 각각 `agent`, `adapter_call`, `router`, `human_input`, `join`, `loop_control`, `workflow_call`, `remote_agent_call`, `callback_wait`를 사용한다.
@@ -286,6 +288,14 @@ node, edge, container 의미와 marker 판정은 `docs/workbench/process-flow.md
 6. 새 Graph marker 가 필요하면 Graph IR 의미(`process-flow.md`), node/edge/container 렌더러, `features/graph.css` 색을 모두 갱신한다.
 7. 화면 단위 자손 선택자(`.foo-table td span`) 는 항상 `>` 직계 자식으로 좁힌다.
 8. 변경 후 Chrome DevTools MCP 또는 Playwright로 스크린샷을 찍어 색 매핑·레이아웃이 맞는지 시각 확인한다.
+
+## Build/Design artifact sync UX
+
+- Design save의 binary observable은 `analysis-result.json.processFlow` 갱신이다. 이 화면에서 split artifacts, `scaffold-plan.json`, `runtime-stub/`, validation 결과를 직접 쓰지 않는다.
+- Build 실행 스텝의 primary action label은 `계약 동기화 + runtime-stub 재생성`이다. 이 action은 server-owned `POST /api/af/:reqId/artifact-sync/run`을 사용하고, drift summary, written artifact list, generation command, validation command/result, live log를 운영자에게 보여준다.
+- Artifact order copy는 항상 `Graph IR 저장 → split 동기화 → scaffold-plan 작성 → runtime-stub 재생성 → validate-artifacts 실행 → reviewer approval` 순서로 쓴다.
+- 기존 scaffold-plan 저장, `runtime-stub/build`, Verify command 실행은 separate/advanced controls로 남길 수 있다. 그러나 그 UI는 primary compound path와 다른 approval 의미를 암시하지 않아야 한다.
+- Success state는 "산출물이 동기화됨"을 뜻한다. `analysis_reviewed`, `boundaries_approved`, `runtime_contracts_approved`, `stub_ready_for_followup` gate chip은 reviewer가 따로 토글하기 전까지 그대로 보여야 한다.
 
 ## 검증
 

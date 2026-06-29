@@ -129,6 +129,76 @@
   word-break: break-word;
 }
 
+.af-artifact-sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.af-artifact-sync-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+
+.af-artifact-sync-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(220px, 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.af-artifact-sync-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-4xl);
+  font-size: var(--fs-sm);
+}
+
+.af-artifact-sync-list code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.af-artifact-sync-process {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--fs-sm);
+}
+
+.af-artifact-sync-process p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.af-artifact-sync-process > code {
+  display: block;
+  padding: var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.af-artifact-sync-process small {
+  color: var(--text-subtle);
+  font-size: var(--fs-xs);
+}
+
+@media (max-width: 900px) {
+  .af-artifact-sync-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .af-markdown-editor {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
