@@ -53,7 +53,7 @@ export function ManualScaffoldPanel({
   warnings
 }: ManualScaffoldPanelProps) {
   return (
-    <Panel>
+    <Panel tone="muted" className="af-build-manual-panel">
       <SectionHeader
         eyebrow="advanced/manual"
         title="Scaffold plan 수동 제어"

@@ -27,7 +27,7 @@ export function ArtifactSyncRunPanel({
   showLog
 }: ArtifactSyncRunPanelProps) {
   return (
-    <Panel>
+    <Panel className="af-build-primary-panel">
       <SectionHeader
         eyebrow="primary"
         title="계약 동기화 + runtime-stub 재생성"
@@ -48,8 +48,10 @@ export function ArtifactSyncRunPanel({
           {compoundDisabledReason}
         </p>
       ) : null}
-      <ArtifactSyncStatusPanel result={result} isRunning={isPending} />
-      {showLog ? <StreamLogPanel entries={entries} isRunning={isLogRunning} logRef={logRef} /> : null}
+      <div className="af-build-primary-scan">
+        <ArtifactSyncStatusPanel result={result} isRunning={isPending} />
+        <StreamLogPanel entries={showLog ? entries : []} isRunning={showLog && isLogRunning} logRef={logRef} />
+      </div>
     </Panel>
   );
 }

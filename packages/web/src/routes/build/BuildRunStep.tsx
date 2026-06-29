@@ -13,8 +13,7 @@ import { useBuildRuntimeStub, useRuntimeStub, useSaveScaffoldPlan, useScaffoldPl
 import { ArtifactSyncRunPanel } from "./ArtifactSyncRunPanel";
 import { buildArtifactSyncRunOptions } from "./artifactSyncRunOptions";
 import { buildAdkGraphReadiness } from "./buildReadiness";
-import { ManualRuntimeStubPanel } from "./ManualRuntimeStubPanel";
-import { ManualScaffoldPanel } from "./ManualScaffoldPanel";
+import { ManualBuildControls } from "./ManualBuildControls";
 import { useBuildProcessLog } from "./processLog";
 
 interface BuildRunStepProps {
@@ -199,41 +198,37 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
         result={artifactSync.data ?? null}
         showLog={processLog.owner === "artifact-sync"}
       />
-      <ManualScaffoldPanel
+      <ManualBuildControls
         adapterConnections={adapterConnections}
         adkGraphReadiness={buildAdkGraphReadiness(effectivePlan)}
+        artifactSyncPending={artifactSync.isPending}
         blockers={blockers}
+        buildStubData={buildStub.data}
+        buildStubPending={buildStub.isPending}
         designGatesReady={designGatesReady}
         effectivePlan={effectivePlan}
+        entries={processLog.entries}
+        logRef={processLog.logRef}
         mockLabDiscovery={{
           data: mockLabDiscovery.data ?? null,
           error: mockLabDiscovery.error,
           isLoading: mockLabDiscovery.isLoading
         }}
         modeDirty={modeDirty}
+        onBuildStub={handleBuildStub}
         onMockLabBinding={handleMockLabBinding}
         onOutputModeChange={handleOutputModeChange}
         onSavePlan={handleSavePlan}
         outputMode={selectedOutputMode}
+        planReady={planReady}
         reqId={reqId}
         savedMode={savedMode}
         savePending={saveScaffold.isPending}
         scaffoldLoading={scaffoldLoading}
         scaffoldPlan={scaffoldPlan}
-        warnings={warnings}
-      />
-      <ManualRuntimeStubPanel
-        artifactSyncPending={artifactSync.isPending}
-        buildStubData={buildStub.data}
-        buildStubPending={buildStub.isPending}
-        designGatesReady={designGatesReady}
-        entries={processLog.entries}
-        logRef={processLog.logRef}
-        onBuildStub={handleBuildStub}
-        outputMode={selectedOutputMode}
-        planReady={planReady}
-        showLog={processLog.owner === "runtime-stub"}
+        showRuntimeStubLog={processLog.owner === "runtime-stub"}
         stubReady={stubReady}
+        warnings={warnings}
       />
     </>
   );
