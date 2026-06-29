@@ -2,6 +2,7 @@ import { Button, EmptyState, Panel, SectionHeader } from "../../ui/primitives";
 import type { ScaffoldOutputMode, ScaffoldPlan, ScaffoldPlanModule } from "../../analyzer/types";
 import type { MockLabDiscoveryPayload } from "../../state/useMockLabDiscovery";
 import type { AdkGraphReadiness } from "./buildReadiness";
+import { hasMockLabBindingTargets } from "../../mock-lab/mockLabIntegration";
 import { MockLabBindingPanel } from "./MockLabBindingPanel";
 
 interface AdapterConnections {
@@ -87,7 +88,7 @@ export function ManualScaffoldPanel({
       ) : (
         <EmptyState title="분석 결과가 없습니다" description="Analyze 단계에서 analysis-result.json 을 먼저 import 하세요." />
       )}
-      {outputMode === "runnable" && effectivePlan ? (
+      {outputMode === "runnable" && effectivePlan && hasMockLabBindingTargets(effectivePlan) ? (
         <MockLabBindingPanel
           plan={effectivePlan}
           discovery={mockLabDiscovery.data}
@@ -96,6 +97,9 @@ export function ManualScaffoldPanel({
           reqId={reqId}
           onChange={onMockLabBinding}
         />
+      ) : null}
+      {outputMode === "runnable" && effectivePlan && !hasMockLabBindingTargets(effectivePlan) ? (
+        <p className="af-landing-message">Mock Lab MCP 바인딩 대상 adapter가 없습니다. 현재 plan은 agent/workflow 중심 runtime-stub으로 생성됩니다.</p>
       ) : null}
       <BlockerList title="blockers" entries={blockers} open />
       <BlockerList title="warnings" entries={warnings} />

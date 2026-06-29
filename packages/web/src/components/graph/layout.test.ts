@@ -144,3 +144,55 @@ const afterById = new Map(layoutGraphIR(movedGraph, { nodeId: null, edgeId: null
 assert.deepEqual(afterById.get("mid"), draggedMid, "dragged node should land where dropped");
 assert.deepEqual(afterById.get("left"), beforeById.get("left"), "node left of the dragged node must not move");
 assert.deepEqual(afterById.get("right"), beforeById.get("right"), "node right of the dragged node must not move");
+
+const routeGraph: GraphIR = {
+  requirement_id: "req-route-map",
+  graph_id: "graph-route-map",
+  root_workflow_module_id: null,
+  nodes: [
+    {
+      ...flowNode("human-choice", "human_input", "human_input"),
+      label: "분기 선택",
+      human_input_contract: {
+        message: "분기값을 입력하세요.",
+        payload_schema_ref: null,
+        response_schema_ref: "str",
+        response_mapping: null,
+        choice_options: ["run_analysis", "skip_analysis"],
+        accepted_aliases: { skip_analysis: ["skip", "건너뛰기"] },
+        default_choice: "skip_analysis"
+      }
+    },
+    flowNode("router-choice", "local_graph", "router"),
+    flowNode("skip-target", "output", "output"),
+    flowNode("analysis-target", "output", "output")
+  ],
+  edges: [
+    { id: "edge-3", from: "human-choice", to: "router-choice", from_port: null, to_port: null, edge_kind: "event_output", execution_semantics: "normal_transition", data_label: "", schema_ref: null, route_condition: null, state_key: null, artifact_key: null, a2a_contract_id: null, is_remote_boundary_crossing: false },
+    { id: "edge-4", from: "router-choice", to: "skip-target", from_port: null, to_port: null, edge_kind: "route", execution_semantics: "conditional", data_label: "skip", schema_ref: null, route_condition: "choice == skip_analysis", route_aliases: ["skip", "건너뛰기"], is_default_route: true, state_key: null, artifact_key: null, a2a_contract_id: null, is_remote_boundary_crossing: false },
+    { id: "edge-5", from: "router-choice", to: "analysis-target", from_port: null, to_port: null, edge_kind: "route", execution_semantics: "conditional", data_label: "analysis", schema_ref: null, route_condition: "choice == run_analysis", route_aliases: ["analyze"], is_default_route: false, state_key: null, artifact_key: null, a2a_contract_id: null, is_remote_boundary_crossing: false }
+  ],
+  containers: [],
+  lanes: [],
+  validation: { ok: true, errors: [], warnings: [] }
+};
+const routerLayoutNode = layoutGraphIR(routeGraph, { nodeId: null, edgeId: null }, () => undefined).nodes.find(
+  (node) => node.id === "router-choice"
+);
+assert.equal(routerLayoutNode?.data.upstreamHumanPrompt, "분기값을 입력하세요.");
+assert.deepEqual(routerLayoutNode?.data.routeMap, [
+  {
+    value: "skip_analysis",
+    aliases: ["skip", "건너뛰기"],
+    isDefault: true,
+    targetNodeId: "skip-target",
+    targetLabel: "skip-target"
+  },
+  {
+    value: "run_analysis",
+    aliases: ["analyze"],
+    isDefault: false,
+    targetNodeId: "analysis-target",
+    targetLabel: "analysis-target"
+  }
+]);

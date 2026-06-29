@@ -69,7 +69,7 @@
 
 .af-runner-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) auto;
+  grid-template-columns: minmax(180px, 240px) repeat(2, auto);
   gap: 10px;
   align-items: end;
 }
@@ -185,6 +185,35 @@
 .af-runner-artifacts {
   display: grid;
   gap: 8px;
+}
+
+.af-runner-catalog-context {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted, #f0f1ec);
+  padding: 8px;
+  color: var(--text-strong);
+}
+
+.af-runner-catalog-context > strong {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+}
+
+.af-runner-catalog-context > span,
+.af-runner-catalog-context > small {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.af-runner-catalog-context > small {
+  grid-column: 1 / -1;
 }
 
 .af-runner-artifact-row {

@@ -1,0 +1,162 @@
+{
+  "schema_ref": "catalog.page_recommendation.recommend_scenario_by_behavior_type.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "recommend_scenario_by_behavior_type",
+  "title": "Recommend Scenario By Behavior Type",
+  "description": "Synthetic 행동 유형 기반 시나리오 추천 결과를 반환합니다(참조 page_id는 실데이터).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      },
+      "selected_page_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customer_behavior_hint": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "objective_text",
+      "selected_page_ids",
+      "customer_behavior_hint"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "recommended_scenarios": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "scenario_id": {
+              "type": "string"
+            },
+            "scenario_name": {
+              "type": "string"
+            },
+            "related_page_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "score": {
+              "type": "number"
+            },
+            "basis": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenario_id",
+            "scenario_name",
+            "related_page_ids",
+            "score",
+            "basis"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "recommended_scenarios"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "recommend_scenario_by_behavior_type_default_success",
+      "arguments": {
+        "objective_text": "꿀머니 이탈률 분석할래",
+        "selected_page_ids": [
+          "NWMMH00040_003M"
+        ],
+        "customer_behavior_hint": "혜택 조회 중단"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "recommended_scenarios": [
+          {
+            "scenario_id": "SCN_KKULMONEY_DROPOFF_001",
+            "scenario_name": "꿀머니 혜택 조회 중단 고객 재유도",
+            "related_page_ids": [
+              "NWMMH00040_003M"
+            ],
+            "score": 0.88,
+            "basis": "혜택 조회 중단 행동유형 기반 추천"
+          },
+          {
+            "scenario_id": "SCN_DEPOSIT_DETAIL_REVISIT_002",
+            "scenario_name": "상품 상세 열람 후 미가입 고객 재방문 유도",
+            "related_page_ids": [
+              "NWMMH00051_001M"
+            ],
+            "score": 0.81,
+            "basis": "상품 상세 조회 행동유형 기반 추천"
+          }
+        ]
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_objective_text",
+      "arguments": {
+        "objective_text": ""
+      },
+      "isError": true,
+      "message": "objective_text 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"recommend_scenario_by_behavior_type\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "recommended_scenarios": [
+        {
+          "scenario_id": "SCN_KKULMONEY_DROPOFF_001",
+          "scenario_name": "꿀머니 혜택 조회 중단 고객 재유도",
+          "related_page_ids": [
+            "NWMMH00040_003M"
+          ],
+          "score": 0.88,
+          "basis": "혜택 조회 중단 행동유형 기반 추천"
+        },
+        {
+          "scenario_id": "SCN_DEPOSIT_DETAIL_REVISIT_002",
+          "scenario_name": "상품 상세 열람 후 미가입 고객 재방문 유도",
+          "related_page_ids": [
+            "NWMMH00051_001M"
+          ],
+          "score": 0.81,
+          "basis": "상품 상세 조회 행동유형 기반 추천"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

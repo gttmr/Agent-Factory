@@ -1,564 +1,469 @@
 adapters:
-  - name: bank_document_ocr_mock_adapter
-    adapter_kind: external_service
-    owner_domain: 공통
-    status: approved
-    access_protocol: local
-    component_source: stub
-    runtime_binding: unresolved
-    contract_status: mock_ready
-    inputs:
-      - name: document_uri
-        type: string
-        required: true
-      - name: document_type_hint
-        type: string
-        required: false
-    outputs:
-      - name: ocr_text
-        type: text
-      - name: page_blocks
-        type: array<object>
-      - name: confidence
-        type: number
-      - name: extraction_warnings
-        type: array<string>
-    risk_signals:
-      - personal_data
-      - financial_data
-      - audit_required
-    runtime_mock:
-      ocr_text: "[SYNTHETIC] 대출신청서: 신청금액 30,000,000원, 연소득 75,000,000원, 제출서류: 신분증/소득증빙"
-      page_blocks:
-        - page: 1
-          block_id: block-application-summary
-          text: 신청금액 30,000,000원 / 연소득 75,000,000원
-        - page: 2
-          block_id: block-income-proof
-          text: 소득금액증명원 연소득 72,000,000원
-      confidence: 0.97
-      extraction_warnings:
-        - synthetic_ocr_output
-    notes: local smoke에서 항상 동일한 OCR 결과를 반환하는 synthetic Adapter다.
-
-  - name: banking_policy_search_mock_adapter
+  - name: Page Metadata RAG 조회 Adapter
     adapter_kind: retrieval
     owner_domain: 공통
     status: approved
-    access_protocol: local
-    component_source: stub
-    runtime_binding: unresolved
-    contract_status: mock_ready
-    inputs:
-      - name: query
-        type: text
-        required: true
-      - name: domain_filter
-        type: string
-        required: false
-    outputs:
-      - name: policy_matches
-        type: array<object>
-      - name: citations
-        type: array<object>
-      - name: freshness
-        type: object
-    risk_signals:
-      - audit_required
-    runtime_mock:
-      policy_matches:
-        - policy_id: LOAN-DOC-REQ-001
-          title: 개인신용대출 필수서류 체크리스트
-          matched_rule: income_certificate_required
-          excerpt: 재직/소득 증빙은 신청일 기준 30일 이내 발급본을 우선 확인한다.
-        - policy_id: LOAN-RISK-DSR-002
-          title: DSR soft-limit 검토 기준
-          matched_rule: dsr_soft_limit_review
-          excerpt: soft-limit 경고는 자동 거절이 아니며 담당자 확인 대상으로 분류한다.
-      citations:
-        - source: synthetic-policy://loan/documents
-          section: 2.1
-        - source: synthetic-policy://loan/dsr
-          section: 4.3
-      freshness:
-        effective_date: "2026-01-01"
-        synthetic: true
-    notes: 정책 검색 결과와 citation shape를 완성한 retrieval mock이다.
-
-  - name: customer_account_snapshot_mock_adapter
-    adapter_kind: data_query
-    owner_domain: 고객
-    status: approved
-    access_protocol: local
-    component_source: stub
-    runtime_binding: unresolved
-    contract_status: mock_ready
-    inputs:
-      - name: customer_identifier
-        type: string
-        required: true
-      - name: snapshot_scope
-        type: array<string>
-        required: false
-    outputs:
-      - name: customer_snapshot
-        type: object
-      - name: account_summary
-        type: object
-      - name: data_freshness
-        type: object
-    risk_signals:
-      - personal_data
-      - financial_data
-      - audit_required
-    runtime_mock:
-      customer_snapshot:
-        customer_id: CUST-DEMO-001
-        display_name: 김데모
-        kyc_status: verified
-        relationship_years: 7
-        masking: synthetic
-      account_summary:
-        deposit_balance: 18500000
-        monthly_income_estimate: 6000000
-        delinquency_count_12m: 0
-        existing_loan_balance: 42000000
-      data_freshness:
-        as_of: "2026-05-01T09:00:00+09:00"
-        synthetic: true
-    notes: 실제 고객정보 없이 local smoke가 완성된 customer/account shape를 받도록 하는 data query mock이다.
-
-  - name: loan_precheck_rule_mock_adapter
-    adapter_kind: rule_registry
-    owner_domain: 리스크
-    status: approved
-    access_protocol: local
-    component_source: stub
-    runtime_binding: unresolved
-    contract_status: mock_ready
-    inputs:
-      - name: rule_set_key
-        type: string
-        required: true
-      - name: case_features
-        type: object
-        required: true
-    outputs:
-      - name: rule_result
-        type: object
-      - name: matched_rules
-        type: array<object>
-      - name: required_actions
-        type: array<string>
-    risk_signals:
-      - customer_impact
-      - credit_decision_support
-      - audit_required
-    runtime_mock:
-      rule_result:
-        rule_set_key: loan_precheck_demo_v1
-        outcome: review_required
-        score_band: B
-        hard_stop: false
-      matched_rules:
-        - rule_id: DSR_SOFT_LIMIT
-          result: review_required
-          reason: 추정 DSR이 soft threshold 근처입니다.
-        - rule_id: DOCUMENT_COMPLETENESS
-          result: supplement_required
-          reason: 재직증명서가 누락되었습니다.
-      required_actions:
-        - request_employment_certificate
-        - route_to_manual_reviewer
-    notes: 자동 승인/거절 대신 검토 필요 상태를 반환하는 rule registry mock이다.
-
-  - name: customer_notice_template_mock_adapter
-    adapter_kind: template
-    owner_domain: 공통
-    status: approved
-    access_protocol: local
-    component_source: stub
-    runtime_binding: unresolved
-    contract_status: mock_ready
-    inputs:
-      - name: template_key
-        type: string
-        required: true
-      - name: locale
-        type: string
-        required: false
-      - name: channel
-        type: string
-        required: false
-    outputs:
-      - name: template
-        type: object
-      - name: required_variables
-        type: array<string>
-      - name: approval_constraints
-        type: object
-    risk_signals:
-      - external_message
-      - audit_required
-    runtime_mock:
-      template:
-        template_key: loan_supplement_request_demo
-        locale: ko-KR
-        channel: internal_preview
-        body: "[데모] 대출 사전심사를 위해 {missing_documents} 보완 제출이 필요합니다. 담당자 검토 후 다음 단계를 안내드립니다."
-      required_variables:
-        - missing_documents
-        - reviewer_contact
-      approval_constraints:
-        external_send_allowed: false
-        requires_human_approval: true
-        synthetic: true
-    notes: 고객 발송이 아니라 내부 preview만 가능한 synthetic template mock이다.
-
-  - name: legacy_loan_limit_change_synthetic_adapter
-    adapter_kind: legacy_api
-    owner_domain: 여신
-    status: approved
     access_protocol: mcp
-    mcp_server: legacy-loan-eai-mcp
-    mcp_tool_name: submit_loan_limit_change
-    mcp_schema_ref: catalog.banking.legacy_loan_limit_change.synthetic.v1
-    mcp_auth_mode: synthetic_service_token
-    component_source: mcp
-    runtime_binding: mcp
-    contract_status: mock_ready
-    inputs:
-      - name: work_item_id
-        type: string
-        required: true
-      - name: customer_ref
-        type: string
-        required: true
-      - name: approval_token
-        type: string
-        required: true
-      - name: correlation_id
-        type: string
-        required: true
-      - name: idempotency_key
-        type: string
-        required: true
-    outputs:
-      - name: eai_job_id
-        type: string
-      - name: callback_expected
-        type: boolean
-      - name: safe_summary
-        type: string
-    risk_signals:
-      - financial_data
-      - customer_impact
-      - transaction_write
-      - human_approval_required
-      - audit_required
-    notes: Context Manager와 Callback Broker 검토를 요구하는 synthetic MCP/EAI legacy write 계약이다.
-
-  - name: customer_profile_lookup_synthetic_adapter
-    adapter_kind: legacy_api
-    owner_domain: 고객
-    status: approved
-    access_protocol: mcp
-    mcp_server: customer-profile-eai-mcp
-    mcp_tool_name: lookup_customer_profile
-    mcp_schema_ref: catalog.banking.customer_profile_lookup.synthetic.v1
-    mcp_auth_mode: synthetic_service_token
-    component_source: mcp
-    runtime_binding: mcp
-    contract_status: mock_ready
-    inputs:
-      - name: customer_ref
-        type: string
-        required: true
-      - name: lookup_purpose
-        type: string
-        required: true
-      - name: correlation_id
-        type: string
-        required: true
-    outputs:
-      - name: profile_summary
-        type: object
-      - name: holdings_summary
-        type: object
-      - name: safe_summary
-        type: string
-    risk_signals:
-      - personal_data
-      - financial_data
-      - audit_required
-    notes: Sync read-only legacy lookup synthetic 계약이다. callback broker와 Context Manager는 기본 필수값이 아니다.
-
-  - name: page_candidate_rag_mock_adapter
-    adapter_kind: retrieval
-    owner_domain: 디지털채널
-    status: approved
-    access_protocol: mcp
-    mcp_server: page-analysis-mcp
+    mcp_server: wf-page-recommendation-mock
     mcp_tool_name: search_page_candidates
-    mcp_schema_ref: catalog.page_analysis.search_page_candidates.v1
+    mcp_schema_ref: catalog.page_recommendation.search_page_candidates.v1
     mcp_auth_mode: none
     component_source: mcp
     runtime_binding: mcp
     contract_status: mock_ready
     inputs:
-      - name: query
-        type: text
+      - name: objective_text
+        type: string
         required: true
-      - name: top_k
-        type: number
+      - name: product_hint
+        type: string
+        required: false
+      - name: journey_stage
+        type: string
+        required: false
+      - name: event_type
+        type: string
+        required: false
+      - name: keywords
+        type: array
         required: false
     outputs:
       - name: page_candidates
-        type: array<object>
-      - name: retrieval_metadata
-        type: object
+        type: array
+        required: true
     risk_signals:
-      - financial_data
+      - customer_impact
       - audit_required
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
-      runtime_mcp_label: 런타임 MCP
-      runtime_mcp_note: page-analysis-mcp/search_page_candidates 호출 결과를 후속 Agent가 읽습니다.
       page_candidates:
-        - page_id: svc-savings-auto-transfer-setup
-          service_id: savings
-          page_name: 적금 자동이체 설정
-          behavior_path:
-            large: 가입/전환
-            medium: 자동이체
-            small: 설정 이탈
-          score: 0.94
-          evidence:
-            - synthetic-rag-page-catalog:autotransfer
-            - behavior-taxonomy:auto-transfer-dropoff
-      retrieval_metadata:
-        query_id: rag-page-demo-001
-        corpus: synthetic-page-catalog-v1
-        query: 적금 자동이체 설정 전환율 개선을 위한 CDP 시나리오를 설계하고 분석할 페이지를 추천해줘.
-        effective_date: "2026-06-08"
-    notes: 사용자 요청 query를 받아 합성 page 후보를 반환하는 런타임 MCP 목업 Adapter다.
-
-  - name: user_flow_analysis_mock_adapter
+        - page_id: NWDID00019_002M
+          page_name: 예금/적금 가입 - 이자 시뮬레이션(STEP01)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+          product_event_area: 1
+          rag_score: 0.93
+          description: 상품가입_B 시 이자 시뮬레이션 페이지입니다. 이자 수익을 미리 예측합니다.
+          match_reason: 예적금 가입 퍼널 진입 단계로 이탈 고객 재유도 직접 대상
+        - page_id: NWDID00019_003M
+          page_name: 예금/적금 가입 - 가입정보 확인(STEP02)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인
+          product_event_area: 1
+          rag_score: 0.91
+          description: 상품가입_B의 가입정보 확인 단계입니다. 입력한 정보를 다시 한번 확인합니다.
+          match_reason: 가입 정보 확인 단계 이탈이 잦은 핵심 퍼널 구간
+        - page_id: NWDID00019_004M
+          page_name: 예금/적금 가입 - 약관동의(STEP03)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의
+          product_event_area: 1
+          rag_score: 0.9
+          description: '예금/적금 상품 가입 시, 약관 동의 단계로, 가입 전 필수 확인이 필요해요. 핵심키워드: 약관동의, 상품가입, 예금, 적금, 가입절차'
+          match_reason: 약관동의 필수 단계로 가입 직전 이탈 방지 대상
+        - page_id: NWDID00019_005M
+          page_name: 예금/적금 가입 - 가입완료/실패(STEP04)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패
+          product_event_area: 1
+          rag_score: 0.88
+          description: '장병내일준비적금 가입 완료 또는 실패 후 안내되는 페이지입니다. 핵심키워드: 가입완료, 실패, 안내'
+          match_reason: 가입 완료/실패 분기 단계로 실패 이탈 고객 회수 대상
+        - page_id: NWMMH00051_001M
+          page_name: 입출금/예금/적금 상품 상세
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+          product_event_area: 1
+          rag_score: 0.86
+          description: 입출금/예금/적금 상품의 상세 정보를 확인하는 페이지입니다. 상품명, 금리, 최소가입금액, 만기일, 이자 지급 방식, 가입 조건 등을 상세히 안내합니다.
+          match_reason: 상품 상세 조회 후 미가입 이탈 고객의 가입 전환 유도 대상
+        - page_id: NWMMH00023_001M
+          page_name: 예적금 상품몰 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 메인(상품) > 예적금(입출금, 예금, 적금)
+          product_event_area: 0
+          rag_score: 0.78
+          description: 예금, 적금 상품을 확인하고, 가입할 수 있는 메인 화면입니다. 상품명, 금리, 기간, 이자 계산 방식 등을 확인하며, 선택을 결정합니다.
+          match_reason: 예적금 탐색 진입 메인으로 상위 퍼널 후보
+        - page_id: NWMMH00021_001M
+          page_name: 상품몰 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 상품메인
+          action_category_medium: NA
+          page_path: 메인(상품)
+          product_event_area: 0
+          rag_score: 0.62
+          description: 상품몰의 메인 화면입니다. 다양한 금융상품(예금, 적금, 펀드, 대출, 보험 등)을 한눈에 확인하고, 원하는 상품으로 이동할 수 있습니다.
+          match_reason: 전체 상품 진입 메인으로 광범위 후보
+        - page_id: NWMMH00057_001M
+          page_name: 대출 가입 안내
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 여신상품
+          action_category_medium: NA
+          page_path: 금융상품 > 대출 > 가입하기 > 안내
+          product_event_area: 1
+          rag_score: 0.41
+          description: 대출 가입 안내 페이지. 대출 상품, 조건, 신청 절차 설명.
+          match_reason: 여신 상품 페이지로 예적금 목적과는 약한 연관
+        - page_id: NWMMH00034_001M
+          page_name: 개인사업자 상품 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 개인사업자상품
+          action_category_medium: 개인사업자대출
+          page_path: 메인(상품) > 개인사업자
+          product_event_area: 0
+          rag_score: 0.33
+          description: 메인(상품) > 개인사업자 페이지입니다. 개인사업자 전용 상품을 확인할 수 있습니다.
+          match_reason: 개인사업자 전용 영역으로 예적금 목적과 연관 낮음
+        - page_id: NWMMH00040_003M
+          page_name: 내 꿀머니
+          screen_category_large: 메인
+          screen_category_medium: 홈/메뉴
+          action_category_large: 꿀머니조회
+          action_category_medium: 꿀머니
+          page_path: 메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니
+          product_event_area: 0
+          rag_score: 0.94
+          description: 내 꿀머니 메인. 포인트, 캐시백, 혜택을 한 눈에 확인.
+          match_reason: 꿀머니 혜택 잔액·포인트 조회 목적과 직접 연결된 페이지로 이탈률 분석 대상
+    notes: Mock Lab wf-page-recommendation-mock/search_page_candidates synthetic MCP tool에 고정된 Adapter 계약이다.
+  - name: 분석 입력 구성 Function
     adapter_kind: computation
-    owner_domain: 디지털채널
+    owner_domain: 공통
     status: approved
-    access_protocol: mcp
-    mcp_server: page-analysis-mcp
-    mcp_tool_name: analyze_user_flow
-    mcp_schema_ref: catalog.page_analysis.analyze_user_flow.v1
-    mcp_auth_mode: none
-    component_source: mcp
-    runtime_binding: mcp
+    access_protocol: local
+    component_source: stub
+    runtime_binding: unresolved
     contract_status: mock_ready
     inputs:
-      - name: scenario_design_purpose
-        type: text
-        required: true
-      - name: scenario_target
-        type: text
-        required: true
-      - name: business_domain
-        type: string
-        required: true
-      - name: page_id
-        type: string
-        required: true
-      - name: additional_required_information
-        type: text
-        required: false
-    outputs:
-      - name: analysis_result
+      - name: initial_selection
         type: object
-      - name: recommended_page_id
-        type: string
+        required: true
+    outputs:
+      - name: analysis_input_bundle
+        type: object
+        required: true
     risk_signals:
-      - financial_data
       - audit_required
     runtime_mock:
       synthetic: true
-      source: agent-factory-mock-lab
-      runtime_mcp_label: 런타임 MCP
-      runtime_mcp_note: page-analysis-mcp/analyze_user_flow 호출 결과를 후속 Agent가 읽습니다.
-      analysis_result:
-        method: user_flow_analysis
-        page_id: svc-savings-auto-transfer-setup
-        summary: 자동이체 금액 입력 이후 인증 진입 전 단계에서 합성 이탈이 높습니다.
-        findings:
-          - step: amount_input
-            signal: hesitation
-            synthetic_dropoff_rate: 0.31
-          - step: auth_entry
-            signal: retry
-            synthetic_dropoff_rate: 0.18
-      recommended_page_id: svc-savings-auto-transfer-setup
-    notes: 선택된 page_id의 합성 퍼널 병목을 반환하는 런타임 MCP 목업 Adapter다.
-
-  - name: behavior_scenario_recommendation_mock_adapter
+      source: agent-factory-catalog-fixture
+      analysis_input_bundle:
+        selected_page_ids:
+          - NWMMH00040_003M
+        objective_text: 꿀머니 이탈률 분석할래
+        customer_behavior_hint: 혜택 조회 중단
+    notes: Graph IR에서 local_function으로 호출되는 synthetic computation Adapter 계약이다.
+  - name: UserFlow 분석 Adapter
     adapter_kind: computation
-    owner_domain: 디지털채널
+    owner_domain: 공통
     status: approved
     access_protocol: mcp
-    mcp_server: page-analysis-mcp
-    mcp_tool_name: recommend_behavior_scenarios
-    mcp_schema_ref: catalog.page_analysis.recommend_behavior_scenarios.v1
+    mcp_server: wf-page-recommendation-mock
+    mcp_tool_name: run_userflow_analysis
+    mcp_schema_ref: catalog.page_recommendation.run_userflow_analysis.v1
     mcp_auth_mode: none
     component_source: mcp
     runtime_binding: mcp
     contract_status: mock_ready
     inputs:
-      - name: scenario_design_purpose
-        type: text
+      - name: selected_page_ids
+        type: array
         required: true
-      - name: scenario_target
-        type: text
-        required: true
-      - name: business_domain
+      - name: objective_text
         type: string
         required: true
-      - name: page_id
-        type: string
-        required: true
-      - name: additional_required_information
-        type: text
-        required: false
     outputs:
-      - name: analysis_result
-        type: object
-      - name: scenario_recommendations
-        type: array<object>
-      - name: recommended_page_id
+      - name: funnel_dropoff_pages
+        type: array
+        required: true
+      - name: insight
         type: string
+        required: true
     risk_signals:
       - customer_impact
       - audit_required
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
-      runtime_mcp_label: 런타임 MCP
-      runtime_mcp_note: page-analysis-mcp/recommend_behavior_scenarios 호출 결과를 후속 Agent가 읽습니다.
-      analysis_result:
-        method: behavior_scenario_recommendation
-        behavior_path:
-          large: 가입/전환
-          medium: 자동이체
-          small: 설정 이탈
-        summary: 자동이체 설정 이탈 사용자를 복귀시키는 합성 시나리오 후보를 추천합니다.
-      scenario_recommendations:
-        - scenario_id: auto_transfer_setup_recovery
-          title: 자동이체 설정 복귀 유도
-          trigger: amount_input_abandonment
-          expected_page_id: svc-savings-auto-transfer-setup
-      recommended_page_id: svc-savings-auto-transfer-setup
-    notes: 행동 유형 분류와 page_id를 받아 합성 시나리오 추천을 반환하는 런타임 MCP 목업 Adapter다.
-
-  - name: text_to_sql_solution_adapter
-    adapter_kind: external_service
-    owner_domain: 데이터분석
+      funnel_dropoff_pages:
+        - page_id: NWMMH00040_003M
+          page_name: 내 꿀머니
+          dropoff_rate: 0.41
+          reason: 꿀머니 혜택 조회 화면에서 이탈률 높음
+      major_previous_pages:
+        - NWMMH00021_001M
+      major_next_pages:
+        - NWMMH00040_003M
+      insight: 혜택·이벤트 탭에서 내 꿀머니 화면 진입 후 이탈이 가장 큼
+    notes: Mock Lab wf-page-recommendation-mock/run_userflow_analysis synthetic MCP tool에 고정된 Adapter 계약이다.
+  - name: 행동유형 기반 시나리오 추천 Adapter
+    adapter_kind: computation
+    owner_domain: 공통
     status: approved
     access_protocol: mcp
-    mcp_server: page-analysis-mcp
-    mcp_tool_name: generate_text_to_sql
-    mcp_schema_ref: catalog.page_analysis.generate_text_to_sql.v1
+    mcp_server: wf-page-recommendation-mock
+    mcp_tool_name: recommend_scenario_by_behavior_type
+    mcp_schema_ref: catalog.page_recommendation.recommend_scenario_by_behavior_type.v1
     mcp_auth_mode: none
     component_source: mcp
     runtime_binding: mcp
     contract_status: mock_ready
     inputs:
-      - name: user_request
-        type: text
-        required: true
-      - name: candidate_selected_page_id
+      - name: objective_text
         type: string
         required: true
-      - name: recommendation_rationale
-        type: text
-        required: false
+      - name: selected_page_ids
+        type: array
+        required: true
+      - name: customer_behavior_hint
+        type: string
+        required: true
     outputs:
-      - name: sql_text
-        type: text
-      - name: sql_generation_metadata
-        type: object
+      - name: recommended_scenarios
+        type: array
+        required: true
     risk_signals:
-      - financial_data
       - customer_impact
       - audit_required
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
-      runtime_mcp_label: 런타임 MCP
-      runtime_mcp_note: page-analysis-mcp/generate_text_to_sql 호출 결과를 후속 Agent가 읽습니다.
-      sql_text: SELECT page_id, COUNT(*) AS visits, AVG(completion_rate) AS completion_rate FROM synthetic_page_events WHERE page_id = 'svc-savings-auto-transfer-setup' GROUP BY page_id
-      sql_generation_metadata:
-        readonly: true
-        t2s_solution: synthetic-cdp-t2s-v1
-        selected_page_id: svc-savings-auto-transfer-setup
-        sql_hash: synthetic-generated-sql-hash-001
-    notes: 사용자 요청과 추천 page_id를 받아 워크플로우 내부에서 합성 읽기 전용 SQL을 생성하는 런타임 MCP 목업 Adapter다.
-
-  - name: page_customer_sql_execution_adapter
-    adapter_kind: data_query
-    owner_domain: 데이터분석
+      recommended_scenarios:
+        - scenario_id: SCN_KKULMONEY_DROPOFF_001
+          scenario_name: 꿀머니 혜택 조회 중단 고객 재유도
+          related_page_ids:
+            - NWMMH00040_003M
+          score: 0.88
+          basis: 혜택 조회 중단 행동유형 기반 추천
+        - scenario_id: SCN_DEPOSIT_DETAIL_REVISIT_002
+          scenario_name: 상품 상세 열람 후 미가입 고객 재방문 유도
+          related_page_ids:
+            - NWMMH00051_001M
+          score: 0.81
+          basis: 상품 상세 조회 행동유형 기반 추천
+    notes: Mock Lab wf-page-recommendation-mock/recommend_scenario_by_behavior_type synthetic MCP tool에 고정된 Adapter 계약이다.
+  - name: T2S 분석 Adapter
+    adapter_kind: computation
+    owner_domain: 공통
     status: approved
     access_protocol: mcp
-    mcp_server: page-analysis-mcp
-    mcp_tool_name: execute_page_customer_sql
-    mcp_schema_ref: catalog.page_analysis.execute_page_customer_sql.v1
+    mcp_server: wf-page-recommendation-mock
+    mcp_tool_name: analyze_page_customer_relation
+    mcp_schema_ref: catalog.page_recommendation.analyze_page_customer_relation.v1
     mcp_auth_mode: none
     component_source: mcp
     runtime_binding: mcp
     contract_status: mock_ready
     inputs:
-      - name: sql_text
-        type: text
+      - name: selected_page_ids
+        type: array
         required: true
-      - name: candidate_selected_page_id
+      - name: objective_text
         type: string
-        required: false
+        required: true
     outputs:
-      - name: rows
-        type: array<object>
-      - name: row_count
-        type: number
-      - name: schema
-        type: array<object>
-      - name: query_summary
-        type: object
+      - name: page_customer_relations
+        type: array
+        required: true
+      - name: insight
+        type: string
+        required: true
     risk_signals:
-      - financial_data
       - customer_impact
       - audit_required
     runtime_mock:
       synthetic: true
       source: agent-factory-mock-lab
-      runtime_mcp_label: 런타임 MCP
-      runtime_mcp_note: page-analysis-mcp/execute_page_customer_sql 호출 결과를 후속 Agent가 읽습니다.
-      rows:
-        - page_id: svc-savings-auto-transfer-setup
-          visits: 1280
-          completion_rate: 0.42
-          revisit_rate: 0.37
-          synthetic_segment: auto_transfer_setup_dropoff
-      row_count: 1
-      schema:
-        - name: page_id
-          type: string
-        - name: visits
-          type: integer
-        - name: completion_rate
-          type: number
-        - name: revisit_rate
-          type: number
-        - name: synthetic_segment
-          type: string
-      query_summary:
-        readonly: true
-        tables:
-          - synthetic_page_events
-        sql_hash: synthetic-sql-hash-001
-    notes: 워크플로우 내부 T2S 런타임 MCP Adapter가 만든 SQL 전문을 소비해 분석 요약이 아니라 합성 SQL 실행 rows를 반환하는 읽기 전용 목업 Adapter다.
+      page_customer_relations:
+        - page_id: NWMMH00040_003M
+          target_customer_count: 5634
+          signal: high_dropoff
+          recommendation_score: 0.91
+      insight: 내 꿀머니(NWMMH00040_003M) 페이지가 고객 규모·이탈 신호 기준 우선 분석 대상
+    notes: Mock Lab wf-page-recommendation-mock/analyze_page_customer_relation synthetic MCP tool에 고정된 Adapter 계약이다.
+  - name: 시나리오 목적 분류체계 조회 Adapter
+    adapter_kind: retrieval
+    owner_domain: 공통
+    status: approved
+    access_protocol: mcp
+    mcp_server: wf-page-recommendation-mock
+    mcp_tool_name: get_scenario_taxonomy
+    mcp_schema_ref: catalog.page_recommendation.get_scenario_taxonomy.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+    outputs:
+      - name: categories
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      categories:
+        - category_large: 상품
+          category_medium: IRP
+          category_small: 신규
+        - category_large: 상품
+          category_medium: ISA
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 노란우산
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 신용대출
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 예금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 외화예금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 요구불
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 적금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 청약
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 펀드
+          category_small: 신규
+        - category_large: 혜택
+          category_medium: 꿀머니
+          category_small: 이탈률분석
+    notes: Mock Lab wf-page-recommendation-mock/get_scenario_taxonomy synthetic MCP tool에 고정된 Adapter 계약이다.
+  - name: 페이지×상품 매핑 조회 Adapter
+    adapter_kind: retrieval
+    owner_domain: 공통
+    status: approved
+    access_protocol: mcp
+    mcp_server: wf-page-recommendation-mock
+    mcp_tool_name: search_page_products
+    mcp_schema_ref: catalog.page_recommendation.search_page_products.v1
+    mcp_auth_mode: none
+    component_source: mcp
+    runtime_binding: mcp
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: product_class
+        type: string
+        required: false
+    outputs:
+      - name: page_products
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      base_date: '20260526'
+      page_products:
+        - page_id: NWMMH00040_003M
+          product_code: BENEFIT_KKULMONEY
+          product_name: 꿀머니 혜택
+          product_class: 혜택
+          screen_category_large: 메인
+          screen_category_medium: 홈/메뉴
+          page_path: 메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니
+        - page_id: NWMMH00051_001M
+          product_code: P010002584
+          product_name: 우리 빙고 적금
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+        - page_id: NWDID00019_002M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+        - page_id: NWDID00019_003M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인
+        - page_id: NWDID00019_004M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의
+        - page_id: NWDID00019_005M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패
+        - page_id: NWDID00019_002M
+          product_code: P010002353
+          product_name: WON 적금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+        - page_id: NWMMH00051_001M
+          product_code: P010002590
+          product_name: 우리 T-WON 적금
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+        - page_id: NWMMH00057_001M
+          product_code: P020000121
+          product_name: 예금담보대출
+          product_class: 여신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 대출 > 가입하기 > 안내
+        - page_id: NWMMH00051_001M
+          product_code: P010002562
+          product_name: 우월한 월급 통장
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+    notes: Mock Lab wf-page-recommendation-mock/search_page_products synthetic MCP tool에 고정된 Adapter 계약이다.

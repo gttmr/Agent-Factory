@@ -159,7 +159,10 @@ function normalizeHumanInputContract(raw: Record<string, unknown>, label: string
     message,
     payload_schema_ref: asNullableString(contract.payload_schema_ref),
     response_schema_ref: normalizeResponseSchemaRef(contract.response_schema_ref, hasReviewedContract ? null : "str"),
-    response_mapping: responseMapping && Object.keys(responseMapping).length ? responseMapping : null
+    response_mapping: responseMapping && Object.keys(responseMapping).length ? responseMapping : null,
+    choice_options: nullableStringArray(contract.choice_options),
+    accepted_aliases: nullableStringArrayRecord(contract.accepted_aliases),
+    default_choice: asNullableString(contract.default_choice)
   };
 }
 
@@ -167,6 +170,49 @@ function hasInvalidResponseMappingShape(value: unknown): boolean {
   if (value === undefined || value === null) return false;
   if (!isRecord(value)) return true;
   return Object.entries(value).some(([key, mapping]) => !key.trim() || typeof mapping !== "string" || !mapping.trim());
+}
+
+function hasInvalidStringArrayShape(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  return !Array.isArray(value) || value.some((entry) => typeof entry !== "string" || !entry.trim());
+}
+
+function hasInvalidStringArrayRecordShape(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (!isRecord(value)) return true;
+  return Object.entries(value).some(
+    ([key, aliases]) =>
+      !key.trim() ||
+      !Array.isArray(aliases) ||
+      aliases.some((alias) => typeof alias !== "string" || !alias.trim())
+  );
+}
+
+function nullableStringArray(value: unknown): string[] | null {
+  const values = asStringArray(value);
+  return values.length ? values : null;
+}
+
+function nullableStringArrayRecord(value: unknown): Record<string, string[]> | null {
+  if (Array.isArray(value)) {
+    const entries: [string, string[]][] = [];
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const choice = asNullableString(item.choice);
+      const aliases = asStringArray(item.aliases);
+      if (choice && aliases.length) entries.push([choice, aliases]);
+    }
+    return entries.length ? Object.fromEntries(entries) : null;
+  }
+  if (!isRecord(value)) return null;
+  const entries: [string, string[]][] = [];
+  for (const [key, aliases] of Object.entries(value)) {
+    if (!key.trim()) continue;
+    const normalizedAliases = asStringArray(aliases);
+    if (!normalizedAliases.length) continue;
+    entries.push([key.trim(), normalizedAliases]);
+  }
+  return entries.length ? Object.fromEntries(entries) : null;
 }
 
 function isRemoteAgentNode(node: GraphNode | undefined): node is GraphNode {
@@ -337,6 +383,9 @@ const SOFT_VALIDATION_CODES = new Set([
   "loop_region_missing_exit",
   "human_input_payload_schema_invalid",
   "human_input_response_mapping_invalid",
+  "human_input_choice_options_invalid",
+  "human_input_accepted_aliases_invalid",
+  "human_input_default_choice_invalid",
   "human_input_contract_invalid"
 ]);
 
@@ -925,6 +974,31 @@ export function validateGraphIRSoft(
         errors.push({
           code: "human_input_response_mapping_invalid",
           message: `Node ${node.id} human_input_contract.response_mapping must be an object with non-empty string values or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      if (hasInvalidStringArrayShape(node.human_input_contract.choice_options)) {
+        errors.push({
+          code: "human_input_choice_options_invalid",
+          message: `Node ${node.id} human_input_contract.choice_options must be an array of non-empty strings or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      if (hasInvalidStringArrayRecordShape(node.human_input_contract.accepted_aliases)) {
+        errors.push({
+          code: "human_input_accepted_aliases_invalid",
+          message: `Node ${node.id} human_input_contract.accepted_aliases must be an object of non-empty string arrays or null.`,
+          target_kind: "node",
+          target_id: node.id
+        });
+      }
+      const defaultChoice = node.human_input_contract.default_choice;
+      if (defaultChoice !== undefined && defaultChoice !== null && (typeof defaultChoice !== "string" || !defaultChoice.trim())) {
+        errors.push({
+          code: "human_input_default_choice_invalid",
+          message: `Node ${node.id} human_input_contract.default_choice must be a non-empty string or null.`,
           target_kind: "node",
           target_id: node.id
         });

@@ -200,6 +200,13 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "stringArrayMapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    },
     "humanInputContract": {
       "type": "object",
       "additionalProperties": false,
@@ -210,7 +217,14 @@
         "response_schema_ref": { "$ref": "#/$defs/nullableString" },
         "response_mapping": {
           "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }]
-        }
+        },
+        "choice_options": {
+          "anyOf": [{ "type": "array", "items": { "type": "string", "minLength": 1 } }, { "type": "null" }]
+        },
+        "accepted_aliases": {
+          "anyOf": [{ "$ref": "#/$defs/stringArrayMapping" }, { "type": "null" }]
+        },
+        "default_choice": { "$ref": "#/$defs/nullableString" }
       }
     },
     "mockBinding": {

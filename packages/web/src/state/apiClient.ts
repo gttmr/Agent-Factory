@@ -23,7 +23,7 @@ export class AfApiError extends Error {
   }
 }
 
-export type StageRunStage = "analyze" | "design";
+export type StageRunStage = "analyze" | "design" | "build" | "verify";
 export type StageRunStatus = "running" | "completed" | "failed" | "applied" | "canceled";
 
 export interface StageRunRequestBody {
@@ -34,6 +34,7 @@ export interface StageRunRequestBody {
     domain?: string;
   };
   catalog?: unknown[];
+  verifyCommand?: string;
   streamProgress?: boolean;
 }
 
@@ -63,6 +64,12 @@ export interface StageRunCodexMetadata {
   } | null;
 }
 
+export interface StageRunCatalogContext {
+  source: "request" | "server_default" | "absent";
+  count: number;
+  diagnostics: string[];
+}
+
 export interface StageRunSummary {
   run_id: string;
   stage: StageRunStage;
@@ -78,6 +85,7 @@ export interface StageRunSummary {
     errors: string[];
   };
   last_error: string | null;
+  catalog_context?: StageRunCatalogContext;
   codex?: StageRunCodexMetadata;
 }
 
@@ -214,6 +222,12 @@ export async function applyStageRun(
   });
   if (!response.ok) throw await readResponseError(response, "stage run 적용에 실패했습니다.");
   return (await response.json()) as { ok: true; applied_artifacts: string[] };
+}
+
+export async function cancelStageRun(reqId: string, stage: StageRunStage): Promise<{ ok: true; status: "cancel_requested" }> {
+  const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/stages/${stage}/cancel`, { method: "POST" });
+  if (!response.ok) throw await readResponseError(response, "stage run 취소에 실패했습니다.");
+  return (await response.json()) as { ok: true; status: "cancel_requested" };
 }
 
 export async function streamStageRun(

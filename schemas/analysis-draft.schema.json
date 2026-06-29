@@ -496,17 +496,50 @@
       "required": [],
       "properties": {}
     },
+    "humanInputAliasEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["choice", "aliases"],
+      "properties": {
+        "choice": { "type": "string", "minLength": 1 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "humanInputContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
+      "required": [
+        "message",
+        "payload_schema_ref",
+        "response_schema_ref",
+        "response_mapping",
+        "choice_options",
+        "accepted_aliases",
+        "default_choice"
+      ],
       "properties": {
         "message": { "type": "string", "minLength": 1 },
         "payload_schema_ref": { "$ref": "#/$defs/nullableString" },
         "response_schema_ref": { "$ref": "#/$defs/nullableString" },
         "response_mapping": {
           "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }]
-        }
+        },
+        "choice_options": {
+          "anyOf": [{ "type": "array", "items": { "type": "string", "minLength": 1 } }, { "type": "null" }]
+        },
+        "accepted_aliases": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/humanInputAliasEntry" }
+            },
+            { "type": "null" }
+          ]
+        },
+        "default_choice": { "$ref": "#/$defs/nullableString" }
       }
     },
     "graphMockBinding": {

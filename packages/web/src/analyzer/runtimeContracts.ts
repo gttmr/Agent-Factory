@@ -45,12 +45,16 @@ export function buildRuntimeContracts({
 }: RuntimeContractBuildInput): RuntimeContract[] {
   const normalizedExistingContracts = existingContracts.flatMap(normalizeRuntimeContractInput);
   const existingById = new Map(normalizedExistingContracts.map((contract) => [contract.contract_id, contract]));
+  const candidateById = new Map(moduleCandidates.map((candidate) => [candidate.id, candidate]));
   const next: RuntimeContract[] = [];
   const usedIds = new Set<string>();
 
   const addContract = (base: RuntimeContract) => {
     const previous = existingById.get(base.contract_id);
-    const merged = previous ? mergeRuntimeContract(previous, base) : base;
+    const merged = hydrateRuntimeContractFromCandidate(
+      previous ? mergeRuntimeContract(previous, base) : base,
+      candidateById.get(previous?.module_id ?? base.module_id ?? "")
+    );
     usedIds.add(merged.contract_id);
     next.push(merged);
   };
@@ -89,7 +93,7 @@ export function buildRuntimeContracts({
 
   for (const existing of normalizedExistingContracts) {
     if (!usedIds.has(existing.contract_id) && existing.contract_status !== "rejected") {
-      next.push(existing);
+      next.push(hydrateRuntimeContractFromCandidate(existing, candidateById.get(existing.module_id ?? "")));
     }
   }
 
@@ -154,7 +158,7 @@ function mergeRuntimeContract(previous: RuntimeContract, base: RuntimeContract):
     reviewer_notes: previous.reviewer_notes ?? base.reviewer_notes,
     summary: previous.summary || base.summary,
     required_review_fields: previous.required_review_fields?.length
-      ? previous.required_review_fields
+      ? normalizeRequiredReviewFields(previous.required_review_fields)
       : base.required_review_fields,
     runtime_support: { ...base.runtime_support, ...previous.runtime_support },
     operation: { ...base.operation, ...previous.operation },
@@ -185,7 +189,7 @@ function normalizeRuntimeContractInput(value: unknown): RuntimeContract[] {
       contract_status: contractStatus,
       summary: typeof record.summary === "string" ? record.summary : "",
       required_review_fields: Array.isArray(record.required_review_fields)
-        ? record.required_review_fields.filter((item): item is string => typeof item === "string")
+        ? normalizeRequiredReviewFields(record.required_review_fields.filter((item): item is string => typeof item === "string"))
         : [],
       reviewer_notes: typeof record.reviewer_notes === "string" ? record.reviewer_notes : "",
       runtime_support: normalizeRuntimeSupport(record.runtime_support),
@@ -203,6 +207,88 @@ function normalizeRuntimeContractInput(value: unknown): RuntimeContract[] {
         : []
     }
   ];
+}
+
+function hydrateRuntimeContractFromCandidate(contract: RuntimeContract, candidate: ModuleCandidate | undefined): RuntimeContract {
+  if (!candidate) return contract;
+  const graphIrAnnotations = { ...contract.graph_ir_annotations };
+  copyCandidateString(graphIrAnnotations, "mock_server_id", candidate.mcp_server);
+  copyCandidateString(graphIrAnnotations, "tool_name", candidate.mcp_tool_name);
+  copyCandidateString(graphIrAnnotations, "input_schema", candidate.mcp_schema_ref);
+  return { ...contract, graph_ir_annotations: graphIrAnnotations };
+}
+
+function copyCandidateString(target: Record<string, string>, key: string, value: unknown): void {
+  if (target[key]) return;
+  if (typeof value === "string" && value.trim()) target[key] = value.trim();
+}
+
+function normalizeRequiredReviewFields(fields: string[]): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const field of fields) {
+    const path = runtimeContractReviewFieldPath(field);
+    if (!path) continue;
+    if (seen.has(path)) continue;
+    seen.add(path);
+    normalized.push(path);
+  }
+  return normalized;
+}
+
+function runtimeContractReviewFieldPath(field: string): string {
+  const trimmed = field.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes(".")) return trimmed;
+  if (isRuntimeSupportField(trimmed)) return `runtime_support.${trimmed}`;
+  if (isOperationField(trimmed)) return `operation.${trimmed}`;
+  const policyPath = policyFieldPath(trimmed);
+  if (policyPath) return policyPath;
+  if (isGraphIrAnnotationField(trimmed)) return `graph_ir_annotations.${trimmed}`;
+  return trimmed;
+}
+
+function isRuntimeSupportField(field: string): field is keyof RuntimeContract["runtime_support"] {
+  return (
+    field === "context_manager_required" ||
+    field === "callback_broker_required" ||
+    field === "human_approval_required" ||
+    field === "idempotency_required" ||
+    field === "audit_required" ||
+    field === "compensation_required"
+  );
+}
+
+function isOperationField(field: string): field is keyof RuntimeContract["operation"] {
+  return (
+    field === "operation_type" ||
+    field === "side_effect_level" ||
+    field === "callback_expected" ||
+    field === "async_resume_required"
+  );
+}
+
+function policyFieldPath(field: string): string | null {
+  if (field.endsWith("_policy") || field === "data_policy") return `policies.${field}`;
+  if (field === "auth") return "policies.auth_policy";
+  if (field === "timeout") return "policies.timeout_policy";
+  if (field === "retry") return "policies.retry_policy";
+  if (field === "fallback") return "policies.fallback_policy";
+  if (field === "masking") return "policies.masking_policy";
+  return null;
+}
+
+function isGraphIrAnnotationField(field: string): boolean {
+  return (
+    field === "mock_server_id" ||
+    field === "tool_name" ||
+    field === "input_schema" ||
+    field === "output_schema" ||
+    field === "sample_response_ref" ||
+    field === "mock_binding_status" ||
+    field.startsWith("human_input_contract") ||
+    field.includes("state_key")
+  );
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

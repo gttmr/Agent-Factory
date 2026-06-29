@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { ScaffoldPlan, ScaffoldPlanModule } from "../../analyzer/types";
 import type { MockLabDiscoveryPayload, MockLabDiscoveryServer } from "../../state/useMockLabDiscovery";
-import { buildMockLabRoute, isMcpBoundAdapter } from "../../mock-lab/mockLabIntegration";
+import { buildMockLabRoute, isMcpBoundAdapter, mockLabBindingTargets } from "../../mock-lab/mockLabIntegration";
 
 interface MockLabBindingPanelProps {
   readonly discovery: MockLabDiscoveryPayload | null;
@@ -27,7 +27,7 @@ export function MockLabBindingPanel({
   plan,
   reqId
 }: MockLabBindingPanelProps) {
-  const adapters = plan.modules.filter((module) => module.module_category === "adapter");
+  const adapters = mockLabBindingTargets(plan);
   const options = mockLabToolOptions(discovery);
   return (
     <div className="af-mcp-binding-panel">

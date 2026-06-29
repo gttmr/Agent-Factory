@@ -60,9 +60,23 @@ export default function RunSandbox() {
     });
   }
 
+  function handleRestart() {
+    setActionMessage(null);
+    stopRuntime.mutate(undefined, {
+      onSuccess: () => {
+        startRuntime.mutate(undefined, {
+          onSuccess: (result) => setActionMessage(`ADK runtime 재시작: ${result.status.api_base_url}`),
+          onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK runtime 재시작 실패")
+        });
+      },
+      onError: (error) => setActionMessage(error instanceof Error ? error.message : "ADK runtime 중지 실패")
+    });
+  }
+
   const serverStatus = status.data?.server.status ?? "stopped";
   const isRunning = serverStatus === "running";
   const canStop = Boolean(status.data?.server.can_stop) || serverStatus === "failed";
+  const isStale = Boolean(status.data?.server.stale);
   const webUrl = status.data?.web_url ?? null;
 
   return (
@@ -99,6 +113,11 @@ export default function RunSandbox() {
               {!status.data?.server.pid && status.data?.server.port_owner_pid ? <li>port owner pid: {status.data.server.port_owner_pid}</li> : null}
             </ul>
             {status.data?.server.message ? <p className="af-landing-error">{status.data.server.message}</p> : null}
+            {isStale ? (
+              <p className="af-landing-error">
+                runtime-stub 이 실행 이후 변경되었습니다. 현재 ADK runtime 은 이전 bundle 로 동작하므로 재시작해야 변경분이 반영됩니다.
+              </p>
+            ) : null}
             {!status.data?.installed && status.data?.setup_hint ? (
               <p className="af-landing-message">{status.data.setup_hint}</p>
             ) : null}
@@ -118,6 +137,14 @@ export default function RunSandbox() {
                 onClick={handleStop}
               >
                 {stopRuntime.isPending ? "중지 중…" : "중지"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!isStale || !canStop || stopRuntime.isPending || startRuntime.isPending}
+                onClick={handleRestart}
+              >
+                {stopRuntime.isPending || startRuntime.isPending ? "재시작 중…" : "재시작"}
               </Button>
             </div>
             {status.data?.server.stderr_tail ? (

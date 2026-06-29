@@ -1,11 +1,7 @@
 domains:
-  - name: 고객
+  - name: 공통
     owner: placeholder-development-leader
-  - name: 수신
+  - name: 디지털채널
     owner: placeholder-development-leader
-  - name: 여신
-    owner: placeholder-development-leader
-  - name: 카드
-    owner: placeholder-development-leader
-  - name: 리스크
+  - name: 데이터분석
     owner: placeholder-development-leader

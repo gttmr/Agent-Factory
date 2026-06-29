@@ -1,0 +1,305 @@
+{
+  "schema_ref": "catalog.page_recommendation.search_page_products.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "search_page_products",
+  "title": "Search Page Products",
+  "description": "페이지 X 상품 매핑(실데이터 샘플)을 반환합니다. 페이지 메타 검색과 병렬 실행 후 결합합니다.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      },
+      "product_class": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "objective_text"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "base_date": {
+        "type": "string"
+      },
+      "page_products": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "page_id": {
+              "type": "string"
+            },
+            "product_code": {
+              "type": "string"
+            },
+            "product_name": {
+              "type": "string"
+            },
+            "product_class": {
+              "type": "string"
+            },
+            "screen_category_large": {
+              "type": "string"
+            },
+            "screen_category_medium": {
+              "type": "string"
+            },
+            "page_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "page_id",
+            "product_code",
+            "product_name",
+            "product_class",
+            "screen_category_large",
+            "screen_category_medium",
+            "page_path"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "base_date",
+      "page_products"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "search_page_products_default_success",
+      "arguments": {
+        "objective_text": "꿀머니 이탈률 분석할래"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "base_date": "20260526",
+        "page_products": [
+          {
+            "page_id": "NWMMH00040_003M",
+            "product_code": "BENEFIT_KKULMONEY",
+            "product_name": "꿀머니 혜택",
+            "product_class": "혜택",
+            "screen_category_large": "메인",
+            "screen_category_medium": "홈/메뉴",
+            "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002584",
+            "product_name": "우리 빙고 적금",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          },
+          {
+            "page_id": "NWDID00019_002M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+          },
+          {
+            "page_id": "NWDID00019_003M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인"
+          },
+          {
+            "page_id": "NWDID00019_004M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의"
+          },
+          {
+            "page_id": "NWDID00019_005M",
+            "product_code": "P010002491",
+            "product_name": "WON플러스 예금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패"
+          },
+          {
+            "page_id": "NWDID00019_002M",
+            "product_code": "P010002353",
+            "product_name": "WON 적금",
+            "product_class": "수신",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002590",
+            "product_name": "우리 T-WON 적금",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          },
+          {
+            "page_id": "NWMMH00057_001M",
+            "product_code": "P020000121",
+            "product_name": "예금담보대출",
+            "product_class": "여신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 대출 > 가입하기 > 안내"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "product_code": "P010002562",
+            "product_name": "우월한 월급 통장",
+            "product_class": "수신",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+          }
+        ]
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_objective_text",
+      "arguments": {
+        "objective_text": ""
+      },
+      "isError": true,
+      "message": "objective_text 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"search_page_products\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "base_date": "20260526",
+      "page_products": [
+        {
+          "page_id": "NWMMH00040_003M",
+          "product_code": "BENEFIT_KKULMONEY",
+          "product_name": "꿀머니 혜택",
+          "product_class": "혜택",
+          "screen_category_large": "메인",
+          "screen_category_medium": "홈/메뉴",
+          "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니"
+        },
+        {
+          "page_id": "NWMMH00051_001M",
+          "product_code": "P010002584",
+          "product_name": "우리 빙고 적금",
+          "product_class": "수신",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+        },
+        {
+          "page_id": "NWDID00019_002M",
+          "product_code": "P010002491",
+          "product_name": "WON플러스 예금",
+          "product_class": "수신",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+        },
+        {
+          "page_id": "NWDID00019_003M",
+          "product_code": "P010002491",
+          "product_name": "WON플러스 예금",
+          "product_class": "수신",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인"
+        },
+        {
+          "page_id": "NWDID00019_004M",
+          "product_code": "P010002491",
+          "product_name": "WON플러스 예금",
+          "product_class": "수신",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의"
+        },
+        {
+          "page_id": "NWDID00019_005M",
+          "product_code": "P010002491",
+          "product_name": "WON플러스 예금",
+          "product_class": "수신",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패"
+        },
+        {
+          "page_id": "NWDID00019_002M",
+          "product_code": "P010002353",
+          "product_name": "WON 적금",
+          "product_class": "수신",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션"
+        },
+        {
+          "page_id": "NWMMH00051_001M",
+          "product_code": "P010002590",
+          "product_name": "우리 T-WON 적금",
+          "product_class": "수신",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+        },
+        {
+          "page_id": "NWMMH00057_001M",
+          "product_code": "P020000121",
+          "product_name": "예금담보대출",
+          "product_class": "여신",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "page_path": "금융상품 > 대출 > 가입하기 > 안내"
+        },
+        {
+          "page_id": "NWMMH00051_001M",
+          "product_code": "P010002562",
+          "product_name": "우월한 월급 통장",
+          "product_class": "수신",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

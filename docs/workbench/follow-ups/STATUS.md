@@ -3,14 +3,14 @@
 이 파일 하나만 보면 어디까지 했고 무엇이 남았는지 알 수 있도록 정리한 진입점이다.
 브리프 목록 자체는 `INDEX.md`, 마이그레이션 전체 설계는 `/home/ilmaswsl/.claude/plans/agent-factory-synthetic-hummingbird.md`.
 
-마지막 갱신: 2026-06-28 (KST 기준).
+마지막 갱신: 2026-06-29 (KST 기준).
 
 2026-06-23 현재 실행 계약 메모: Stage Runner와 direct analyzer, Mock Lab draft는 더 이상 repo 코드에서 `codex exec` 또는 외부 Codex CLI 프로세스를 직접 spawn하지 않는다. 서버는 `@openai/codex-sdk` TypeScript SDK를 사용하고, 아래 과거 브리프의 Codex CLI 표현은 당시 설계/구현 기록으로만 읽는다.
 
 ## 현재 사용 규칙
 
 - 이 파일은 follow-up backlog/status 진입점이다. live branch cleanliness나 HEAD SHA는 매번 `git status`와 `git log`로 확인한다.
-- 현재 남은 브리프는 10-14다. 아래 "남은 후속" 표가 canonical backlog이고, 과거 완료 오판 문구는 제거됐다.
+- 현재 남은 큰 브리프는 12와 10이다. 12, 10은 사용자가 나중에 처리하기로 결정했으므로 마지막 순서로 둔다.
 - detailed brief가 이 파일, `INDEX.md`, active docs, 현재 코드와 충돌하면 현재 코드와 active docs를 먼저 확인한다.
 
 ## 2026-06-23 브랜치 상태 기록
@@ -42,17 +42,14 @@ git log --oneline -8
 - **검증 자산**: 시나리오 `scenario-g`(human-input)·`scenario-h`(state 채널)·`scenario-i`(remote a2a + `mock_remote/serve_app.py`). generator 회귀 `scripts/generate-adk-source.test.mjs`(12 tests). 실 `google-adk[a2a]` 2.2.0 로 라이브 A2A round-trip 확인(`scenario-i` mock, `MOCK_REMOTE_OK`).
   - A2A 테스트용 venv(`google-adk[a2a]` + `a2a-sdk[http-server]` + `uvicorn`)는 `/tmp/a2a-spike/.venv` 에 만들어 두었음(세션 휘발 가능 — 없으면 `python3 -m venv` 후 동일 패키지 설치). mock 기동: `cd templates/regression-scenarios/scenario-i-remote-a2a/mock_remote && uvicorn serve_app:a2a_app --host localhost --port 8001`.
 
-### 남은 후속 (브리프 10–14, 미구현)
+### 남은 후속 우선순위
 
 | 번호 | 요약 | 규모 |
 |---|---|---|
-| 10 | dynamic-workflow lowering (route/loop/dynamic) — generator 대규모 개편 | 大 |
-| 11 | agent/비-connected consumer 의 명명 채널 읽기 | 中 |
 | 12 | A2A 계약 정책(auth/timeout/retry/fallback) → `RemoteA2aAgent` config 매핑 | 中 |
-| 13 | scaffold-plan 워닝 문구 카테고리/모드 인식화 | 小 |
-| 14 | 실행(RunSandbox)/Build 런타임 UX(shared venv 안내·stale 로드·adapter 없는 Mock Lab 패널) | 中 |
+| 10 | dynamic-workflow lowering (route/loop/dynamic) — generator 대규모 개편 | 大 |
 
-권장 순서: **13(작고 빠름) → 14 → 11 → 12 → 10(가장 큼).** 13/11 은 PR-A 연장, 12 는 PR-B 연장, 10(dynamic)은 독립 큰 작업.
+완료된 현 작업 순서: **15 → 13 → 14 → 11 → 16**. 마지막 backlog 순서는 **12 → 10**으로 고정한다. 15의 ADK Web CSS NIT와 runtime-contract 빈 배열 gate 정책은 별도 잔무로만 추적한다.
 
 ## 운영 정책 결정 기록
 
@@ -75,7 +72,7 @@ git log --oneline -8
 | 06 | 완료 / 09에 흡수 | direct analyze hook은 구현됐고 기본 UI는 Analyze Stage Runner로 전환됨. |
 | 07 | 완료 | onboarding HTML과 screenshot asset이 현재 route/Stage Runner 흐름으로 갱신됨. |
 | 08 | 완료 | GraphCanvas child lazy split, Vite build 정량 기록, `_perf-notes.md` 작성이 완료됨. |
-| 09 | 완료 | Analyze + Design Stage Runner 구현 완료. Build/Verify runner는 후속 제외 범위. |
+| 09 | 완료 | Analyze + Design Stage Runner 구현 완료. Build/Verify 확장은 brief 16에서 처리됨. |
 
 ## 완료한 브리프
 
@@ -84,7 +81,7 @@ git log --oneline -8
 Analyze + Design 화면을 공통 Stage Runner 모델로 연결했다.
 
 - 신규 `packages/web/server/stageRunner.ts` — stage별 Codex SDK 실행, fake 실행 모드, root 단위 lock, run artifact 기록, diff/apply, diagnostics 보존
-- `/api/af/:reqId/stages/:stage/*` — `run`, `cancel`(501 후속), `runs`, `run detail`, `apply`
+- `/api/af/:reqId/stages/:stage/*` — `run`, `cancel`, `runs`, `run detail`, `apply`
 - `af-run-manifest.json` — optional `stage_runs` 실행 요약을 tolerant하게 읽고 검증
 - `AnalyzeWorkbench` / `DesignWorkbench` — 첫 Panel에 Skill Runner UI, 최근 run, event log, proposed artifact diff/preview, 명시적 apply
 - approval gate는 자동 토글하지 않음. `manifest.stage_runs`는 실행 상태이고 `manifest.approvals.*`가 계속 gate source of truth.
@@ -145,6 +142,20 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 ## 이번 작업에서 완료된 브리프
 
+### brief 16 — Build/Verify Stage Runner 확장
+
+- Stage Runner stage enum을 `analyze/design/build/verify`로 확장했다.
+- Build stage는 기존 `runtime-stub/build` primitive를 감싸 canonical `runtime-stub/` side effect와 run history를 함께 남긴다.
+- Verify stage는 기존 allowlist verify primitive를 감싸 `validation-report.md`와 `catalog-delta.yaml` proposal template을 생성한다. catalog delta는 자동 추론하지 않는다.
+- `/api/af/:reqId/stages/:stage/cancel`은 active stage run AbortController에 cancel 요청을 보낸다.
+
+### brief 13/14/11 — runtime gap 정리
+
+- Runnable scaffold warning은 category/output mode를 반영해 `LlmAgent smoke TODO skeleton`, `Mock Lab MCP synthetic adapter skeleton`, `RemoteA2aAgent smoke TODO skeleton`처럼 완성 구현으로 오해하지 않게 표시한다.
+- RunSandbox는 runtime-stub fingerprint를 기록해 실행 이후 bundle 변경을 stale로 보여주고, 사용자가 누르는 재시작 버튼으로만 stop/start를 수행한다.
+- Build 수동 패널은 adapter가 없는 runnable plan에서 Mock Lab binding panel을 숨기고 대상 없음 안내만 표시한다.
+- 명명 state channel은 agent instruction 또는 connected MCP adapter consumer로만 읽는다. 비-connected state consumer와 agent/non-connected artifact consumer는 runnable generation blocker로 명시한다.
+
 ### brief 01 — Canvas collaboration overlay
 
 - `GraphCanvas` 가 `comments` / `highlights` 를 받아 노드/엣지 comment count pin 과 highlight state 를 렌더링한다.
@@ -175,17 +186,19 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 - 최신 `npm run build` 결과: `DesignWorkbench-*.js` 48.83 kB / gzip 13.40 kB, `GraphCanvas-*.js` 261.38 kB / gzip 87.27 kB, `index-*.js` 269.04 kB / gzip 85.47 kB.
 - 정량 기록은 `docs/workbench/follow-ups/_perf-notes.md` 에 남겼다.
 
-## 미구현 브리프
+## 남은 브리프와 최근 처리
 
-현재 `docs/workbench/follow-ups` 에 남은 미구현/부분 구현 브리프는 10-14다.
+현재 큰 미구현 브리프는 12와 10이다. 13, 14, 11, 16은 이번 구현에서 처리했다.
 
 | 번호 | 상태 | 현재 판단 |
 |---|---|---|
-| 10 | 미구현 | dynamic-workflow lowering(route/loop/dynamic). generator 대규모 개편. |
-| 11 | 미구현(부분) | agent/비-connected consumer 의 명명 state/artifact 채널 읽기. 현재 connected MCP adapter consumer 중심. |
-| 12 | 미구현(부분) | A2A 계약 auth/timeout/retry/fallback 을 `RemoteA2aAgent` config/interceptor로 매핑. |
-| 13 | 미구현 | scaffold-plan warning 문구를 category/output_mode 인식형으로 정리. |
-| 14 | 미구현(부분 대체) | RunSandbox/Build runtime UX: shared venv/manual runtime prep 안내, 재생성 후 stale 로드, adapter 없는 시나리오 Mock Lab 패널 숨김. |
+| 10 | 마지막 예정 | dynamic-workflow lowering(route/loop/dynamic). generator 대규모 개편. |
+| 11 | 완료(범위 재정의) | state channel은 agent instruction 또는 connected MCP adapter로만 소비한다. 비-connected/agent artifact consumer는 generator blocker로 명시한다. |
+| 12 | 마지막 예정 | A2A 계약 auth/timeout/retry/fallback 을 `RemoteA2aAgent` config/interceptor로 매핑. |
+| 13 | 완료 | scaffold-plan warning 문구를 category/output_mode 인식형 smoke TODO skeleton 문구로 정리. |
+| 14 | 완료 | RunSandbox stale 감지+명시 재시작, adapter 없는 Mock Lab binding panel 숨김/안내 구현. shared venv 안내는 기존 RunSandbox 계약 유지. |
+| 15 | 코드 수정 완료(1–6) | router resume, route-map UI, runtime contract path normalization/hydration, catalog ID-first binding, Stage Runner catalog hydration, human-input 선택지 contract 최소 구현 및 ADK Web/Workbench smoke 확인. |
+| 16 | 완료 | Build/Verify Stage Runner 확장: build primitive wrapping, verify report/delta proposal, cancel endpoint, UI panel. |
 
 ## 남은 잔무 (브리프 외)
 

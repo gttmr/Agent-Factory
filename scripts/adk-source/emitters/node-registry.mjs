@@ -24,7 +24,7 @@ export function emitRunnableNodeBlocks(context, { orderedModules, humanInputNode
       emitDecl: emitFunctionNodeDecl
     },
     stub_function: { emitFunc: (module) => emitStubFunc(module, context), emitDecl: emitFunctionNodeDecl },
-    human_input: { emitFunc: emitHumanInputFunc, emitDecl: emitHumanInputNodeDecl },
+    human_input: { emitFunc: (node) => emitHumanInputFunc(node, context), emitDecl: emitHumanInputNodeDecl },
     router: { emitFunc: (node) => emitRouteFunc(node, context), emitDecl: emitRouterNodeDecl },
     remote_a2a: {
       emitFunc: () => null,

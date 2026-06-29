@@ -1,5 +1,5 @@
 import { adapterConnection } from "../adapters.mjs";
-import { agentOutputStateKey } from "../channels.mjs";
+import { agentOutputStateKey, incomingStateChannelKeys } from "../channels.mjs";
 import { DEFAULT_MODEL } from "../context.mjs";
 import { graphIndexes } from "../graph/indexes.mjs";
 import { nodeSymbol, pyNodeName } from "../naming.mjs";
@@ -7,7 +7,7 @@ import { toPyStr, truncate } from "../python-literals.mjs";
 
 export function emitAgentNode(module, context) {
   const sym = nodeSymbol(module);
-  const instruction = module.instruction || defaultAgentInstruction(module);
+  const instruction = agentInstruction(module, context);
   const mode = agentExecutionMode(module, context);
   return `${sym} = LlmAgent(
     name=${toPyStr(pyNodeName(module))},
@@ -17,6 +17,18 @@ export function emitAgentNode(module, context) {
     output_key=${toPyStr(agentOutputStateKey(context.graphContext, module))},
     mode=${toPyStr(mode)},
 )`;
+}
+
+export function agentInstruction(module, context) {
+  const instruction = module.instruction || defaultAgentInstruction(module);
+  const incomingStateKeys = incomingStateChannelKeys(context.graphContext, module.id);
+  if (!incomingStateKeys.length) return instruction;
+  return [
+    instruction,
+    "",
+    `검토된 session state 입력: ${incomingStateKeys.join(", ")}`,
+    "위 key들은 workflow가 이전 node output을 ctx.state에 저장한 값입니다. 답변 또는 판단 시 검토된 입력으로만 참조하세요."
+  ].join("\n");
 }
 
 export function agentExecutionMode(module, context) {

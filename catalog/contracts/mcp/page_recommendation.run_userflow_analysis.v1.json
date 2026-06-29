@@ -1,0 +1,157 @@
+{
+  "schema_ref": "catalog.page_recommendation.run_userflow_analysis.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "run_userflow_analysis",
+  "title": "Run UserFlow Analysis",
+  "description": "Synthetic UserFlow 분석 결과를 반환합니다(참조 page_id는 실데이터).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "selected_page_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "selected_page_ids",
+      "objective_text"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "funnel_dropoff_pages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "page_id": {
+              "type": "string"
+            },
+            "page_name": {
+              "type": "string"
+            },
+            "dropoff_rate": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "page_id",
+            "page_name",
+            "dropoff_rate",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "major_previous_pages": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "major_next_pages": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "insight": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "funnel_dropoff_pages",
+      "major_previous_pages",
+      "major_next_pages",
+      "insight"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "run_userflow_analysis_default_success",
+      "arguments": {
+        "selected_page_ids": [
+          "NWMMH00040_003M"
+        ],
+        "objective_text": "꿀머니 이탈률 분석할래"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "funnel_dropoff_pages": [
+          {
+            "page_id": "NWMMH00040_003M",
+            "page_name": "내 꿀머니",
+            "dropoff_rate": 0.41,
+            "reason": "꿀머니 혜택 조회 화면에서 이탈률 높음"
+          }
+        ],
+        "major_previous_pages": [
+          "NWMMH00021_001M"
+        ],
+        "major_next_pages": [
+          "NWMMH00040_003M"
+        ],
+        "insight": "혜택·이벤트 탭에서 내 꿀머니 화면 진입 후 이탈이 가장 큼"
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_selected_page_ids",
+      "arguments": {
+        "selected_page_ids": ""
+      },
+      "isError": true,
+      "message": "selected_page_ids 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"run_userflow_analysis\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "funnel_dropoff_pages": [
+        {
+          "page_id": "NWMMH00040_003M",
+          "page_name": "내 꿀머니",
+          "dropoff_rate": 0.41,
+          "reason": "꿀머니 혜택 조회 화면에서 이탈률 높음"
+        }
+      ],
+      "major_previous_pages": [
+        "NWMMH00021_001M"
+      ],
+      "major_next_pages": [
+        "NWMMH00040_003M"
+      ],
+      "insight": "혜택·이벤트 탭에서 내 꿀머니 화면 진입 후 이탈이 가장 큼"
+    },
+    "isError": false
+  }
+}

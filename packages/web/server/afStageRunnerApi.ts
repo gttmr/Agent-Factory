@@ -15,6 +15,7 @@ export async function handleStageRunner(
   repoRoot: string,
   store: ArtifactRootStore,
   locks: Set<string>,
+  controllers: Map<string, AbortController>,
   reqId: string,
   rest: string[],
   req: IncomingMessage,
@@ -33,15 +34,18 @@ export async function handleStageRunner(
       return;
     }
     const body = parseStageRunRequestBody(await readJsonBody(req));
+    const abortController = new AbortController();
     locks.add(reqId);
+    controllers.set(reqId, abortController);
     try {
       if (shouldStreamStageRun(req, body)) {
-        await handleStageRunSse(repoRoot, store, reqId, stage, body, res);
+        await handleStageRunSse(repoRoot, store, reqId, stage, body, abortController.signal, res);
       } else {
-        const summary = await runStageSkill({ repoRoot, store, reqId, stage, body });
+        const summary = await runStageSkill({ repoRoot, store, reqId, stage, body, signal: abortController.signal });
         sendJson(res, summary.status === "failed" ? 422 : 200, summary);
       }
     } finally {
+      controllers.delete(reqId);
       locks.delete(reqId);
     }
     return;
@@ -52,7 +56,13 @@ export async function handleStageRunner(
       sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
       return;
     }
-    sendJson(res, 501, { error: "cancel 은 child-process registry 준비 후 후속 구현합니다." });
+    const controller = controllers.get(reqId);
+    if (!controller) {
+      sendJson(res, 409, { error: "진행 중인 stage run 이 없습니다." });
+      return;
+    }
+    controller.abort();
+    sendJson(res, 202, { ok: true, status: "cancel_requested" });
     return;
   }
 
@@ -93,8 +103,9 @@ async function handleStageRunSse(
   repoRoot: string,
   store: ArtifactRootStore,
   reqId: string,
-  stage: "analyze" | "design",
+  stage: "analyze" | "design" | "build" | "verify",
   body: StageRunRequestBody,
+  signal: AbortSignal,
   res: ServerResponse
 ): Promise<void> {
   res.statusCode = 200;
@@ -110,6 +121,7 @@ async function handleStageRunSse(
     reqId,
     stage,
     body,
+    signal,
     onEvent: writeEvent
   });
   writeEvent({
@@ -138,6 +150,7 @@ function parseStageRunRequestBody(body: unknown): StageRunRequestBody {
     model: typeof body.model === "string" ? body.model : undefined,
     input,
     catalog: Array.isArray(body.catalog) ? body.catalog : undefined,
+    verifyCommand: typeof body.verifyCommand === "string" ? body.verifyCommand : undefined,
     streamProgress: typeof body.streamProgress === "boolean" ? body.streamProgress : undefined
   };
 }

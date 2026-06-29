@@ -1,0 +1,131 @@
+{
+  "schema_ref": "catalog.page_recommendation.analyze_page_customer_relation.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "analyze_page_customer_relation",
+  "title": "Analyze Page Customer Relation",
+  "description": "Synthetic T2S/Page-Customer 관계 분석 결과를 반환합니다(참조 page_id는 실데이터).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "selected_page_ids": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "selected_page_ids",
+      "objective_text"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "page_customer_relations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "page_id": {
+              "type": "string"
+            },
+            "target_customer_count": {
+              "type": "integer"
+            },
+            "signal": {
+              "type": "string"
+            },
+            "recommendation_score": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "page_id",
+            "target_customer_count",
+            "signal",
+            "recommendation_score"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "insight": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "page_customer_relations",
+      "insight"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "analyze_page_customer_relation_default_success",
+      "arguments": {
+        "selected_page_ids": [
+          "NWMMH00040_003M"
+        ],
+        "objective_text": "꿀머니 이탈률 분석할래"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "page_customer_relations": [
+          {
+            "page_id": "NWMMH00040_003M",
+            "target_customer_count": 5634,
+            "signal": "high_dropoff",
+            "recommendation_score": 0.91
+          }
+        ],
+        "insight": "내 꿀머니(NWMMH00040_003M) 페이지가 고객 규모·이탈 신호 기준 우선 분석 대상"
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_selected_page_ids",
+      "arguments": {
+        "selected_page_ids": ""
+      },
+      "isError": true,
+      "message": "selected_page_ids 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"analyze_page_customer_relation\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "page_customer_relations": [
+        {
+          "page_id": "NWMMH00040_003M",
+          "target_customer_count": 5634,
+          "signal": "high_dropoff",
+          "recommendation_score": 0.91
+        }
+      ],
+      "insight": "내 꿀머니(NWMMH00040_003M) 페이지가 고객 규모·이탈 신호 기준 우선 분석 대상"
+    },
+    "isError": false
+  }
+}

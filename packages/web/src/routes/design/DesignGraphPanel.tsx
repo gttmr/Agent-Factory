@@ -126,6 +126,7 @@ export function DesignGraphPanel({
             <GraphInspector
               selectedNode={selectedNode}
               selectedEdge={selectedEdge}
+              graphIR={graphEditState?.editModeActive ? graphEditState.draft : graphIR}
               nodeLabel={nodeLabel}
               candidate={selectedCandidate}
               a2aContracts={a2aContracts}

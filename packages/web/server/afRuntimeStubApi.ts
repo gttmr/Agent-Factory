@@ -4,7 +4,26 @@ import { join, resolve, sep } from "node:path";
 import type { ArtifactRootStore } from "./artifactRootStore";
 import { readJsonBody, sendJson } from "./httpApi";
 import { beginSse, flushBufferedProcessOutput, runProcess, shouldStreamProcess, writeSseEvent } from "./processStreaming";
-import { collectRuntimeStubFiles, isIgnoredRuntimeStubPath } from "./runtimeStubFiles";
+import { collectRuntimeStubFiles, isIgnoredRuntimeStubPath, type RuntimeStubFile } from "./runtimeStubFiles";
+
+export interface RuntimeStubBuildInput {
+  readonly repoRoot: string;
+  readonly store: ArtifactRootStore;
+  readonly reqId: string;
+  readonly signal?: AbortSignal;
+  readonly onStdout?: (chunk: string) => void;
+  readonly onStderr?: (chunk: string) => void;
+  readonly onError?: (error: Error) => void;
+}
+
+export interface RuntimeStubBuildResult {
+  readonly ok: boolean;
+  readonly files: readonly RuntimeStubFile[];
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly command: string;
+  readonly exit_code?: number | null;
+}
 
 export async function handleListRuntimeStub(
   store: ArtifactRootStore,
@@ -71,34 +90,65 @@ export async function handleBuildRuntimeStub(
   const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];
   const command = `node ${args.join(" ")}`;
   if (shouldStreamProcess(req, body)) {
-    await handleBuildRuntimeStubSse(repoRoot, stubDir, args, command, res);
+    await handleBuildRuntimeStubSse(repoRoot, store, reqId, command, res);
     return;
   }
-  const result = await runProcess(repoRoot, "node", args);
-  if (result.code !== 0) {
+  const result = await runRuntimeStubBuild({ repoRoot, store, reqId });
+  if (!result.ok) {
     sendJson(res, 422, {
       error: "runtime-stub 생성 실패",
-      exit_code: result.code,
+      exit_code: result.exit_code,
       stdout: result.stdout,
       stderr: result.stderr,
       command
     });
     return;
   }
-  const files = await collectRuntimeStubFiles(stubDir, stubDir);
   sendJson(res, 200, {
     ok: true,
-    files,
+    files: result.files,
     stdout: result.stdout,
     stderr: result.stderr,
     command
   });
 }
 
+export async function runRuntimeStubBuild(input: RuntimeStubBuildInput): Promise<RuntimeStubBuildResult> {
+  const rootDir = input.store.resolveRootDir(input.reqId);
+  const stubDir = join(rootDir, "runtime-stub");
+  const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];
+  const command = `node ${args.join(" ")}`;
+  const result = await runProcess(input.repoRoot, "node", args, {
+    signal: input.signal,
+    onStdout: input.onStdout,
+    onStderr: input.onStderr,
+    onError: input.onError
+  });
+  if (result.code !== 0) {
+    return {
+      ok: false,
+      files: [],
+      stdout: result.stdout,
+      stderr: result.stderr,
+      command,
+      exit_code: result.code
+    };
+  }
+  const files = await collectRuntimeStubFiles(stubDir, stubDir);
+  return {
+    ok: true,
+    files,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    command,
+    exit_code: result.code
+  };
+}
+
 async function handleBuildRuntimeStubSse(
   repoRoot: string,
-  stubDir: string,
-  args: string[],
+  store: ArtifactRootStore,
+  reqId: string,
   command: string,
   res: ServerResponse
 ): Promise<void> {
@@ -112,7 +162,10 @@ async function handleBuildRuntimeStubSse(
   try {
     let streamedStdout = false;
     let streamedStderr = false;
-    const result = await runProcess(repoRoot, "node", args, {
+    const result = await runRuntimeStubBuild({
+      repoRoot,
+      store,
+      reqId,
       signal: abortController.signal,
       onStdout: (chunk) => {
         streamedStdout = true;
@@ -124,21 +177,25 @@ async function handleBuildRuntimeStubSse(
       },
       onError: (error) => writeSseEvent(res, "error", { error: error.message })
     });
-    flushBufferedProcessOutput(res, result, streamedStdout, streamedStderr);
-    if (result.code !== 0) {
+    flushBufferedProcessOutput(
+      res,
+      { code: result.exit_code ?? (result.ok ? 0 : -1), stdout: result.stdout, stderr: result.stderr },
+      streamedStdout,
+      streamedStderr
+    );
+    if (!result.ok) {
       writeSseEvent(res, "error", {
         error: "runtime-stub 생성 실패",
-        exit_code: result.code,
+        exit_code: result.exit_code,
         stdout: result.stdout,
         stderr: result.stderr,
         command
       });
       return;
     }
-    const files = await collectRuntimeStubFiles(stubDir, stubDir);
     writeSseEvent(res, "done", {
       ok: true,
-      files,
+      files: result.files,
       stdout: result.stdout,
       stderr: result.stderr,
       command

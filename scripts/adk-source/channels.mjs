@@ -1,5 +1,6 @@
 import { stateKey } from "./naming.mjs";
 import { toPyStr } from "./python-literals.mjs";
+import { adapterConnection } from "./adapters.mjs";
 import { graphIndexes } from "./graph/indexes.mjs";
 
 export function edgeDataChannel(edge) {
@@ -140,12 +141,24 @@ ${indent}            _artifact_payloads.append(_value)
 export function assertDataChannelsSupported(context) {
   const conflicts = [];
   const agentArtifacts = [];
+  const unsupportedStateConsumers = [];
+  const unsupportedArtifactConsumers = [];
   for (const module of context.modules) {
-    if (module.module_category !== "agent") continue;
-    const keys = outgoingStateChannelKeys(context, module.id);
-    if (keys.length > 1) conflicts.push(`${module.id} (${keys.join(", ")})`);
-    const artifactKeys = outgoingArtifactChannelKeys(context, module.id);
-    if (artifactKeys.length) agentArtifacts.push(`${module.id} (${artifactKeys.join(", ")})`);
+    if (module.module_category === "agent") {
+      const keys = outgoingStateChannelKeys(context, module.id);
+      if (keys.length > 1) conflicts.push(`${module.id} (${keys.join(", ")})`);
+      const artifactKeys = outgoingArtifactChannelKeys(context, module.id);
+      if (artifactKeys.length) agentArtifacts.push(`${module.id} (${artifactKeys.join(", ")})`);
+    }
+    const incomingStateKeys = incomingStateChannelKeys(context, module.id);
+    const incomingArtifactKeys = incomingArtifactChannelKeys(context, module.id);
+    const connectedAdapter = adapterConnection(module) === "mcp_connected";
+    if (incomingStateKeys.length && module.module_category !== "agent" && !connectedAdapter) {
+      unsupportedStateConsumers.push(`${module.id} (${incomingStateKeys.join(", ")})`);
+    }
+    if (incomingArtifactKeys.length && !connectedAdapter) {
+      unsupportedArtifactConsumers.push(`${module.id} (${incomingArtifactKeys.join(", ")})`);
+    }
   }
   if (conflicts.length > 0) {
     throw new Error(
@@ -155,6 +168,16 @@ export function assertDataChannelsSupported(context) {
   if (agentArtifacts.length > 0) {
     throw new Error(
       `runnable mode cannot lower an artifact channel produced by an agent node (LlmAgent emits text, not artifacts): ${agentArtifacts.join("; ")}. Produce the artifact from a function/adapter node, or use a state channel.`
+    );
+  }
+  if (unsupportedStateConsumers.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower a state channel consumed by non-connected node: ${unsupportedStateConsumers.join("; ")}. Send state into an agent instruction or a connected MCP adapter, or add explicit reviewed runtime binding.`
+    );
+  }
+  if (unsupportedArtifactConsumers.length > 0) {
+    throw new Error(
+      `runnable mode cannot lower an artifact channel consumed by non-connected node: ${unsupportedArtifactConsumers.join("; ")}. Artifact payload loading is only implemented for connected MCP adapters.`
     );
   }
   const producersByStateKey = new Map();

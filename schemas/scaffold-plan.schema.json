@@ -400,6 +400,24 @@
             { "type": "object", "additionalProperties": { "type": "string" } },
             { "type": "null" }
           ]
+        },
+        "choice_options": {
+          "anyOf": [{ "type": "array", "items": { "type": "string", "minLength": 1 } }, { "type": "null" }]
+        },
+        "accepted_aliases": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "default_choice": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
         }
       }
     },

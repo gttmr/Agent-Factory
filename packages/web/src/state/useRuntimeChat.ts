@@ -22,6 +22,9 @@ export interface RuntimeChatStatus {
     managed: boolean;
     owner_matches_runtime: boolean;
     can_stop: boolean;
+    stale: boolean;
+    started_stub_fingerprint: string | null;
+    current_stub_fingerprint: string | null;
     message: string | null;
     port_owner_pid: number | null;
     port_owner_command: string | null;

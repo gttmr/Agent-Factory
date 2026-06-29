@@ -88,6 +88,7 @@ try {
     `${JSON.stringify({ package: "req_adopt_adk" }, null, 2)}\n`,
     "utf8"
   );
+  await writeFile(join(adoptStubDir, "req_adopt_adk/agent.py"), "root_agent = object()\n", "utf8");
   await writeFile(join(sharedVenvDir, "bin/python"), "#!/bin/sh\nexit 0\n", "utf8");
   await writeFile(
     join(sharedVenvDir, "bin/adk"),
@@ -112,6 +113,7 @@ try {
   const started = await firstManager.start("req-adopt");
   assert.equal(started.ok, true);
   assert.equal(started.status.server.status, "running");
+  assert.equal(started.status.server.stale, false);
   assert.ok(started.status.server.pid);
 
   const restartedManager = new RuntimeChatManager({ repoRoot, store, port: adoptPort });
@@ -120,6 +122,13 @@ try {
   assert.equal(adopted.server.managed, true);
   assert.equal(adopted.server.can_stop, true);
   assert.equal(adopted.server.pid, started.status.server.pid);
+  assert.equal(adopted.server.stale, false);
+
+  await writeFile(join(adoptStubDir, "req_adopt_adk/agent.py"), "root_agent = 'changed'\n", "utf8");
+  const staleStatus = await restartedManager.status("req-adopt");
+  assert.equal(staleStatus.server.status, "running");
+  assert.equal(staleStatus.server.stale, true);
+  assert.notEqual(staleStatus.server.started_stub_fingerprint, staleStatus.server.current_stub_fingerprint);
 
   const stopped = await restartedManager.stop("req-adopt");
   assert.equal(stopped.ok, true);

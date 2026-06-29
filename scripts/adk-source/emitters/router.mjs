@@ -15,8 +15,18 @@ export function emitRouteFunc(node, context) {
     })
     .join("\n");
   const fallback = routeCases.find((route) => route.isDefault) ?? routeCases[0];
-  return `def ${routeFuncName(node)}(node_input=None):
-    text = str(node_input or "").strip().lower()
+  return `def _route_decision_text(node_input):
+    if isinstance(node_input, dict):
+        for key in ("response", "choice", "value"):
+            value = node_input.get(key)
+            if value is not None:
+                return str(value).strip().lower()
+        return ""
+    return str(node_input or "").strip().lower()
+
+
+def ${routeFuncName(node)}(node_input=None):
+    text = _route_decision_text(node_input)
 ${checks}
     return Event(route=${toPyStr(fallback.value)}, output=node_input)`;
 }

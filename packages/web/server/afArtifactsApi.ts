@@ -53,6 +53,7 @@ const YAML_PATHS = new Set(["catalog-delta.yaml"]);
 export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
   const stageRunLocks = new Set<string>();
+  const stageRunControllers = new Map<string, AbortController>();
   const runtimeChat = new RuntimeChatManager({ repoRoot, store });
 
   return async function afArtifactsMiddleware(
@@ -89,7 +90,7 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
       const sub = rest.join("/");
 
       if (rest[0] === "stages") {
-        return await handleStageRunner(repoRoot, store, stageRunLocks, reqId, rest.slice(1), req, res);
+        return await handleStageRunner(repoRoot, store, stageRunLocks, stageRunControllers, reqId, rest.slice(1), req, res);
       }
 
       if (sub === "manifest") {

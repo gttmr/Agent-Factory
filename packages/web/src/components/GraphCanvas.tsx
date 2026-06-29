@@ -543,6 +543,7 @@ export function GraphCanvas({
         <GraphInspector
           selectedNode={selectedNode}
           selectedEdge={selectedEdge}
+          graphIR={activeGraphIR}
           nodeLabel={nodeLabel}
           candidate={selectedCandidate}
           a2aContracts={a2aContracts}

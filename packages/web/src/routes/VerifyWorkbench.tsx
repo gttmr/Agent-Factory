@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { EmptyState, Panel } from "../ui/primitives";
+import { StageRunnerPanel } from "../components/StageRunnerPanel";
+import { EmptyState, Panel, SelectField } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
-import { useRunVerify, type VerifyRunResult } from "../state/useVerify";
+import { useRunVerify, VERIFY_COMMANDS, type VerifyRunResult } from "../state/useVerify";
 import type { ProcessStreamEvent } from "../state/useStreamingProcess";
 import { VerifyReviewStep } from "./verify/VerifyReviewStep";
 import { VerifyRunStep } from "./verify/VerifyRunStep";
@@ -41,6 +42,7 @@ export default function VerifyWorkbench() {
   const [deltaDraft, setDeltaDraft] = useState("");
   const [deltaDirty, setDeltaDirty] = useState(false);
   const [lastRun, setLastRun] = useState<VerifyRunResult | null>(null);
+  const [stageRunnerCommand, setStageRunnerCommand] = useState("validate_artifact_root");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [verifyStreamLog, setVerifyStreamLog] = useState<StreamLogEntry[]>([]);
   const verifyStreamLogRef = useRef<HTMLPreElement | null>(null);
@@ -162,14 +164,49 @@ export default function VerifyWorkbench() {
       {notice}
 
       {activeStep === "run" ? (
-        <VerifyRunStep
-          isPending={runVerify.isPending}
-          lastRun={lastRun}
-          onRun={handleRun}
-          runningCommand={runningCommand}
-          streamLog={verifyStreamLog}
-          streamLogRef={verifyStreamLogRef}
-        />
+        <>
+          <StageRunnerPanel
+            reqId={reqId}
+            stage="verify"
+            skillName="verify/run"
+            title="Verify Stage Runner"
+            description="기존 allowlist 검증 명령을 실행하고 validation-report.md와 catalog-delta.yaml 제안 템플릿을 run 이력에 남깁니다."
+            controls={
+              <SelectField
+                label="검증 명령"
+                value={stageRunnerCommand}
+                onChange={(event) => setStageRunnerCommand(event.currentTarget.value)}
+              >
+                {VERIFY_COMMANDS.map((command) => (
+                  <option key={command.key} value={command.key}>
+                    {command.label}
+                  </option>
+                ))}
+              </SelectField>
+            }
+            metrics={[
+              { label: "last", value: validationLabel[lastResult] ?? lastResult, tone: lastResult === "passed" ? "ok" : lastResult === "failed" ? "danger" : "warn" },
+              { label: "report", value: reportArtifact.data ? "exists" : "empty", tone: reportArtifact.data ? "ok" : "warn" },
+              { label: "catalog-delta", value: deltaArtifact.data ? "exists" : "empty", tone: deltaArtifact.data ? "ok" : "warn" }
+            ]}
+            currentArtifactEtag={null}
+            runButtonLabel="verify 기록 실행"
+            buildRunBody={(model) => ({ model, verifyCommand: stageRunnerCommand })}
+            onRunCompleted={() => setActiveStep("review")}
+            onApplied={() => {
+              setActionMessage("검증 제안 적용 완료");
+              setActiveStep("review");
+            }}
+          />
+          <VerifyRunStep
+            isPending={runVerify.isPending}
+            lastRun={lastRun}
+            onRun={handleRun}
+            runningCommand={runningCommand}
+            streamLog={verifyStreamLog}
+            streamLogRef={verifyStreamLogRef}
+          />
+        </>
       ) : null}
 
       {activeStep === "review" ? (

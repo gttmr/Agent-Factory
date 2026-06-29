@@ -1,0 +1,409 @@
+{
+  "schema_ref": "catalog.page_recommendation.search_page_candidates.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "search_page_candidates",
+  "title": "Search Page Candidates",
+  "description": "Page Metadata(실데이터 샘플) 기반 페이지 후보를 score 순으로 반환합니다.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      },
+      "product_hint": {
+        "type": "string",
+        "minLength": 1
+      },
+      "journey_stage": {
+        "type": "string",
+        "minLength": 1
+      },
+      "event_type": {
+        "type": "string",
+        "minLength": 1
+      },
+      "keywords": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "objective_text"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "page_candidates": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "page_id": {
+              "type": "string"
+            },
+            "page_name": {
+              "type": "string"
+            },
+            "screen_category_large": {
+              "type": "string"
+            },
+            "screen_category_medium": {
+              "type": "string"
+            },
+            "action_category_large": {
+              "type": "string"
+            },
+            "action_category_medium": {
+              "type": "string"
+            },
+            "page_path": {
+              "type": "string"
+            },
+            "product_event_area": {
+              "type": "integer"
+            },
+            "description": {
+              "type": "string"
+            },
+            "match_reason": {
+              "type": "string"
+            },
+            "rag_score": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "page_id",
+            "page_name",
+            "screen_category_large",
+            "screen_category_medium",
+            "action_category_large",
+            "action_category_medium",
+            "page_path",
+            "product_event_area",
+            "description",
+            "match_reason",
+            "rag_score"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "page_candidates"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "search_page_candidates_default_success",
+      "arguments": {
+        "objective_text": "꿀머니 이탈률 분석할래"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "page_candidates": [
+          {
+            "page_id": "NWDID00019_002M",
+            "page_name": "예금/적금 가입 - 이자 시뮬레이션(STEP01)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션",
+            "product_event_area": 1,
+            "rag_score": 0.93,
+            "description": "상품가입_B 시 이자 시뮬레이션 페이지입니다. 이자 수익을 미리 예측합니다.",
+            "match_reason": "예적금 가입 퍼널 진입 단계로 이탈 고객 재유도 직접 대상"
+          },
+          {
+            "page_id": "NWDID00019_003M",
+            "page_name": "예금/적금 가입 - 가입정보 확인(STEP02)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인",
+            "product_event_area": 1,
+            "rag_score": 0.91,
+            "description": "상품가입_B의 가입정보 확인 단계입니다. 입력한 정보를 다시 한번 확인합니다.",
+            "match_reason": "가입 정보 확인 단계 이탈이 잦은 핵심 퍼널 구간"
+          },
+          {
+            "page_id": "NWDID00019_004M",
+            "page_name": "예금/적금 가입 - 약관동의(STEP03)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의",
+            "product_event_area": 1,
+            "rag_score": 0.9,
+            "description": "예금/적금 상품 가입 시, 약관 동의 단계로, 가입 전 필수 확인이 필요해요. 핵심키워드: 약관동의, 상품가입, 예금, 적금, 가입절차",
+            "match_reason": "약관동의 필수 단계로 가입 직전 이탈 방지 대상"
+          },
+          {
+            "page_id": "NWDID00019_005M",
+            "page_name": "예금/적금 가입 - 가입완료/실패(STEP04)",
+            "screen_category_large": "예/적금",
+            "screen_category_medium": "입출금/예금/적금 가입",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패",
+            "product_event_area": 1,
+            "rag_score": 0.88,
+            "description": "장병내일준비적금 가입 완료 또는 실패 후 안내되는 페이지입니다. 핵심키워드: 가입완료, 실패, 안내",
+            "match_reason": "가입 완료/실패 분기 단계로 실패 이탈 고객 회수 대상"
+          },
+          {
+            "page_id": "NWMMH00051_001M",
+            "page_name": "입출금/예금/적금 상품 상세",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세",
+            "product_event_area": 1,
+            "rag_score": 0.86,
+            "description": "입출금/예금/적금 상품의 상세 정보를 확인하는 페이지입니다. 상품명, 금리, 최소가입금액, 만기일, 이자 지급 방식, 가입 조건 등을 상세히 안내합니다.",
+            "match_reason": "상품 상세 조회 후 미가입 이탈 고객의 가입 전환 유도 대상"
+          },
+          {
+            "page_id": "NWMMH00023_001M",
+            "page_name": "예적금 상품몰 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "수신상품",
+            "action_category_medium": "예적금",
+            "page_path": "메인(상품) > 예적금(입출금, 예금, 적금)",
+            "product_event_area": 0,
+            "rag_score": 0.78,
+            "description": "예금, 적금 상품을 확인하고, 가입할 수 있는 메인 화면입니다. 상품명, 금리, 기간, 이자 계산 방식 등을 확인하며, 선택을 결정합니다.",
+            "match_reason": "예적금 탐색 진입 메인으로 상위 퍼널 후보"
+          },
+          {
+            "page_id": "NWMMH00021_001M",
+            "page_name": "상품몰 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "상품메인",
+            "action_category_medium": "NA",
+            "page_path": "메인(상품)",
+            "product_event_area": 0,
+            "rag_score": 0.62,
+            "description": "상품몰의 메인 화면입니다. 다양한 금융상품(예금, 적금, 펀드, 대출, 보험 등)을 한눈에 확인하고, 원하는 상품으로 이동할 수 있습니다.",
+            "match_reason": "전체 상품 진입 메인으로 광범위 후보"
+          },
+          {
+            "page_id": "NWMMH00057_001M",
+            "page_name": "대출 가입 안내",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "여신상품",
+            "action_category_medium": "NA",
+            "page_path": "금융상품 > 대출 > 가입하기 > 안내",
+            "product_event_area": 1,
+            "rag_score": 0.41,
+            "description": "대출 가입 안내 페이지. 대출 상품, 조건, 신청 절차 설명.",
+            "match_reason": "여신 상품 페이지로 예적금 목적과는 약한 연관"
+          },
+          {
+            "page_id": "NWMMH00034_001M",
+            "page_name": "개인사업자 상품 메인",
+            "screen_category_large": "메인",
+            "screen_category_medium": "상품몰",
+            "action_category_large": "개인사업자상품",
+            "action_category_medium": "개인사업자대출",
+            "page_path": "메인(상품) > 개인사업자",
+            "product_event_area": 0,
+            "rag_score": 0.33,
+            "description": "메인(상품) > 개인사업자 페이지입니다. 개인사업자 전용 상품을 확인할 수 있습니다.",
+            "match_reason": "개인사업자 전용 영역으로 예적금 목적과 연관 낮음"
+          },
+          {
+            "page_id": "NWMMH00040_003M",
+            "page_name": "내 꿀머니",
+            "screen_category_large": "메인",
+            "screen_category_medium": "홈/메뉴",
+            "action_category_large": "꿀머니조회",
+            "action_category_medium": "꿀머니",
+            "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니",
+            "product_event_area": 0,
+            "rag_score": 0.94,
+            "description": "내 꿀머니 메인. 포인트, 캐시백, 혜택을 한 눈에 확인.",
+            "match_reason": "꿀머니 혜택 잔액·포인트 조회 목적과 직접 연결된 페이지로 이탈률 분석 대상"
+          }
+        ]
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_objective_text",
+      "arguments": {
+        "objective_text": ""
+      },
+      "isError": true,
+      "message": "objective_text 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"search_page_candidates\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "page_candidates": [
+        {
+          "page_id": "NWDID00019_002M",
+          "page_name": "예금/적금 가입 - 이자 시뮬레이션(STEP01)",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션",
+          "product_event_area": 1,
+          "rag_score": 0.93,
+          "description": "상품가입_B 시 이자 시뮬레이션 페이지입니다. 이자 수익을 미리 예측합니다.",
+          "match_reason": "예적금 가입 퍼널 진입 단계로 이탈 고객 재유도 직접 대상"
+        },
+        {
+          "page_id": "NWDID00019_003M",
+          "page_name": "예금/적금 가입 - 가입정보 확인(STEP02)",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인",
+          "product_event_area": 1,
+          "rag_score": 0.91,
+          "description": "상품가입_B의 가입정보 확인 단계입니다. 입력한 정보를 다시 한번 확인합니다.",
+          "match_reason": "가입 정보 확인 단계 이탈이 잦은 핵심 퍼널 구간"
+        },
+        {
+          "page_id": "NWDID00019_004M",
+          "page_name": "예금/적금 가입 - 약관동의(STEP03)",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의",
+          "product_event_area": 1,
+          "rag_score": 0.9,
+          "description": "예금/적금 상품 가입 시, 약관 동의 단계로, 가입 전 필수 확인이 필요해요. 핵심키워드: 약관동의, 상품가입, 예금, 적금, 가입절차",
+          "match_reason": "약관동의 필수 단계로 가입 직전 이탈 방지 대상"
+        },
+        {
+          "page_id": "NWDID00019_005M",
+          "page_name": "예금/적금 가입 - 가입완료/실패(STEP04)",
+          "screen_category_large": "예/적금",
+          "screen_category_medium": "입출금/예금/적금 가입",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패",
+          "product_event_area": 1,
+          "rag_score": 0.88,
+          "description": "장병내일준비적금 가입 완료 또는 실패 후 안내되는 페이지입니다. 핵심키워드: 가입완료, 실패, 안내",
+          "match_reason": "가입 완료/실패 분기 단계로 실패 이탈 고객 회수 대상"
+        },
+        {
+          "page_id": "NWMMH00051_001M",
+          "page_name": "입출금/예금/적금 상품 상세",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세",
+          "product_event_area": 1,
+          "rag_score": 0.86,
+          "description": "입출금/예금/적금 상품의 상세 정보를 확인하는 페이지입니다. 상품명, 금리, 최소가입금액, 만기일, 이자 지급 방식, 가입 조건 등을 상세히 안내합니다.",
+          "match_reason": "상품 상세 조회 후 미가입 이탈 고객의 가입 전환 유도 대상"
+        },
+        {
+          "page_id": "NWMMH00023_001M",
+          "page_name": "예적금 상품몰 메인",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "action_category_large": "수신상품",
+          "action_category_medium": "예적금",
+          "page_path": "메인(상품) > 예적금(입출금, 예금, 적금)",
+          "product_event_area": 0,
+          "rag_score": 0.78,
+          "description": "예금, 적금 상품을 확인하고, 가입할 수 있는 메인 화면입니다. 상품명, 금리, 기간, 이자 계산 방식 등을 확인하며, 선택을 결정합니다.",
+          "match_reason": "예적금 탐색 진입 메인으로 상위 퍼널 후보"
+        },
+        {
+          "page_id": "NWMMH00021_001M",
+          "page_name": "상품몰 메인",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "action_category_large": "상품메인",
+          "action_category_medium": "NA",
+          "page_path": "메인(상품)",
+          "product_event_area": 0,
+          "rag_score": 0.62,
+          "description": "상품몰의 메인 화면입니다. 다양한 금융상품(예금, 적금, 펀드, 대출, 보험 등)을 한눈에 확인하고, 원하는 상품으로 이동할 수 있습니다.",
+          "match_reason": "전체 상품 진입 메인으로 광범위 후보"
+        },
+        {
+          "page_id": "NWMMH00057_001M",
+          "page_name": "대출 가입 안내",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "action_category_large": "여신상품",
+          "action_category_medium": "NA",
+          "page_path": "금융상품 > 대출 > 가입하기 > 안내",
+          "product_event_area": 1,
+          "rag_score": 0.41,
+          "description": "대출 가입 안내 페이지. 대출 상품, 조건, 신청 절차 설명.",
+          "match_reason": "여신 상품 페이지로 예적금 목적과는 약한 연관"
+        },
+        {
+          "page_id": "NWMMH00034_001M",
+          "page_name": "개인사업자 상품 메인",
+          "screen_category_large": "메인",
+          "screen_category_medium": "상품몰",
+          "action_category_large": "개인사업자상품",
+          "action_category_medium": "개인사업자대출",
+          "page_path": "메인(상품) > 개인사업자",
+          "product_event_area": 0,
+          "rag_score": 0.33,
+          "description": "메인(상품) > 개인사업자 페이지입니다. 개인사업자 전용 상품을 확인할 수 있습니다.",
+          "match_reason": "개인사업자 전용 영역으로 예적금 목적과 연관 낮음"
+        },
+        {
+          "page_id": "NWMMH00040_003M",
+          "page_name": "내 꿀머니",
+          "screen_category_large": "메인",
+          "screen_category_medium": "홈/메뉴",
+          "action_category_large": "꿀머니조회",
+          "action_category_medium": "꿀머니",
+          "page_path": "메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니",
+          "product_event_area": 0,
+          "rag_score": 0.94,
+          "description": "내 꿀머니 메인. 포인트, 캐시백, 혜택을 한 눈에 확인.",
+          "match_reason": "꿀머니 혜택 잔액·포인트 조회 목적과 직접 연결된 페이지로 이탈률 분석 대상"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

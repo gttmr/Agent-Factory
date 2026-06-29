@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type {
   A2AContract,
   GraphEdge,
+  GraphIR,
   GraphNode,
   ModuleCandidate,
   ModuleCategory
@@ -12,10 +13,12 @@ import {
   nextGraphElementTabAfterSelectionChange,
   type GraphElementTabId
 } from "./graphElementEditorModel";
+import { routeMapForNode, upstreamHumanPromptForRouter, type GraphRouteSummary } from "./graph/layout";
 
 interface GraphInspectorProps {
   selectedNode: GraphNode | null;
   selectedEdge: GraphEdge | null;
+  graphIR: GraphIR | null;
   nodeLabel: (id: string) => string;
   candidate: ModuleCandidate | null;
   a2aContracts: A2AContract[];
@@ -59,6 +62,38 @@ function EmptyTabMessage({ children }: { children: ReactNode }) {
   return <p className="graph-inspector-note">{children}</p>;
 }
 
+function InlineList({ values }: { values: readonly string[] }) {
+  if (!values.length) return <EmptyValue />;
+  return (
+    <div className="graph-inspector-chips">
+      {values.map((value) => (
+        <span key={value} className="chip">
+          {value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function RouteMapTable({ routes }: { routes: readonly GraphRouteSummary[] }) {
+  return (
+    <div className="graph-route-map-table">
+      {routes.map((route) => (
+        <div
+          key={`${route.value}:${route.targetNodeId}`}
+          className="graph-route-map-row"
+          title={`${route.value} -> ${route.targetLabel}${route.aliases.length ? `; aliases: ${route.aliases.join(", ")}` : ""}`}
+        >
+          <span className="graph-route-value">route: {route.value}</span>
+          <span className="graph-route-target">target: {route.targetLabel}</span>
+          {route.isDefault ? <span className="graph-route-default">default</span> : null}
+          {route.aliases.length ? <span className="graph-route-aliases">aliases: {route.aliases.join(", ")}</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GraphElementTabs({
   activeTab,
   onTabChange
@@ -85,7 +120,7 @@ function GraphElementTabs({
 }
 
 export function GraphInspector(props: GraphInspectorProps) {
-  const { selectedNode, selectedEdge, nodeLabel, candidate, a2aContracts, onNavigateToA2AContracts, onClose } = props;
+  const { selectedNode, selectedEdge, graphIR, nodeLabel, candidate, a2aContracts, onNavigateToA2AContracts, onClose } = props;
   const [activeTab, setActiveTab] = useState<GraphElementTabId>("basic");
   const selectionKey = selectedNode
     ? `node:${selectedNode.id}`
@@ -114,6 +149,12 @@ export function GraphInspector(props: GraphInspectorProps) {
         : "single_turn"
       : null;
     const schemaRefs = selectedNode.schema_refs ?? [];
+    const graphNodes = graphIR?.nodes ?? [];
+    const graphEdges = graphIR?.edges ?? [];
+    const nodeById = new Map(graphNodes.map((node) => [node.id, node]));
+    const routeMap = selectedNode.node_kind === "router" ? routeMapForNode(selectedNode.id, graphEdges, nodeById) : [];
+    const upstreamHumanPrompt =
+      selectedNode.node_kind === "router" ? upstreamHumanPromptForRouter(selectedNode.id, graphEdges, nodeById) : null;
 
     return (
       <aside className="graph-inspector">
@@ -147,6 +188,11 @@ export function GraphInspector(props: GraphInspectorProps) {
             <Row label="검토 상태">{selectedNode.review_status ?? <EmptyValue />}</Row>
             <Row label="lane">{(selectedNode.lane_id as string) ?? <EmptyValue />}</Row>
             <Row label="container">{selectedNode.container_id ?? <EmptyValue />}</Row>
+            {selectedNode.node_kind === "router" && routeMap.length ? (
+              <Row label="route map">
+                <RouteMapTable routes={routeMap} />
+              </Row>
+            ) : null}
           </Section>
         ) : null}
 
@@ -194,6 +240,21 @@ export function GraphInspector(props: GraphInspectorProps) {
                 </Row>
                 <Row label="response_mapping">
                   <code>{JSON.stringify(selectedNode.human_input_contract?.response_mapping ?? {})}</code>
+                </Row>
+                <Row label="choice_options">
+                  <InlineList values={selectedNode.human_input_contract?.choice_options ?? []} />
+                </Row>
+                <Row label="default_choice">{selectedNode.human_input_contract?.default_choice ?? <EmptyValue />}</Row>
+                <Row label="accepted_aliases">
+                  <code>{JSON.stringify(selectedNode.human_input_contract?.accepted_aliases ?? {})}</code>
+                </Row>
+              </>
+            ) : null}
+            {selectedNode.node_kind === "router" ? (
+              <>
+                <Row label="upstream prompt">{upstreamHumanPrompt ?? <EmptyValue />}</Row>
+                <Row label="routes">
+                  {routeMap.length ? <RouteMapTable routes={routeMap} /> : <EmptyValue />}
                 </Row>
               </>
             ) : null}

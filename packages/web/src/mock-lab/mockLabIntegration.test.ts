@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   applyMockLabBinding,
   buildMockLabRoute,
+  hasMockLabBindingTargets,
   isMcpBoundAdapter
 } from "./mockLabIntegration.ts";
 import type { ScaffoldPlan } from "../analyzer/types.ts";
@@ -62,3 +63,11 @@ assert.equal(next.modules[1], plan.modules[1]);
 assert.equal(plan.modules[0].access_protocol, "local");
 assert.equal(isMcpBoundAdapter(next.modules[0]), true);
 assert.equal(isMcpBoundAdapter(next.modules[1]), false);
+assert.equal(hasMockLabBindingTargets(plan), true);
+assert.equal(
+  hasMockLabBindingTargets({
+    ...plan,
+    modules: [plan.modules[1]]
+  }),
+  false
+);

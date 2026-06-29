@@ -410,10 +410,46 @@ assert.deepEqual(normalizedReviewedAdkFields.nodes[1]?.human_input_contract, {
   message: "담당자 승인 여부를 입력하세요.",
   payload_schema_ref: null,
   response_schema_ref: "str",
-  response_mapping: null
+  response_mapping: null,
+  choice_options: null,
+  accepted_aliases: null,
+  default_choice: null
 });
 assert.deepEqual(normalizedReviewedAdkFields.edges[0]?.route_aliases, ["승인", "approve"]);
 assert.equal(normalizedReviewedAdkFields.edges[0]?.is_default_route, true);
+
+const normalizedHumanInputChoiceFields = normalizeGraphIRForRuntime(
+  graphWithNodes([
+    node({
+      id: "node-human-choice",
+      label: "분기 선택",
+      node_kind: "human_input",
+      lane_id: "human_input",
+      human_input_contract: {
+        message: "다음 경로를 선택하세요.",
+        payload_schema_ref: null,
+        response_schema_ref: "str",
+        response_mapping: null,
+        choice_options: ["run_analysis", "skip_analysis"],
+        accepted_aliases: {
+          run_analysis: ["analyze", "분석"],
+          skip_analysis: ["skip", "건너뛰기"]
+        },
+        default_choice: "skip_analysis"
+      }
+    } as Partial<GraphNode>)
+  ]),
+  "req-human-choice-fields"
+);
+assert.deepEqual(normalizedHumanInputChoiceFields.nodes[0]?.human_input_contract?.choice_options, [
+  "run_analysis",
+  "skip_analysis"
+]);
+assert.deepEqual(normalizedHumanInputChoiceFields.nodes[0]?.human_input_contract?.accepted_aliases, {
+  run_analysis: ["analyze", "분석"],
+  skip_analysis: ["skip", "건너뛰기"]
+});
+assert.equal(normalizedHumanInputChoiceFields.nodes[0]?.human_input_contract?.default_choice, "skip_analysis");
 
 const humanInputBackfill = normalizeGraphIRForRuntime(
   graphWithNodes([node({ id: "node-human-input", label: "사람 승인", node_kind: "human_input", lane_id: "human_input" })]),
