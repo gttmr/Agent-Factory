@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { Button, EmptyState, Field, Panel, SectionHeader } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
@@ -79,6 +80,8 @@ const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
 // 관련 핸들러(handleSaveRuntimeContract, handleSaveA2AContract, handleCreateComment)는 보존한다.
 // ──────────────────────────────────────────────────────────────────────────
 const INSPECTOR_ENABLED = false;
+const GRAPH_IR_SAVE_SUCCESS_MESSAGE =
+  "Graph IR 저장 완료 — Build 에서 계약 동기화 + runtime-stub 재생성이 필요합니다.";
 
 const GraphCanvas = lazy(async () => {
   const module = await import("../components/GraphCanvas");
@@ -95,6 +98,7 @@ export default function DesignWorkbench() {
 
   const { data: manifestData, isLoading: manifestLoading } = useArtifactRoot(reqId);
   const { data: analysisData, isLoading: analysisLoading } = useAnalysisArtifact(reqId);
+  const queryClient = useQueryClient();
   const approvalMutation = useApprovalGate(reqId);
   const saveAnalysisMutation = useSaveAnalysisArtifact(reqId);
   const { name: authorName, role: authorRole, setName: setAuthorName, setRole: setAuthorRole } = useAuthor();
@@ -321,7 +325,13 @@ export default function DesignWorkbench() {
     saveAnalysisMutation.mutate(
       { analysis: nextAnalysis, etag: analysisEtag },
       {
-        onSuccess: () => setActionMessage("Graph IR 저장 완료"),
+        onSuccess: () => {
+          void Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["af", reqId, "scaffold-plan"] }),
+            queryClient.invalidateQueries({ queryKey: ["af", reqId, "runtime-stub"] })
+          ]);
+          setActionMessage(GRAPH_IR_SAVE_SUCCESS_MESSAGE);
+        },
         onError: (error) =>
           setActionMessage(error instanceof Error ? error.message : "Graph IR 저장 실패")
       }
@@ -427,6 +437,11 @@ export default function DesignWorkbench() {
       <div className="af-stage-notice" role="status">
         {manifestLoading || analysisLoading ? <span>데이터 불러오는 중…</span> : null}
         {actionMessage ? <span>{actionMessage}</span> : null}
+        {actionMessage === GRAPH_IR_SAVE_SUCCESS_MESSAGE && reqId ? (
+          <Link className="ui-button ui-button-secondary" to={`/af/${reqId}/build?step=run`}>
+            Build 동기화로 이동
+          </Link>
+        ) : null}
       </div>
     ) : null;
 
