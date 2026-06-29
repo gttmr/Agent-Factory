@@ -117,10 +117,9 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 - `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
 - `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
 
-현재 ADK skeleton 생성 범위에서는 `workflow_kind: dynamic`과 `container_kind: dynamic_workflow`를 design/contract container로만 취급한다.
-`dynamic_workflow`는 rationale, 수동 구현 범위, checkpoint/resume 요구를 보존할 수 있지만 runnable dynamic codegen 대상이 아니며 runtime `adk_mapping`을 선언하지 않는다.
-동적 로직이 필요한 복잡한 흐름은 하위 업무 Workflow로 분리하고 parent Graph IR에서는 `node_kind: workflow_call`로 조립한다.
-실제 dynamic Python 로직은 생성 bundle의 TODO 경계 안에서 전문 개발자가 수동 보강한다.
+`workflow_kind: dynamic`과 `container_kind: dynamic_workflow`는 Graph IR에서 runtime 경로가 코드로 결정되는 흐름을 보존한다.
+`dynamic_workflow` container는 runtime `adk_mapping`을 선언하지 않는다. Runnable generation은 reviewed dynamic/loop shape를 감지하면 public `output_mode: "runnable"` 안에서 내부 ADK dynamic workflow builder를 선택할 수 있다.
+Generator가 만드는 dynamic Python은 `@node` + `ctx.run_node(...)` wiring skeleton과 reviewed loop decision handling까지이며, 실제 production business loop/fallback/escalation logic은 생성 bundle의 TODO 경계 안에서 전문 개발자가 보강한다.
 
 ## Graph IR call nodes
 

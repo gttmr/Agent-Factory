@@ -156,6 +156,8 @@ export function assertNoSymbolCollisions(orderedModules, syntheticNodes = []) {
         ["function name", routeFuncName(node)],
         ["node name", pyGraphNodeName(node)]
       ]);
+    } else if (node.node_kind === "loop_control") {
+      check(node.id, [["node symbol", syntheticNodeSymbol(node)], ["node name", pyGraphNodeName(node)]]);
     } else if (node.node_kind === "join" || node.explicit === true) {
       check(node.id, [["node symbol", syntheticNodeSymbol(node)], ["node name", pyGraphNodeName(node)]]);
     }

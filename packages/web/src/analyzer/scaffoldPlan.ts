@@ -550,32 +550,35 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
   ];
 }
 
-// Dynamic Workflow stays design/contract-only in this skeleton scope: the
-// runnable ADK generator (`assertRunnableGraphSupported`) rejects dynamic
-// workflow modules and `dynamic_workflow` containers. Mirror that rejection at
-// plan-validation time so `can_generate_source` never reports a runnable plan
-// the generator will then refuse — surface the workflow_call redirect instead.
 function collectRunnableDynamicBlockers(
   outputMode: ScaffoldOutputMode,
-  modules: ScaffoldPlanModule[],
+  _modules: ScaffoldPlanModule[],
   processFlow: ProcessFlow
 ): string[] {
   if (outputMode !== "runnable") return [];
   const blockers: string[] = [];
-  for (const module of modules) {
-    if (module.module_category === "workflow" && module.workflow_kind === "dynamic") {
+  const nodes = processFlow?.nodes ?? [];
+  const edges = processFlow?.edges ?? [];
+  const loopControls = nodes.filter((node) => node?.node_kind === "loop_control");
+  for (const node of loopControls) {
+    const outgoing = edges.filter((edge) => edge?.from === node.id);
+    const backEdges = outgoing.filter((edge) => edge.execution_semantics === "loop_back");
+    const exitEdges = outgoing.filter((edge) => edge.execution_semantics === "loop_exit");
+    if (!backEdges.length || !exitEdges.length) {
+      blockers.push(`${node.id}: loop_control 은 loop_back 과 loop_exit edge가 모두 필요합니다.`);
+      continue;
+    }
+    const missingDecision = [...backEdges, ...exitEdges].filter((edge) => {
+      const hasCondition = typeof edge.route_condition === "string" && edge.route_condition.trim();
+      const hasAliases = Array.isArray(edge.route_aliases) && edge.route_aliases.some((alias) => alias.trim());
+      const defaultExit = edge.execution_semantics === "loop_exit" && edge.is_default_route === true;
+      return !hasCondition && !hasAliases && !defaultExit;
+    });
+    if (missingDecision.length > 0) {
       blockers.push(
-        `${module.name}: Dynamic Workflow는 runnable 생성 대상이 아닙니다. 하위 업무 Workflow로 분리하고 parent graph에서 workflow_call 노드로 조립하세요.`
+        `${node.id}: dynamic loop runnable 생성을 위해 loop_back/loop_exit route_condition 또는 route_aliases를 검토하세요.`
       );
     }
-  }
-  const dynamicContainers = (processFlow?.containers ?? []).filter(
-    (container) => container?.container_kind === "dynamic_workflow"
-  );
-  if (dynamicContainers.length > 0) {
-    blockers.push(
-      `dynamic_workflow container ${dynamicContainers.length}개는 runnable 생성 대상이 아닙니다. design/contract container로 유지하고 동적 흐름은 workflow_call로 조립하세요.`
-    );
   }
   return blockers;
 }

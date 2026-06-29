@@ -340,7 +340,7 @@ test("runnable keeps LLM-selected MCP toolsets as unconnected handoff stubs", ()
       manifest.runtime.unconnected_adapters.some((adapterEntry) => adapterEntry.module_id === "mod-gen-adapter"),
       "LLM-selected MCP toolset must remain an unconnected handoff"
     );
-    assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context\) -> dict:/);
+    assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context, node_input=None\) -> dict:/);
     assert.match(agentSource, /"connection_status": "unconnected"/);
     assert.doesNotMatch(agentSource, /from mcp import ClientSession/);
     assert.doesNotMatch(agentSource, /"connection_status": "mcp_connected"/);
@@ -489,6 +489,159 @@ test("runnable contract test does not require LlmAgent mode when no LlmAgent nod
   }
 });
 
+test("runnable lowers reviewed loop control through an ADK dynamic workflow node", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-draft", name: "Draft Agent" },
+    { ...unconnectedAdapter, id: "mod-review", name: "Review Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-dynamic-loop-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "draft", node_kind: "agent", module_id: "mod-draft" },
+        { id: "review", node_kind: "adapter", module_id: "mod-review" },
+        { id: "loop-control", node_kind: "loop_control", module_id: null },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "draft" },
+        { from: "draft", to: "review" },
+        { from: "review", to: "loop-control" },
+        {
+          from: "loop-control",
+          to: "draft",
+          edge_kind: "control",
+          execution_semantics: "loop_back",
+          route_condition: "decision == retry",
+          route_aliases: ["revise"]
+        },
+        {
+          from: "loop-control",
+          to: "out1",
+          edge_kind: "control",
+          execution_semantics: "loop_exit",
+          route_condition: "decision == done",
+          route_aliases: ["approved"],
+          is_default_route: true
+        }
+      ],
+      containers: [
+        {
+          id: "container-loop",
+          container_kind: "loop_region",
+          contains_node_ids: ["draft", "review", "loop-control"],
+          entry_node_ids: ["draft"],
+          exit_node_ids: ["loop-control"]
+        }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    execFileSync("python3", ["-c", "import ast, sys; ast.parse(sys.stdin.read())"], { input: source, stdio: "pipe" });
+    assert.match(source, /from google\.adk\.workflow import FunctionNode, START, Workflow, node/);
+    assert.match(source, /@node\(name="dynamic_workflow", rerun_on_resume=True\)/);
+    assert.match(source, /while True:/);
+    assert.match(source, /await ctx\.run_node\(agent_mod_draft, payload\)/);
+    assert.match(source, /await ctx\.run_node\(node_mod_review, payload\)/);
+    assert.match(source, /ctx\.state\["af_dynamic_loop:loop-control"\]/);
+    assert.match(
+      source,
+      /_dynamic_should_continue\(_loop_decision, \["retry", "revise"\], \["done", "approved"\], "loop_exit"\)/
+    );
+    assert.match(source, /root_agent = Workflow\(\s*name="req_ch_adk",\s*description=.*,\s*edges=\[\(START, dynamic_workflow\)\],\s*\)/s);
+    assert.doesNotMatch(source, /loop Graph IR yet|wait for loop lowering/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects loop control edges without reviewed loop decisions", () => {
+  const { agentBase } = channelModules();
+  const modules = [{ ...agentBase, id: "mod-draft", name: "Draft Agent" }];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-dynamic-loop-reject-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "draft", node_kind: "agent", module_id: "mod-draft" },
+        { id: "loop-control", node_kind: "loop_control", module_id: null },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "draft" },
+        { from: "draft", to: "loop-control" },
+        { from: "loop-control", to: "draft", edge_kind: "control", execution_semantics: "loop_back" },
+        { from: "loop-control", to: "out1", edge_kind: "control", execution_semantics: "loop_exit" }
+      ],
+      containers: [
+        {
+          id: "container-loop",
+          container_kind: "loop_region",
+          contains_node_ids: ["draft", "loop-control"],
+          entry_node_ids: ["draft"],
+          exit_node_ids: ["loop-control"]
+        }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /loop_control loop-control requires reviewed route_condition/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable dynamic workflow modules use the internal dynamic builder without a new output mode", () => {
+  const { unconnectedAdapter } = channelModules();
+  const dynamicWorkflow = {
+    ...unconnectedAdapter,
+    id: "mod-dynamic",
+    name: "Dynamic Workflow",
+    module_category: "workflow",
+    workflow_kind: "dynamic",
+    adapter_kind: null,
+    node_kind: "workflow"
+  };
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-dynamic-module-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules: [dynamicWorkflow],
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "dynamic", node_kind: "workflow", module_id: "mod-dynamic" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "dynamic" },
+        { from: "dynamic", to: "out1" }
+      ],
+      containers: [
+        {
+          id: "container-dynamic",
+          container_kind: "dynamic_workflow",
+          contains_node_ids: ["dynamic"],
+          entry_node_ids: ["dynamic"],
+          exit_node_ids: ["dynamic"]
+        }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const { manifest, agentSource } = readBundle(outputRoot);
+    assert.equal(manifest.output_mode, "runnable");
+    assert.match(agentSource, /@node\(name="dynamic_workflow", rerun_on_resume=True\)/);
+    assert.match(agentSource, /await ctx\.run_node\(node_mod_dynamic, payload\)/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/fan-in)", () => {
   const cases = [
     { name: "module-bound human_input node", mutate: (pf) => pf.nodes.push({ id: "h1", node_kind: "human_input", module_id: "mod-gen-agent" }) },
@@ -516,7 +669,55 @@ test("runnable mode rejects Graph IR shapes it cannot lower (v1: DAG + fan-out/f
         ];
       }
     },
-    { name: "loop_region container", mutate: (pf) => { (pf.containers ||= []).push({ id: "container-loop", container_kind: "loop_region" }); } }
+    {
+      name: "dynamic workflow mixed with router route",
+      mutate: (pf) => {
+        pf.nodes.push({ id: "done-router", node_kind: "router", module_id: null });
+        pf.edges = [
+          { from: "in1", to: "mod-gen-agent" },
+          { from: "mod-gen-agent", to: "done-router" },
+          {
+            from: "done-router",
+            to: "mod-gen-adapter",
+            edge_kind: "route",
+            execution_semantics: "conditional",
+            route_condition: "choice == done"
+          },
+          { from: "mod-gen-adapter", to: "out1" }
+        ];
+        pf.containers = [
+          ...(Array.isArray(pf.containers) ? pf.containers : []),
+          {
+            id: "container-dynamic",
+            container_kind: "dynamic_workflow",
+            contains_node_ids: ["mod-gen-agent", "done-router", "mod-gen-adapter"],
+            entry_node_ids: ["mod-gen-agent"],
+            exit_node_ids: ["mod-gen-adapter"]
+          }
+        ];
+      }
+    },
+    {
+      name: "dynamic workflow with module-bound router node",
+      mutate: (pf) => {
+        pf.nodes.push({ id: "router-module", node_kind: "router", module_id: "mod-gen-agent" });
+        pf.edges = [
+          { from: "in1", to: "router-module" },
+          { from: "router-module", to: "out1" }
+        ];
+        pf.containers = [
+          ...(Array.isArray(pf.containers) ? pf.containers : []),
+          {
+            id: "container-dynamic",
+            container_kind: "dynamic_workflow",
+            contains_node_ids: ["router-module"],
+            entry_node_ids: ["router-module"],
+            exit_node_ids: ["router-module"]
+          }
+        ];
+      }
+    },
+    { name: "loop_control without loop edges", mutate: (pf) => { pf.nodes.push({ id: "loop-control", node_kind: "loop_control", module_id: null }); } }
   ];
   for (const testCase of cases) {
     const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-reject-"));

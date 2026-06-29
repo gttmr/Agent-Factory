@@ -580,10 +580,6 @@ assert.ok(
 );
 assert.equal(rootPlan.validation.can_generate_source, true, "plan with the root excluded and an approved child should be generatable");
 
-// --- dynamic workflow stays smoke-only: runnable plans block before generation ---
-// The runnable ADK generator rejects dynamic workflow modules and
-// `dynamic_workflow` containers. The scaffold plan must mirror that so the Build
-// gate (`can_generate_source`) never offers a runnable plan the generator refuses.
 const dynamicWorkflowCandidate = candidate({
   id: "mod-dynamic-wf",
   name: "이탈위험 동적 Workflow",
@@ -616,19 +612,88 @@ const dynamicRunnablePlan = buildScaffoldPlan({
 });
 assert.equal(
   dynamicRunnablePlan.validation.can_generate_source,
-  false,
-  "runnable plan with a dynamic workflow module must not be generatable"
+  true,
+  "runnable plan with a dynamic workflow module can use the internal dynamic builder"
 );
 assert.ok(
-  dynamicRunnablePlan.validation.blockers.some((b) => b.includes("Dynamic Workflow") && b.includes("workflow_call")),
-  "dynamic workflow module should produce a workflow_call redirect blocker"
+  dynamicRunnablePlan.validation.blockers.every((b) => !b.includes("Dynamic Workflow")),
+  "dynamic workflow module should not produce a workflow_call redirect blocker"
 );
 assert.ok(
-  dynamicRunnablePlan.validation.blockers.some((b) => b.includes("dynamic_workflow container")),
-  "dynamic_workflow container should produce a blocker"
+  dynamicRunnablePlan.validation.blockers.every((b) => !b.includes("dynamic_workflow container")),
+  "dynamic_workflow container should not produce a blocker"
 );
 
-// Smoke mode keeps dynamic workflows as a design/contract handoff — no dynamic blocker.
+const loopWithoutReviewedDecisionPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [candidate()],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "loop-control",
+        label: "loop-control",
+        module_id: null,
+        node_kind: "loop_control",
+        execution_kind: null,
+        adk_node_role: "synthetic",
+        owner_scope: "local",
+        container_id: "container-loop",
+        lane_id: "local_graph",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        review_status: "approved"
+      }
+    ],
+    edges: [
+      {
+        id: "loop-back",
+        from: "loop-control",
+        to: "loop-control",
+        from_port: null,
+        to_port: null,
+        edge_kind: "control",
+        execution_semantics: "loop_back",
+        data_label: "retry",
+        schema_ref: null,
+        route_condition: null,
+        state_key: null,
+        artifact_key: null,
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
+      },
+      {
+        id: "loop-exit",
+        from: "loop-control",
+        to: "loop-control",
+        from_port: null,
+        to_port: null,
+        edge_kind: "control",
+        execution_semantics: "loop_exit",
+        data_label: "done",
+        schema_ref: null,
+        route_condition: null,
+        state_key: null,
+        artifact_key: null,
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.equal(
+  loopWithoutReviewedDecisionPlan.validation.can_generate_source,
+  false,
+  "runnable loop plan without reviewed loop decisions must not be generatable"
+);
+assert.ok(
+  loopWithoutReviewedDecisionPlan.validation.blockers.some((b) => b.includes("route_condition") || b.includes("route_aliases")),
+  "loop_control should request reviewed loop decision conditions"
+);
+
 const dynamicSmokePlan = buildScaffoldPlan({
   normalizedRequirement,
   moduleCandidates: [dynamicWorkflowCandidate],

@@ -77,7 +77,7 @@ export function assertRunnableBundle(outputRoot) {
   assert.match(agentSource, /\.agent-factory\/runtime\.env/);
   assert.match(agentSource, /if key not in os\.environ:/);
   assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
-  assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context\)/);
+  assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context, node_input=None\)/);
   assert.match(agentSource, /node_mod_gen_adapter = FunctionNode\(func=_fn_mod_gen_adapter/);
   assert.ok(
     manifest.runtime.unconnected_adapters.some((adapter) => adapter.module_id === "mod-gen-adapter"),

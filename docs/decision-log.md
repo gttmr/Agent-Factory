@@ -314,6 +314,11 @@
 - **배경**: `req-page-recommendation-required` catalog-first ADK Web QA에서 `skip_analysis` 입력이 prompt 전체 문자열의 `run_analysis`에 먼저 매칭되어 분석 branch가 실행됐고, route map과 catalog/runtime contract provenance가 UI와 artifact contract에 충분히 드러나지 않았다.
 - **영향**: ADK generator router/human-input emitters, Graph IR schemas and editor/inspector UI, runtime contract normalization/hydration, scaffold catalog binding, Stage Runner request snapshot and summary UI, validation/generator regressions.
 
+### Dynamic/loop Graph IR은 public runnable mode 안의 내부 ADK dynamic builder로 lower한다
+- **결정**: `output_mode: "runnable"`을 유지하고, generator가 reviewed dynamic/loop Graph IR shape를 감지하면 내부 ADK dynamic workflow builder를 선택한다. `loop_control`은 reviewed `loop_back`/`loop_exit` decision edge의 `route_condition`/`route_aliases`/default metadata만 사용하며, `dynamic_workflow` container는 runtime `adk_mapping`을 계속 선언하지 않는다.
+- **배경**: ADK dynamic workflow는 `@node`와 `ctx.run_node(...)`로 Python control flow를 표현한다. 별도 output mode를 추가하면 기존 Build UI와 scaffold contract가 불필요하게 갈라지고, loop decision을 prose에서 추론하면 reviewer가 승인하지 않은 runtime behavior가 생성될 수 있다.
+- **영향**: ADK generator dynamic builder/guards, scaffold-plan blockers, Graph IR soft/export validators, scenario-d loop fixture, active validation/process-flow/workflow docs.
+
 ---
 
 ## 2026-06-09 이전 (backfill 요약)

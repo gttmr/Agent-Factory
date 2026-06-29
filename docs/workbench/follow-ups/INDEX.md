@@ -25,7 +25,7 @@
 | 07 | `07-onboarding-html-refresh.md` | 완료 | 정적 onboarding HTML과 새 screenshot asset이 route shell + Stage Runner 모델로 갱신됨. |
 | 08 | `08-perf-and-bundle.md` | 완료 | GraphCanvas child lazy split과 Vite build 정량 기록이 완료됨. `_perf-notes.md` 참고. |
 | 09 | `09-skill-runner-workbench.md` | 완료 | Analyze + Design Stage Runner, run evidence, diff/apply, gate 분리 구현됨. Build/Verify 확장은 brief 16에서 처리됨. |
-| 10 | `10-dynamic-workflow-lowering.md` | 마지막 예정 | route/loop/dynamic 을 ADK 2.x dynamic workflow 로 lower. generator 대규모 개편(현재 거부). |
+| 10 | `10-dynamic-workflow-lowering.md` | 완료 | route/loop/dynamic 을 public `runnable` mode 안의 내부 ADK dynamic workflow builder로 lower. |
 | 11 | `11-agent-consumer-channel-reads.md` | 완료(범위 재정의) | state channel은 agent instruction/connected MCP adapter만 소비. 비-connected state consumer와 agent/non-connected artifact consumer는 blocker. |
 | 12 | `12-a2a-contract-policy-mapping.md` | 완료 | `adk_runtime_policy` 추가. `RemoteA2aAgent` timeout/auth interceptor만 ADK-supported source로 lower하고 retry/fallback은 handoff policy로 기록. |
 | 13 | `13-scaffold-plan-warning-accuracy.md` | 완료 | runnable skeleton warning을 category/output_mode 인식형으로 정리. |
@@ -35,7 +35,7 @@
 
 `09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프이자 brief 09 구현 기록이다. Analyze + Design Stage Runner는 구현됐고, Build/Verify runner는 여전히 별도 후속 범위다. 기존 05의 `verify/run` / `runtime-stub/build` SSE 전환은 완료되어 BuildWorkbench/VerifyWorkbench live log 로 제공된다.
 
-브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 마지막 backlog 순서 중 12는 완료됐고 10이 남았다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
+브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 마지막 backlog 순서였던 12와 10은 모두 완료됐다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
 
 ## 공통 작업 자세
 

@@ -1,5 +1,6 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
+import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
 import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
 import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
 import { usesRoutes } from "./graph/routes.mjs";
@@ -8,10 +9,14 @@ import { assertRemoteA2aSupported, usesRemoteA2a, usesRemoteA2aAuthInterceptor }
 import { componentContracts } from "./agent-contracts.mjs";
 import { emitRunnableNodeBlocks } from "./emitters/node-registry.mjs";
 import { buildRuntimeHelperSection } from "./emitters/runtime-helpers.mjs";
+import { buildDynamicRunnableAgentPy } from "./agent-dynamic.mjs";
 
 export function buildRunnableAgentPy(context) {
   const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName, processFlow } =
     context;
+  if (hasDynamicRunnableShape(graphContext)) {
+    return buildDynamicRunnableAgentPy(context);
+  }
   assertRunnableGraphSupported(graphContext);
   assertDataChannelsSupported(graphContext);
   assertRemoteA2aSupported({ analysisResult, modules });

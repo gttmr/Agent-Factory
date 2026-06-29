@@ -10,7 +10,7 @@
 ## 현재 사용 규칙
 
 - 이 파일은 follow-up backlog/status 진입점이다. live branch cleanliness나 HEAD SHA는 매번 `git status`와 `git log`로 확인한다.
-- 현재 남은 큰 브리프는 10이다. 12는 먼저 처리됐고, 마지막 순서 중 남은 작업은 10이다.
+- 마지막 backlog 순서였던 12와 10은 모두 처리됐다. 새 작업은 `INDEX.md`에 새 번호로 추가한다.
 - detailed brief가 이 파일, `INDEX.md`, active docs, 현재 코드와 충돌하면 현재 코드와 active docs를 먼저 확인한다.
 
 ## 2026-06-23 브랜치 상태 기록
@@ -46,9 +46,9 @@ git log --oneline -8
 
 | 번호 | 요약 | 규모 |
 |---|---|---|
-| 10 | dynamic-workflow lowering (route/loop/dynamic) — generator 대규모 개편 | 大 |
+| - | 현재 없음 | - |
 
-완료된 현 작업 순서: **15 → 13 → 14 → 11 → 16 → 12**. 마지막 backlog 순서 중 남은 작업은 **10**이다. 15의 ADK Web CSS NIT와 runtime-contract 빈 배열 gate 정책은 별도 잔무로만 추적한다.
+완료된 현 작업 순서: **15 → 13 → 14 → 11 → 16 → 12 → 10**. 15의 ADK Web CSS NIT와 runtime-contract 빈 배열 gate 정책은 별도 잔무로만 추적한다.
 
 ## 운영 정책 결정 기록
 
@@ -141,6 +141,14 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 ## 이번 작업에서 완료된 브리프
 
+### brief 10 — Dynamic-workflow runnable lowering
+
+- Public `output_mode: "runnable"`은 유지하고, reviewed loop/dynamic Graph IR shape에서 내부 ADK dynamic workflow builder를 선택한다.
+- Generated source는 `@node(name="dynamic_workflow", rerun_on_resume=True)` + `ctx.run_node(...)` + bounded `while` skeleton을 만든다.
+- `loop_region`은 정확히 하나의 `loop_control`을 요구하고, outgoing `loop_back`/`loop_exit` decision edge에는 reviewed `route_condition` 또는 `route_aliases`가 필요하다. `loop_exit`은 `is_default_route: true`만으로 기본 exit를 표현할 수 있다.
+- `route_aliases`/`is_default_route` validator 정책은 route edge뿐 아니라 loop decision edge에도 허용되도록 확장했다. Router default 중복 집계에는 route edge만 포함한다.
+- `scenario-d` loop edges에 reviewed retry/approved aliases를 추가했다.
+
 ### brief 12 — A2A 계약 정책 매핑
 
 - `A2AContract.adk_runtime_policy`를 추가해 ADK runtime policy를 prose `auth/timeout/retry/fallback` 필드와 분리했다.
@@ -194,11 +202,11 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 ## 남은 브리프와 최근 처리
 
-현재 큰 미구현 브리프는 10이다. 12, 13, 14, 11, 16은 이번 구현에서 처리했다.
+현재 큰 미구현 브리프는 없다. 10, 12, 13, 14, 11, 16은 이번 구현에서 처리했다.
 
 | 번호 | 상태 | 현재 판단 |
 |---|---|---|
-| 10 | 마지막 예정 | dynamic-workflow lowering(route/loop/dynamic). generator 대규모 개편. |
+| 10 | 완료 | dynamic-workflow lowering(route/loop/dynamic). Public runnable mode 안에서 내부 ADK dynamic builder를 선택한다. |
 | 11 | 완료(범위 재정의) | state channel은 agent instruction 또는 connected MCP adapter로만 소비한다. 비-connected/agent artifact consumer는 generator blocker로 명시한다. |
 | 12 | 완료 | A2A 계약 `adk_runtime_policy`를 추가하고 timeout/auth만 ADK-supported source로 lower. retry/fallback은 handoff policy. |
 | 13 | 완료 | scaffold-plan warning 문구를 category/output_mode 인식형 smoke TODO skeleton 문구로 정리. |

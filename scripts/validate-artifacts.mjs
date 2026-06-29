@@ -1083,9 +1083,12 @@ function validateScaffoldGraph(graph) {
 }
 
 function validateRouteReviewContract(edge, label, defaultRouteEdgesByRouter) {
+  const isRouteReviewEdge =
+    edge.edge_kind === "route" ||
+    ((edge.execution_semantics === "loop_back" || edge.execution_semantics === "loop_exit") && edge.edge_kind === "control");
   if (Array.isArray(edge.route_aliases)) {
-    if (edge.route_aliases.length > 0 && edge.edge_kind !== "route") {
-      errors.push(`${label} route_aliases is allowed only on route edges.`);
+    if (edge.route_aliases.length > 0 && !isRouteReviewEdge) {
+      errors.push(`${label} route_aliases is allowed only on route or loop decision edges.`);
     }
     if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
       errors.push(`${label} route_aliases entries must be non-empty strings.`);
@@ -1094,12 +1097,14 @@ function validateRouteReviewContract(edge, label, defaultRouteEdgesByRouter) {
     errors.push(`${label} route_aliases must be an array of strings or null.`);
   }
   if (edge.is_default_route === true) {
-    if (edge.edge_kind !== "route") {
-      errors.push(`${label} is_default_route is allowed only on route edges.`);
+    if (!isRouteReviewEdge) {
+      errors.push(`${label} is_default_route is allowed only on route or loop decision edges.`);
     } else if (typeof edge.from === "string") {
-      const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
-      defaults.push(typeof edge.id === "string" ? edge.id : label);
-      defaultRouteEdgesByRouter.set(edge.from, defaults);
+      if (edge.edge_kind === "route") {
+        const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
+        defaults.push(typeof edge.id === "string" ? edge.id : label);
+        defaultRouteEdgesByRouter.set(edge.from, defaults);
+      }
     }
   } else if (
     edge.is_default_route !== undefined &&
