@@ -1,4 +1,5 @@
 import { execFile, spawn, type ChildProcessByStdio } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { delimiter, join, posix, resolve, win32 } from "node:path";
@@ -7,6 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import type { ArtifactRootStore } from "./artifactRootStore";
 import { buildRuntimeProcessEnv } from "./runtimeEnv";
+import { collectRuntimeStubFiles } from "./runtimeStubFiles";
 
 export const DEFAULT_ADK_CHAT_PORT = 8765;
 const DEFAULT_ADK_HOST = "127.0.0.1";
@@ -34,6 +36,9 @@ export interface RuntimeChatStatus {
     managed: boolean;
     owner_matches_runtime: boolean;
     can_stop: boolean;
+    stale: boolean;
+    started_stub_fingerprint: string | null;
+    current_stub_fingerprint: string | null;
     message: string | null;
     port_owner_pid: number | null;
     port_owner_command: string | null;
@@ -77,6 +82,7 @@ interface RuntimeProcess {
   stdout: string;
   stderr: string;
   exitCode: number | null;
+  stubFingerprint: string;
 }
 
 interface RuntimeContext {
@@ -98,6 +104,7 @@ interface RuntimeProcessRecord {
   appName: string;
   command: string;
   startedAt: string;
+  stubFingerprint?: string;
 }
 
 interface PortOwner {
@@ -189,6 +196,7 @@ export class RuntimeChatManager {
     const command = buildAdkServerCommand(ctx);
     const env = await buildRuntimeProcessEnv({ repoRoot: this.repoRoot, stubDir: ctx.stubDir });
     const pathValue = env.PATH || process.env.PATH || "";
+    const stubFingerprint = await runtimeStubFingerprint(ctx.stubDir);
     const child = spawn(command.command, command.args, {
       cwd: ctx.stubDir,
       env: {
@@ -205,7 +213,8 @@ export class RuntimeChatManager {
       host: ctx.host,
       stdout: "",
       stderr: "",
-      exitCode: null
+      exitCode: null,
+      stubFingerprint
     };
     child.stdout.on("data", (chunk: Buffer) => {
       proc.stdout = tail(`${proc.stdout}${chunk.toString("utf8")}`);
@@ -223,7 +232,8 @@ export class RuntimeChatManager {
       host: ctx.host,
       appName: ctx.appName,
       command: command.display,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      stubFingerprint
     });
     return {
       ok: true,
@@ -317,6 +327,7 @@ export class RuntimeChatManager {
     const record = live ? null : await readProcessRecord(ctx);
     const recordedLive = record && isPidAlive(record.pid) ? record : null;
     const portOwner = live || recordedLive ? null : await findPortOwner(ctx);
+    const currentStubFingerprint = await runtimeStubFingerprint(ctx.stubDir).catch(() => null);
     const conflictMessage =
       portOwner && !portOwner.matchesCurrentRuntime
         ? portOwner.safeToStop
@@ -336,6 +347,7 @@ export class RuntimeChatManager {
     } else {
       serverStatus = "failed";
     }
+    const startedStubFingerprint = live?.stubFingerprint ?? recordedLive?.stubFingerprint ?? null;
     return {
       port: ctx.port,
       host: ctx.host,
@@ -357,6 +369,11 @@ export class RuntimeChatManager {
         managed,
         owner_matches_runtime: Boolean(live || recordedLive || portOwner?.matchesCurrentRuntime),
         can_stop: canStop,
+        stale:
+          serverStatus === "running" &&
+          Boolean(startedStubFingerprint && currentStubFingerprint && startedStubFingerprint !== currentStubFingerprint),
+        started_stub_fingerprint: startedStubFingerprint,
+        current_stub_fingerprint: currentStubFingerprint,
         message: conflictMessage,
         port_owner_pid: portOwner?.pid ?? null,
         port_owner_command: portOwner?.command ?? null,
@@ -457,8 +474,9 @@ async function readProcessRecord(ctx: RuntimeContext): Promise<RuntimeProcessRec
   const appName = typeof value.appName === "string" ? value.appName : "";
   const command = typeof value.command === "string" ? value.command : "";
   const startedAt = typeof value.startedAt === "string" ? value.startedAt : "";
+  const stubFingerprint = typeof value.stubFingerprint === "string" ? value.stubFingerprint : undefined;
   if (!Number.isInteger(pid) || pid <= 0 || port !== ctx.port || host !== ctx.host) return null;
-  return { pid, port, host, appName, command, startedAt };
+  return { pid, port, host, appName, command, startedAt, stubFingerprint };
 }
 
 async function clearProcessRecord(ctx: RuntimeContext): Promise<void> {
@@ -536,6 +554,18 @@ function baseUrl(ctx: { host: string; port: number }): string {
 
 function tail(value: string, max = 20_000): string {
   return value.length > max ? value.slice(-max) : value;
+}
+
+async function runtimeStubFingerprint(stubDir: string): Promise<string> {
+  const files = await collectRuntimeStubFiles(stubDir, stubDir);
+  const hash = createHash("sha256");
+  for (const file of files) {
+    hash.update(file.path);
+    hash.update("\0");
+    hash.update(await readFile(join(stubDir, file.path)));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
 }
 
 function setupHint(ctx: Pick<RuntimeContext, "venvDir" | "pythonPath">): string {

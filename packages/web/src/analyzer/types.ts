@@ -808,6 +808,9 @@ export interface HumanInputContract {
   payload_schema_ref: string | null;
   response_schema_ref: string | null;
   response_mapping: Record<string, string> | null;
+  choice_options?: string[] | null;
+  accepted_aliases?: Record<string, string[]> | null;
+  default_choice?: string | null;
 }
 
 export interface GraphValidationIssue {

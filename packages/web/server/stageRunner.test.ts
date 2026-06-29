@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fixture from "../../../templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json" with { type: "json" };
@@ -8,6 +8,7 @@ import { ArtifactConflictError, ArtifactRootStore } from "./artifactRootStore.ts
 import {
   applyStageRun,
   type CodexStageRunner,
+  type StagePrimitiveRunner,
   listStageRuns,
   readStageRunDetail,
   runStageSkill
@@ -199,17 +200,138 @@ assert.equal(manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex?.thread_id,
 assert.equal(manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex?.event_count, 3);
 assert.equal("usage" in (manifestAfterSdkRun.manifest.stage_runs?.analyze?.codex ?? {}), false);
 
-await assert.rejects(
-  () =>
-    runStageSkill({
-      repoRoot,
-      store,
-      reqId: "req-001",
-      stage: "build",
-      body: { execution_mode: "fake", model: "gpt-5.5" }
-    }),
-  /지원하지 않는 stage/
+await mkdir(join(repoRoot, "catalog"), { recursive: true });
+await writeFile(
+  join(repoRoot, "catalog/agents.yaml"),
+  [
+    "agents:",
+    "  - id: cat-required-page-agent",
+    "    name: Required Page Agent",
+    "    agent_kind: specialist",
+    "    status: approved"
+  ].join("\n"),
+  "utf8"
 );
+await writeFile(join(repoRoot, "catalog/workflows.yaml"), "workflows: []\n", "utf8");
+await writeFile(join(repoRoot, "catalog/adapters.yaml"), "adapters: []\n", "utf8");
+await writeFile(join(repoRoot, "catalog/remote-a2a-contracts.yaml"), "remote_a2a_contracts: []\n", "utf8");
+await store.createRoot("req-catalog-hydrated");
+await store.writeArtifact("req-catalog-hydrated", "analysis-result.json", `${JSON.stringify(fixture, null, 2)}\n`, null);
+const catalogHydratedRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-catalog-hydrated",
+  stage: "analyze",
+  body: {
+    execution_mode: "fake",
+    model: "gpt-5.5"
+  }
+});
+assert.equal(catalogHydratedRun.catalog_context?.source, "server_default");
+assert.equal(catalogHydratedRun.catalog_context?.count, 1);
+const catalogHydratedDetail = await readStageRunDetail({
+  store,
+  reqId: "req-catalog-hydrated",
+  stage: "analyze",
+  runId: catalogHydratedRun.run_id
+});
+assert.match(JSON.stringify(catalogHydratedDetail.request), /cat-required-page-agent/);
+assert.match(JSON.stringify(catalogHydratedDetail.request), /"source":"server_default"/);
+
+const primitiveRunner: StagePrimitiveRunner = {
+  async build(input) {
+    assert.equal(input.stage, "build");
+    assert.equal(input.model, "gpt-5.5");
+    await input.emit({
+      phase: "process_event",
+      title: "stdout",
+      message: "runtime-stub build completed",
+      snippet: "generated req_001_adk/agent.py"
+    });
+    const packageDir = join(input.rootDir, "runtime-stub/req_001_adk");
+    await mkdir(packageDir, { recursive: true });
+    await writeFile(join(packageDir, "agent.py"), "root_agent = object()\n", "utf8");
+    return {
+      ok: true,
+      command: "node scripts/generate-adk-source.mjs",
+      stdout: "runtime-stub build completed",
+      stderr: "",
+      files: [{ path: "req_001_adk/agent.py", bytes: 22 }]
+    };
+  },
+  async verify(input) {
+    assert.equal(input.stage, "verify");
+    assert.equal(input.commandKey, "test_analyzer");
+    await input.emit({
+      phase: "process_event",
+      title: "stderr",
+      message: "analyzer regression failed",
+      snippet: "expected test failure"
+    });
+    return {
+      ok: false,
+      exit_code: 1,
+      command: "npm run test:analyzer --prefix packages/web",
+      command_key: "test_analyzer",
+      stdout: "",
+      stderr: "expected test failure"
+    };
+  }
+};
+
+const buildRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-001",
+  stage: "build",
+  body: { execution_mode: "fake", model: "gpt-5.5" },
+  primitiveRunner
+});
+assert.equal(buildRun.stage, "build");
+assert.equal(buildRun.status, "completed");
+assert.match(buildRun.run_id, /^\d{8}T\d{6}Z-build-[a-f0-9]{6}$/);
+assert.deepEqual(buildRun.output_artifacts, ["runtime-stub/req_001_adk/agent.py"]);
+const buildDetail = await readStageRunDetail({ store, reqId: "req-001", stage: "build", runId: buildRun.run_id });
+assert.equal(buildDetail.diff_summary.files.length, 0);
+assert.ok(buildDetail.events.some((event) => event.phase === "process_event"));
+
+const verifyRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-001",
+  stage: "verify",
+  body: { model: "gpt-5.5", verifyCommand: "test_analyzer" },
+  primitiveRunner
+});
+assert.equal(verifyRun.stage, "verify");
+assert.equal(verifyRun.status, "completed");
+assert.equal(verifyRun.validation.ok, false);
+assert.deepEqual(verifyRun.validation.errors, ["verify command failed with exit code 1"]);
+assert.deepEqual(verifyRun.output_artifacts, [
+  `runs/verify/${verifyRun.run_id}/proposed-artifacts/validation-report.md`,
+  `runs/verify/${verifyRun.run_id}/proposed-artifacts/catalog-delta.yaml`
+]);
+const verifyDetail = await readStageRunDetail({ store, reqId: "req-001", stage: "verify", runId: verifyRun.run_id });
+assert.deepEqual(
+  verifyDetail.diff_summary.files.map((file) => file.path),
+  ["validation-report.md", "catalog-delta.yaml"]
+);
+assert.match(verifyDetail.proposed_artifacts[0].preview, /test_analyzer/);
+assert.match(verifyDetail.proposed_artifacts[1].preview, /proposed_additions: \[\]/);
+
+const abortController = new AbortController();
+abortController.abort();
+const canceledRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-001",
+  stage: "build",
+  body: { model: "gpt-5.5" },
+  primitiveRunner,
+  signal: abortController.signal
+});
+assert.equal(canceledRun.status, "canceled");
+assert.equal(canceledRun.output_artifacts.length, 0);
 
 await store.createRoot("req-blocked");
 await store.writeArtifact("req-blocked", "analysis-result.json", `${JSON.stringify(fixture, null, 2)}\n`, null);

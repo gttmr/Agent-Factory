@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-06-29 · 작업 브랜치 `artifact-root-sync-regeneration-ux` — follow-up 13/14/11/16 runtime handoff 정리
+
+### Build/Verify도 Stage Runner run history로 기록한다
+- **결정**: Stage Runner stage surface를 `analyze/design/build/verify`로 확장한다. `build`는 기존 `runtime-stub/build` primitive를 감싸 canonical `runtime-stub/` side effect와 run evidence를 남기고, `verify`는 기존 allowlist verify primitive를 감싸 `validation-report.md`와 `catalog-delta.yaml` proposal template을 생성한다. Verify catalog delta는 자동 추론하지 않는다. `cancel`은 active stage run AbortController에만 적용하며 ADK runtime process 제어와 분리한다.
+- **배경**: Analyze/Design은 Stage Runner 기록과 diff/apply 흐름이 있었지만 Build/Verify는 별도 수동 실행만 있어 run evidence와 follow-up artifact 기록 방식이 갈라졌다.
+- **영향**: `packages/web/server/stageRunner.ts`, `afStageRunnerApi.ts`, `afRuntimeStubApi.ts`, `afVerifyRunApi.ts`, `BuildRunStep.tsx`, `VerifyWorkbench.tsx`, `StageRunnerPanel.tsx`, `docs/workbench/follow-ups/16-build-verify-stage-runner.md`.
+
+### Runnable skeleton과 data channel의 안전 경계를 명시한다
+- **결정**: Runnable scaffold warning은 category/output mode별 smoke TODO skeleton 문구를 낸다. Named state channel은 agent instruction 또는 connected MCP adapter consumer로만 읽고, 비-connected state consumer와 agent/non-connected artifact consumer는 runnable generation blocker로 처리한다. RunSandbox는 started runtime-stub fingerprint와 current fingerprint를 비교해 stale을 표시하고, 자동 재시작 대신 사용자가 누르는 재시작 버튼만 제공한다.
+- **배경**: runnable handoff가 완성 구현처럼 보이거나, generator가 실제로 읽지 않는 channel consumer가 조용히 통과하면 reviewer가 ADK Web smoke 결과를 과신할 수 있었다. runtime-stub 재생성 뒤 기존 ADK process가 오래된 bundle을 계속 들고 있는 문제도 화면에 드러나야 했다.
+- **영향**: `scaffoldPlan.ts`, `generate-adk-source` channel guard/agent instruction, `runtimeChat.ts`, `RunSandbox.tsx`, Build Mock Lab binding UI, active follow-up status.
+
 ## 2026-06-29 · 작업 브랜치 `artifact-root-sync-regeneration-ux` — artifact sync/regeneration 계약
 
 ### Build의 기본 산출물 순서를 server-owned compound path로 고정한다
@@ -290,6 +302,12 @@
 - **결정**: `StageShell`의 내부 `실행/검토/승인` navigation을 220px 좌측 레일에서 compact header stepper로 옮긴다. Stage header 아래에는 summary strip과 "다음에 할 일" guidance strip을 두고, Analyze/Design/Build/Verify 각 route가 stage-specific work surface를 소유한다.
 - **배경**: 기존 좌측 레일은 stage navigation, approval chip, Graph canvas, Build/Verify 도구면과 폭을 경쟁해 desktop workbench에서도 실제 검토/실행 surface를 좁혔다. 사용 환경은 desktop으로 확정되어 mobile/tablet QA를 acceptance 기준으로 유지할 필요가 없다.
 - **영향**: `StageShell`, Analyze/Design/Build/Verify route composition, `stage-shell.css`, route-specific CSS, `docs/visualization/design-system.md`. Approval gate source of truth, schema, analyzer, catalog, server API, generator 계약은 변경하지 않는다.
+
+## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
+
+- **결정**: `RequestInput -> router` lowering은 human-input output dict 전체가 아니라 `response` / `choice` / `value`를 우선 route decision으로 읽는다. 숫자 alias가 있는 route-choice `RequestInput`은 ADK Web의 numeric 입력을 허용하도록 `response_schema=str`를 생략하고 router에서 문자열로 정규화한다. Workbench router node/inspector는 route value, aliases, default, target을 표시한다. Stage Runner는 caller가 catalog payload를 생략하면 active server catalog를 hydrate하고 source/count/diagnostics를 기록한다.
+- **배경**: `req-page-recommendation-required` catalog-first ADK Web QA에서 `skip_analysis` 입력이 prompt 전체 문자열의 `run_analysis`에 먼저 매칭되어 분석 branch가 실행됐고, route map과 catalog/runtime contract provenance가 UI와 artifact contract에 충분히 드러나지 않았다.
+- **영향**: ADK generator router/human-input emitters, Graph IR schemas and editor/inspector UI, runtime contract normalization/hydration, scaffold catalog binding, Stage Runner request snapshot and summary UI, validation/generator regressions.
 
 ---
 

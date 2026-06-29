@@ -92,6 +92,7 @@ function FunctionToolNode({ data, kind }: NodeProps<GraphNodeData> & { kind: "fu
 
 function HumanInputNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
+  const choices = graphNode.human_input_contract?.choice_options ?? [];
   return (
     <div
       className={`graph-node graph-node-card graph-node-human ${selected ? "is-selected" : ""} ${
@@ -107,6 +108,7 @@ function HumanInputNode({ data }: NodeProps<GraphNodeData>) {
         {graphNode.module_id ? <span className="graph-node-mod">{graphNode.module_id}</span> : null}
         {reviewChip(graphNode.review_status)}
       </div>
+      {choices.length ? <span className="graph-node-route-hint">{choices.join(" / ")}</span> : null}
     </div>
   );
 }
@@ -134,6 +136,7 @@ function CallbackWaitNode({ data }: NodeProps<GraphNodeData>) {
 
 function RouterNode({ data }: NodeProps<GraphNodeData>) {
   const { graphNode, selected, onSelect } = data;
+  const routes = data.routeMap ?? [];
   return (
     <div
       className={`graph-node graph-node-router ${selected ? "is-selected" : ""} ${
@@ -143,10 +146,28 @@ function RouterNode({ data }: NodeProps<GraphNodeData>) {
     >
       <HandleStrip />
       <CollaborationBadges data={data} />
-      <div className="graph-node-router-inner">
-        <span className="graph-node-eyebrow">router</span>
-        <strong>{graphNode.label}</strong>
+      <div className="graph-node-router-head">
+        <span className="graph-node-router-glyph" aria-hidden>
+          ◇
+        </span>
+        <div>
+          <span className="graph-node-eyebrow">router</span>
+          <strong>{graphNode.label}</strong>
+        </div>
       </div>
+      {data.upstreamHumanPrompt ? <span className="graph-node-route-prompt">{data.upstreamHumanPrompt}</span> : null}
+      {routes.length ? (
+        <div className="graph-node-route-map" aria-label="router route map">
+          {routes.map((route) => (
+            <div key={`${route.value}:${route.targetNodeId}`} className="graph-node-route-row">
+              <span className="graph-node-route-value">{route.value}</span>
+              <span className="graph-node-route-target">→ {route.targetLabel}</span>
+              {route.isDefault ? <span className="graph-node-route-default">default</span> : null}
+              {route.aliases.length ? <span className="graph-node-route-aliases">{route.aliases.join(", ")}</span> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

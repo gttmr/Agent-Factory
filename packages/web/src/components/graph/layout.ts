@@ -14,9 +14,19 @@ export interface GraphNodeData {
   graphNode: GraphNode;
   selected: boolean;
   onSelect: (id: string) => void;
+  routeMap?: GraphRouteSummary[];
+  upstreamHumanPrompt?: string | null;
   commentCount?: number;
   commentTooltip?: string;
   highlightCount?: number;
+}
+
+export interface GraphRouteSummary {
+  value: string;
+  aliases: string[];
+  isDefault: boolean;
+  targetNodeId: string;
+  targetLabel: string;
 }
 
 export interface GraphEdgeData {
@@ -45,7 +55,8 @@ export interface LayoutResult {
 
 const NODE_WIDTH = 232;
 const NODE_HEIGHT = 116;
-const ROUTER_SIZE = 96;
+const ROUTER_WIDTH = 260;
+const ROUTER_HEIGHT = 168;
 const JOIN_SIZE = 56; // loop_control box
 // join box hugs its 22px dot so the left/right edge handles anchor at the
 // circle's perimeter (vertical center = dot center). The join label is rendered
@@ -70,7 +81,7 @@ const LANE_ORDER: LaneId[] = [
 ];
 
 function nodeSize(node: GraphNode): { width: number; height: number } {
-  if (node.node_kind === "router") return { width: ROUTER_SIZE, height: ROUTER_SIZE };
+  if (node.node_kind === "router") return { width: ROUTER_WIDTH, height: ROUTER_HEIGHT };
   if (node.node_kind === "join") return { width: JOIN_DOT_BOX, height: JOIN_DOT_BOX };
   if (node.node_kind === "loop_control") return { width: JOIN_SIZE, height: JOIN_SIZE };
   if (node.node_kind === "input" || node.node_kind === "output") {
@@ -258,7 +269,9 @@ export function layoutGraphIR(
       data: {
         graphNode: n,
         selected: selection.nodeId === n.id,
-        onSelect: (id: string) => onSelect("node", id)
+        onSelect: (id: string) => onSelect("node", id),
+        routeMap: n.node_kind === "router" ? routeMapForNode(n.id, allEdges, nodeById) : undefined,
+        upstreamHumanPrompt: n.node_kind === "router" ? upstreamHumanPromptForRouter(n.id, allEdges, nodeById) : null
       },
       draggable: false,
       selectable: true,
@@ -283,4 +296,47 @@ export function layoutGraphIR(
   });
 
   return { nodes: rfNodes, edges: rfEdges, containerRects };
+}
+
+export function routeMapForNode(
+  nodeId: string,
+  edges: readonly GraphEdge[],
+  nodeById: ReadonlyMap<string, GraphNode>
+): GraphRouteSummary[] {
+  return edges
+    .filter((edge) => edge.edge_kind === "route" && edge.from === nodeId)
+    .map((edge) => {
+      const target = nodeById.get(edge.to);
+      return {
+        value: routeValue(edge),
+        aliases: Array.isArray(edge.route_aliases)
+          ? edge.route_aliases.filter((alias): alias is string => typeof alias === "string" && Boolean(alias.trim()))
+          : [],
+        isDefault: edge.is_default_route === true,
+        targetNodeId: edge.to,
+        targetLabel: target?.label ?? edge.to
+      };
+    });
+}
+
+export function upstreamHumanPromptForRouter(
+  routerNodeId: string,
+  edges: readonly GraphEdge[],
+  nodeById: ReadonlyMap<string, GraphNode>
+): string | null {
+  for (const edge of edges) {
+    if (edge.to !== routerNodeId) continue;
+    const source = nodeById.get(edge.from);
+    if (source?.node_kind !== "human_input") continue;
+    return source.human_input_contract?.message ?? source.label;
+  }
+  return null;
+}
+
+function routeValue(edge: GraphEdge): string {
+  const condition = typeof edge.route_condition === "string" ? edge.route_condition.trim() : "";
+  const match = /(?:choice|route|decision)\s*==\s*["']?([A-Za-z0-9_-]+)["']?/i.exec(condition);
+  if (match) return match[1];
+  if (/^[A-Za-z0-9_-]+$/.test(condition)) return condition;
+  return edge.id ?? edge.to;
 }

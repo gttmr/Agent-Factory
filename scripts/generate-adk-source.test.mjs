@@ -166,7 +166,7 @@ test("runnable lowers a user-confirmation route without joining branch convergen
           module_id: null,
           label: "Legacy HITL label",
           human_input_contract: {
-            message: "추가 분석을 수행할까요?",
+            message: "추가 분석을 수행할까요? run_analysis 또는 skip_analysis 중 하나로 답하세요.",
             payload_schema_ref: null,
             response_schema_ref: "str",
             response_mapping: null
@@ -210,11 +210,16 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.match(source, /from google\.adk\.events import Event, RequestInput/);
     assert.match(source, /def _hitl_confirm\(ctx: Context, node_input=None\):/);
     assert.match(source, /_hitl_response = _first_resume_input\(ctx\)/);
-    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\?", payload=node_input, response_schema=str\)/);
+    assert.match(
+      source,
+      /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.", payload=node_input, response_schema=str\)/
+    );
     assert.match(source, /"previous": node_input/);
     assert.match(source, /"response": _hitl_response/);
     assert.match(source, /node_confirm = FunctionNode\(func=_hitl_confirm, name="confirm", rerun_on_resume=True\)/);
     assert.match(source, /def _route_analysis_router\(node_input=None\):/);
+    assert.match(source, /for key in \("response", "choice", "value"\):/);
+    assert.match(source, /text = _route_decision_text\(node_input\)/);
     assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "담당자 승인"\]\):/);
     assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "분석 생략"\]\):/);
     assert.match(source, /Event\(route="run_analysis", output=node_input\)/);
@@ -225,8 +230,86 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.doesNotMatch(source, /join_1 = JoinNode\(name="join_1"\)/);
     assert.match(sampleInputs, /workflow_chat_smoke:/);
     assert.match(sampleInputs, /conversation:/);
-    assert.match(sampleInputs, /추가 분석을 수행할까요\?/);
+    assert.match(sampleInputs, /추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\./);
     assert.doesNotMatch(sampleInputs, /"1"/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable leaves numeric route-choice input untyped so ADK Web accepts number replies", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...agentBase, id: "mod-a", name: "초기_선택_Agent" },
+    { ...unconnectedAdapter, id: "mod-analysis", name: "분석_실행_Adapter" },
+    { ...unconnectedAdapter, id: "mod-final", name: "최종_선택_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-route-numeric-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        {
+          id: "confirm",
+          node_kind: "human_input",
+          module_id: null,
+          label: "분석 실행 여부 확인",
+          human_input_contract: {
+            message: "추가 분석을 수행할까요? run_analysis 또는 skip_analysis 중 하나로 답하세요.",
+            payload_schema_ref: null,
+            response_schema_ref: "str",
+            response_mapping: null,
+            choice_options: ["run_analysis", "skip_analysis"],
+            accepted_aliases: {
+              run_analysis: ["1", "분석 실행"],
+              skip_analysis: ["2", "분석 없이 진행"]
+            },
+            default_choice: "skip_analysis"
+          }
+        },
+        { id: "analysis-router", node_kind: "router", module_id: null, label: "분석 실행 여부 route" },
+        { id: "analysis", node_kind: "adapter", module_id: "mod-analysis" },
+        { id: "final", node_kind: "adapter", module_id: "mod-final" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "a" },
+        { from: "a", to: "confirm" },
+        { from: "confirm", to: "analysis-router" },
+        {
+          from: "analysis-router",
+          to: "analysis",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "choice == run_analysis",
+          route_aliases: ["1", "분석 실행"],
+          is_default_route: false
+        },
+        {
+          from: "analysis-router",
+          to: "final",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "choice == skip_analysis",
+          route_aliases: ["2", "분석 없이 진행"],
+          is_default_route: true
+        },
+        { from: "analysis", to: "final" },
+        { from: "final", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /def _hitl_confirm\(ctx: Context, node_input=None\):/);
+    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.\\n선택지: run_analysis, skip_analysis\\n기본값: skip_analysis\\nalias: run_analysis=1\/분석 실행; skip_analysis=2\/분석 없이 진행", payload=node_input\)/);
+    assert.doesNotMatch(source, /RequestInput\([^)]*response_schema=str/s);
+    assert.match(source, /for key in \("response", "choice", "value"\):/);
+    assert.match(source, /return str\(value\)\.strip\(\)\.lower\(\)/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "1", "분석 실행"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "2", "분석 없이 진행"\]\):/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -478,7 +561,8 @@ test("runnable lowers per-edge state channels (agent output_key, function mirror
       ],
       edges: [
         { from: "in1", to: "a" },
-        { from: "a", to: "b", edge_kind: "session_state", state_key: "agent_summary" },
+        { from: "in1", to: "b" },
+        { from: "a", to: "c", edge_kind: "session_state", state_key: "agent_summary" },
         { from: "b", to: "c", edge_kind: "temp_state", state_key: "lookup_payload" },
         { from: "c", to: "out1" }
       ]
@@ -490,6 +574,38 @@ test("runnable lowers per-edge state channels (agent output_key, function mirror
     assert.match(source, /ctx\.state\["temp:lookup_payload"\] = payload/, "function producer mirrors payload to the scoped temp channel");
     assert.match(source, /"temp:lookup_payload"/, "connected consumer receives the incoming channel key");
     assert.doesNotMatch(source, /output_key="mod_a_output"/, "named channel replaces the canonical agent output key");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable describes reviewed state channels consumed by agent nodes", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-pre", name: "고객_컨텍스트_Adapter" },
+    { ...agentBase, id: "mod-agent", name: "컨텍스트_판단_Agent" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-agent-state-consumer-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "pre", node_kind: "adapter", module_id: "mod-pre" },
+        { id: "agent", node_kind: "agent", module_id: "mod-agent" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "pre" },
+        { from: "pre", to: "agent", edge_kind: "session_state", state_key: "customer_context" },
+        { from: "agent", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /검토된 session state 입력: customer_context/);
+    assert.match(source, /ctx\.state\["customer_context"\] = payload/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -657,6 +773,37 @@ test("runnable rejects an agent with conflicting outgoing state channels", () =>
   }
 });
 
+test("runnable rejects state channels consumed by non-connected adapter stubs", () => {
+  const { unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-b", name: "B_Adapter" },
+    { ...unconnectedAdapter, id: "mod-c", name: "C_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-state-stub-consumer-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "c", node_kind: "adapter", module_id: "mod-c" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "b" },
+        { from: "b", to: "c", edge_kind: "session_state", state_key: "handoff_payload" },
+        { from: "c", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /state channel consumed by non-connected node/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test("runnable lowers an artifact channel (function save_artifact, consumer load_artifact)", () => {
   const { agentBase, unconnectedAdapter, connectedAdapter } = channelModules();
   const modules = [
@@ -694,6 +841,37 @@ test("runnable lowers an artifact channel (function save_artifact, consumer load
     );
     assert.match(source, /await ctx\.load_artifact\(_artifact_key\)/, "consumer loads incoming artifacts");
     assert.match(source, /extra_payloads=_artifact_payloads/, "consumer passes loaded artifacts to input resolution");
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable rejects artifact channels consumed by agent nodes", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-b", name: "증거_Adapter" },
+    { ...agentBase, id: "mod-a", name: "검토_Agent" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-artifact-agent-consumer-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "b", node_kind: "adapter", module_id: "mod-b" },
+        { id: "a", node_kind: "agent", module_id: "mod-a" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "b" },
+        { from: "b", to: "a", edge_kind: "artifact", artifact_key: "evidence_blob.json" },
+        { from: "a", to: "out1" }
+      ]
+    });
+    assert.throws(
+      () => execFileSync(process.execPath, [generator, artifactRoot, join(artifactRoot, "out")], { stdio: "pipe" }),
+      /artifact channel consumed by non-connected node/
+    );
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

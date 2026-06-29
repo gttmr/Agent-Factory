@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { buildScaffoldPlan } from "./scaffoldPlan.ts";
+import { buildRuntimeContracts, runtimeContractReadinessIssues } from "./runtimeContracts.ts";
 import type { CatalogEntry } from "../catalog/types.ts";
-import type { ModuleCandidate, NormalizedRequirement, ProcessFlow } from "./types.ts";
+import type { ModuleCandidate, NormalizedRequirement, ProcessFlow, RuntimeContract } from "./types.ts";
 
 const normalizedRequirement: NormalizedRequirement = {
   id: "req-ko-defaults",
@@ -100,6 +101,14 @@ assert.equal(runnableModule.model, "hosted_vllm/local-model");
 assert.equal(runnableModule.agent_execution_mode, "single_turn");
 assert.ok(runnablePlan.manifest.new_code_required[0].reason.includes("카탈로그"));
 assert.ok(runnableModule.developer_todos.every((todo) => /검토|구현|매핑|자격|승인/.test(todo)));
+assert.ok(
+  runnablePlan.validation.warnings.some((warning) => /LlmAgent smoke TODO skeleton/.test(warning)),
+  "runnable agent warning must say this is a smoke TODO skeleton"
+);
+assert.ok(
+  runnablePlan.validation.warnings.every((warning) => !/fully implemented|generated as/.test(warning)),
+  "runnable warnings must not imply a complete production implementation"
+);
 
 const chatPlan = buildScaffoldPlan({
   normalizedRequirement,
@@ -263,6 +272,10 @@ assert.deepEqual(mockBindingModule.mock_binding, {
   sample_response_ref: "mock_samples.customer_profile.basic",
   status: "linked"
 });
+assert.ok(
+  mockBindingPlan.validation.warnings.some((warning) => /Mock Lab MCP synthetic adapter skeleton/.test(warning)),
+  "runnable MCP adapter warning must describe the synthetic skeleton boundary"
+);
 assert.equal(mockBindingModule.adk_skeleton_contract.implementation_template, "mcp_mock_adapter_stub");
 
 const graphSemanticsPlan = buildScaffoldPlan({
@@ -473,6 +486,70 @@ const catalogPlan = buildScaffoldPlan({
 assert.ok(catalogPlan.modules[0].instruction?.includes("검토된 CDP 신호"));
 assert.ok(catalogPlan.modules[0].developer_todos.every((todo) => /catalog|런타임|입력|출력/.test(todo)));
 assert.ok(catalogPlan.validation.warnings.every((warning) => !/generated as|runtime-wiring TODO/.test(warning)));
+
+const catalogIdFirstPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [candidate({ name: "renamed_page_agent", catalog_entry_id: "cat-page-agent" })],
+  processFlow: flow,
+  catalogEntries: [
+    catalogEntry({ id: "wrong-name-match", name: "renamed_page_agent", responsibility: "이름 fallback은 legacy 전용입니다." }),
+    catalogEntry({ id: "cat-page-agent", name: "catalog_original_agent", responsibility: "ID로 고정된 catalog 계약입니다." })
+  ],
+  outputMode: "runnable"
+});
+assert.equal(catalogIdFirstPlan.modules[0].catalog_binding?.catalog_id, "cat-page-agent");
+assert.ok(catalogIdFirstPlan.modules[0].instruction?.includes("ID로 고정된 catalog 계약"));
+
+const runtimeContractWithLabelFields: RuntimeContract = {
+  contract_id: "rtc-mock-lab-label-fields",
+  contract_kind: "mcp_legacy_adapter",
+  module_id: "mod-001",
+  title: "Mock Lab label-field contract",
+  contract_status: "approved",
+  summary: "Synthetic Mock Lab contract",
+  required_review_fields: ["mock_server_id", "tool_name", "data_policy"],
+  reviewer_notes: "",
+  runtime_support: {
+    context_manager_required: false,
+    callback_broker_required: false,
+    human_approval_required: false,
+    idempotency_required: false,
+    audit_required: true,
+    compensation_required: false
+  },
+  operation: {
+    operation_type: "read",
+    side_effect_level: "read_only",
+    callback_expected: false,
+    async_resume_required: false
+  },
+  identifiers: [],
+  policies: {
+    auth_policy: "synthetic only",
+    timeout_policy: "local smoke",
+    retry_policy: "none",
+    fallback_policy: "manual review",
+    masking_policy: "synthetic",
+    data_policy: "Synthetic data only"
+  },
+  graph_ir_annotations: {
+    mock_server_id: "wf-page-recommendation-mock",
+    tool_name: "search_page_candidates"
+  },
+  synthetic_examples: [],
+  developer_todos: []
+};
+const normalizedContracts = buildRuntimeContracts({
+  normalizedRequirement,
+  moduleCandidates: [],
+  existingContracts: [runtimeContractWithLabelFields]
+});
+assert.deepEqual(normalizedContracts[0].required_review_fields, [
+  "graph_ir_annotations.mock_server_id",
+  "graph_ir_annotations.tool_name",
+  "policies.data_policy"
+]);
+assert.deepEqual(runtimeContractReadinessIssues(normalizedContracts[0]), []);
 
 // --- root workflow candidate exclusion ---
 // The root workflow (root_workflow_module_id) maps to the generated Workflow itself

@@ -887,6 +887,33 @@ function validateHumanInputContract(node, label) {
       errors.push(`${label}.human_input_contract.response_mapping must be an object with non-empty string values or null.`);
     }
   }
+  if (contract.choice_options !== undefined && contract.choice_options !== null) {
+    if (
+      !Array.isArray(contract.choice_options) ||
+      contract.choice_options.some((item) => typeof item !== "string" || !item.trim())
+    ) {
+      errors.push(`${label}.human_input_contract.choice_options must be an array of non-empty strings or null.`);
+    }
+  }
+  if (contract.accepted_aliases !== undefined && contract.accepted_aliases !== null) {
+    if (
+      typeof contract.accepted_aliases !== "object" ||
+      Array.isArray(contract.accepted_aliases) ||
+      Object.entries(contract.accepted_aliases).some(
+        ([key, aliases]) =>
+          !key.trim() ||
+          !Array.isArray(aliases) ||
+          aliases.some((alias) => typeof alias !== "string" || !alias.trim())
+      )
+    ) {
+      errors.push(`${label}.human_input_contract.accepted_aliases must be an object of non-empty string arrays or null.`);
+    }
+  }
+  if (contract.default_choice !== undefined && contract.default_choice !== null) {
+    if (typeof contract.default_choice !== "string" || !contract.default_choice.trim()) {
+      errors.push(`${label}.human_input_contract.default_choice must be a non-empty string or null.`);
+    }
+  }
 }
 
 function validateScaffoldPlan(dir = root) {

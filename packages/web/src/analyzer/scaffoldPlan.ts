@@ -85,7 +85,7 @@ export function buildScaffoldPlan({
   blockers.push(...collectRunnableDynamicBlockers(outputMode, modules, processFlow));
   const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
   blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
-  const warnings = collectWarnings(modules, deployableCandidates, runtimeContracts);
+  const warnings = collectWarnings(outputMode, modules, deployableCandidates, runtimeContracts);
 
   const scaffoldPlan = {
     requirement_id: normalizedRequirement.id,
@@ -461,6 +461,10 @@ function seedAgentInstruction(candidate: ModuleCandidate, catalogEntry: CatalogE
 }
 
 function findCatalogBinding(candidate: ModuleCandidate, entries: CatalogEntry[]): CatalogEntry | undefined {
+  if (candidate.catalog_entry_id) {
+    const exact = entries.find((entry) => entry.id === candidate.catalog_entry_id);
+    if (exact) return exact;
+  }
   const normalizedName = normalizeName(candidate.name);
   return entries.find(
     (entry) => entry.module_category === candidate.module_category && normalizeName(entry.name) === normalizedName
@@ -585,15 +589,19 @@ function collectRuntimeContractBlockers(contracts: RuntimeContract[]): string[] 
 }
 
 function collectWarnings(
+  outputMode: ScaffoldOutputMode,
   modules: ScaffoldPlanModule[],
   candidates: ModuleCandidate[],
   runtimeContracts: RuntimeContract[]
 ): string[] {
   const moduleWarnings = modules.flatMap((module) => {
-    if (module.catalog_binding) {
-      return [`${module.name}: catalog binding은 설정 승인 전까지 검토된 런타임 wiring TODO로 표시됩니다.`];
+    const warnings = module.catalog_binding
+      ? [`${module.name}: catalog binding은 설정 승인 전까지 검토된 런타임 wiring TODO로 표시됩니다.`]
+      : [`${module.name}: 선택된 catalog binding이 없어 새 코드 TODO boundary로 생성됩니다.`];
+    if (outputMode === "runnable") {
+      warnings.push(runnableSkeletonWarning(module));
     }
-    return [`${module.name}: 선택된 catalog binding이 없어 새 코드 TODO boundary로 생성됩니다.`];
+    return warnings;
   });
   const unresolvedCandidates = countUnresolvedMissingInfoCandidates(candidates);
   if (unresolvedCandidates > 0) {
@@ -603,6 +611,22 @@ function collectWarnings(
     moduleWarnings.push(`Runtime 계약 ${runtimeContracts.length}개가 scaffold-plan에 포함됩니다.`);
   }
   return moduleWarnings;
+}
+
+function runnableSkeletonWarning(module: ScaffoldPlanModule): string {
+  if (module.module_category === "agent") {
+    return `${module.name}: LlmAgent smoke TODO skeleton입니다. 검토된 artifact와 synthetic 입력만 wiring하며 production business logic은 포함하지 않습니다.`;
+  }
+  if (module.module_category === "adapter" && module.mock_binding?.provider === "mock_lab" && module.mock_binding.status === "linked") {
+    return `${module.name}: Mock Lab MCP synthetic adapter skeleton입니다. local smoke 검증용 binding이며 실제 endpoint, credential, private data는 포함하지 않습니다.`;
+  }
+  if (module.module_category === "remote_a2a") {
+    return `${module.name}: RemoteA2aAgent smoke TODO skeleton입니다. Agent Card와 protocol boundary 검토용이며 운영 remote agent 구현이 아닙니다.`;
+  }
+  if (module.module_category === "workflow") {
+    return `${module.name}: Workflow smoke TODO skeleton입니다. Graph IR 연결 검증용이며 운영 orchestration logic은 reviewer가 채워야 합니다.`;
+  }
+  return `${module.name}: Runnable smoke TODO skeleton입니다. 검토된 계약을 확인하는 handoff 산출물이며 운영 구현이 아닙니다.`;
 }
 
 function toScaffoldRuntimeContract(contract: RuntimeContract): ScaffoldPlanRuntimeContract {

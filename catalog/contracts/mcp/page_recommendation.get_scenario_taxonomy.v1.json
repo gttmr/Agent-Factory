@@ -1,0 +1,209 @@
+{
+  "schema_ref": "catalog.page_recommendation.get_scenario_taxonomy.v1",
+  "server": "wf-page-recommendation-mock",
+  "tool": "get_scenario_taxonomy",
+  "title": "Get Scenario Taxonomy",
+  "description": "시나리오 목적 분류체계(대분류/중분류/소분류) 목록을 반환합니다.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "objective_text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "objective_text"
+    ],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "synthetic": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "string"
+      },
+      "categories": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "category_large": {
+              "type": "string"
+            },
+            "category_medium": {
+              "type": "string"
+            },
+            "category_small": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "category_large",
+            "category_medium",
+            "category_small"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "synthetic",
+      "source",
+      "categories"
+    ],
+    "additionalProperties": false
+  },
+  "success_examples": [
+    {
+      "name": "get_scenario_taxonomy_default_success",
+      "arguments": {
+        "objective_text": "꿀머니 이탈률 분석할래"
+      },
+      "structuredContent": {
+        "synthetic": true,
+        "source": "agent-factory-mock-lab",
+        "categories": [
+          {
+            "category_large": "상품",
+            "category_medium": "IRP",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "ISA",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "노란우산",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "신용대출",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "예금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "외화예금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "요구불",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "적금",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "청약",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "상품",
+            "category_medium": "펀드",
+            "category_small": "신규"
+          },
+          {
+            "category_large": "혜택",
+            "category_medium": "꿀머니",
+            "category_small": "이탈률분석"
+          }
+        ]
+      }
+    }
+  ],
+  "error_examples": [
+    {
+      "name": "missing_objective_text",
+      "arguments": {
+        "objective_text": ""
+      },
+      "isError": true,
+      "message": "objective_text 입력이 필요합니다."
+    }
+  ],
+  "mock_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"synthetic\":true,\"source\":\"agent-factory-mock-lab\",\"tool\":\"get_scenario_taxonomy\"}"
+      }
+    ],
+    "structuredContent": {
+      "synthetic": true,
+      "source": "agent-factory-mock-lab",
+      "categories": [
+        {
+          "category_large": "상품",
+          "category_medium": "IRP",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "ISA",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "노란우산",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "신용대출",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "예금",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "외화예금",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "요구불",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "적금",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "청약",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "상품",
+          "category_medium": "펀드",
+          "category_small": "신규"
+        },
+        {
+          "category_large": "혜택",
+          "category_medium": "꿀머니",
+          "category_small": "이탈률분석"
+        }
+      ]
+    },
+    "isError": false
+  }
+}

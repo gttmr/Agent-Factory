@@ -3,6 +3,7 @@ import { codexAnalyzerModels, type CodexAnalyzerModel } from "../analyzer/types"
 import type { StageRunEvent, StageRunRequestBody, StageRunStage, StageRunSummary } from "../state/apiClient";
 import {
   useApplyStageRun,
+  useCancelStageRun,
   useStageRunDetail,
   useStageRuns,
   useStartStageRun
@@ -26,6 +27,7 @@ interface StageRunnerPanelProps {
   metrics: RunnerMetric[];
   disabledReason?: string | null;
   currentArtifactEtag?: string | null;
+  applyMode?: "proposed" | "none";
   runButtonLabel?: string;
   buildRunBody: (model: CodexAnalyzerModel) => StageRunRequestBody;
   onRunCompleted?: (summary: StageRunSummary) => void;
@@ -43,6 +45,7 @@ export function StageRunnerPanel({
   metrics,
   disabledReason,
   currentArtifactEtag,
+  applyMode = "proposed",
   runButtonLabel = "Skill Runner 실행",
   buildRunBody,
   onRunCompleted,
@@ -56,6 +59,7 @@ export function StageRunnerPanel({
   const runs = runsQuery.data ?? [];
   const detailQuery = useStageRunDetail(reqId, stage, selectedRunId);
   const applyMutation = useApplyStageRun(reqId, stage, currentArtifactEtag);
+  const cancelMutation = useCancelStageRun(reqId, stage);
   const startMutation = useStartStageRun(reqId, stage, (event) => {
     setLiveEvents((prev) => [...prev, event]);
   });
@@ -70,7 +74,12 @@ export function StageRunnerPanel({
   const detail = detailQuery.data;
   const displayedEvents = startMutation.isPending ? liveEvents : detail?.events ?? [];
   const canRun = !disabledReason && !startMutation.isPending;
-  const canApply = Boolean(detail?.summary.status === "completed" && detail.diff_summary.files.every((file) => file.valid));
+  const canApply = Boolean(
+    applyMode === "proposed" &&
+      detail?.summary.status === "completed" &&
+      detail.diff_summary.files.length > 0 &&
+      detail.diff_summary.files.every((file) => file.valid)
+  );
   const latest = runs[0] ?? null;
 
   function handleRun() {
@@ -103,6 +112,14 @@ export function StageRunnerPanel({
       onError: (error) => {
         setActionMessage(error instanceof Error ? error.message : "제안 적용 실패");
       }
+    });
+  }
+
+  function handleCancel() {
+    setActionMessage(null);
+    cancelMutation.mutate(undefined, {
+      onSuccess: () => setActionMessage("stage run 취소 요청을 보냈습니다."),
+      onError: (error) => setActionMessage(error instanceof Error ? error.message : "stage run 취소 실패")
     });
   }
 
@@ -146,6 +163,11 @@ export function StageRunnerPanel({
             <Button type="button" variant="primary" onClick={handleRun} disabled={!canRun}>
               {startMutation.isPending ? "실행 중…" : runButtonLabel}
             </Button>
+            {startMutation.isPending ? (
+              <Button type="button" variant="ghost" onClick={handleCancel} disabled={cancelMutation.isPending}>
+                {cancelMutation.isPending ? "취소 요청 중…" : "취소"}
+              </Button>
+            ) : null}
           </div>
           {disabledReason ? <p className="af-runner-readiness-blocked">{disabledReason}</p> : null}
           {actionMessage ? <p className="af-landing-message">{actionMessage}</p> : null}
@@ -185,13 +207,26 @@ export function StageRunnerPanel({
         <section className="af-runner-detail" aria-label="run 상세">
           <div className="af-runner-detail-header">
             <h3>{selectedRun?.run_id ?? "선택된 run 없음"}</h3>
-            <Button type="button" variant="secondary" onClick={handleApply} disabled={!canApply || applyMutation.isPending}>
-              {applyMutation.isPending ? "적용 중…" : "제안 적용"}
-            </Button>
+            {applyMode === "proposed" ? (
+              <Button type="button" variant="secondary" onClick={handleApply} disabled={!canApply || applyMutation.isPending}>
+                {applyMutation.isPending ? "적용 중…" : "제안 적용"}
+              </Button>
+            ) : null}
           </div>
           {detailQuery.isLoading ? <p className="af-landing-message">run 상세 불러오는 중…</p> : null}
           {detail ? (
             <>
+              {detail.summary.catalog_context ? (
+                <div className="af-runner-catalog-context">
+                  <strong>catalog</strong>
+                  <span>
+                    {detail.summary.catalog_context.source} · {detail.summary.catalog_context.count} entries
+                  </span>
+                  {detail.summary.catalog_context.diagnostics.length ? (
+                    <small>{detail.summary.catalog_context.diagnostics.join(" ")}</small>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="af-runner-artifacts">
                 {detail.diff_summary.files.map((file) => (
                   <article key={file.path} className="af-runner-artifact-row">

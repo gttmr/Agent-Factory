@@ -239,6 +239,49 @@ function EditableMappingField({
   );
 }
 
+function EditableStringArrayMappingField({
+  label,
+  value,
+  onCommit
+}: {
+  label: string;
+  value: Record<string, string[]> | null | undefined;
+  onCommit: (value: Record<string, string[]> | null) => void;
+}) {
+  const formattedValue = formatStringArrayMapping(value);
+  const [text, setText] = useState(formattedValue);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setText(formattedValue);
+    setError(null);
+  }, [formattedValue]);
+
+  const commit = () => {
+    const result = parseStringArrayMapping(text);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    onCommit(result.value);
+    setText(formatStringArrayMapping(result.value));
+  };
+
+  return (
+    <TextareaField
+      label={label}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={commit}
+      rows={5}
+      spellCheck={false}
+      hint={error ?? 'JSON object: {"skip_analysis":["skip","건너뛰기"]}'}
+      aria-invalid={Boolean(error)}
+    />
+  );
+}
+
 function HumanInputContractFields({
   node,
   onChange
@@ -271,6 +314,29 @@ function HumanInputContractFields({
         label="response_mapping"
         value={contract.response_mapping}
         onCommit={(value) => onChange({ ...contract, response_mapping: value })}
+      />
+      <TextareaField
+        label="choice_options"
+        value={formatStringList(contract.choice_options)}
+        onChange={(event) =>
+          onChange({
+            ...contract,
+            choice_options: nullableStringList(parseStringList(event.target.value))
+          })
+        }
+        rows={3}
+        hint="한 줄에 하나씩 입력"
+      />
+      <Field label="default_choice" hint="비어 있으면 기본값 없음">
+        <input
+          value={contract.default_choice ?? ""}
+          onChange={(event) => onChange({ ...contract, default_choice: nullableString(event.target.value) })}
+        />
+      </Field>
+      <EditableStringArrayMappingField
+        label="accepted_aliases"
+        value={contract.accepted_aliases}
+        onCommit={(value) => onChange({ ...contract, accepted_aliases: value })}
       />
     </>
   );
@@ -814,7 +880,10 @@ function humanInputContractFor(node: GraphNode): NonNullable<GraphNode["human_in
     message: reviewedContract?.message ?? node.label,
     payload_schema_ref: reviewedContract?.payload_schema_ref ?? null,
     response_schema_ref: reviewedContract ? reviewedContract.response_schema_ref : "str",
-    response_mapping: reviewedContract?.response_mapping ?? null
+    response_mapping: reviewedContract?.response_mapping ?? null,
+    choice_options: reviewedContract?.choice_options ?? null,
+    accepted_aliases: reviewedContract?.accepted_aliases ?? null,
+    default_choice: reviewedContract?.default_choice ?? null
   };
 }
 
@@ -829,7 +898,15 @@ function parseStringList(value: string): string[] {
     .filter(Boolean);
 }
 
+function nullableStringList(value: string[]): string[] | null {
+  return value.length ? value : null;
+}
+
 function formatMapping(value: Record<string, string> | null | undefined): string {
+  return JSON.stringify(value ?? {}, null, 2);
+}
+
+function formatStringArrayMapping(value: Record<string, string[]> | null | undefined): string {
   return JSON.stringify(value ?? {}, null, 2);
 }
 
@@ -852,6 +929,29 @@ function parseMapping(text: string): { ok: true; value: Record<string, string> |
     }
   }
   return { ok: true, value: entries.length ? (Object.fromEntries(entries) as Record<string, string>) : {} };
+}
+
+function parseStringArrayMapping(
+  text: string
+): { ok: true; value: Record<string, string[]> | null } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: "유효한 JSON object를 입력하세요." };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { ok: false, error: "mapping은 JSON object여야 합니다." };
+  }
+  const entries = Object.entries(parsed);
+  for (const [key, value] of entries) {
+    if (!key.trim() || !Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
+      return { ok: false, error: "mapping key와 alias 배열은 비어 있지 않은 string이어야 합니다." };
+    }
+  }
+  return { ok: true, value: entries.length ? (Object.fromEntries(entries) as Record<string, string[]>) : {} };
 }
 
 function nodeLabel(nodes: GraphNode[], nodeId: string): string {

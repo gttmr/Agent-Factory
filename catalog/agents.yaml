@@ -1,87 +1,129 @@
 agents:
-  - name: loan_document_review_mock_agent
+  - name: 1차 Page 선택 Agent
     agent_kind: specialist
-    owner_domain: 여신
+    owner_domain: 공통
     status: approved
     component_source: stub
     runtime_binding: unresolved
     contract_status: mock_ready
-    responsibility: OCR와 정책 조회 결과를 바탕으로 대출 신청 서류의 누락, 불일치, 보완 필요 사항을 synthetic rule로 정리한다.
+    responsibility: RAG 후보를 읽고 초기 추천 후보를 설명하는 judgment node다.
     inputs:
-      - name: document_context
-        type: object
+      - name: page_candidates
+        type: array
         required: true
-      - name: policy_matches
-        type: array<object>
+      - name: page_products
+        type: array
         required: true
     outputs:
-      - name: document_review_result
+      - name: initial_selection
         type: object
-      - name: missing_documents
-        type: array<string>
-      - name: followup_questions
-        type: array<string>
+        required: true
     scaffold_output: agent_shell_only
+    risk_signals:
+      - customer_impact
+      - audit_required
     runtime_mock:
-      document_review_result:
-        decision: supplement_required
-        checked_items:
-          - loan_application_form
-          - income_certificate
-          - identity_document
-        mismatches:
-          - field: annual_income
-            document_value: 72000000
-            application_value: 75000000
-            severity: medium
-        confidence: 0.94
-      missing_documents:
-        - employment_certificate
-      followup_questions:
-        - 재직증명서 최신본을 추가 제출해야 합니다.
-        - 신청서 소득 금액과 소득증빙 금액 차이를 확인해야 합니다.
-    notes: 완전 synthetic local smoke용 Agent 계약이다. 실제 심사 판단이나 고객 통지는 포함하지 않는다.
-
-  - name: credit_risk_reasoning_mock_agent
+      initial_selection:
+        selected_page_ids:
+          - NWMMH00040_003M
+        rationale: 꿀머니 혜택 조회 목적과 직접 연결된 페이지입니다.
+        requires_user_confirmation: true
+    notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
+  - name: 분석 결과 종합 Agent
     agent_kind: specialist
-    owner_domain: 리스크
+    owner_domain: 공통
     status: approved
     component_source: stub
     runtime_binding: unresolved
     contract_status: mock_ready
-    responsibility: 고객 snapshot, rule result, 문서 검토 결과를 모아 사람이 확인할 위험 근거와 다음 조치를 설명한다.
+    responsibility: 세 분석 mock 결과를 종합해 Page/Page Group 후보를 다시 선택하는 judgment node다.
     inputs:
-      - name: customer_snapshot
+      - name: userflow
         type: object
         required: true
-      - name: rule_result
+      - name: scenario
         type: object
         required: true
-      - name: document_review_result
+      - name: t2s
         type: object
         required: true
     outputs:
-      - name: risk_reasoning
+      - name: synthesized_page_selection
         type: object
-      - name: approval_required
-        type: boolean
-      - name: reviewer_notes
-        type: array<string>
+        required: true
     scaffold_output: agent_shell_only
+    risk_signals:
+      - customer_impact
+      - audit_required
     runtime_mock:
-      risk_reasoning:
-        summary: 소득 증빙 불일치와 최근 DSR 경고로 담당자 확인이 필요합니다.
-        risk_flags:
-          - income_document_mismatch
-          - dsr_watch
-        evidence:
-          - rule: DSR_SOFT_LIMIT
-            result: review_required
-          - rule: DOCUMENT_COMPLETENESS
-            result: supplement_required
-        recommendation: request_supplement_then_manual_review
-      approval_required: true
-      reviewer_notes:
-        - 자동 승인/거절이 아니라 담당자 검토 큐로 전달합니다.
-        - synthetic demo 데이터이며 실제 신용 판단에 사용할 수 없습니다.
-    notes: 위험 설명만 생성하는 mock Agent다. 실제 credit decision은 하지 않는다.
+      synthesized_page_selection:
+        selected_page_ids:
+          - NWMMH00040_003M
+        basis:
+          - userflow high_dropoff
+          - scenario recommendation
+          - t2s relation score
+        requires_user_confirmation: true
+    notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
+  - name: 목적 분류 Agent
+    agent_kind: specialist
+    owner_domain: 공통
+    status: approved
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
+    responsibility: get_scenario_taxonomy가 제공한 분류체계를 참고해 objective_text를 대/중/소 분류로 매핑하는 judgment node다.
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: categories
+        type: array
+        required: true
+    outputs:
+      - name: objective_classification
+        type: object
+        required: true
+    scaffold_output: agent_shell_only
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      objective_classification:
+        category_large: 혜택
+        category_medium: 꿀머니
+        category_small: 이탈률분석
+        confidence: 0.91
+    notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
+  - name: Adapter Arguments 생성 Agent
+    agent_kind: specialist
+    owner_domain: 공통
+    status: approved
+    component_source: stub
+    runtime_binding: unresolved
+    contract_status: mock_ready
+    responsibility: 목적/시나리오 분류 확인 응답과 이전 objective context를 결합해 후속 MCP Adapter 호출 인자를 구성하는 reasoning node다.
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: objective_classification
+        type: object
+        required: false
+      - name: purpose_confirmation
+        type: object
+        required: false
+    outputs:
+      - name: adapter_arguments
+        type: object
+        required: true
+    scaffold_output: agent_shell_only
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      adapter_arguments:
+        objective_text: 꿀머니 이탈률 분석할래
+        product_hint: 꿀머니 혜택
+        customer_behavior_hint: 혜택 조회 중단
+    notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.

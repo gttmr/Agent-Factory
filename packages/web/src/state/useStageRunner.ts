@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   applyStageRun,
+  cancelStageRun,
   fetchStageRun,
   listStageRuns,
   streamStageRun,
@@ -49,8 +50,25 @@ export function useStartStageRun(
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "stage-runs", stage] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "stage-runs", stage, summary.run_id] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "manifest"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "runtime-stub"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "validation-report.md"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "catalog-delta.yaml"] });
     },
     onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "stage-runs", stage] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "manifest"] });
+    }
+  });
+}
+
+export function useCancelStageRun(reqId: string | undefined, stage: StageRunStage) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!reqId) throw new Error("requirement_id 가 없습니다.");
+      return await cancelStageRun(reqId, stage);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "stage-runs", stage] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "manifest"] });
     }
@@ -69,6 +87,9 @@ export function useApplyStageRun(reqId: string | undefined, stage: StageRunStage
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "stage-runs", stage, runId] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "analysis-result"] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "boundary-design.md"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "validation-report.md"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "catalog-delta.yaml"] });
+      queryClient.invalidateQueries({ queryKey: ["af", reqId, "runtime-stub"] });
       queryClient.invalidateQueries({ queryKey: ["af", reqId, "manifest"] });
     }
   });

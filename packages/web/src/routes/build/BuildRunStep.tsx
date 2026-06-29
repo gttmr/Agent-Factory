@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { StageRunnerPanel } from "../../components/StageRunnerPanel";
 import { Panel } from "../../ui/primitives";
 import { buildScaffoldPlan } from "../../analyzer/scaffoldPlan";
 import type { ScaffoldOutputMode, ScaffoldPlanModule } from "../../analyzer/types";
@@ -102,6 +103,13 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
   const blockers = scaffoldPlan?.validation?.blockers ?? effectivePlan?.validation.blockers ?? [];
   const warnings = scaffoldPlan?.validation?.warnings ?? effectivePlan?.validation.warnings ?? [];
   const compoundDisabledReason = buildCompoundDisabledReason({ analysisExists: Boolean(analysis), boundariesApproved, runtimeApproved });
+  const buildStageDisabledReason =
+    compoundDisabledReason ??
+    (modeDirty
+      ? "저장된 scaffold-plan 과 선택한 output mode가 다릅니다. 먼저 scaffold-plan 을 재생성하세요."
+      : !planReady
+        ? "scaffold-plan.json 이 생성 가능 상태여야 build stage를 실행할 수 있습니다."
+        : null);
 
   function handleSavePlan() {
     if (!effectivePlan) return;
@@ -188,6 +196,22 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
           </Link>
         </Panel>
       ) : null}
+      <StageRunnerPanel
+        reqId={reqId}
+        stage="build"
+        skillName="runtime-stub/build"
+        title="Build Stage Runner"
+        description="기존 runtime-stub 생성 primitive를 실행하고 run 이력에 기록합니다. canonical runtime-stub side effect는 기존 Build API와 동일합니다."
+        metrics={[
+          { label: "scaffold", value: planReady ? "ready" : "blocked", tone: planReady ? "ok" : "warn" },
+          { label: "runtime-stub", value: stubReady ? `${runtimeStub?.files.length ?? 0} files` : "empty", tone: stubReady ? "ok" : "warn" },
+          { label: "mode", value: selectedOutputMode }
+        ]}
+        disabledReason={buildStageDisabledReason}
+        applyMode="none"
+        runButtonLabel="runtime-stub build 기록 실행"
+        buildRunBody={(model) => ({ model })}
+      />
       <ArtifactSyncRunPanel
         compoundDisabledReason={compoundDisabledReason}
         entries={processLog.entries}

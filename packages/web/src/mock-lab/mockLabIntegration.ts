@@ -23,6 +23,14 @@ export function isMcpBoundAdapter(module: Pick<ScaffoldPlanModule, "module_categ
   return module.module_category === "adapter" && module.access_protocol === "mcp" && Boolean(module.mcp_server) && Boolean(module.mcp_tool_name);
 }
 
+export function mockLabBindingTargets(plan: Pick<ScaffoldPlan, "modules">): ScaffoldPlanModule[] {
+  return plan.modules.filter((module) => module.module_category === "adapter");
+}
+
+export function hasMockLabBindingTargets(plan: Pick<ScaffoldPlan, "modules">): boolean {
+  return mockLabBindingTargets(plan).length > 0;
+}
+
 export function applyMockLabBinding(
   plan: ScaffoldPlan,
   moduleId: string,

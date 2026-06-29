@@ -97,6 +97,8 @@ function humanInputSamples({ processFlow, modules }) {
 }
 
 function suggestedHumanInputReply(node, index, context) {
+  const reviewedDefault = reviewedDefaultChoice(node);
+  if (reviewedDefault) return reviewedDefault;
   const routeReply = reviewedRouteReplyAfterNode(node, context.processFlow);
   if (routeReply) return routeReply;
   const label = humanInputPrompt(node);
@@ -108,6 +110,15 @@ function humanInputPrompt(node) {
   const reviewedPrompt = node?.human_input_contract?.message;
   if (typeof reviewedPrompt === "string" && reviewedPrompt.trim()) return reviewedPrompt.trim();
   return typeof node.label === "string" && node.label.trim() ? node.label.trim() : node.id;
+}
+
+function reviewedDefaultChoice(node) {
+  const contract = node?.human_input_contract;
+  if (typeof contract?.default_choice === "string" && contract.default_choice.trim()) return contract.default_choice.trim();
+  const choices = Array.isArray(contract?.choice_options)
+    ? contract.choice_options.filter((choice) => typeof choice === "string" && choice.trim())
+    : [];
+  return choices[0]?.trim() ?? "";
 }
 
 function reviewedRouteReplyAfterNode(node, processFlow) {
