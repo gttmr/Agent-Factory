@@ -227,8 +227,8 @@ Design 검토 화면의 GraphCanvas stage는 desktop review 기준으로 24rem-3
 - 새 그래프 설계의 1차 노드 메뉴는 taxonomy가 아니라 실행 흐름 중심이다: 판단, API/도구 호출, 조건 분기, 사람 입력/승인, 병합, 반복 제어, 서브워크플로우 호출, 외부 Agent 호출, 대기/callback. 내부 `node_kind`는 각각 `agent`, `adapter_call`, `router`, `human_input`, `join`, `loop_control`, `workflow_call`, `remote_agent_call`, `callback_wait`를 사용한다.
 - `adapter_call`은 Workflow가 고정한 호출 노드이며, MCP smoke 연결은 `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`, `mock_binding.provider: mock_lab`로 표시한다. LLM-selected MCP toolset은 `agent` 쪽 `invoke_binding: mcp_toolset`, `call_control: selected_by_llm`로 분리하고 node card에 Adapter처럼 표시하지 않는다.
 - `agent` 노드 편집 폼은 `agent_execution_mode`를 `Single turn`/`Chat` 세그먼트 컨트롤로 노출한다. `task`는 선택지로 노출하지 않는다. `Chat`은 같은 ADK session history를 암묵 입력으로 쓰므로 helper copy와 inspector context row에 stateful warning을 유지한다.
-- `human_input` 노드의 `human_input_contract`는 편집 패널 계약 탭에서 노출한다. Reviewer는 `RequestInput message`, payload schema ref, response schema ref, response mapping을 입력하며, 현재 runnable skeleton이 자동 lower하는 response schema는 `str` 또는 빈 값이다.
-- `route` 엣지는 편집 패널 계약 탭에서 `route_condition`, `route_aliases`, `router fallback route` 체크박스를 노출한다. Alias는 줄 단위로 입력하고, 같은 router에서 fallback은 하나만 선택해야 한다.
+- `human_input` 노드의 `human_input_contract`는 편집 패널 `입출력` 그룹에서 입력/응답 schema와 response mapping을, `흐름` 그룹에서 RequestInput message와 선택지를 검토한다. 현재 runnable skeleton이 자동 lower하는 response schema는 `str` 또는 빈 값이다.
+- `route` 엣지는 편집 패널 `흐름` 그룹에서 `route_condition`, `route_aliases`, `router fallback route` 체크박스를 노출한다. Alias는 줄 단위로 입력하고, 같은 router에서 fallback은 하나만 선택해야 한다.
 - `node_kind`는 v1 편집 폼에서 바꾸지 않는다. 종류를 바꾸려면 기존 노드를 삭제하고 새 노드를 추가한다.
 - 새 노드는 `remote_agent_call`이 아니면 parent 없는 첫 `graph_workflow`/`dynamic_workflow` 컨테이너에 기본 배치하고, 해당 컨테이너의 `contains_node_ids`에도 즉시 추가한다. `remote_agent_call` 새 노드는 로컬 workflow 컨테이너에 자동 편입하지 않는다.
 - `callback_wait`는 module category가 아니라 callback/resume execution semantics다. Inspector/Editor의 실행 설정 섹션에서 `invoke_binding`, `decision_owner`, `call_control`을 확인한다.
@@ -239,13 +239,14 @@ Design 검토 화면의 GraphCanvas stage는 desktop review 기준으로 24rem-3
 - `join` 노드는 박스를 dot(원) 크기에 맞춰(`JOIN_DOT_BOX`) dot 중심이 좌/우 edge 핸들과 같은 높이에 오게 한다. join 라벨은 박스 아래 absolute caption으로 깔아 dot 중심을 밀지 않는다.
 - Graph node header는 책임 분류와 검토 상태만 빠르게 읽히게 한다. category/subtype, label, module id, review status가 visual owner이며 `runtime_binding`, `invoke_binding`, `call_control`, Mock Lab binding, ADK Skeleton contract는 node card에 올리지 않는다.
 - `agent_execution_mode`의 visual owner는 선택된 Inspector/Editor의 실행 설정과 편집 segmented control이다. `execution_kind`가 `llm_single_turn`, `single_turn`, `chat`, `task`처럼 mode 의미를 담는 legacy/technical label이면 agent node header의 subtype badge로 반복 표시하지 않는다.
-- Inspector/Editor는 축을 섞지 않는다. 섹션 순서는 `책임 분류` → `계약` → `실행 설정` → `정책·리스크` → `Mock Lab` → `ADK Skeleton`이고, `runtime_binding`은 `invoke_binding` 아래 legacy/compat 정보로만 표시한다.
+- Inspector/Editor는 고정 탭이 아니라 선택된 노드/엣지에 실제 데이터가 있는 맥락별 그룹만 표시한다. 그룹 순서는 `요약` → `입출력` → `흐름` → `호출·런타임` → `검토·리스크` → `ADK Skeleton` → `원본`이다. `Mock Lab` binding은 독립 그룹이 아니라 Adapter 호출의 `호출·런타임` 안에서 표시하고, `ADK Skeleton`은 `workflow`/`workflow_call` 선택에 skeleton contract 또는 ADK role이 있을 때만 표시한다.
 - `agent` 노드에서 `chat` badge는 accent 색으로 session-history dependency를 스캔 가능하게 한다.
 
 **Graph Inspector** *(노드/엣지를 선택하면 **상단 좌측 정보 패널**에 `GraphInspector`가 렌더된다 — 위 "화면 골격" 참고. 우측 Inspector 패널 자리(`INSPECTOR_ENABLED=true` 재활성)에서도 같은 명세를 쓴다.)*
 - 노드 선택 시 `node_kind`, `module_id`, agent mode/context, container, lane, owner, review status, 연결된 module candidate risk/missing information을 표시한다.
 - Inspector도 같은 de-duplication 규칙을 따른다. agent mode는 `agent_execution_mode` 기반의 한 row로 표시하고, mode와 충돌하거나 같은 뜻인 raw `execution_kind`는 주 정보 영역에 반복 표시하지 않는다.
-- 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `route_condition`, `route_aliases`, `is_default_route`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다.
+- `입출력` 그룹의 schema ref는 inert chip이 아니라 expandable schema card다. `/api/catalog.contracts`에서 schema body를 찾으면 type, required fields, properties, examples/mock response를 인라인으로 보여주고, body가 없으면 연결된 module candidate의 input/output field spec을 fallback schema로 펼친다. 그래프 ref와 candidate field spec이 모두 없을 때만 ref만 존재한다고 명시한다. `input_mapping`/`output_mapping`은 `{}` JSON 문자열 대신 `대상 필드 <- 소스` 표로 표시한다.
+- 엣지 선택 시 `edge_kind`, `execution_semantics`, `data_label`, `schema_ref`, `state_key`, `artifact_key`, `a2a_contract_id`, boundary crossing을 표시한다. `route_condition`, `route_aliases`, `is_default_route`, `flow_kind`, `call_control`은 `흐름` 그룹에 둔다.
 - 선택된 edge는 label 유무와 관계없이 선 자체를 굵게 표시하고 다른 edge보다 위에 렌더링해 선택 상태를 즉시 알 수 있어야 한다.
 - `remote_a2a` edge는 Remote A2A 계약 검토 화면으로 이동할 수 있어야 한다.
 

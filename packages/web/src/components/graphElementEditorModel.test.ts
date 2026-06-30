@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import {
-  GRAPH_ELEMENT_TABS,
+  GRAPH_ELEMENT_GROUPS,
+  availableGraphElementGroups,
   isEdgeKindEditable,
   isNodeModuleLinkEditable,
   isNodeRuntimeControlEditable,
-  nextGraphElementTabAfterSelectionChange
+  nextGraphElementGroupAfterSelectionChange
 } from "./graphElementEditorModel.ts";
 import type { GraphEdge, GraphNode } from "../analyzer/types";
 
@@ -48,19 +49,99 @@ function edge(from = "node-1", to = "node-2", patch: Partial<GraphEdge> = {}): G
 }
 
 assert.deepEqual(
-  GRAPH_ELEMENT_TABS.map((tab) => tab.id),
-  ["basic", "contract", "runtime", "policy", "mock", "adk"],
-  "Graph element editor keeps the approved six-tab order"
+  GRAPH_ELEMENT_GROUPS.map((group) => group.id),
+  ["summary", "io", "flow", "runtime", "risk", "adk", "raw"],
+  "Graph element detail groups follow the contextual information architecture"
+);
+assert.deepEqual(
+  availableGraphElementGroups({
+    selectedNode: node({
+      node_kind: "adapter_call",
+      schema_refs: ["customer.lookup.request.v1", "customer.lookup.response.v1"],
+      mock_binding: {
+        provider: "mock_lab",
+        package_path: "packages/mock-lab",
+        mock_server_id: "wf-customer",
+        tool_name: "lookup_customer",
+        input_schema: "customer.lookup.request.v1",
+        output_schema: "customer.lookup.response.v1",
+        sample_response_ref: "customer.lookup.basic",
+        status: "linked"
+      },
+      invoke_binding: "mcp_tool",
+      call_control: "fixed_by_workflow"
+    }),
+    selectedEdge: null,
+    candidate: null
+  }).map((group) => group.id),
+  ["summary", "io", "runtime", "raw"],
+  "adapter calls show IO and runtime details without irrelevant ADK or flow groups"
+);
+assert.deepEqual(
+  availableGraphElementGroups({
+    selectedNode: node({
+      node_kind: "adapter_call",
+      schema_refs: ["customer.lookup.request.v1"],
+      adk_skeleton_contract: {
+        scaffold_level: "mock_testable_skeleton",
+        implementation_template: "adapter_placeholder_stub",
+        manual_completion_required: true,
+        developer_todos: ["Wire the MCP adapter."]
+      }
+    }),
+    selectedEdge: null,
+    candidate: null
+  }).map((group) => group.id),
+  ["summary", "io", "raw"],
+  "ADK Skeleton is workflow-only even when legacy adapter data carries a skeleton field"
+);
+assert.deepEqual(
+  availableGraphElementGroups({
+    selectedNode: node({
+      node_kind: "workflow_call",
+      workflow_ref: { id: "wf-risk", version: "v1", source: "catalog", display_name: "Risk" },
+      input_mapping: { payload: "$state.payload" },
+      output_mapping: { result: "$result" },
+      adk_skeleton_contract: {
+        scaffold_level: "mock_testable_skeleton",
+        implementation_template: "workflow_call_placeholder_stub",
+        manual_completion_required: true,
+        developer_todos: ["Define the subworkflow contract."]
+      }
+    }),
+    selectedEdge: null,
+    candidate: null
+  }).map((group) => group.id),
+  ["summary", "io", "runtime", "adk", "raw"],
+  "workflow calls expose mapping, runtime target, and ADK skeleton details"
+);
+assert.deepEqual(
+  availableGraphElementGroups({
+    selectedNode: null,
+    selectedEdge: edge("router", "analysis", {
+      edge_kind: "route",
+      execution_semantics: "conditional",
+      flow_kind: "route",
+      route_condition: "choice == run_analysis",
+      route_aliases: ["run", "분석"],
+      is_default_route: false
+    }),
+    candidate: null
+  }).map((group) => group.id),
+  ["summary", "flow", "raw"],
+  "route edges focus on flow details and hide Mock/ADK"
 );
 assert.equal(
-  nextGraphElementTabAfterSelectionChange("contract"),
-  "contract",
-  "graph element tab should stay on the current tab when another node or edge is selected"
-);
-assert.equal(
-  nextGraphElementTabAfterSelectionChange("adk"),
-  "adk",
-  "graph element tab should preserve the current ADK tab across selection changes"
+  nextGraphElementGroupAfterSelectionChange(
+    "adk",
+    availableGraphElementGroups({
+      selectedNode: node({ node_kind: "adapter_call", schema_refs: ["customer.lookup.request.v1"] }),
+      selectedEdge: null,
+      candidate: null
+    })
+  ),
+  "summary",
+  "selection changes fall back to summary when the previous group is unavailable"
 );
 
 assert.equal(

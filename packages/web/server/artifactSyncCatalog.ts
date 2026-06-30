@@ -51,6 +51,7 @@ export async function loadServerScaffoldCatalog(repoRoot: string): Promise<Catal
     workflows: [],
     adapters: [],
     remoteA2A: [],
+    contracts: {},
     domainOwners: null,
     riskGates: null
   };

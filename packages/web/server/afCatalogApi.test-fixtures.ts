@@ -197,3 +197,35 @@ export async function postPublish(repoRoot: string, body: unknown): Promise<{ st
     body: chunks.join("").trim() ? (JSON.parse(chunks.join("")) as Record<string, unknown>) : {}
   };
 }
+
+export async function getCatalog(repoRoot: string): Promise<{ status: number; body: Record<string, unknown> }> {
+  const middleware = createAfCatalogMiddleware(repoRoot);
+  const req = Readable.from([]) as IncomingMessage;
+  req.method = "GET";
+  req.url = "/";
+  const chunks: string[] = [];
+  const res = new ServerResponse(req);
+  res.setHeader = function setHeader() {
+    return this;
+  };
+  res.end = function end(
+    chunk?: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | (() => void),
+    callback?: () => void
+  ) {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk.toString());
+    if (typeof encodingOrCallback === "function") {
+      encodingOrCallback();
+    } else {
+      callback?.();
+    }
+    return this;
+  };
+  await middleware(req, res, (error) => {
+    throw error instanceof Error ? error : new Error("unexpected catalog middleware next()");
+  });
+  return {
+    status: res.statusCode,
+    body: chunks.join("").trim() ? (JSON.parse(chunks.join("")) as Record<string, unknown>) : {}
+  };
+}

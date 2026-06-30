@@ -1,10 +1,29 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { matchingDelta, postPublish, validAdapterProposal, withTempRepo, writeDelta } from "./afCatalogApi.test-fixtures.ts";
+import { getCatalog, matchingDelta, postPublish, validAdapterProposal, withTempRepo, writeDelta } from "./afCatalogApi.test-fixtures.ts";
 
 await withTempRepo(async (repoRoot) => {
   await writeFile(join(repoRoot, "catalog", "adapters.yaml"), "adapters: []\n", "utf8");
+  await mkdir(join(repoRoot, "catalog", "contracts", "mcp"), { recursive: true });
+  await writeFile(
+    join(repoRoot, "catalog", "contracts", "mcp", "customer.lookup.v1.json"),
+    `${JSON.stringify({ schema_ref: "catalog.customer.lookup.v1", inputSchema: { type: "object" } }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const catalog = await getCatalog(repoRoot);
+  assert.equal(catalog.status, 200);
+  assert.deepEqual(
+    (catalog.body.contracts as Record<string, unknown> | undefined)?.["mcp/customer.lookup.v1.json"],
+    { schema_ref: "catalog.customer.lookup.v1", inputSchema: { type: "object" } },
+    "catalog API includes nested contract files by relative path"
+  );
+  assert.deepEqual(
+    (catalog.body.contracts as Record<string, unknown> | undefined)?.["catalog.customer.lookup.v1"],
+    { schema_ref: "catalog.customer.lookup.v1", inputSchema: { type: "object" } },
+    "catalog API aliases contracts by schema_ref"
+  );
 
   const invalidReq = await postPublish(repoRoot, {
     req_id: "../bad",

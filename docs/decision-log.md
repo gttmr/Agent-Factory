@@ -340,6 +340,13 @@
 - **배경**: 기존 좌측 레일은 stage navigation, approval chip, Graph canvas, Build/Verify 도구면과 폭을 경쟁해 desktop workbench에서도 실제 검토/실행 surface를 좁혔다. 사용 환경은 desktop으로 확정되어 mobile/tablet QA를 acceptance 기준으로 유지할 필요가 없다.
 - **영향**: `StageShell`, Analyze/Design/Build/Verify route composition, `stage-shell.css`, route-specific CSS, `docs/visualization/design-system.md`. Approval gate source of truth, schema, analyzer, catalog, server API, generator 계약은 변경하지 않는다.
 
+## 2026-06-30 · 로컬 작업 — Graph IR 선택 패널 정보구조 개선
+
+### Graph Inspector/Editor는 고정 탭 대신 맥락별 그룹을 쓴다
+- **결정**: Design Graph IR 선택 패널의 `기본/계약/실행/정책/Mock/ADK` 고정 탭을 `요약`, `입출력`, `흐름`, `호출·런타임`, `검토·리스크`, 조건부 `ADK Skeleton`, `원본` 그룹으로 바꾼다. 선택된 노드/엣지에 실제 데이터가 있는 그룹만 표시한다. Schema ref는 `/api/catalog.contracts`의 contract body를 찾아 인라인 확장 카드로 보여 주고, body가 없으면 연결된 module candidate의 input/output field spec을 fallback schema로 펼친다. `Mock Lab` binding은 Adapter 호출의 런타임 정보로 접고, ADK Skeleton은 `workflow`/`workflow_call` 선택에 관련 contract가 있을 때만 보인다.
+- **배경**: 기존 고정 탭은 대부분의 선택에서 빈 `Mock`/`ADK` 탭을 보여 주고, schema ref 이름만 노출해 reviewer가 입출력 구조를 확인할 수 없었다. `input_mapping`/`output_mapping`도 raw JSON으로만 보였고 대상 필드와 source field 방향이 불분명했다.
+- **영향**: Design Graph IR `GraphInspector`/`GraphElementEditor`, `/api/catalog` contract index, active visualization design-system docs. Graph IR artifact schema와 approval gate semantics는 바꾸지 않는다.
+
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
 ### A2A readiness와 `input-required`는 chat-ready/final answer가 아니다

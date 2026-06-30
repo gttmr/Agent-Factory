@@ -1,6 +1,6 @@
 // Controlled by GraphEditState.draft: field changes update the live draft immediately.
 // The canvas toolbar owns whole-graph save/cancel, so this form keeps no mirror state.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AGENT_EXECUTION_MODES,
   GRAPH_EDGE_KINDS,
@@ -18,20 +18,23 @@ import {
 import { CategoryBadge } from "./CategoryBadge";
 import type { GraphEditState } from "./GraphCanvas";
 import {
-  GRAPH_ELEMENT_TABS,
+  availableGraphElementGroups,
   isEdgeKindEditable,
   isModuleBoundNodeKind,
   isNodeModuleLinkEditable,
   isNodeRuntimeControlEditable,
-  nextGraphElementTabAfterSelectionChange,
-  type GraphElementTabId
+  nextGraphElementGroupAfterSelectionChange,
+  type GraphElementGroup,
+  type GraphElementGroupId
 } from "./graphElementEditorModel";
+import { FieldSpecList, JsonDetails, MappingTable, SchemaRefCards } from "./GraphSchemaDetails";
 import { Button, Field, SelectField, TextareaField } from "../ui/primitives";
 
 interface GraphElementEditorProps {
   editState: GraphEditState;
   moduleCandidates: ModuleCandidate[];
   a2aContracts: A2AContract[];
+  catalogContracts?: Record<string, unknown>;
   onClose: () => void;
 }
 
@@ -118,8 +121,20 @@ const EDGE_KIND_HELP: Record<EdgeKind, string> = {
   remote_a2a: "A2A 프로토콜로 별도 Agent를 호출합니다."
 };
 
-export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, onClose }: GraphElementEditorProps) {
-  const [activeTab, setActiveTab] = useState<GraphElementTabId>("basic");
+export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, catalogContracts = {}, onClose }: GraphElementEditorProps) {
+  const [activeGroup, setActiveGroup] = useState<GraphElementGroupId>("summary");
+  const selectedCandidate = editState.selectedNode?.module_id
+    ? moduleCandidates.find((candidate) => candidate.id === editState.selectedNode?.module_id) ?? null
+    : null;
+  const groups = useMemo(
+    () =>
+      availableGraphElementGroups({
+        selectedNode: editState.selectedNode,
+        selectedEdge: editState.selectedEdge,
+        candidate: selectedCandidate
+      }),
+    [editState.selectedEdge, editState.selectedNode, selectedCandidate]
+  );
   const selectionKey = editState.selectedNode
     ? `node:${editState.selectedNode.id}`
     : editState.selectedEdge
@@ -127,8 +142,8 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
       : "empty";
 
   useEffect(() => {
-    setActiveTab((currentTab) => nextGraphElementTabAfterSelectionChange(currentTab));
-  }, [selectionKey]);
+    setActiveGroup((currentGroup) => nextGraphElementGroupAfterSelectionChange(currentGroup, groups));
+  }, [selectionKey, groups]);
 
   if (editState.selectedNode) {
     return (
@@ -136,8 +151,10 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
         node={editState.selectedNode}
         editState={editState}
         moduleCandidates={moduleCandidates}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        catalogContracts={catalogContracts}
+        groups={groups}
+        activeGroup={activeGroup}
+        onGroupChange={setActiveGroup}
         onClose={onClose}
       />
     );
@@ -149,8 +166,10 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
         edge={editState.selectedEdge}
         editState={editState}
         a2aContracts={a2aContracts}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        catalogContracts={catalogContracts}
+        groups={groups}
+        activeGroup={activeGroup}
+        onGroupChange={setActiveGroup}
         onClose={onClose}
       />
     );
@@ -164,24 +183,26 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
 }
 
 function GraphElementTabs({
-  activeTab,
-  onTabChange
+  activeGroup,
+  groups,
+  onGroupChange
 }: {
-  activeTab: GraphElementTabId;
-  onTabChange: (tab: GraphElementTabId) => void;
+  activeGroup: GraphElementGroupId;
+  groups: readonly GraphElementGroup[];
+  onGroupChange: (group: GraphElementGroupId) => void;
 }) {
   return (
-    <div className="graph-element-tabs" role="tablist" aria-label="그래프 요소 편집 탭">
-      {GRAPH_ELEMENT_TABS.map((tab) => (
+    <div className="graph-element-tabs" role="tablist" aria-label="그래프 요소 편집 그룹">
+      {groups.map((group) => (
         <button
-          key={tab.id}
+          key={group.id}
           type="button"
           role="tab"
-          aria-selected={activeTab === tab.id}
-          className={`graph-element-tab${activeTab === tab.id ? " is-active" : ""}`}
-          onClick={() => onTabChange(tab.id)}
+          aria-selected={activeGroup === group.id}
+          className={`graph-element-tab${activeGroup === group.id ? " is-active" : ""}`}
+          onClick={() => onGroupChange(group.id)}
         >
-          {tab.label}
+          {group.label}
         </button>
       ))}
     </div>
@@ -346,15 +367,19 @@ function NodeForm({
   node,
   editState,
   moduleCandidates,
-  activeTab,
-  onTabChange,
+  catalogContracts,
+  groups,
+  activeGroup,
+  onGroupChange,
   onClose
 }: {
   node: GraphNode;
   editState: GraphEditState;
   moduleCandidates: ModuleCandidate[];
-  activeTab: GraphElementTabId;
-  onTabChange: (tab: GraphElementTabId) => void;
+  catalogContracts: Record<string, unknown>;
+  groups: readonly GraphElementGroup[];
+  activeGroup: GraphElementGroupId;
+  onGroupChange: (group: GraphElementGroupId) => void;
   onClose: () => void;
 }) {
   const category = moduleCategoryFromNodeKind(node.node_kind);
@@ -364,6 +389,7 @@ function NodeForm({
   const matchingCandidates = canLinkModule
     ? moduleCandidates.filter((candidate) => candidate.module_category === moduleCategoryFromNodeKind(node.node_kind))
     : [];
+  const selectedCandidate = node.module_id ? moduleCandidates.find((candidate) => candidate.id === node.module_id) ?? null : null;
   const agentExecutionMode: AgentExecutionMode = node.agent_execution_mode === "chat" ? "chat" : "single_turn";
   const schemaRefs = node.schema_refs ?? [];
   const containerLabel = node.container_id
@@ -391,10 +417,10 @@ function NodeForm({
         </Button>
       </header>
 
-      <GraphElementTabs activeTab={activeTab} onTabChange={onTabChange} />
+      <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={onGroupChange} />
 
-      {activeTab === "basic" ? (
-      <EditorSection title="기본">
+      {activeGroup === "summary" ? (
+      <EditorSection title="요약">
         <Field label="라벨">
           <input value={node.label} onChange={(event) => editState.updateNodeFields(node.id, { label: event.target.value })} />
         </Field>
@@ -466,27 +492,17 @@ function NodeForm({
       </EditorSection>
       ) : null}
 
-      {activeTab === "contract" ? (
-        <EditorSection title="계약">
+      {activeGroup === "io" ? (
+        <EditorSection title="입출력">
           {schemaRefs.length ? (
-            <TextareaField label="schema_refs" value={JSON.stringify(schemaRefs, null, 2)} readOnly rows={4} />
+            <Field label="schemas">
+              <SchemaRefCards refs={schemaRefs} contracts={catalogContracts} candidate={selectedCandidate} mockBinding={node.mock_binding} />
+            </Field>
           ) : null}
+          {selectedCandidate?.inputs?.length ? <FieldSpecList title="candidate inputs" fields={selectedCandidate.inputs} /> : null}
+          {selectedCandidate?.outputs?.length ? <FieldSpecList title="candidate outputs" fields={selectedCandidate.outputs} /> : null}
           {node.input_schema ? <Field label="input_schema"><input value={node.input_schema} readOnly /></Field> : null}
           {node.output_schema ? <Field label="output_schema"><input value={node.output_schema} readOnly /></Field> : null}
-          {node.node_kind === "workflow_call" ? (
-            <>
-              <Field label="workflow_ref">
-                <input
-                  value={
-                    node.workflow_ref
-                      ? `${node.workflow_ref.display_name} (${node.workflow_ref.id}${node.workflow_ref.version ? ` ${node.workflow_ref.version}` : ""})`
-                      : "미지정"
-                  }
-                  readOnly
-                />
-              </Field>
-            </>
-          ) : null}
           {node.node_kind === "human_input" ? (
             <HumanInputContractFields
               node={node}
@@ -495,7 +511,7 @@ function NodeForm({
               }
             />
           ) : null}
-          {canLinkModule ? (
+          {node.node_kind === "workflow_call" || node.input_mapping || node.output_mapping ? (
             <>
               <EditableMappingField
                 label="input_mapping"
@@ -513,15 +529,44 @@ function NodeForm({
           !node.input_schema &&
           !node.output_schema &&
           !node.workflow_ref &&
-          !canLinkModule &&
+          !node.input_mapping &&
+          !node.output_mapping &&
           node.node_kind !== "human_input" ? (
             <EmptyTabMessage>이 노드에 표시할 계약 정보가 없습니다.</EmptyTabMessage>
           ) : null}
         </EditorSection>
       ) : null}
 
-      {activeTab === "runtime" ? (
-      <EditorSection title="실행">
+      {activeGroup === "flow" ? (
+      <EditorSection title="흐름">
+        {node.node_kind === "human_input" ? (
+          <>
+            <Field label="RequestInput">
+              <ReadonlyInput value={node.human_input_contract?.message ?? node.label} />
+            </Field>
+            <Field label="choice_options">
+              <ReadonlyInput value={(node.human_input_contract?.choice_options ?? []).join(" / ") || "없음"} />
+            </Field>
+          </>
+        ) : null}
+        {node.node_kind === "router" ? (
+          <EmptyTabMessage>라우트 조건과 alias는 연결된 route edge를 선택해서 편집합니다.</EmptyTabMessage>
+        ) : null}
+        {node.node_kind === "callback_wait" ? <EmptyTabMessage>callback/resume 흐름의 대기 지점입니다.</EmptyTabMessage> : null}
+        {node.node_kind === "loop_control" ? <EmptyTabMessage>반복 제어 지점입니다. 조건은 연결 edge와 container에서 검토합니다.</EmptyTabMessage> : null}
+      </EditorSection>
+      ) : null}
+
+      {activeGroup === "runtime" ? (
+      <EditorSection title="호출·런타임">
+        {node.workflow_ref ? (
+          <Field label="workflow_ref">
+            <input
+              value={`${node.workflow_ref.display_name} (${node.workflow_ref.id}${node.workflow_ref.version ? ` ${node.workflow_ref.version}` : ""})`}
+              readOnly
+            />
+          </Field>
+        ) : null}
         {runtimeControlEditable ? (
           <SelectField
             label="invoke_binding"
@@ -578,11 +623,14 @@ function NodeForm({
             <small>{AGENT_EXECUTION_MODE_HELP[agentExecutionMode]}</small>
           </div>
         ) : null}
+        {node.mock_binding ? (
+          <TextareaField label="Mock Lab binding" value={JSON.stringify(node.mock_binding, null, 2)} readOnly rows={7} />
+        ) : null}
       </EditorSection>
       ) : null}
 
-      {activeTab === "policy" ? (
-      <EditorSection title="정책·리스크">
+      {activeGroup === "risk" ? (
+      <EditorSection title="검토·리스크">
         <Field label="owner_scope">
           <input value={node.owner_scope ?? ""} readOnly />
         </Field>
@@ -595,35 +643,22 @@ function NodeForm({
       </EditorSection>
       ) : null}
 
-      {activeTab === "mock" ? (
-        <EditorSection title="Mock">
-          {node.node_kind === "adapter_call" || node.mock_binding ? (
-            <TextareaField
-              label="binding"
-              value={JSON.stringify(
-                node.mock_binding ?? { provider: "mock_lab", package_path: "packages/mock-lab", status: "missing" },
-                null,
-                2
-              )}
-              readOnly
-              rows={7}
-            />
-          ) : (
-            <EmptyTabMessage>이 노드는 Mock Lab binding 대상이 아닙니다.</EmptyTabMessage>
-          )}
-        </EditorSection>
-      ) : null}
-
-      {activeTab === "adk" ? (
-        <EditorSection title="ADK">
+      {activeGroup === "adk" ? (
+        <EditorSection title="ADK Skeleton">
           {node.adk_skeleton_contract ? (
-            <TextareaField label="contract" value={JSON.stringify(node.adk_skeleton_contract, null, 2)} readOnly rows={7} />
+            <JsonDetails label="ADK skeleton contract" value={node.adk_skeleton_contract} />
           ) : (
             <EmptyTabMessage>ADK Skeleton Contract가 없습니다.</EmptyTabMessage>
           )}
           {node.adk_node_role ? (
             <p className="graph-element-editor-hint">ADK role 호환 메타데이터: {node.adk_node_role}</p>
           ) : null}
+        </EditorSection>
+      ) : null}
+
+      {activeGroup === "raw" ? (
+        <EditorSection title="원본 Graph IR">
+          <JsonDetails label="node JSON" value={node} />
         </EditorSection>
       ) : null}
 
@@ -640,15 +675,19 @@ function EdgeForm({
   edge,
   editState,
   a2aContracts,
-  activeTab,
-  onTabChange,
+  catalogContracts,
+  groups,
+  activeGroup,
+  onGroupChange,
   onClose
 }: {
   edge: GraphEdge;
   editState: GraphEditState;
   a2aContracts: A2AContract[];
-  activeTab: GraphElementTabId;
-  onTabChange: (tab: GraphElementTabId) => void;
+  catalogContracts: Record<string, unknown>;
+  groups: readonly GraphElementGroup[];
+  activeGroup: GraphElementGroupId;
+  onGroupChange: (group: GraphElementGroupId) => void;
   onClose: () => void;
 }) {
   const edgeId = selectedEdgeId(editState, edge);
@@ -679,10 +718,10 @@ function EdgeForm({
         </Button>
       </header>
 
-      <GraphElementTabs activeTab={activeTab} onTabChange={onTabChange} />
+      <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={onGroupChange} />
 
-      {activeTab === "basic" ? (
-      <EditorSection title="기본">
+      {activeGroup === "summary" ? (
+      <EditorSection title="요약">
         <Field label="연결">
           <input value={`${edge.from} → ${edge.to}`} readOnly />
         </Field>
@@ -725,12 +764,68 @@ function EdgeForm({
       </EditorSection>
       ) : null}
 
-      {activeTab === "contract" ? (
-      <EditorSection title="계약">
+      {activeGroup === "io" ? (
+      <EditorSection title="입출력">
         <Field label="data_label">
           <input value={edge.data_label} onChange={(event) => editState.updateEdgeFields(edgeId, { data_label: event.target.value })} />
         </Field>
 
+        {isStateEdge ? (
+          <Field label="state_key" hint="state key">
+            <input
+              value={edge.state_key ?? ""}
+              onChange={(event) => editState.updateEdgeFields(edgeId, { state_key: nullableString(event.target.value) })}
+            />
+          </Field>
+        ) : null}
+
+        {edge.edge_kind === "artifact" ? (
+          <Field label="artifact_key" hint="artifact key">
+            <input
+              value={edge.artifact_key ?? ""}
+              onChange={(event) => editState.updateEdgeFields(edgeId, { artifact_key: nullableString(event.target.value) })}
+            />
+          </Field>
+        ) : null}
+
+        <Field label="schema_ref">
+          <input
+            value={edge.schema_ref ?? ""}
+            onChange={(event) => editState.updateEdgeFields(edgeId, { schema_ref: nullableString(event.target.value) })}
+          />
+        </Field>
+        {edge.schema_ref ? (
+          <Field label="schema preview">
+            <SchemaRefCards refs={[edge.schema_ref]} contracts={catalogContracts} candidate={null} />
+          </Field>
+        ) : null}
+
+        {edge.edge_kind === "remote_a2a" ? (
+          <>
+            <SelectField
+              label="a2a_contract_id"
+              value={edge.a2a_contract_id ?? ""}
+              onChange={(event) =>
+                editState.updateEdgeFields(edgeId, { a2a_contract_id: nullableString(event.target.value) })
+              }
+            >
+              <option value="">없음</option>
+              {a2aContracts.map((contract) => (
+                <option key={contract.contract_id} value={contract.contract_id}>
+                  {contract.contract_id}
+                </option>
+              ))}
+            </SelectField>
+            {!edge.a2a_contract_id ? (
+              <p className="graph-element-editor-warning">remote_a2a 엣지는 계약 연결이 필요합니다.</p>
+            ) : null}
+          </>
+        ) : null}
+      </EditorSection>
+      ) : null}
+
+      {activeGroup === "flow" ? (
+      <EditorSection title="흐름">
         {edge.edge_kind === "route" ? (
           <>
             <TextareaField
@@ -757,58 +852,6 @@ function EdgeForm({
             </label>
           </>
         ) : null}
-
-        {isStateEdge ? (
-          <Field label="state_key" hint="state key">
-            <input
-              value={edge.state_key ?? ""}
-              onChange={(event) => editState.updateEdgeFields(edgeId, { state_key: nullableString(event.target.value) })}
-            />
-          </Field>
-        ) : null}
-
-        {edge.edge_kind === "artifact" ? (
-          <Field label="artifact_key" hint="artifact key">
-            <input
-              value={edge.artifact_key ?? ""}
-              onChange={(event) => editState.updateEdgeFields(edgeId, { artifact_key: nullableString(event.target.value) })}
-            />
-          </Field>
-        ) : null}
-
-        <Field label="schema_ref">
-          <input
-            value={edge.schema_ref ?? ""}
-            onChange={(event) => editState.updateEdgeFields(edgeId, { schema_ref: nullableString(event.target.value) })}
-          />
-        </Field>
-
-        {edge.edge_kind === "remote_a2a" ? (
-          <>
-            <SelectField
-              label="a2a_contract_id"
-              value={edge.a2a_contract_id ?? ""}
-              onChange={(event) =>
-                editState.updateEdgeFields(edgeId, { a2a_contract_id: nullableString(event.target.value) })
-              }
-            >
-              <option value="">없음</option>
-              {a2aContracts.map((contract) => (
-                <option key={contract.contract_id} value={contract.contract_id}>
-                  {contract.contract_id}
-                </option>
-              ))}
-            </SelectField>
-            {!edge.a2a_contract_id ? (
-              <p className="graph-element-editor-warning">remote_a2a 엣지는 계약 연결이 필요합니다.</p>
-            ) : null}
-          </>
-        ) : null}
-      </EditorSection>
-      ) : null}
-
-      {activeTab === "runtime" ? (
-      <EditorSection title="실행">
         <Field label="flow_kind" hint="edge_kind와 graph topology에서 고정">
           <ReadonlyInput value={edge.flow_kind ?? "없음"} />
         </Field>
@@ -819,23 +862,17 @@ function EdgeForm({
       </EditorSection>
       ) : null}
 
-      {activeTab === "policy" ? (
-      <EditorSection title="정책">
+      {activeGroup === "risk" ? (
+      <EditorSection title="검토·리스크">
         <Field label="is_remote_boundary_crossing">
           <input value={edge.is_remote_boundary_crossing ? "true" : "false"} readOnly />
         </Field>
       </EditorSection>
       ) : null}
 
-      {activeTab === "mock" ? (
-        <EditorSection title="Mock">
-          <EmptyTabMessage>엣지는 Mock Lab binding을 직접 갖지 않습니다.</EmptyTabMessage>
-        </EditorSection>
-      ) : null}
-
-      {activeTab === "adk" ? (
-        <EditorSection title="ADK">
-          <EmptyTabMessage>엣지는 ADK Skeleton Contract를 직접 갖지 않습니다.</EmptyTabMessage>
+      {activeGroup === "raw" ? (
+        <EditorSection title="원본 Graph IR">
+          <JsonDetails label="edge JSON" value={edge} />
         </EditorSection>
       ) : null}
 

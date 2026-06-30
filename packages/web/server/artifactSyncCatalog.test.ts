@@ -92,6 +92,7 @@ const expectedIndex = {
     }
   ],
   domainOwners: null,
+  contracts: {},
   riskGates: null
 } satisfies CatalogIndex;
 

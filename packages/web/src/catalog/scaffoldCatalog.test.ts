@@ -29,6 +29,7 @@ const index: CatalogIndex = {
     }
   ],
   domainOwners: null,
+  contracts: {},
   riskGates: null
 };
 

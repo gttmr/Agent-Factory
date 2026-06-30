@@ -19,6 +19,7 @@ import type {
   HighlightRecord
 } from "../../state/useCollaboration";
 import type { AuthorRole } from "../../state/useAuthor";
+import { useCatalog } from "../../state/useCatalog";
 import { DesignBottomPanel } from "./DesignBottomPanel";
 import { DesignGraphPanel } from "./DesignGraphPanel";
 import type { SidebarTab } from "./designStageModel";
@@ -106,6 +107,9 @@ export function DesignReviewStep({
   nodeLabel,
   handlers
 }: DesignReviewStepProps) {
+  const catalog = useCatalog();
+  const catalogContracts = catalog.data?.contracts ?? {};
+
   return (
     <div className="af-design-split">
       <DesignGraphPanel
@@ -122,6 +126,7 @@ export function DesignReviewStep({
         selectedContract={contracts.selectedContract}
         selectedA2ARow={contracts.selectedA2ARow}
         a2aContracts={contracts.a2aContracts}
+        catalogContracts={catalogContracts}
         comments={collaboration.comments}
         highlights={collaboration.highlights}
         anchor={collaboration.anchor}
