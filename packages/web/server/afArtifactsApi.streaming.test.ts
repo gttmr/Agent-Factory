@@ -145,6 +145,35 @@ async function assertRuntimeChatLifecycle(request: ArtifactTestRequest, root: st
   assert.equal(started.status.server.status, "running");
   assert.ok(started.status.server.pid);
   assert.equal(responseJson<{ readonly ok: boolean }>(await request({ url: "/req-runtime/runtime-chat/stop", method: "POST" })).ok, true);
+
+  const a2aStatus = responseJson<{
+    readonly installed: boolean;
+    readonly port: number;
+    readonly app_name: string;
+    readonly rpc_url: string;
+    readonly agent_card_url: string;
+    readonly server: { readonly status: string };
+  }>(await request({ url: "/req-runtime/runtime-a2a/status" }));
+  assert.equal(a2aStatus.installed, true);
+  assert.equal(a2aStatus.port, Number(process.env.AF_ADK_A2A_PORT));
+  assert.equal(a2aStatus.app_name, "req_stream_adk");
+  assert.equal(a2aStatus.rpc_url, `http://127.0.0.1:${process.env.AF_ADK_A2A_PORT}/a2a/req_stream_adk`);
+  assert.equal(
+    a2aStatus.agent_card_url,
+    `http://127.0.0.1:${process.env.AF_ADK_A2A_PORT}/a2a/req_stream_adk/.well-known/agent-card.json`
+  );
+  assert.equal(a2aStatus.server.status, "stopped");
+
+  const card = responseJson<{
+    readonly app_name: string;
+    readonly rpc_url: string;
+    readonly agent_card_url: string;
+    readonly card: { readonly name: string; readonly url: string; readonly preferredTransport: string };
+  }>(await request({ url: "/req-runtime/runtime-a2a/agent-card" }));
+  assert.equal(card.app_name, "req_stream_adk");
+  assert.equal(card.card.name, "req_stream_adk");
+  assert.equal(card.card.url, card.rpc_url);
+  assert.equal(card.card.preferredTransport, "JSONRPC");
 }
 
 async function writeFakeRuntimeStub(root: string, reqId: string): Promise<void> {
@@ -179,11 +208,13 @@ function getAvailablePort(): Promise<number> {
 const repoRoot = await mkdtemp(join(tmpdir(), "af-artifacts-api-stream-"));
 const originalPath = process.env.PATH ?? "";
 const originalRuntimePort = process.env.AF_ADK_CHAT_PORT;
+const originalA2aPort = process.env.AF_ADK_A2A_PORT;
 
 try {
   await writeFakeScripts(repoRoot);
   process.env.PATH = `${join(repoRoot, "bin")}:${originalPath}`;
   process.env.AF_ADK_CHAT_PORT = String(await getAvailablePort());
+  process.env.AF_ADK_A2A_PORT = String(await getAvailablePort());
   const request = createRequester(repoRoot);
 
   await createRoot(request, "req-stream");
@@ -200,5 +231,7 @@ try {
   process.env.PATH = originalPath;
   if (originalRuntimePort === undefined) delete process.env.AF_ADK_CHAT_PORT;
   else process.env.AF_ADK_CHAT_PORT = originalRuntimePort;
+  if (originalA2aPort === undefined) delete process.env.AF_ADK_A2A_PORT;
+  else process.env.AF_ADK_A2A_PORT = originalA2aPort;
   await rm(repoRoot, { recursive: true, force: true });
 }

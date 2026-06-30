@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { assertPregeneratedAgentCard, assertRunnableAgentCard } from "./agent-card-assertions.mjs";
 import {
   collectFiles,
   collectGeneratorSourceFiles,
@@ -79,13 +80,11 @@ export function assertRunnableBundle(outputRoot) {
   assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
   assert.match(agentSource, /async def _fn_mod_gen_adapter\(ctx: Context, node_input=None\)/);
   assert.match(agentSource, /node_mod_gen_adapter = FunctionNode\(func=_fn_mod_gen_adapter/);
-  assert.ok(
-    manifest.runtime.unconnected_adapters.some((adapter) => adapter.module_id === "mod-gen-adapter"),
-    "fixture adapter must be reported as unconnected"
-  );
+  assert.ok(manifest.runtime.unconnected_adapters.some((adapter) => adapter.module_id === "mod-gen-adapter"), "fixture adapter must be reported as unconnected");
   assert.equal(manifest.runtime.connected_adapters.length, 0);
   assert.ok(existsSync(join(outputRoot, "agents.config.yaml")), "runnable bundle must emit agents.config.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "workflow.py")), "bundle must include workflow.py for developer handoff");
+  assertRunnableAgentCard(outputRoot, packageName, readme);
   assert.ok(existsSync(join(outputRoot, packageName, "schemas.py")), "bundle must include schemas.py");
   assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")), "bundle must include mock_config.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
@@ -140,6 +139,7 @@ export function assertPregeneratedRunnableBundle(outputRoot) {
   assert.doesNotMatch(agentSource, /SyntheticRuntimeSmokeAgent/);
   assert.ok(existsSync(join(outputRoot, "agents.config.yaml")), "runnable bundle must emit agents.config.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "workflow.py")), "bundle must include workflow.py for developer handoff");
+  assertPregeneratedAgentCard(outputRoot, packageName);
   assert.ok(existsSync(join(outputRoot, packageName, "schemas.py")), "bundle must include schemas.py");
   assert.ok(existsSync(join(outputRoot, packageName, "mock_config.yaml")), "bundle must include mock_config.yaml");
   assert.ok(existsSync(join(outputRoot, packageName, "sample_inputs.yaml")), "bundle must include sample_inputs.yaml");
@@ -206,6 +206,7 @@ function assertCommonBundle(outputRoot, manifest) {
   assert.ok(manifest.graph_ir, "manifest must include graph_ir");
   assert.ok(existsSync(join(outputRoot, "scaffold-plan.json")));
   assert.ok(existsSync(join(outputRoot, "implementation-handoff.md")));
+  assert.ok(existsSync(join(outputRoot, "af_adk_a2a_server.py")), "runtime-stub must include ADK A2A launcher");
   assert.ok(existsSync(join(outputRoot, "runtime-chat-smoke.json")));
   assert.ok(!existsSync(join(outputRoot, "requirements.txt")), "runtime-stub must not carry artifact-local Python requirements");
   assert.doesNotMatch(readme, /python3 -m venv \.venv/);

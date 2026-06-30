@@ -70,6 +70,24 @@
   color: var(--cat-workflow);
 }
 
+.af-a2a-provider-import {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.af-a2a-provider-import .ui-field {
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+
+.af-a2a-provider-import .af-landing-error {
+  margin: 0;
+  flex: 1 1 180px;
+}
+
 .af-a2a-inspector {
   display: flex;
   flex-direction: column;

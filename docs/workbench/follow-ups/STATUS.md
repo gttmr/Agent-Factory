@@ -3,15 +3,24 @@
 이 파일 하나만 보면 어디까지 했고 무엇이 남았는지 알 수 있도록 정리한 진입점이다.
 브리프 목록 자체는 `INDEX.md`, 마이그레이션 전체 설계는 `/home/ilmaswsl/.claude/plans/agent-factory-synthetic-hummingbird.md`.
 
-마지막 갱신: 2026-06-29 (KST 기준).
+마지막 갱신: 2026-06-30 (KST 기준).
 
 2026-06-23 현재 실행 계약 메모: Stage Runner와 direct analyzer, Mock Lab draft는 더 이상 repo 코드에서 `codex exec` 또는 외부 Codex CLI 프로세스를 직접 spawn하지 않는다. 서버는 `@openai/codex-sdk` TypeScript SDK를 사용하고, 아래 과거 브리프의 Codex CLI 표현은 당시 설계/구현 기록으로만 읽는다.
 
 ## 현재 사용 규칙
 
 - 이 파일은 follow-up backlog/status 진입점이다. live branch cleanliness나 HEAD SHA는 매번 `git status`와 `git log`로 확인한다.
-- 마지막 backlog 순서였던 12와 10은 모두 처리됐다. 새 작업은 `INDEX.md`에 새 번호로 추가한다.
+- 마지막 backlog 순서였던 12와 10은 모두 처리됐다. 현재 새 대기 브리프는 17이다. 새 작업은 `INDEX.md`에 새 번호로 추가한다.
 - detailed brief가 이 파일, `INDEX.md`, active docs, 현재 코드와 충돌하면 현재 코드와 active docs를 먼저 확인한다.
+
+## 2026-06-30 A2A readiness / input-required 계약
+
+- Agent Card `HTTP 200`은 provider process/card health일 뿐이며 chat-ready로 보지 않는다. semantic `message/send` probe가 별도 readiness source다.
+- local Mock Lab prerequisite가 빠져 있으면 `server.status: running` 뒤에 숨기지 않고 prerequisite/blocked 상태와 시작 action으로 노출한다. `wf-page-recommendation-mock`이 현재 확인된 prerequisite다.
+- A2A task `input-required`는 최종 답변이 아니라 remote agent가 사람 입력을 기다리는 interactive task state다.
+- 현재 ADK Web plain text chat은 동일 remote task를 `functionResponse`로 이어 보내는 검증된 remote HITL resume bridge가 아니다. multi-turn remote HITL resume은 별도 후속으로 둔다.
+- current live provider에서 Mock Lab start 후 관찰한 `working`은 input-required 증명이 아니며 chat-ready로 overclaim하지 않는다.
+- 이 runtime path는 synthetic/local smoke용이다. private endpoint, credential, deployment script, production persistence, real customer data는 포함하지 않는다.
 
 ## 2026-06-23 브랜치 상태 기록
 
@@ -46,9 +55,10 @@ git log --oneline -8
 
 | 번호 | 요약 | 규모 |
 |---|---|---|
-| - | 현재 없음 | - |
+| 17 | A2A UI error surfacing cleanup | S |
+| TBD | Remote A2A HITL resume bridge | M |
 
-완료된 현 작업 순서: **15 → 13 → 14 → 11 → 16 → 12 → 10**. 15의 ADK Web CSS NIT와 runtime-contract 빈 배열 gate 정책은 별도 잔무로만 추적한다.
+완료된 현 작업 순서: **15 → 13 → 14 → 11 → 16 → 12 → 10 → local A2A provider/import**. 다음 대기 브리프는 **17**. 15의 ADK Web CSS NIT와 runtime-contract 빈 배열 gate 정책은 별도 잔무로만 추적한다.
 
 ## 운영 정책 결정 기록
 
@@ -170,6 +180,15 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 - Build 수동 패널은 adapter가 없는 runnable plan에서 Mock Lab binding panel을 숨기고 대상 없음 안내만 표시한다.
 - 명명 state channel은 agent instruction 또는 connected MCP adapter consumer로만 읽는다. 비-connected state consumer와 agent/non-connected artifact consumer는 runnable generation blocker로 명시한다.
 
+### local A2A provider/import — req-page-recommendation-a2a-consumer
+
+- Generated runtime-stub은 `agent.json`과 `af_adk_a2a_server.py`를 포함한다. RunSandbox A2A provider는 ADK FastAPI/Web runner + A2A executor를 쓰되, ADK 2.2/2.3 `api_server --a2a`의 `json` local-scope route-registration bug를 in-memory patch로 우회한다.
+- Provider start는 포트 listen만으로 성공하지 않고 Agent Card URL이 valid JSON을 200으로 반환해야 `running`이다. 실패 시 status는 `failed`, `agent_card_ready=false`, stderr tail을 보여준다. 단, Agent Card health와 semantic `message/send` readiness는 분리한다.
+- `wf-page-recommendation-mock` 같은 local Mock Lab prerequisite가 없으면 provider를 chat-ready로 보지 않고 blocked/prerequisite 상태와 start action을 보여준다.
+- A2A `input-required`는 remote HITL 대기 상태다. 현재 plain ADK Web text chat은 같은 task resume proof가 아니므로 full remote HITL resume은 후속으로 남긴다.
+- Design `Remote A2A` 탭은 `stub_ready_for_followup`인 local artifact의 Agent Card를 가져와 draft remote_a2a 후보/계약/Graph node를 만든다. 단순 `input -> output` placeholder graph만 `input -> remote -> output`으로 자동 재배선하고, 후보/계약 승인은 자동화하지 않는다.
+- 화면으로 `req-page-recommendation-a2a-consumer` artifact를 생성해 provider import, 후보 missing-info 해소, A2A contract 승인, boundaries/runtime/stub gates, runnable Build 재생성을 완료했다.
+
 ### brief 01 — Canvas collaboration overlay
 
 - `GraphCanvas` 가 `comments` / `highlights` 를 받아 노드/엣지 comment count pin 과 highlight state 를 렌더링한다.
@@ -202,7 +221,7 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 
 ## 남은 브리프와 최근 처리
 
-현재 큰 미구현 브리프는 없다. 10, 12, 13, 14, 11, 16은 이번 구현에서 처리했다.
+10, 12, 13, 14, 11, 16은 처리됐다. 현재 대기 브리프는 17 하나이며, local A2A provider/import smoke 중 발견한 UI error-surfacing cleanup이다.
 
 | 번호 | 상태 | 현재 판단 |
 |---|---|---|
@@ -213,6 +232,8 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 | 14 | 완료 | RunSandbox stale 감지+명시 재시작, adapter 없는 Mock Lab binding panel 숨김/안내 구현. shared venv 안내는 기존 RunSandbox 계약 유지. |
 | 15 | 코드 수정 완료(1–6) | router resume, route-map UI, runtime contract path normalization/hydration, catalog ID-first binding, Stage Runner catalog hydration, human-input 선택지 contract 최소 구현 및 ADK Web/Workbench smoke 확인. |
 | 16 | 완료 | Build/Verify Stage Runner 확장: build primitive wrapping, verify report/delta proposal, cancel endpoint, UI panel. |
+| 17 | 대기 | Local A2A provider import 화면 smoke 중 발견한 404 console noise, 422 detail opacity, React Flow warning 정리. |
+| TBD | 대기 | Full Remote A2A HITL resume bridge. Plain ADK Web text chat으로 `input-required` task resume이 검증되지 않았으므로 별도 설계/검증 필요. |
 
 ## 남은 잔무 (브리프 외)
 

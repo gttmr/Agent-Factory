@@ -1,10 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { RuntimeChatManager } from "./runtimeChat";
+import type { RuntimeA2aManager } from "./runtimeA2a";
 import { sendJson } from "./httpApi";
-import { runtimeChatInputRequiredFromStatus } from "./runtimeChatInputRequired";
 
-export async function handleRuntimeChat(
-  runtimeChat: RuntimeChatManager,
+export async function handleRuntimeA2a(
+  runtimeA2a: RuntimeA2aManager,
   reqId: string,
   rest: string[],
   req: IncomingMessage,
@@ -16,22 +15,22 @@ export async function handleRuntimeChat(
       sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
       return;
     }
-    sendJson(res, 200, await runtimeChat.status(reqId));
+    sendJson(res, 200, await runtimeA2a.status(reqId));
+    return;
+  }
+  if (action === "agent-card") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 200, await runtimeA2a.agentCard(reqId));
     return;
   }
   if (action === "install") {
     sendJson(res, 405, {
       error: "웹에서 ADK dependency 설치는 지원하지 않습니다. 공유 venv를 수동으로 준비하세요.",
-      status: await runtimeChat.status(reqId)
+      status: await runtimeA2a.status(reqId)
     });
-    return;
-  }
-  if (action === "input-required") {
-    if (req.method !== "GET") {
-      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
-      return;
-    }
-    sendJson(res, 200, await runtimeChatInputRequiredFromStatus(await runtimeChat.status(reqId)));
     return;
   }
   if (action === "start") {
@@ -39,7 +38,7 @@ export async function handleRuntimeChat(
       sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
       return;
     }
-    sendJson(res, 200, await runtimeChat.start(reqId));
+    sendJson(res, 200, await runtimeA2a.start(reqId));
     return;
   }
   if (action === "stop") {
@@ -47,8 +46,8 @@ export async function handleRuntimeChat(
       sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
       return;
     }
-    sendJson(res, 200, await runtimeChat.stop(reqId));
+    sendJson(res, 200, await runtimeA2a.stop(reqId));
     return;
   }
-  sendJson(res, 404, { error: "알 수 없는 runtime-chat 경로입니다." });
+  sendJson(res, 404, { error: "알 수 없는 runtime-a2a 경로입니다." });
 }

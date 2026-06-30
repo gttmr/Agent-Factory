@@ -140,6 +140,7 @@ export default function DesignWorkbench() {
     onSelectReviewModule: setSelectedReviewModuleId, onSaveCandidate: actions.saveCandidate,
     onSelectContract: setSelectedContractId, onSelectA2AModule: setSelectedA2AModuleId,
     onCreateA2AContract: actions.createA2AContract,
+    onImportLocalA2AProvider: actions.importLocalA2AProvider,
     onAuthorNameChange: setAuthorName, onAuthorRoleChange: setAuthorRole,
     onCreateComment: (input) =>
       createDesignComment({ input, authorName, authorRole, mutate: createComment.mutate, setActionMessage }),

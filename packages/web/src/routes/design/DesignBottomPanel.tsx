@@ -1,20 +1,17 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Selection } from "../../components/GraphCanvas";
+import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
 import { approveCandidate, resolveMissingItem, setCandidateStatus } from "../../analyzer/moduleReview";
 import type { AnalysisResult, GraphIR, ModuleCandidate, ModuleStatus, RuntimeContract } from "../../analyzer/types";
-import { A2AContractInspector, A2AContractSidebar } from "../../design/A2AContractPanel";
-import type { buildA2AReviewRows } from "../../design/A2AContractPanel";
 import { DESIGN_BOTTOM_TABS, nextDesignBottomTabAfterModuleSelect } from "../../design/designWorkbenchTabs";
 import { ReviewNotesPanel } from "../../design/ReviewNotesPanel";
 import { RuntimeContractSidebar } from "../../design/RuntimeContractPanel";
 import { reviewNotesBadgeCount } from "../../design/reviewNotesModel";
 import type { CommentAnchor, CommentRecord, CommentStage, HighlightRecord, CreateHighlightInput } from "../../state/useCollaboration";
 import type { AuthorRole } from "../../state/useAuthor";
-import { Button } from "../../ui/primitives";
+import { DesignA2ATab, type DesignA2AReviewRow } from "./DesignA2ATab";
 import { ModuleReviewDetail, ModuleSidebar } from "./DesignModuleReview";
 import type { SidebarTab } from "./designStageModel";
-
-type A2AReviewRow = ReturnType<typeof buildA2AReviewRows>[number];
 
 interface DesignBottomPanelProps {
   reqId: string;
@@ -24,7 +21,7 @@ interface DesignBottomPanelProps {
   graphIR: GraphIR | null;
   selectedReviewCandidate: ModuleCandidate | null;
   selectedContractId: string | null;
-  selectedA2ARow: A2AReviewRow | null;
+  selectedA2ARow: DesignA2AReviewRow | null;
   runtimeContracts: RuntimeContract[];
   a2aContracts: AnalysisResult["a2aContracts"];
   comments: CommentRecord[];
@@ -41,6 +38,7 @@ interface DesignBottomPanelProps {
   onSelectContract: (contractId: string) => void;
   onSelectA2AModule: (moduleId: string) => void;
   onCreateA2AContract: (candidate: ModuleCandidate) => void;
+  onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
   onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
   onAuthorNameChange: (value: string) => void;
   onAuthorRoleChange: (value: AuthorRole) => void;
@@ -88,6 +86,7 @@ export function DesignBottomPanel({
   onSelectContract,
   onSelectA2AModule,
   onCreateA2AContract,
+  onImportLocalA2AProvider,
   onSaveA2AContract,
   onAuthorNameChange,
   onAuthorRoleChange,
@@ -133,13 +132,15 @@ export function DesignBottomPanel({
           <RuntimeContractSidebar contracts={runtimeContracts} selectedContractId={selectedContractId} onSelect={onSelectContract} />
         ) : null}
         {activeTab === "a2a" ? (
-          <A2ATab
+          <DesignA2ATab
+            reqId={reqId}
             analysis={analysis}
             a2aContracts={a2aContracts}
             selectedA2ARow={selectedA2ARow}
             saving={saving}
             onSelectA2AModule={onSelectA2AModule}
             onCreateA2AContract={onCreateA2AContract}
+            onImportLocalA2AProvider={onImportLocalA2AProvider}
             onSaveA2AContract={onSaveA2AContract}
           />
         ) : null}
@@ -205,42 +206,6 @@ function ModuleReviewTab({
         }}
         onDefer={(candidate) => onSaveCandidate(candidate.id, setCandidateStatus(candidate, "deferred"), "deferred")}
         onReject={(candidate) => onSaveCandidate(candidate.id, setCandidateStatus(candidate, "rejected"), "rejected")}
-      />
-    </div>
-  );
-}
-
-function A2ATab({
-  analysis,
-  a2aContracts,
-  selectedA2ARow,
-  saving,
-  onSelectA2AModule,
-  onCreateA2AContract,
-  onSaveA2AContract
-}: Pick<DesignBottomPanelProps, "analysis" | "a2aContracts" | "selectedA2ARow" | "saving" | "onSelectA2AModule" | "onCreateA2AContract" | "onSaveA2AContract">) {
-  return (
-    <div className="af-a2a-tab-panel">
-      <div className="af-a2a-tab-actions">
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={!selectedA2ARow || Boolean(selectedA2ARow.contract) || saving}
-          onClick={() => {
-            if (selectedA2ARow) onCreateA2AContract(selectedA2ARow.candidate);
-          }}
-        >
-          새 계약 생성
-        </Button>
-      </div>
-      <A2AContractSidebar candidates={analysis.moduleCandidates} contracts={a2aContracts} selectedModuleId={selectedA2ARow?.candidate.id ?? null} onSelect={onSelectA2AModule} />
-      <A2AContractInspector
-        key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
-        candidate={selectedA2ARow?.candidate ?? null}
-        contract={selectedA2ARow?.contract ?? null}
-        saving={saving}
-        onSave={onSaveA2AContract}
-        onCancel={() => undefined}
       />
     </div>
   );

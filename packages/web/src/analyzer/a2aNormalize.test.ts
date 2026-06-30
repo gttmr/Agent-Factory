@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createA2AContractForCandidate, mintNextContractId, normalizeA2A } from "./a2aNormalize.ts";
+import "./localA2aProvider.test.ts";
 import type { AnalysisResult, ModuleCandidate } from "./types.ts";
 
 const placeholderRuntimePolicy = {

@@ -69,6 +69,19 @@ adk web --host 127.0.0.1 --port 8765 --no-reload .
 curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
 curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
 \`\`\`
+
+## ADK A2A provider
+
+\`\`\`bash
+AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
+AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
+python af_adk_a2a_server.py --host 127.0.0.1 --port 8001 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+curl http://127.0.0.1:8001/a2a/${packageName}/.well-known/agent-card.json
+\`\`\`
+
+\`af_adk_a2a_server.py\` uses ADK's FastAPI/Web runner and A2A executor, but applies a local in-memory compatibility patch for ADK CLI versions whose \`api_server --a2a\` path fails before registering \`agent.json\`.
+
+When generated \`RequestInput\` nodes pause the workflow, the local provider keeps that pause as an A2A \`input-required\` task state and exposes the ADK long-running function call as \`adk_request_input\`. Agent Card metadata advertises the ADK A2A extension used by ADK 2.3 for this local executor path, but it does not prove full remote HITL resume support; verify same-task function-response continuation before treating plain chat follow-up as resume.
 `;
   }
   return `# ${packageName}

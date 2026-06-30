@@ -1,4 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
+import { importLocalA2AProvider } from "../../analyzer/localA2aProvider";
 import { applyNodeReviewStatus } from "../../analyzer/moduleReview";
 import { createA2AContractForCandidate } from "../../analyzer/a2aNormalize";
 import { insertCatalogWorkflowNode, pruneDetachedCatalogWorkflowCandidates } from "../../analyzer/nestedWorkflowInsert";
@@ -82,6 +84,19 @@ export function createDesignWorkbenchActions(ctx: DesignActionContext) {
         },
         onError: (error) =>
           ctx.setActionMessage(error instanceof Error ? error.message : "A2A contract 생성 실패")
+      });
+    },
+    importLocalA2AProvider(provider: LocalA2AProviderImport) {
+      if (!ctx.analysis) return;
+      const imported = importLocalA2AProvider(ctx.analysis, provider);
+      ctx.saveAnalysis(imported.analysis, {
+        onSuccess: () => {
+          ctx.setSelectedA2AModuleId(imported.candidateId);
+          ctx.setActiveTab("a2a");
+          ctx.setActionMessage(`${imported.contractId} local A2A provider 등록 완료 — 계약 검토와 승인이 필요합니다.`);
+        },
+        onError: (error) =>
+          ctx.setActionMessage(error instanceof Error ? error.message : "Local A2A provider 등록 실패")
       });
     },
     insertCatalogWorkflow(entry: Parameters<typeof insertCatalogWorkflowNode>[1]) {

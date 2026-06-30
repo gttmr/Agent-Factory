@@ -22,10 +22,10 @@
   - 활성 스텝은 얕은 `?step=run|review|approve` 쿼리 파라미터로 관리하고(`useStageStep`), 파라미터가 없으면 첫 미완료 스텝으로 착지한다. 스텝 status는 manifest.approvals + 산출물 존재에서 **읽기만** 하고 게이트를 재계산하지 않는다.
   - 게이트 토글(승인 스텝)은 `useApprovalGate` 경유다. Skill Runner 성공이 게이트를 자동으로 켜지 않는다.
 - Analyze는 분석 결과가 있으면 review/evidence/missing-information/approval path가 주 작업면이 되고, run 스텝은 입력 보강·재분석·JSON import를 위한 refresh path로 읽힌다.
-- Design 검토 스텝은 **상/하 분할**(`af-design-split`)이다. **상단**은 `[선택 노드/엣지 정보 패널 │ 넓은 그래프 캔버스]` 2열이고, 좌측 패널은 선택한 노드/엣지 상세(재사용 `GraphInspector`)만 표시한다(선택이 없으면 안내 문구). **하단**은 신규 전체폭 패널(`af-design-bottom`)로, 모듈·Runtime 계약·Remote A2A·검토 메모 탭 목록을 담는다(상단 캔버스+좌측 패널 아래로 화면이 확장된다). 경로 하이라이트는 별도 탭이 아니라 `검토 메모` 탭 안의 섹션으로(코멘트와 함께) 들어간다. 우측 Inspector 패널은 그래프 뷰에 폭을 양보하려고 비활성화돼 있다(`DesignWorkbench`의 `INSPECTOR_ENABLED=false`, `GraphCanvas`는 `hideInspector`로 `.graph-canvas-root--no-inspector` 1열). 플래그를 `true`로 되돌리면 상단 grid 에 Inspector 열이 복원된다. 비활성 동안 우측 Runtime 계약 편집기와 노드/엣지 앵커 코멘트 작성은 휴면이다. Remote A2A 계약 편집은 하단 `Remote A2A` 탭에서 활성화되어 목록 아래에 편집 surface를 둔다.
+- Design 검토 스텝은 **상/하 분할**(`af-design-split`)이다. **상단**은 `[선택 노드/엣지 정보 패널 │ 넓은 그래프 캔버스]` 2열이고, 좌측 패널은 선택한 노드/엣지 상세(재사용 `GraphInspector`)만 표시한다(선택이 없으면 안내 문구). **하단**은 신규 전체폭 패널(`af-design-bottom`)로, 모듈·Runtime 계약·Remote A2A·검토 메모 탭 목록을 담는다(상단 캔버스+좌측 패널 아래로 화면이 확장된다). 경로 하이라이트는 별도 탭이 아니라 `검토 메모` 탭 안의 섹션으로(코멘트와 함께) 들어간다. 우측 Inspector 패널은 그래프 뷰에 폭을 양보하려고 비활성화돼 있다(`DesignWorkbench`의 `INSPECTOR_ENABLED=false`, `GraphCanvas`는 `hideInspector`로 `.graph-canvas-root--no-inspector` 1열). 플래그를 `true`로 되돌리면 상단 grid 에 Inspector 열이 복원된다. 비활성 동안 우측 Runtime 계약 편집기와 노드/엣지 앵커 코멘트 작성은 휴면이다. Remote A2A 계약 편집은 하단 `Remote A2A` 탭에서 활성화되어 목록 아래에 편집 surface를 두며, local provider import control은 같은 탭의 목록 위 compact row로 둔다.
 - Build 실행 스텝은 `계약 동기화 + runtime-stub 재생성` compound action, 상태 요약, stream log를 primary scan path에 둔다. 수동 scaffold/runtime-stub 버튼은 advanced manual controls로 내려 secondary path로 표시한다.
 - Verify는 승인 게이트가 없어 2스텝(실행·기록)만 쓴다. 실행 화면은 allow-list 검증 명령과 stream log가 한 화면에서 읽히고, 기록 화면은 `validation-report.md`와 `catalog-delta.yaml` 편집 surface를 나란히 둔다.
-- 게이트 없는 보조 nav `실행` 화면은 StageShell stepper를 쓰지 않는 단일 도구 화면으로, ADK 런타임 연결 제어 + ADK 공식 dev UI(`web_url`, :8765)로의 링크 버튼만 둔다(AF 자체 간이 챗은 제거).
+- 게이트 없는 보조 nav `실행` 화면은 StageShell stepper를 쓰지 않는 단일 도구 화면으로, ADK runtime chat(:8765) 제어와 ADK A2A provider(:8001) 제어를 별도 패널로 둔다. Remote A2A 계약이 `owner: local artifact:<reqId>` provider를 가리키면 provider 패널은 현재 consumer artifact가 아니라 그 local provider artifact의 status/start/stop을 대상으로 한다. A2A provider 패널은 provider artifact, app, shared venv, server, Agent Card readiness, 마지막 explicit semantic `message/send` probe 결과, port, pid를 스캔 가능한 목록으로 보여주고, Agent Card/RPC URL은 card health check가 성공한 뒤에만 노출한다(AF 자체 간이 챗은 제거). Passive status polling은 `message/send`를 호출하지 않는다.
 
 현재 workbench 운영/QA 기준은 desktop viewport다. StageShell은 desktop에서 compact stepper, summary/guidance strip, stage-specific workspace가 겹치지 않고 읽히는 것을 우선 계약으로 삼는다. 좁은 viewport에서는 header stepper와 gate chip이 줄바꿈되어도 본문을 밀어내지 않도록 간격을 줄이지만, mobile/tablet 화면은 이 문서의 acceptance baseline이 아니다.
 단계가 늘어나도 상단에 모든 버튼을 쌓지 않는다.
@@ -256,6 +256,7 @@ Design 검토 화면의 GraphCanvas stage는 desktop review 기준으로 24rem-3
 
 **Remote A2A 하단 탭**
 - `Remote A2A` 탭은 후보/계약 목록 아래에 `A2AContractInspector` 편집 surface를 둔다.
+- local provider import control은 `stub_ready_for_followup`인 다른 artifact를 select로 고르고 `Agent Card 불러오기` 버튼으로 명시 실행한다. Import 결과는 draft 후보/계약/Graph node일 뿐이므로 승인 CTA처럼 보이면 안 된다.
 - 매칭 계약이 없는 선택 후보에는 `새 계약 생성` 버튼으로 placeholder 계약을 만들고, 후보의 `a2a_contract_id`를 같은 저장에서 연결한다.
 - readiness issue가 남아 있으면 `contract_status: approved` 저장을 막고, 게이트 토글은 여전히 `manifest.approvals.runtime_contracts_approved`에서 reviewer가 별도로 수행한다.
 
