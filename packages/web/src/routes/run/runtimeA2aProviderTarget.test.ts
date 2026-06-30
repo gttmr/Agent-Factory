@@ -14,23 +14,15 @@ const draftRemoteCandidate = candidate({
   status: "needs_info"
 });
 
-assert.deepEqual(runtimeA2aProviderTarget(analysis([draftRemoteCandidate, approvedRemoteCandidate]), "consumer"), {
+assert.deepEqual(runtimeA2aProviderTarget(analysis([draftRemoteCandidate, approvedRemoteCandidate])), {
   reqId: "req-page-recommendation-required",
   source: "remote_a2a_contract",
   remoteModuleId: "mod-provider-approved"
 });
 
-assert.deepEqual(runtimeA2aProviderTarget(analysis([draftRemoteCandidate]), "consumer"), {
-  reqId: "consumer",
-  source: "current_artifact",
-  remoteModuleId: null
-});
+assert.equal(runtimeA2aProviderTarget(analysis([draftRemoteCandidate])), null);
 
-assert.deepEqual(runtimeA2aProviderTarget(analysis([]), "provider-root"), {
-  reqId: "provider-root",
-  source: "current_artifact",
-  remoteModuleId: null
-});
+assert.equal(runtimeA2aProviderTarget(analysis([])), null);
 
 function candidate(input: Pick<ModuleCandidate, "id" | "owner" | "status">): ModuleCandidate {
   return {

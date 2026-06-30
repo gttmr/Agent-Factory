@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { ArtifactRootStore } from "./artifactRootStore.ts";
 import {
   DEFAULT_ADK_CHAT_PORT,
@@ -138,11 +139,25 @@ try {
     join(sharedVenvDir, "bin/adk"),
     [
       "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
       "const http = require('node:http');",
+      "const path = require('node:path');",
       "const args = process.argv.slice(2);",
       "const port = Number(args[args.indexOf('--port') + 1]);",
       "const host = args[args.indexOf('--host') + 1] || '127.0.0.1';",
+      "function appName() {",
+      "  const entry = fs.readdirSync(process.cwd(), { withFileTypes: true }).find((item) => item.isDirectory() && !item.name.startsWith('.'));",
+      "  if (!entry) return 'unknown_adk';",
+      "  const manifestPath = path.join(process.cwd(), entry.name, 'workflow_manifest.json');",
+      "  if (!fs.existsSync(manifestPath)) return entry.name;",
+      "  return JSON.parse(fs.readFileSync(manifestPath, 'utf8')).package || entry.name;",
+      "}",
       "const server = http.createServer((req, res) => {",
+      "  if (req.url === '/list-apps') {",
+      "    res.setHeader('content-type', 'application/json');",
+      "    res.end(JSON.stringify([appName()]));",
+      "    return;",
+      "  }",
       "  const match = req.url && req.url.match(/^\\/a2a\\/([^/]+)\\/\\.well-known\\/agent-card\\.json$/);",
       "  if (match) {",
       "    res.setHeader('content-type', 'application/json');",
@@ -152,7 +167,7 @@ try {
       "  res.end('fake adk');",
       "});",
       "server.listen(port, host);",
-      "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+      "process.on('SIGTERM', () => { server.close(); process.exit(0); });",
       "setInterval(() => undefined, 1000);",
       ""
     ].join("\n"),
@@ -182,7 +197,29 @@ try {
   assert.equal(staleStatus.server.stale, true);
   assert.notEqual(staleStatus.server.started_stub_fingerprint, staleStatus.server.current_stub_fingerprint);
 
-  const stopped = await restartedManager.stop("req-adopt");
+  await store.createRoot("req-switch");
+  const switchStubDir = join(repoRoot, "artifacts/af/req-switch/runtime-stub");
+  await mkdir(join(switchStubDir, "req_switch_adk"), { recursive: true });
+  await writeFile(
+    join(switchStubDir, "req_switch_adk/workflow_manifest.json"),
+    `${JSON.stringify({ package: "req_switch_adk" }, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(join(switchStubDir, "req_switch_adk/agent.py"), "root_agent = object()\n", "utf8");
+  const switchManager = new RuntimeChatManager({ repoRoot, store, port: adoptPort });
+  const switchBlockedStatus = await switchManager.status("req-switch");
+  assert.equal(switchBlockedStatus.server.status, "failed");
+  assert.ok(switchBlockedStatus.server.port_owner_pid);
+  assert.match(switchBlockedStatus.server.message ?? "", /replace it/);
+  const switched = await switchManager.start("req-switch");
+  assert.equal(switched.ok, true);
+  assert.equal(switched.status.server.status, "running");
+  assert.equal(switched.status.app_name, "req_switch_adk");
+  const switchedPid = switched.status.server.pid;
+  assert.ok(switchedPid);
+  assert.deepEqual(await waitForListApps(adoptPort, ["req_switch_adk"]), ["req_switch_adk"]);
+
+  const stopped = await switchManager.stop("req-switch");
   assert.equal(stopped.ok, true);
   assert.equal(stopped.status.server.status, "stopped");
 
@@ -241,4 +278,22 @@ function getAvailablePort(): Promise<number> {
       });
     });
   });
+}
+
+async function waitForListApps(port: number, expected: readonly string[]): Promise<unknown> {
+  const deadline = Date.now() + 3_000;
+  let lastValue: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/list-apps`);
+      lastValue = await response.json();
+      if (Array.isArray(lastValue) && lastValue.length === expected.length && lastValue.every((value, index) => value === expected[index])) {
+        return lastValue;
+      }
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+    }
+    await delay(50);
+  }
+  return lastValue;
 }

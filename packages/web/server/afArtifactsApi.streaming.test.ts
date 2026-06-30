@@ -186,7 +186,28 @@ async function writeFakeSharedAdkRuntime(root: string): Promise<void> {
   const binDir = join(root, ".agent-factory/runtime/.venv/bin");
   await mkdir(binDir, { recursive: true });
   await writeFile(join(binDir, "python"), "#!/bin/sh\nexit 0\n");
-  await writeFile(join(binDir, "adk"), ["#!/bin/sh", "echo 'fake adk server started'", "sleep 30", ""].join("\n"));
+  await writeFile(
+    join(binDir, "adk"),
+    [
+      "#!/usr/bin/env node",
+      "const http = require('node:http');",
+      "const args = process.argv.slice(2);",
+      "const port = Number(args[args.indexOf('--port') + 1]);",
+      "const host = args[args.indexOf('--host') + 1] || '127.0.0.1';",
+      "const server = http.createServer((req, res) => {",
+      "  if (req.url === '/list-apps') {",
+      "    res.setHeader('content-type', 'application/json');",
+      "    res.end(JSON.stringify(['req_stream_adk']));",
+      "    return;",
+      "  }",
+      "  res.end('fake adk server started');",
+      "});",
+      "server.listen(port, host);",
+      "process.on('SIGTERM', () => { server.close(); process.exit(0); });",
+      "setInterval(() => undefined, 1000);",
+      ""
+    ].join("\n")
+  );
   await chmod(join(binDir, "python"), 0o755);
   await chmod(join(binDir, "adk"), 0o755);
 }

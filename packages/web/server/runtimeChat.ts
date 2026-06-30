@@ -1,8 +1,8 @@
 import { execFile, spawn, type ChildProcessByStdio } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, readlink, stat, unlink, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { delimiter, join, posix, resolve, win32 } from "node:path";
+import { delimiter, join, posix, relative, resolve, win32 } from "node:path";
 import type { Readable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -13,6 +13,8 @@ import { collectRuntimeStubFiles } from "./runtimeStubFiles";
 export const DEFAULT_ADK_CHAT_PORT = 8765;
 const DEFAULT_ADK_HOST = "127.0.0.1";
 const RUNTIME_PROCESS_REGISTRY = ".adk/runtime-chat-process.json";
+const STARTUP_PROBE_TIMEOUT_MS = 5_000;
+const STARTUP_PROBE_INTERVAL_MS = 100;
 const execFileAsync = promisify(execFile);
 
 export interface RuntimeChatStatus {
@@ -87,6 +89,7 @@ interface RuntimeProcess {
 
 interface RuntimeContext {
   reqId: string;
+  repoRoot: string;
   stubDir: string;
   venvDir: string;
   venvBinDir: string;
@@ -186,8 +189,13 @@ export class RuntimeChatManager {
         status: current
       };
     }
-    if (current.server.port_owner_pid && !current.server.can_stop) {
-      throw new Error(current.server.message ?? `ADK runtime port ${ctx.port} is already in use.`);
+    const portOwner = await findPortOwner(ctx);
+    if (portOwner && !portOwner.matchesCurrentRuntime) {
+      if (!portOwner.safeToStop || !portOwner.pid) {
+        throw new Error(current.server.message ?? `ADK runtime port ${ctx.port} is already in use.`);
+      }
+      await terminatePid(portOwner.pid);
+      await waitForPidExit(portOwner.pid);
     }
     const installed = await isFile(ctx.adkPath);
     if (!installed) {
@@ -235,6 +243,7 @@ export class RuntimeChatManager {
       startedAt: new Date().toISOString(),
       stubFingerprint
     });
+    await waitForAdkAppReady(ctx, proc);
     return {
       ok: true,
       command: command.display,
@@ -310,6 +319,7 @@ export class RuntimeChatManager {
     const venv = resolveAdkRuntimeVenv({ repoRoot: this.repoRoot });
     return {
       reqId,
+      repoRoot: this.repoRoot,
       stubDir,
       venvDir: venv.venvDir,
       venvBinDir: venv.binDir,
@@ -331,8 +341,8 @@ export class RuntimeChatManager {
     const conflictMessage =
       portOwner && !portOwner.matchesCurrentRuntime
         ? portOwner.safeToStop
-          ? `Port ${ctx.port} is already used by another ADK runtime (PID ${portOwner.pid}). Stop it before starting this artifact.`
-          : `Port ${ctx.port} is already in use by PID ${portOwner.pid}. Stop that process or set AF_ADK_CHAT_PORT to another port.`
+          ? `Port ${ctx.port} is already used by another ADK runtime${portOwner.pid ? ` (PID ${portOwner.pid})` : ""}. Starting this artifact will replace it.`
+          : `Port ${ctx.port} is already in use${portOwner.pid ? ` by PID ${portOwner.pid}` : ""}. Stop that process or set AF_ADK_CHAT_PORT to another port.`
         : null;
     const runningPid = live?.child.pid ?? recordedLive?.pid ?? (portOwner?.matchesCurrentRuntime ? portOwner.pid : null);
     const managed = Boolean(live || recordedLive);
@@ -501,7 +511,6 @@ async function terminatePid(pid: number): Promise<void> {
   }
   try {
     process.kill(-pid, "SIGTERM");
-    return;
   } catch {
     // Fall back to the individual PID when it is not a process-group leader.
   }
@@ -523,13 +532,80 @@ async function waitForPidExit(pid: number | null, timeoutMs = 2_000): Promise<vo
 
 async function findPortOwner(ctx: RuntimeContext): Promise<PortOwner | null> {
   if (!(await isTcpPortListening(ctx.host, ctx.port))) return null;
+  const processInfo = await findListeningProcess(ctx.port);
+  if (!processInfo) {
+    return {
+      pid: null,
+      command: null,
+      cwd: null,
+      matchesCurrentRuntime: false,
+      safeToStop: false
+    };
+  }
+  const command = (await readProcessCommand(processInfo.pid)) ?? processInfo.command;
+  const cwd = await readProcessCwd(processInfo.pid);
+  const matchesCurrentRuntime = Boolean(cwd && isSamePath(cwd, ctx.stubDir) && isAdkApiServerCommand(command, ctx.adkPath));
+  const safeToStop = Boolean(
+    cwd && !matchesCurrentRuntime && isArtifactRuntimeStubPath(ctx.repoRoot, cwd) && isAdkApiServerCommand(command, ctx.adkPath)
+  );
   return {
-    pid: null,
-    command: null,
-    cwd: null,
-    matchesCurrentRuntime: false,
-    safeToStop: false
+    pid: processInfo.pid,
+    command,
+    cwd,
+    matchesCurrentRuntime,
+    safeToStop
   };
+}
+
+async function findListeningProcess(port: number): Promise<{ pid: number; command: string | null } | null> {
+  const result = await execFileAsync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-FpPc"]).catch(() => null);
+  if (!result) return null;
+  let pid: number | null = null;
+  let command: string | null = null;
+  for (const line of result.stdout.split(/\r?\n/)) {
+    if (line.startsWith("p")) pid = positiveInteger(line.slice(1));
+    else if (line.startsWith("c")) command = line.slice(1).trim() || null;
+    if (pid) return { pid, command };
+  }
+  return null;
+}
+
+async function readProcessCwd(pid: number): Promise<string | null> {
+  if (process.platform === "win32") return null;
+  return await readlink(`/proc/${pid}/cwd`).catch(() => null);
+}
+
+async function readProcessCommand(pid: number): Promise<string | null> {
+  if (process.platform === "win32") return null;
+  const value = await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "");
+  const command = value
+    .split("\0")
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return command || null;
+}
+
+function positiveInteger(value: string): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function isSamePath(left: string, right: string): boolean {
+  return resolve(left) === resolve(right);
+}
+
+function isArtifactRuntimeStubPath(repoRoot: string, value: string): boolean {
+  const runtimeRoot = resolve(repoRoot, "artifacts", "af");
+  const target = resolve(value);
+  const childPath = relative(runtimeRoot, target);
+  const pathParts = target.split(/[\\/]/);
+  return childPath !== "" && !childPath.startsWith("..") && !childPath.startsWith("/") && pathParts[pathParts.length - 1] === "runtime-stub";
+}
+
+function isAdkApiServerCommand(command: string | null, adkPath: string): boolean {
+  if (!command) return false;
+  return command.includes(" api_server ") && (command.includes(adkPath) || /(^|\s)adk(\s|$)/.test(command));
 }
 
 function isTcpPortListening(host: string, port: number): Promise<boolean> {
@@ -546,6 +622,38 @@ function isTcpPortListening(host: string, port: number): Promise<boolean> {
     socket.once("connect", () => settle(true));
     socket.once("error", () => settle(false));
   });
+}
+
+async function waitForAdkAppReady(ctx: RuntimeContext, proc: RuntimeProcess): Promise<void> {
+  const deadline = Date.now() + STARTUP_PROBE_TIMEOUT_MS;
+  let lastMessage = "ADK Web is not reachable yet.";
+  while (Date.now() < deadline) {
+    if (proc.exitCode !== null) {
+      throw new Error(`ADK runtime exited before ${ctx.appName} was ready. ${tail(proc.stderr || proc.stdout || "", 1_000)}`);
+    }
+    const probe = await probeAdkAppList(ctx);
+    if (probe.ready) return;
+    lastMessage = probe.message;
+    await delay(STARTUP_PROBE_INTERVAL_MS);
+  }
+  throw new Error(`ADK runtime did not expose ${ctx.appName} on ${baseUrl(ctx)}/list-apps. ${lastMessage}`);
+}
+
+async function probeAdkAppList(ctx: RuntimeContext): Promise<{ readonly ready: boolean; readonly message: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 500);
+  try {
+    const response = await fetch(`${baseUrl(ctx)}/list-apps`, { signal: controller.signal });
+    if (!response.ok) return { ready: false, message: `/list-apps returned HTTP ${response.status}.` };
+    const value: unknown = await response.json();
+    if (Array.isArray(value) && value.includes(ctx.appName)) return { ready: true, message: "ready" };
+    return { ready: false, message: `/list-apps returned ${JSON.stringify(value)}.` };
+  } catch (error) {
+    if (error instanceof Error) return { ready: false, message: error.message };
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function baseUrl(ctx: { host: string; port: number }): string {
