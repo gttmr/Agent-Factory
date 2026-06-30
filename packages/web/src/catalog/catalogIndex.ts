@@ -18,6 +18,7 @@ export interface CatalogEntryRaw {
   status?: string;
   component_source?: string;
   runtime_binding?: string;
+  a2a_provider_req_id?: string;
   access_protocol?: string;
   mcp_server?: string;
   mcp_tool_name?: string;

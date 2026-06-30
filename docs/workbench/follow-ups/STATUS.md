@@ -15,10 +15,14 @@
 
 ## 2026-06-30 A2A readiness / input-required 계약
 
+- Workflow catalog reuse remains local by default: normal workflow entries insert as `workflow_call`. Only the Reuse Hub `A2A 가능하게 변경` proposal plus `등록 승인` publish path creates an A2A-capable workflow version.
+- A2A-capable workflow rows stay `module_category: workflow` and carry provider metadata: `component_source: remote_a2a`, `runtime_binding: remote_a2a`, `a2a_provider_req_id`, and A2A-ready `contract_status`. `published_from` is provenance, not a provider pointer.
+- Consumer Design insertion for those rows uses `a2a_provider_req_id` to fetch the provider Agent Card and inserts a `remote_a2a` facade candidate, A2A contract, and `remote_agent_call` node. Missing provider roots or failed Agent Card fetches must leave the consumer analysis unchanged.
 - Agent Card `HTTP 200`은 provider process/card health일 뿐이며 chat-ready로 보지 않는다. semantic `message/send` probe가 별도 readiness source다.
 - local Mock Lab prerequisite가 빠져 있으면 `server.status: running` 뒤에 숨기지 않고 prerequisite/blocked 상태와 시작 action으로 노출한다. `wf-page-recommendation-mock`이 현재 확인된 prerequisite다.
 - A2A task `input-required`는 최종 답변이 아니라 remote agent가 사람 입력을 기다리는 interactive task state다.
-- 현재 ADK Web plain text chat은 동일 remote task를 `functionResponse`로 이어 보내는 검증된 remote HITL resume bridge가 아니다. multi-turn remote HITL resume은 별도 후속으로 둔다.
+- Workbench resume is the verified bridge for supported `input-required` events: it requires task/context/interrupt/function metadata and sends a function_response DataPart through `/api/af/:reqId/runtime-a2a/resume`. 현재 ADK Web plain text chat은 동일 remote task를 `functionResponse`로 이어 보내는 검증된 remote HITL resume bridge가 아니다.
+- Runtime task id, context id, interrupt id are runtime-state only. They may appear in runtime events, local runtime registries, API transcripts, and QA evidence; they must not be persisted into catalog rows, design artifacts, scaffold plans, or generated source.
 - current live provider에서 Mock Lab start 후 관찰한 `working`은 input-required 증명이 아니며 chat-ready로 overclaim하지 않는다.
 - 이 runtime path는 synthetic/local smoke용이다. private endpoint, credential, deployment script, production persistence, real customer data는 포함하지 않는다.
 

@@ -6,11 +6,20 @@ import type { CatalogHubEntry } from "../catalog/catalogIndex";
 interface CatalogCardProps {
   entry: CatalogHubEntry;
   onPin?: (entry: CatalogHubEntry) => void;
+  onConvertA2a?: (entry: CatalogHubEntry) => void;
   pinDisabledReason?: string;
+  a2aConversionDisabledReason?: string | null;
   mockLabHref?: string;
 }
 
-export function CatalogCard({ entry, onPin, pinDisabledReason, mockLabHref }: CatalogCardProps) {
+export function CatalogCard({
+  entry,
+  onPin,
+  onConvertA2a,
+  pinDisabledReason,
+  a2aConversionDisabledReason,
+  mockLabHref
+}: CatalogCardProps) {
   return (
     <article className="af-catalog-card">
       <header className="af-catalog-card-header">
@@ -53,6 +62,17 @@ export function CatalogCard({ entry, onPin, pinDisabledReason, mockLabHref }: Ca
             <Link className="ui-button ui-button-secondary" to={mockLabHref}>
               Mock Lab
             </Link>
+          ) : null}
+          {entry.category === "workflow" && onConvertA2a ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={Boolean(a2aConversionDisabledReason)}
+              onClick={() => onConvertA2a(entry)}
+              title={a2aConversionDisabledReason ?? "Workflow catalog 항목을 Remote A2A runtime binding 제안으로 전환합니다."}
+            >
+              A2A 가능하게 변경
+            </Button>
           ) : null}
           {onPin ? (
             <Button

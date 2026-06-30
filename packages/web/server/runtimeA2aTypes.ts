@@ -24,8 +24,9 @@ export interface RuntimeA2aStatus {
     agent_card_ready: boolean;
     agent_card_status_code: number | null;
     message_send_ready: boolean;
-    message_send_status: "not_checked" | "ready" | "interactive_required" | "failed";
+    message_send_status: "not_checked" | "ready" | "working" | "interactive_required" | "failed";
     message_send_task_state: string | null;
+    message_send_resume: RuntimeA2aMessageSendResume | null;
     mock_lab_prerequisites: RuntimeA2aMockLabPrerequisite[];
     message: string | null;
     started_stub_fingerprint: string | null;
@@ -33,6 +34,14 @@ export interface RuntimeA2aStatus {
     stdout_tail: string;
     stderr_tail: string;
   };
+}
+
+export interface RuntimeA2aMessageSendResume {
+  readonly task_id: string;
+  readonly context_id: string;
+  readonly interrupt_id: string;
+  readonly function_name: string;
+  readonly response_schema: unknown | null;
 }
 
 export interface RuntimeA2aMockLabPrerequisite {

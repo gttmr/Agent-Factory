@@ -1,26 +1,37 @@
-import { Button, EmptyState, Panel, SectionHeader } from "../../ui/primitives";
+import { type FormEvent, useState } from "react";
+import { Button, EmptyState, Panel, SectionHeader, TextareaField } from "../../ui/primitives";
 import {
   type RuntimeA2aStatus,
+  useResumeRuntimeA2a,
   useStartRuntimeA2a,
   useStopRuntimeA2a
 } from "../../state/useRuntimeA2a";
 import type { RuntimeA2aProviderTarget } from "./runtimeA2aProviderTarget";
-import { remoteInputRequiredView } from "./runtimeInputRequiredView";
+import { type RemoteInputRequiredView, remoteInputRequiredView, runtimeResumeFormView } from "./runtimeInputRequiredView";
 
 interface RuntimeA2aProviderPanelProps {
+  consumerReqId: string | undefined;
   target: RuntimeA2aProviderTarget | null;
   status: RuntimeA2aStatus | null | undefined;
+  inputRequired: RemoteInputRequiredView;
   error: Error | null;
   onActionMessage: (message: string | null) => void;
 }
 
-export function RuntimeA2aProviderPanel({ target, status, error, onActionMessage }: RuntimeA2aProviderPanelProps) {
+export function RuntimeA2aProviderPanel({ consumerReqId, target, status, inputRequired, error, onActionMessage }: RuntimeA2aProviderPanelProps) {
+  const [resumeText, setResumeText] = useState("");
+  const resumeA2a = useResumeRuntimeA2a(consumerReqId);
   const startA2a = useStartRuntimeA2a(target?.reqId);
   const stopA2a = useStopRuntimeA2a(target?.reqId);
   const providerStatus = status?.server.status ?? "stopped";
   const providerCanStop = Boolean(status?.server.can_stop) || providerStatus === "failed";
   const agentCardReady = Boolean(status?.server.agent_card_ready);
-  const remoteInputRequired = remoteInputRequiredView(status);
+  const remoteInputRequired = inputRequired.visible ? inputRequired : remoteInputRequiredView(status);
+  const resumeForm = runtimeResumeFormView(remoteInputRequired, {
+    providerReqId: target?.reqId,
+    responseText: resumeText,
+    pending: resumeA2a.isPending
+  });
   const targetSource =
     target?.source === "remote_a2a_contract" ? "linked Remote A2A provider" : target ? "current artifact" : "확인 중";
 
@@ -38,6 +49,19 @@ export function RuntimeA2aProviderPanel({ target, status, error, onActionMessage
       onSuccess: (result) =>
         onActionMessage(result.ok ? "ADK A2A provider 중지 요청 완료" : result.message ?? "ADK A2A provider 중지 대상 없음"),
       onError: (error) => onActionMessage(error instanceof Error ? error.message : "ADK A2A provider 중지 실패")
+    });
+  }
+
+  function handleResumeSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!resumeForm.request) return;
+    onActionMessage(null);
+    resumeA2a.mutate(resumeForm.request, {
+      onSuccess: (result) => {
+        setResumeText("");
+        onActionMessage(`Workbench resume 전송 완료: task ${result.task_id}`);
+      },
+      onError: (error) => onActionMessage(error instanceof Error ? error.message : "Workbench resume 전송 실패")
     });
   }
 
@@ -63,8 +87,26 @@ export function RuntimeA2aProviderPanel({ target, status, error, onActionMessage
         <div className="af-run-input-required" role="status" aria-live="polite">
           <strong>{remoteInputRequired.title}</strong>
           <p>{remoteInputRequired.prompt}</p>
+          {remoteInputRequired.payload ? <p>{remoteInputRequired.payload}</p> : null}
           <small>{remoteInputRequired.detail}</small>
           {remoteInputRequired.taskState ? <code>task state: {remoteInputRequired.taskState}</code> : null}
+          {resumeForm.submitVisible ? (
+            <form className="af-run-resume-form" onSubmit={handleResumeSubmit}>
+              <TextareaField
+                label="Workbench resume 응답"
+                hint="ADK Web 텍스트 채팅이 아니라 Remote A2A task resume endpoint 로 function_response DataPart 를 전송합니다."
+                value={resumeText}
+                rows={3}
+                onChange={(event) => setResumeText(event.target.value)}
+              />
+              {resumeForm.warning ? <small>{resumeForm.warning}</small> : null}
+              <Button type="submit" variant="primary" disabled={resumeForm.submitDisabled}>
+                {resumeForm.submitLabel}
+              </Button>
+            </form>
+          ) : resumeForm.warning ? (
+            <small>{resumeForm.warning}</small>
+          ) : null}
         </div>
       ) : status?.server.message ? (
         <p className="af-landing-error">{status.server.message}</p>

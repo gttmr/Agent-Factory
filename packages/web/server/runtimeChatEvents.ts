@@ -5,9 +5,11 @@ export interface RemoteInputRequiredDisplayState {
   function_name: string;
   interrupt_id: string | null;
   task_id: string | null;
+  context_id: string | null;
   task_state: string | null;
   remote_path: string | null;
-  resume_supported: false;
+  response_schema: unknown | null;
+  resume_supported: boolean;
   resume_note: string;
 }
 
@@ -25,16 +27,21 @@ export function extractRemoteInputRequiredFromAdkEvents(events: readonly unknown
       const functionCall = remoteInputFunctionCall(part, longRunningToolIds);
       if (!functionCall) continue;
       const args = isRecord(functionCall.args) ? functionCall.args : null;
+      const interruptId = nonEmptyString(functionCall.id) ?? (args ? nonEmptyString(args.interruptId) : null);
+      const taskId = a2aTaskId(event);
+      const contextId = a2aContextId(event);
       return {
         kind: "remote_input_required",
         prompt: inputPrompt(args) ?? "Remote A2A provider 가 사람 입력을 기다립니다.",
         payload: args ? nonEmptyString(args.payload) : null,
         function_name: functionCall.name,
-        interrupt_id: nonEmptyString(functionCall.id) ?? (args ? nonEmptyString(args.interruptId) : null),
-        task_id: a2aTaskId(event),
+        interrupt_id: interruptId,
+        task_id: taskId,
+        context_id: contextId,
         task_state: a2aTaskState(event),
         remote_path: nodePath(event),
-        resume_supported: false,
+        response_schema: args?.response_schema ?? null,
+        resume_supported: Boolean(taskId && contextId && interruptId && functionCall.name),
         resume_note: REMOTE_INPUT_RESUME_NOTE
       };
     }
@@ -68,7 +75,26 @@ function inputPrompt(args: Record<string, unknown> | null): string | null {
 
 function a2aTaskId(event: Record<string, unknown>): string | null {
   const customMetadata = event.customMetadata;
-  return isRecord(customMetadata) ? nonEmptyString(customMetadata["a2a:task_id"]) : null;
+  if (!isRecord(customMetadata)) return null;
+  const response = customMetadata["a2a:response"];
+  return (
+    nonEmptyString(customMetadata["a2a:task_id"]) ??
+    (isRecord(response) ? nonEmptyString(response.id) ?? nonEmptyString(response.taskId) ?? nonEmptyString(response.task_id) : null)
+  );
+}
+
+function a2aContextId(event: Record<string, unknown>): string | null {
+  const customMetadata = event.customMetadata;
+  if (!isRecord(customMetadata)) return null;
+  const response = customMetadata["a2a:response"];
+  if (!isRecord(response)) return nonEmptyString(customMetadata["a2a:context_id"]);
+  const context = response.context;
+  return (
+    nonEmptyString(response.contextId) ??
+    nonEmptyString(response.context_id) ??
+    (isRecord(context) ? nonEmptyString(context.id) : null) ??
+    nonEmptyString(customMetadata["a2a:context_id"])
+  );
 }
 
 function a2aTaskState(event: Record<string, unknown>): string | null {

@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LocalA2AAgentCard } from "../analyzer/localA2aProvider";
 import { AfApiError } from "./apiClient";
+import {
+  invalidateRuntimeA2aResumeQueries,
+  postRuntimeA2aResumeRequest,
+  type RuntimeA2aResumeInput,
+  type RuntimeA2aResumeResult
+} from "./runtimeA2aResume";
 
 export interface RuntimeA2aStatus {
   port: number;
@@ -25,8 +31,9 @@ export interface RuntimeA2aStatus {
     agent_card_ready: boolean;
     agent_card_status_code: number | null;
     message_send_ready: boolean;
-    message_send_status: "not_checked" | "ready" | "interactive_required" | "failed";
+    message_send_status: "not_checked" | "ready" | "working" | "interactive_required" | "failed";
     message_send_task_state: string | null;
+    message_send_resume: RuntimeA2aMessageSendResume | null;
     mock_lab_prerequisites: RuntimeA2aMockLabPrerequisite[];
     message: string | null;
     started_stub_fingerprint: string | null;
@@ -34,6 +41,14 @@ export interface RuntimeA2aStatus {
     stdout_tail: string;
     stderr_tail: string;
   };
+}
+
+export interface RuntimeA2aMessageSendResume {
+  readonly task_id: string;
+  readonly context_id: string;
+  readonly interrupt_id: string;
+  readonly function_name: string;
+  readonly response_schema: unknown | null;
 }
 
 export interface RuntimeA2aMockLabPrerequisite {
@@ -75,6 +90,21 @@ export function useRuntimeA2aStatus(reqId: string | undefined) {
     enabled: Boolean(reqId),
     refetchInterval: 5000,
     refetchOnWindowFocus: true
+  });
+}
+
+export function useResumeRuntimeA2a(reqId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: RuntimeA2aResumeInput) => {
+      if (!reqId) throw new Error("requirement_id 가 없습니다.");
+      const result = await postRuntimeA2aResumeRequest(reqId, input);
+      if (!result.ok) throw new AfApiError(result.status, result.error, result.body);
+      return result.value satisfies RuntimeA2aResumeResult;
+    },
+    onSuccess: (_result, input) => {
+      if (reqId) invalidateRuntimeA2aResumeQueries(queryClient, reqId, input.providerReqId);
+    }
   });
 }
 

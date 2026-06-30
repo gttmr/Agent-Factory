@@ -315,6 +315,8 @@
   margin: 0;
   color: var(--text);
   white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .af-run-input-required code {
@@ -326,6 +328,21 @@
   color: var(--warning-text);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
+}
+
+.af-run-resume-form {
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 42rem;
+}
+
+.af-run-resume-form textarea {
+  min-height: 5.75rem;
+  resize: vertical;
+}
+
+.af-run-resume-form .ui-button {
+  width: fit-content;
 }
 
 .af-action-row {

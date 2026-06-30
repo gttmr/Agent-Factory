@@ -166,17 +166,8 @@ export default function RunSandbox() {
         <Panel>
           <SectionHeader
             title="ADK 웹 UI"
-            description="ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 현재 같은 task resume 으로 검증되지 않았으므로 Workbench 상태를 함께 확인하세요."
+            description="ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 ADK Web 텍스트 채팅이 아니라 아래 Workbench resume 으로 같은 task 에 응답합니다."
           />
-          {remoteInputRequired.visible ? (
-            <div className="af-run-input-required" role="status" aria-live="polite">
-              <strong>{remoteInputRequired.title}</strong>
-              <p>{remoteInputRequired.prompt}</p>
-              {remoteInputRequired.payload ? <p>{remoteInputRequired.payload}</p> : null}
-              <small>{remoteInputRequired.detail}</small>
-              {remoteInputRequired.taskState ? <code>task state: {remoteInputRequired.taskState}</code> : null}
-            </div>
-          ) : null}
           {isRunning && webUrl ? (
             <div className="af-run-weblink">
               <a className="ui-button ui-button-primary" href={webUrl} target="_blank" rel="noreferrer">
@@ -195,8 +186,10 @@ export default function RunSandbox() {
 
       {stubReady ? (
         <RuntimeA2aProviderPanel
+          consumerReqId={reqId}
           target={a2aProviderTarget}
           status={a2aStatus.data}
+          inputRequired={remoteInputRequired}
           error={a2aStatus.error}
           onActionMessage={setActionMessage}
         />

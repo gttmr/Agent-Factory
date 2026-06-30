@@ -27,6 +27,7 @@ export function toScaffoldCatalogEntry(entry: CatalogHubEntry): CatalogEntry {
     mcp_auth_mode: entry.mcp_auth_mode,
     component_source: (entry.component_source as CatalogEntry["component_source"]) ?? undefined,
     runtime_binding: (entry.runtime_binding as CatalogEntry["runtime_binding"]) ?? undefined,
+    a2a_provider_req_id: entry.a2a_provider_req_id,
     owner_domain: entry.owner_domain,
     status: entry.status,
     published_at: entry.published_at,

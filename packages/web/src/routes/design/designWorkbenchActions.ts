@@ -1,12 +1,16 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { CatalogHubEntry } from "../../catalog/catalogIndex";
 import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
 import { importLocalA2AProvider } from "../../analyzer/localA2aProvider";
 import { applyNodeReviewStatus } from "../../analyzer/moduleReview";
 import { createA2AContractForCandidate } from "../../analyzer/a2aNormalize";
 import { insertCatalogWorkflowNode, pruneDetachedCatalogWorkflowCandidates } from "../../analyzer/nestedWorkflowInsert";
 import type { AnalysisResult, GraphIR, ModuleCandidate, ModuleStatus, RuntimeContract } from "../../analyzer/types";
-import type { SidebarTab } from "./designStageModel";
-import { GRAPH_IR_SAVE_SUCCESS_MESSAGE } from "./designStageModel";
+import type { DesignBottomTab } from "../../design/designWorkbenchTabs";
+import type { RuntimeA2aAgentCardResult } from "../../state/useRuntimeA2a";
+
+const GRAPH_IR_SAVE_SUCCESS_MESSAGE =
+  "Graph IR 저장 완료 — Build 에서 계약 동기화 + runtime-stub 재생성이 필요합니다.";
 
 type MutationOptions = {
   onSuccess?: () => void;
@@ -14,6 +18,10 @@ type MutationOptions = {
 };
 
 type ApprovalGate = "boundaries_approved" | "runtime_contracts_approved";
+
+type AnalysisQueryData = {
+  readonly data: AnalysisResult;
+};
 
 interface DesignActionContext {
   reqId: string;
@@ -24,7 +32,7 @@ interface DesignActionContext {
   setActionMessage: (message: string | null) => void;
   setSelectedA2AModuleId: (id: string) => void;
   setSelectedReviewModuleId: (id: string) => void;
-  setActiveTab: (tab: SidebarTab) => void;
+  setActiveTab: (tab: DesignBottomTab) => void;
   setCatalogWorkflowPickerOpen: (open: boolean) => void;
   saveAnalysis: (analysis: AnalysisResult, options: MutationOptions) => void;
   approveGate: (gate: ApprovalGate, value: boolean, options: MutationOptions) => void;
@@ -99,8 +107,42 @@ export function createDesignWorkbenchActions(ctx: DesignActionContext) {
           ctx.setActionMessage(error instanceof Error ? error.message : "Local A2A provider 등록 실패")
       });
     },
-    insertCatalogWorkflow(entry: Parameters<typeof insertCatalogWorkflowNode>[1]) {
+    async insertCatalogWorkflow(entry: CatalogHubEntry) {
       if (!ctx.analysis) return;
+      if (isA2ACapableWorkflowEntry(entry)) {
+        const providerReqId = entry.a2a_provider_req_id?.trim() ?? "";
+        if (!providerReqId) {
+          ctx.setActionMessage("Remote A2A workflow 항목에 a2a_provider_req_id 가 없습니다.");
+          return;
+        }
+
+        try {
+          const provider = await fetchCatalogWorkflowAgentCard(providerReqId);
+          const currentAnalysis = latestAnalysis(ctx);
+          if (!currentAnalysis) return;
+          const imported = importLocalA2AProvider(currentAnalysis, {
+            providerReqId: provider.provider_req_id,
+            appName: provider.app_name,
+            agentCardUrl: provider.agent_card_url,
+            rpcUrl: provider.rpc_url,
+            card: provider.card
+          });
+          ctx.saveAnalysis(imported.analysis, {
+            onSuccess: () => {
+              ctx.setSelectedA2AModuleId(imported.candidateId);
+              ctx.setActiveTab("a2a");
+              ctx.setCatalogWorkflowPickerOpen(false);
+              ctx.setActionMessage(`${imported.contractId} Remote A2A facade 추가 완료 — 계약 검토와 승인이 필요합니다.`);
+            },
+            onError: (error) =>
+              ctx.setActionMessage(error instanceof Error ? error.message : "Remote A2A facade 삽입 실패")
+          });
+        } catch (error) {
+          ctx.setActionMessage(error instanceof Error ? error.message : "ADK A2A Agent Card 조회 실패");
+        }
+        return;
+      }
+
       const nextAnalysis = insertCatalogWorkflowNode(ctx.analysis, entry, ctx.reqId);
       if (nextAnalysis === ctx.analysis) {
         ctx.setActionMessage("processFlow 가 없어 노드를 추가하지 못했습니다.");
@@ -153,4 +195,51 @@ export function createDesignWorkbenchActions(ctx: DesignActionContext) {
       );
     }
   };
+}
+
+function isA2ACapableWorkflowEntry(entry: CatalogHubEntry): boolean {
+  return entry.runtime_binding === "remote_a2a" || entry.component_source === "remote_a2a";
+}
+
+function latestAnalysis(ctx: DesignActionContext): AnalysisResult | null {
+  const cached = ctx.queryClient.getQueryData<AnalysisQueryData | null>(["af", ctx.reqId, "analysis-result"]);
+  return cached?.data ?? ctx.analysis;
+}
+
+async function fetchCatalogWorkflowAgentCard(providerReqId: string): Promise<RuntimeA2aAgentCardResult> {
+  const response = await fetch(`/api/af/${encodeURIComponent(providerReqId)}/runtime-a2a/agent-card`);
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    throw new Error(errorMessage(body) ?? "ADK A2A Agent Card 조회 실패");
+  }
+  if (!isRuntimeA2aAgentCardResult(body)) {
+    throw new Error("ADK A2A Agent Card 응답 형식이 올바르지 않습니다.");
+  }
+  return body;
+}
+
+function errorMessage(value: unknown): string | null {
+  return typeof value === "object" && value !== null && "error" in value && typeof value.error === "string"
+    ? value.error
+    : null;
+}
+
+function isRuntimeA2aAgentCardResult(value: unknown): value is RuntimeA2aAgentCardResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "provider_req_id" in value &&
+    typeof value.provider_req_id === "string" &&
+    "app_name" in value &&
+    typeof value.app_name === "string" &&
+    "rpc_url" in value &&
+    typeof value.rpc_url === "string" &&
+    "agent_card_url" in value &&
+    typeof value.agent_card_url === "string" &&
+    "card" in value &&
+    typeof value.card === "object" &&
+    value.card !== null &&
+    "name" in value.card &&
+    typeof value.card.name === "string"
+  );
 }
