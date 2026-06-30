@@ -5,6 +5,8 @@ import { CatalogCard } from "../catalog-hub/CatalogCard";
 import { PinTargetDialog } from "../catalog-hub/PinTargetDialog";
 import { PublishApprovalDrawer } from "../catalog-hub/PublishApprovalDrawer";
 import { RegisterProposalDrawer } from "../catalog-hub/RegisterProposalDrawer";
+import { WorkflowA2aConversionDrawer } from "../catalog-hub/WorkflowA2aConversionDrawer";
+import { getWorkflowA2aActionState } from "../catalog-hub/workflowA2aConversionDrawerModel";
 import type { CatalogCategory, CatalogHubEntry } from "../catalog/catalogIndex";
 import { useCatalog } from "../state/useCatalog";
 import { useArtifactRoots } from "../state/useArtifactRoot";
@@ -36,6 +38,7 @@ export default function ReuseHubPage() {
   const [query, setQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string>("");
   const [pinTarget, setPinTarget] = useState<CatalogHubEntry | null>(null);
+  const [a2aConversionTarget, setA2aConversionTarget] = useState<CatalogHubEntry | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [approvalDrawerOpen, setApprovalDrawerOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -177,19 +180,24 @@ export default function ReuseHubPage() {
         ) : null}
 
         <div className="af-catalog-grid">
-          {filtered.map((entry) => (
-            <CatalogCard
-              key={entry.id}
-              entry={entry}
-              onPin={(item) => setPinTarget(item)}
-              pinDisabledReason={pinDisabledReason}
-              mockLabHref={
-                entry.category === "adapter"
-                  ? buildMockLabRoute({ adapterName: entry.name, reqId: activeReqId || null })
-                  : undefined
-              }
-            />
-          ))}
+          {filtered.map((entry) => {
+            const a2aAction = getWorkflowA2aActionState(entry, activeReqId);
+            return (
+              <CatalogCard
+                key={entry.id}
+                entry={entry}
+                onPin={(item) => setPinTarget(item)}
+                onConvertA2a={a2aAction.visible ? (item) => setA2aConversionTarget(item) : undefined}
+                pinDisabledReason={pinDisabledReason}
+                a2aConversionDisabledReason={a2aAction.disabledReason}
+                mockLabHref={
+                  entry.category === "adapter"
+                    ? buildMockLabRoute({ adapterName: entry.name, reqId: activeReqId || null })
+                    : undefined
+                }
+              />
+            );
+          })}
         </div>
       </Panel>
 
@@ -198,6 +206,15 @@ export default function ReuseHubPage() {
           reqId={activeReqId}
           entry={pinTarget}
           onClose={() => setPinTarget(null)}
+          onSaved={(msg) => setMessage(msg)}
+        />
+      ) : null}
+      {a2aConversionTarget && activeReqId ? (
+        <WorkflowA2aConversionDrawer
+          reqId={activeReqId}
+          entry={a2aConversionTarget}
+          roots={roots}
+          onClose={() => setA2aConversionTarget(null)}
           onSaved={(msg) => setMessage(msg)}
         />
       ) : null}

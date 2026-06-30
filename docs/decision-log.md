@@ -10,6 +10,36 @@
 
 ---
 
+## 2026-06-30 · 로컬 작업 — catalog publish는 provider Agent Card를 read-only로 검증한다
+
+- **결정**: `POST /api/catalog/publish`의 workflow A2A provider validation은 provider artifact root와 이미 존재하는 `runtime-stub/<app>/agent.json`만 read-only로 확인한다. Catalog publish는 provider `agent.json`을 생성하거나 refresh하지 않는다.
+- **배경**: catalog approval은 catalog YAML publish 경계 안에 있어야 하며, provider runtime-stub 산출물 생성은 Runtime Handoff/RunSandbox runtime 경계에 속한다. Publish validation이 `RuntimeA2aManager.agentCard()`를 호출하면 검증 중 provider artifact root를 mutate해 승인 결과를 과장할 수 있다.
+- **영향**: `catalogPublishValidation.ts`, `runtimeA2aCard.ts`, workflow A2A publish tests, active validation/harness docs.
+
+## 2026-06-30 · 작업 브랜치 `workflow-a2a-capable-conversion` — task 8 docs/final QA
+
+### Workflow A2A는 명시 변환된 catalog runtime binding이다
+- **결정**: 일반 workflow catalog reuse는 계속 `workflow_call`로 삽입한다. Reuse Hub의 `A2A 가능하게 변경` proposal과 `등록 승인` publish를 통과한 workflow row만 `component_source: remote_a2a`, `runtime_binding: remote_a2a`, `a2a_provider_req_id`, A2A-ready `contract_status`를 가진다. `a2a_provider_req_id`는 provider artifact root pointer이고, `published_from`은 provenance로만 둔다.
+- **배경**: workflow가 복잡하거나 여러 root에서 재사용된다는 이유만으로 Remote A2A를 추론하면 taxonomy 책임 축과 runtime 연결 축이 다시 섞인다. A2A 노출은 provider Agent Card와 reviewer approval이 있는 운영 경계여야 한다.
+- **영향**: Reuse Hub conversion drawer/publish path, workflow catalog proposal parsing/publishing, Design catalog workflow insertion, `docs/workbench/agent-factory-harness.md`, `docs/workbench/validation.md`, `docs/workbench/review-board.md`, follow-up status.
+
+### Consumer는 A2A-capable workflow를 Remote A2A facade로 삽입한다
+- **결정**: A2A-capable workflow entry를 consumer Design에 추가하면 원본 workflow를 fragment-expand하지 않고 provider Agent Card를 불러와 consumer artifact 안에 `remote_a2a` facade 후보, draft A2A contract, `remote_agent_call` Graph IR node를 만든다. provider root가 없거나 Agent Card route가 실패하면 publish/insert/resume은 실패해야 하며 partial design/catalog artifact를 쓰지 않는다.
+- **배경**: catalog workflow row는 reusable responsibility contract이고, consumer graph에는 원격 호출 facade만 필요하다. provider root 검증 실패를 성공처럼 보이면 reviewer가 실행 불가능한 remote boundary를 승인할 수 있다.
+- **영향**: Design workflow picker/action model, runtime A2A provider targeting, publish validation, browser/API QA failure matrix.
+
+### Runtime resume state와 design artifact를 분리한다
+- **결정**: Workbench resume bridge는 complete input-required metadata가 있을 때만 function_response DataPart를 provider RPC endpoint로 보낸다. `task_id`, `context_id`, `interrupt_id` 같은 runtime ids는 runtime event/API transcript/local registry에만 존재하며 catalog, `analysis-result.json`, Graph IR, scaffold-plan, generated source에는 persist하지 않는다.
+- **배경**: runtime resume ids는 task instance state라서 reviewable design/source artifact에 들어가면 stale state가 재생성·catalog publish·PR review와 섞인다.
+- **영향**: Runtime event parsing, resume endpoint/UI, validation docs, final QA adversarial checks.
+
+## 2026-06-30 · 작업 브랜치 `workflow-a2a-capable-conversion` — task 7 Run resume UI
+
+### Workbench resume만 Remote A2A task resume을 전송한다
+- **결정**: `/af/:reqId/run`은 Remote A2A input-required 이벤트가 `resume_supported`와 task/context/interrupt/function metadata를 모두 제공할 때만 A2A provider 패널 안에 `Workbench resume` 폼을 표시한다. 전송은 `POST /api/af/:reqId/runtime-a2a/resume`만 사용하며, 성공 후 consumer runtime-chat 상태와 provider runtime-a2a 상태를 함께 invalidate한다. 지원되지 않는 이벤트는 기존 경고와 task state만 보여주고 submit control을 렌더하지 않는다.
+- **배경**: ADK Web 텍스트 채팅은 Remote A2A task resume bridge 로 검증되지 않았으므로, 사용자가 일반 chat 입력과 Workbench의 function_response resume을 혼동하면 안 된다.
+- **영향**: `RunSandbox.tsx`, `RuntimeA2aProviderPanel.tsx`, runtime input-required view model, runtime-a2a client hook, active Run 화면 docs.
+
 ## 2026-06-29 · 작업 브랜치 `artifact-root-sync-regeneration-ux` — follow-up 13/14/11/16 runtime handoff 정리
 
 ### Build/Verify도 Stage Runner run history로 기록한다
@@ -212,6 +242,13 @@
 - **결정**: publish 된 항목은 stable `id`, `version`, `status: published`, `provenance: catalog_published`, `published_at`, `published_from`, 선택적 `source_candidate_id` 를 포함한다. 같은 category/name 의 기존 항목은 `status: deprecated` 로 표시하고, catalog hydration 은 deprecated 를 제외한 최고 version 을 Reuse Hub 에 노출한다.
 - **배경**: 기존 readers 는 name 기반으로 동작하므로 append-only publish 와 기존 seed 항목을 함께 유지하려면 명시적 version/status 모델이 필요했다.
 - **영향**: catalog YAML entry shape, Reuse Hub index hydration, `CatalogEntry` 타입.
+
+## 2026-06-30 · 작업 계획 `workflow-a2a-capable-conversion` — workflow catalog A2A exposure metadata
+
+### Workflow Remote A2A 노출 메타데이터 분리
+- **결정**: `module_category: workflow` catalog entry가 `component_source: remote_a2a` 및 `runtime_binding: remote_a2a`로 노출될 때 제공자 artifact root는 `a2a_provider_req_id`에 저장한다. `published_from`은 publish provenance로만 유지한다.
+- **배경**: source req-id provenance와 runtime provider target을 같은 필드에 담으면 publish idempotency와 catalog hydration에서 의미가 섞인다.
+- **영향**: catalog-delta proposal shape, publish proposal DTO, `POST /api/catalog/publish` validation, catalog YAML entry shape, scaffold catalog hydration.
 
 ### Catalog workflow 중첩 삽입은 단일 노드 방식으로 채택
 - **결정**: Design 검토 화면의 `카탈로그 워크플로우 삽입`은 catalog workflow 내부 fragment를 펼치지 않고, 현재 Graph IR에 단일 `workflow` node와 matching `ModuleCandidate`를 추가한다.

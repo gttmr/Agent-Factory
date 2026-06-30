@@ -7,11 +7,15 @@ import {
   workflowKinds,
   type AdapterKind,
   type AgentKind,
+  type ComponentSource,
   type FieldSpec,
   type ModuleCategory,
   type RemoteContractKind,
   type WorkflowKind
 } from "../analyzer/types";
+import { runtimeBindings, type RuntimeBinding } from "./types";
+
+const componentSources = ["mcp", "remote_a2a", "stub"] as const;
 
 export interface ProposedAddition {
   module_category: ModuleCategory;
@@ -21,10 +25,16 @@ export interface ProposedAddition {
   adapter_kind?: AdapterKind;
   remote_contract_kind?: RemoteContractKind;
   owner_domain?: string;
+  component_source?: ComponentSource;
+  runtime_binding?: RuntimeBinding;
+  a2a_provider_req_id?: string;
   responsibility?: string;
   inputs?: FieldSpec[];
   outputs?: FieldSpec[];
   composition?: string[];
+  risk_signals?: string[];
+  required_before_approval?: string[];
+  contract_status?: string;
   notes?: string;
   source_candidate_id?: string;
   rationale?: string;
@@ -51,7 +61,7 @@ export function parseCatalogDelta(yamlText: string): CatalogDeltaParseResult {
   }
 }
 
-export function appendCatalogDeltaProposal(existing: string, proposal: Record<string, unknown>): string {
+export function appendCatalogDeltaProposal(existing: string, proposal: object): string {
   let parsed: unknown = {};
   if (existing.trim()) {
     try {
@@ -82,6 +92,9 @@ function parseProposedAddition(entry: unknown): ProposedAddition[] {
     name
   };
   copyString(parsed, "owner_domain", entry.owner_domain);
+  copyEnum(parsed, "component_source", entry.component_source, componentSources);
+  copyEnum(parsed, "runtime_binding", entry.runtime_binding, runtimeBindings);
+  copyString(parsed, "a2a_provider_req_id", entry.a2a_provider_req_id);
   copyString(parsed, "responsibility", entry.responsibility);
   copyString(parsed, "notes", entry.notes);
   copyString(parsed, "source_candidate_id", entry.source_candidate_id);
@@ -91,6 +104,9 @@ function parseProposedAddition(entry: unknown): ProposedAddition[] {
   copyArray(parsed, "inputs", entry.inputs);
   copyArray(parsed, "outputs", entry.outputs);
   copyStringArray(parsed, "composition", entry.composition);
+  copyStringArray(parsed, "risk_signals", entry.risk_signals);
+  copyStringArray(parsed, "required_before_approval", entry.required_before_approval);
+  copyString(parsed, "contract_status", entry.contract_status);
 
   const agentKind = normalizeEnum(entry.agent_kind, agentKinds);
   const workflowKind = normalizeEnum(entry.workflow_kind, workflowKinds);
@@ -120,6 +136,16 @@ function readString(value: unknown): string | null {
 
 function copyString(target: Partial<ProposedAddition>, key: keyof ProposedAddition, value: unknown): void {
   const next = readString(value);
+  if (next) (target as Record<string, unknown>)[key] = next;
+}
+
+function copyEnum<T extends readonly string[]>(
+  target: Partial<ProposedAddition>,
+  key: keyof ProposedAddition,
+  value: unknown,
+  allowed: T
+): void {
+  const next = normalizeEnum(value, allowed);
   if (next) (target as Record<string, unknown>)[key] = next;
 }
 

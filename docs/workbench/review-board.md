@@ -18,6 +18,8 @@ DesignWorkbench의 모듈 검토 패널은 두 작업면으로 나뉜다.
 카탈로그에서 온 항목은 기본적으로 수정 대상이 아니다.
 카탈로그 원본을 바꾸려면 Catalog review에서 별도로 처리하고, Module Review에서는 현재 분석 artifact 안의 override와 edge 연결만 저장한다.
 
+일반 workflow catalog 항목은 Design에서 `workflow_call` 후보/노드로 들어온다. Reuse Hub에서 명시적으로 `A2A 가능하게 변경`되고 승인된 workflow row만 예외적으로 `component_source: remote_a2a` 또는 `runtime_binding: remote_a2a`를 가진다. 이 경우 Design 삽입은 `a2a_provider_req_id`로 provider Agent Card를 확인한 뒤 현재 consumer 분석에 `remote_a2a` facade 후보, A2A 계약, `remote_agent_call` Graph IR node를 추가한다. provider id나 Agent Card 검증이 실패하면 현재 분석 artifact는 저장하지 않는다.
+
 ## 모듈 탭 검토 흐름
 
 `needs_info` 후보는 누락 항목을 해소하기 전에는 승인할 수 없다.
@@ -38,6 +40,7 @@ DesignWorkbench의 `Remote A2A` 탭은 `module_category === "remote_a2a"` 후보
 개발 리더는 후보별 계약을 선택해 Agent Card, message contract, task lifecycle, task capability, auth, retry, fallback, audit, data policy와 `contract_status`를 하단 탭에서 직접 검토/저장할 수 있다.
 선택한 Remote A2A 후보에 매칭 계약이 없으면 `새 계약 생성`으로 placeholder `a2a-NNN` 계약을 만들고, 같은 저장에서 후보의 `a2a_contract_id`도 연결한다.
 이미 Build가 끝난 local artifact는 `Agent Card 불러오기`로 provider로 가져올 수 있다. 이 import는 `/api/af/:provider/runtime-a2a/agent-card`가 생성한 Agent Card를 읽어 draft `remote_a2a` 후보, draft A2A 계약, `remote_agent_call` Graph IR 노드를 추가한다. 시작점 artifact가 단순한 `input -> output` placeholder graph일 때만 `input -> remote -> output`으로 자동 재배선하며, 후보 승인과 `contract_status: approved`는 사람이 별도로 처리한다.
+A2A-capable workflow catalog entry를 consumer Design에 삽입할 때도 같은 local provider import path를 사용하지만, 원본 workflow row의 `module_category`는 `workflow`로 유지된다. 이 facade 후보/계약은 consumer artifact 안에서만 검토하며, transient runtime task id, context id, interrupt id는 계약 필드나 Graph IR에 쓰지 않는다.
 우측 Inspector의 계약 편집기는 `INSPECTOR_ENABLED=false`로 계속 파킹되어 있으며, 현재 활성 편집 표면은 하단 `Remote A2A` 탭이다.
 Readiness issue가 남거나 매칭 계약이 없으면 `runtime_contracts_approved` 게이트를 새로 켤 수 없다.
 게이트는 자동으로 켜지지 않으며, Runtime 계약과 Remote A2A 계약이 모두 준비된 뒤 사용자가 직접 토글한다.

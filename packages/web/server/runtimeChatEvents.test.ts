@@ -21,11 +21,21 @@ try {
     function_name: "adk_request_input",
     interrupt_id: "interrupt-1",
     task_id: "task-1",
+    context_id: null,
     task_state: "input-required",
     remote_path: "consumer@1/provider@1",
+    response_schema: { type: "string" },
     resume_supported: false,
     resume_note: "현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다."
   });
+
+  const resumable = extractRemoteInputRequiredFromAdkEvents([remoteInputRequiredEvent({ contextId: "ctx-1" })]);
+  assert.equal(resumable?.task_id, "task-1");
+  assert.equal(resumable?.context_id, "ctx-1");
+  assert.equal(resumable?.interrupt_id, "interrupt-1");
+  assert.equal(resumable?.function_name, "adk_request_input");
+  assert.deepEqual(resumable?.response_schema, { type: "string" });
+  assert.equal(resumable?.resume_supported, true);
 
   const stubDir = join(repoRoot, "artifacts/af/req-chat/runtime-stub");
   await mkdir(stubDir, { recursive: true });
@@ -57,7 +67,7 @@ try {
   await rm(repoRoot, { recursive: true, force: true });
 }
 
-function remoteInputRequiredEvent(): Record<string, unknown> {
+function remoteInputRequiredEvent(input: { readonly contextId?: string } = {}): Record<string, unknown> {
   return {
     content: {
       parts: [
@@ -79,6 +89,7 @@ function remoteInputRequiredEvent(): Record<string, unknown> {
     customMetadata: {
       "a2a:task_id": "task-1",
       "a2a:response": {
+        ...(input.contextId ? { contextId: input.contextId } : {}),
         status: { state: "input-required" }
       }
     },

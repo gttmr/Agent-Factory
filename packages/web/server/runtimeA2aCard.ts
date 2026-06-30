@@ -58,6 +58,17 @@ export async function refreshAgentCard(ctx: A2aCardContext): Promise<LocalAgentC
   return card;
 }
 
+export async function readExistingAgentCard(ctx: Pick<A2aCardContext, "stubDir" | "appName">): Promise<LocalAgentCard> {
+  const value = await readJson(join(ctx.stubDir, ctx.appName, "agent.json"));
+  if (!isLocalAgentCard(value)) {
+    throw new Error("runtime-stub Agent Card file is not a valid local A2A Agent Card.");
+  }
+  if (value.name !== ctx.appName) {
+    throw new Error("runtime-stub Agent Card name does not match the provider app.");
+  }
+  return value;
+}
+
 function buildLocalAgentCard(input: { appName: string; title: string; rpcUrl: string }): LocalAgentCard {
   return {
     name: input.appName,
@@ -96,4 +107,27 @@ function manifestTitle(value: unknown): string | null {
   if (!isRecord(value) || !isRecord(value.requirement)) return null;
   const title = value.requirement.title;
   return typeof title === "string" && title.trim() ? title : null;
+}
+
+function isLocalAgentCard(value: unknown): value is LocalAgentCard {
+  if (!isRecord(value) || !isRecord(value.capabilities)) return false;
+  return (
+    isNonEmptyString(value.name) &&
+    isNonEmptyString(value.description) &&
+    isNonEmptyString(value.url) &&
+    isNonEmptyString(value.version) &&
+    isNonEmptyString(value.preferredTransport) &&
+    isNonEmptyString(value.protocolVersion) &&
+    typeof value.capabilities.streaming === "boolean" &&
+    typeof value.capabilities.pushNotifications === "boolean" &&
+    typeof value.capabilities.stateTransitionHistory === "boolean" &&
+    Array.isArray(value.capabilities.extensions) &&
+    Array.isArray(value.defaultInputModes) &&
+    Array.isArray(value.defaultOutputModes) &&
+    Array.isArray(value.skills)
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && Boolean(value.trim());
 }

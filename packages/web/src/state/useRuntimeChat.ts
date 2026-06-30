@@ -55,9 +55,11 @@ export interface RuntimeChatRemoteInputRequired {
   readonly function_name: string;
   readonly interrupt_id: string | null;
   readonly task_id: string | null;
+  readonly context_id: string | null;
   readonly task_state: string | null;
   readonly remote_path: string | null;
-  readonly resume_supported: false;
+  readonly response_schema: unknown | null;
+  readonly resume_supported: boolean;
   readonly resume_note: string;
 }
 

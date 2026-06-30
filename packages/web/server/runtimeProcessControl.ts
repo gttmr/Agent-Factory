@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { collectRuntimeStubFiles } from "./runtimeStubFiles";
+import type { RuntimeA2aMessageSendResume } from "./runtimeA2aTypes";
 
 const execFileAsync = promisify(execFile);
 
@@ -21,9 +22,12 @@ export interface RuntimeProcessRecord {
 }
 
 export interface RuntimeProcessMessageSendProbe {
-  status: "not_checked" | "ready" | "interactive_required" | "failed";
+  status: "not_checked" | "ready" | "working" | "interactive_required" | "failed";
   taskState: string | null;
   message: string | null;
+  taskId?: string | null;
+  contextId?: string | null;
+  resume?: RuntimeA2aMessageSendResume | null;
   checkedAt: string;
 }
 
@@ -180,14 +184,33 @@ function messageSendProbeField(value: unknown): RuntimeProcessMessageSendProbe |
     status: value.status,
     taskState: nullableStringField(value.taskState),
     message: nullableStringField(value.message),
+    taskId: nullableStringField(value.taskId),
+    contextId: nullableStringField(value.contextId),
+    resume: messageSendResumeField(value.resume),
     checkedAt
   };
 }
 
 function isMessageSendStatus(value: unknown): value is RuntimeProcessMessageSendProbe["status"] {
-  return value === "not_checked" || value === "ready" || value === "interactive_required" || value === "failed";
+  return value === "not_checked" || value === "ready" || value === "working" || value === "interactive_required" || value === "failed";
 }
 
 function nullableStringField(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function messageSendResumeField(value: unknown): RuntimeA2aMessageSendResume | null {
+  if (!isRecord(value)) return null;
+  const taskId = nullableStringField(value.task_id);
+  const contextId = nullableStringField(value.context_id);
+  const interruptId = nullableStringField(value.interrupt_id);
+  const functionName = nullableStringField(value.function_name);
+  if (!taskId || !contextId || !interruptId || !functionName) return null;
+  return {
+    task_id: taskId,
+    context_id: contextId,
+    interrupt_id: interruptId,
+    function_name: functionName,
+    response_schema: value.response_schema ?? null
+  };
 }

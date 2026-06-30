@@ -13,6 +13,7 @@ const store = new ArtifactRootStore({ repoRoot });
 try {
   await assertMessageSendFailedTaskIsNotChatReady();
   await assertInputRequiredTaskIsInteractiveRequired();
+  await assertInputRequiredTaskCarriesResumeMetadata();
   await assertMalformedTaskShapeFailsWithoutCrash();
   await assertRequiredMockLabServerBlocksProviderUntilRunning();
   await assertMalformedMockLabServerStateBlocksWithoutCrash();
@@ -69,6 +70,54 @@ async function assertInputRequiredTaskIsInteractiveRequired(): Promise<void> {
   assert.equal(started.status.server.message_send_status, "interactive_required");
   assert.equal(started.status.server.message_send_task_state, "input-required");
   assert.match(started.status.server.message ?? "", /choose a route/);
+  assert.equal((await manager.stop(scenario.reqId)).ok, true);
+}
+
+async function assertInputRequiredTaskCarriesResumeMetadata(): Promise<void> {
+  const scenario = await prepareScenario("req-a2a-input-required-resume", "req_a2a_input_required_resume_adk");
+  await writeFakeA2aRuntime(repoRoot, {
+    serveAgentCard: true,
+    messageSendResult: {
+      id: "task-probe-1",
+      contextId: "ctx-probe-1",
+      status: {
+        state: "input-required",
+        message: {
+          parts: [
+            {
+              kind: "data",
+              metadata: { adk_type: "function_call", adk_is_long_running: true },
+              data: {
+                id: "interrupt-probe-1",
+                name: "adk_request_input",
+                args: {
+                  message: "목적/시나리오 분류 확인",
+                  payload: "확인이 필요합니다.",
+                  response_schema: { type: "string" }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  const manager = new RuntimeA2aManager(scenario.managerOptions);
+  const started = await manager.start(scenario.reqId);
+
+  assert.equal(started.status.server.message_send_status, "interactive_required");
+  assert.deepEqual(started.status.server.message_send_resume, {
+    task_id: "task-probe-1",
+    context_id: "ctx-probe-1",
+    interrupt_id: "interrupt-probe-1",
+    function_name: "adk_request_input",
+    response_schema: { type: "string" }
+  });
+
+  const passiveStatus = await manager.status(scenario.reqId);
+
+  assert.deepEqual(passiveStatus.server.message_send_resume, started.status.server.message_send_resume);
   assert.equal((await manager.stop(scenario.reqId)).ok, true);
 }
 

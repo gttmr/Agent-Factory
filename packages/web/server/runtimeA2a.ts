@@ -7,7 +7,7 @@ import { buildRuntimeProcessEnv } from "./runtimeEnv";
 import { a2aLauncherPath, buildAdkA2aServerCommand } from "./runtimeA2aCommand";
 import { discoverAppName, refreshAgentCard } from "./runtimeA2aCard";
 import { mockLabPrerequisites } from "./runtimeA2aMockLabPrerequisites";
-import { notCheckedMessageSendProbe, probeAgentCard, probeMessageSend, unavailableAgentCardProbe, type MessageSendProbe } from "./runtimeA2aProbe";
+import { notCheckedMessageSendProbe, probeAgentCard, probeMessageSend, probeTaskGet, unavailableAgentCardProbe, type MessageSendProbe } from "./runtimeA2aProbe";
 import type { RuntimeA2aAgentCardResult, RuntimeA2aManagerOptions, RuntimeA2aStartResult, RuntimeA2aStatus, RuntimeA2aStopResult } from "./runtimeA2aTypes";
 import {
   clearProcessRecord,
@@ -81,6 +81,13 @@ export class RuntimeA2aManager {
     const ctx = await this.context(reqId);
     const card = await refreshAgentCard({ stubDir: ctx.stubDir, appName: ctx.appName, rpcUrl: rpcUrl(ctx) });
     return { provider_req_id: reqId, app_name: ctx.appName, rpc_url: rpcUrl(ctx), agent_card_url: agentCardUrl(ctx), card };
+  }
+
+  async recordMessageSendProbe(reqId: string, probe: MessageSendProbe): Promise<void> {
+    const ctx = await this.context(reqId);
+    const proc = this.processes.get(reqId);
+    if (proc && proc.exitCode === null) proc.lastMessageSendProbe = probe;
+    await this.persistMessageSendProbe(ctx, probe);
   }
 
   async start(reqId: string): Promise<RuntimeA2aStartResult> {
@@ -222,6 +229,7 @@ export class RuntimeA2aManager {
         message_send_ready: semanticProbe.status === "ready",
         message_send_status: semanticProbe.status,
         message_send_task_state: semanticProbe.taskState,
+        message_send_resume: semanticProbe.resume,
         mock_lab_prerequisites: prerequisites,
         started_stub_fingerprint: startedStubFingerprint,
         current_stub_fingerprint: currentStubFingerprint,
@@ -242,7 +250,15 @@ export class RuntimeA2aManager {
   ): Promise<MessageSendProbe> {
     if (!opts.canProbe) return notCheckedMessageSendProbe();
     if (opts.mode === "cached") {
-      return opts.live?.lastMessageSendProbe ?? messageSendProbeFromRecord(opts.recordedLive?.lastMessageSendProbe) ?? notCheckedMessageSendProbe();
+      const cached =
+        opts.live?.lastMessageSendProbe ?? messageSendProbeFromRecord(opts.recordedLive?.lastMessageSendProbe) ?? notCheckedMessageSendProbe();
+      if (cached.status === "working" && cached.taskId) {
+        const probe = await probeTaskGet({ url: rpcUrl(ctx), taskId: cached.taskId, timeoutMs: this.statusProbeTimeoutMs });
+        if (opts.live) opts.live.lastMessageSendProbe = probe;
+        await this.persistMessageSendProbe(ctx, probe);
+        return probe;
+      }
+      return cached;
     }
     const probe = await probeMessageSend({ url: rpcUrl(ctx), timeoutMs: Math.max(this.statusProbeTimeoutMs, DEFAULT_SEMANTIC_PROBE_TIMEOUT_MS) });
     if (opts.live) opts.live.lastMessageSendProbe = probe;
@@ -262,7 +278,14 @@ export class RuntimeA2aManager {
 
 function messageSendProbeFromRecord(probe: RuntimeProcessMessageSendProbe | undefined): MessageSendProbe | null {
   if (!probe) return null;
-  return { status: probe.status, taskState: probe.taskState, message: probe.message };
+  return {
+    status: probe.status,
+    taskState: probe.taskState,
+    message: probe.message,
+    taskId: probe.taskId ?? null,
+    contextId: probe.contextId ?? null,
+    resume: probe.resume ?? null
+  };
 }
 
 function normalizePort(value: number): number {

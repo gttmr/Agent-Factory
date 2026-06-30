@@ -38,6 +38,7 @@ export interface CatalogEntry {
   mcp_auth_mode?: string;
   component_source?: ComponentSource;
   runtime_binding?: RuntimeBinding | null;
+  a2a_provider_req_id?: string;
   owner_domain?: string;
   status?: string;
   published_at?: string;

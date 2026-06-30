@@ -6,7 +6,7 @@ import { useCatalog } from "../state/useCatalog";
 interface CatalogWorkflowPickerProps {
   inserting?: boolean;
   onClose: () => void;
-  onInsert: (entry: CatalogHubEntry) => void;
+  onInsert: (entry: CatalogHubEntry) => void | Promise<void>;
 }
 
 export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: CatalogWorkflowPickerProps) {
@@ -47,22 +47,30 @@ export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: 
           ) : null}
           {filtered.length > 0 ? (
             <ul className="af-catalog-workflow-list">
-              {filtered.map((entry) => (
-                <li key={entry.id} className="af-catalog-workflow-row">
-                  <div className="af-catalog-workflow-main">
-                    <div className="af-catalog-workflow-title">
-                      <strong>{entry.name}</strong>
-                      {typeof entry.version === "number" ? <span>v{entry.version}</span> : null}
-                      {entry.status ? <span>{entry.status}</span> : null}
+              {filtered.map((entry) => {
+                const remoteA2A = isRemoteA2AWorkflowEntry(entry);
+                const providerReqId = entry.a2a_provider_req_id?.trim() ?? "";
+                return (
+                  <li key={entry.id} className="af-catalog-workflow-row">
+                    <div className="af-catalog-workflow-main">
+                      <div className="af-catalog-workflow-title">
+                        <strong>{entry.name}</strong>
+                        {typeof entry.version === "number" ? <span>v{entry.version}</span> : null}
+                        {entry.status ? <span>{entry.status}</span> : null}
+                        {remoteA2A ? <span>Remote A2A</span> : null}
+                      </div>
+                      <small>
+                        {entry.owner_domain ?? "owner_domain 미지정"}
+                        {remoteA2A ? ` · provider ${providerReqId || "미지정"}` : ""}
+                      </small>
+                      <p>{entry.responsibility ?? "responsibility 미지정"}</p>
                     </div>
-                    <small>{entry.owner_domain ?? "owner_domain 미지정"}</small>
-                    <p>{entry.responsibility ?? "responsibility 미지정"}</p>
-                  </div>
-                  <Button type="button" variant="primary" onClick={() => onInsert(entry)} disabled={inserting}>
-                    선택
-                  </Button>
-                </li>
-              ))}
+                    <Button type="button" variant="primary" onClick={() => void onInsert(entry)} disabled={inserting}>
+                      선택
+                    </Button>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
         </div>
@@ -74,4 +82,8 @@ export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: 
       </div>
     </div>
   );
+}
+
+function isRemoteA2AWorkflowEntry(entry: CatalogHubEntry): boolean {
+  return entry.runtime_binding === "remote_a2a" || entry.component_source === "remote_a2a";
 }

@@ -21,6 +21,7 @@ type CatalogStringField =
   | "status"
   | "component_source"
   | "runtime_binding"
+  | "a2a_provider_req_id"
   | "access_protocol"
   | "mcp_server"
   | "mcp_tool_name"
@@ -125,6 +126,7 @@ function copyCatalogStringFields(entry: CatalogHubEntry, row: Record<string, unk
   copyStringField(entry, row, "status");
   copyStringField(entry, row, "component_source");
   copyStringField(entry, row, "runtime_binding");
+  copyStringField(entry, row, "a2a_provider_req_id");
   copyStringField(entry, row, "access_protocol");
   copyStringField(entry, row, "mcp_server");
   copyStringField(entry, row, "mcp_tool_name");

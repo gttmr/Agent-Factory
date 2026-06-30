@@ -40,7 +40,9 @@ const expectedIndex = {
       workflow_kind: "graph",
       owner_domain: "analysis",
       status: "approved",
-      component_source: "stub",
+      component_source: "remote_a2a",
+      runtime_binding: "remote_a2a",
+      a2a_provider_req_id: "req-example",
       responsibility: "Route review and adapter calls.",
       composition: ["seed-agent-summary-v2", "seed-adapter-mock-lab"],
       scaffold_output: "workflows/review_workflow.py",
@@ -159,7 +161,9 @@ workflows:
     workflow_kind: graph
     owner_domain: analysis
     status: approved
-    component_source: stub
+    component_source: remote_a2a
+    runtime_binding: remote_a2a
+    a2a_provider_req_id: req-example
     responsibility: Route review and adapter calls.
     composition:
       - seed-agent-summary-v2
@@ -238,6 +242,9 @@ try {
     tool: "fetch_case",
     result: { ok: true }
   });
+  assert.equal(loaded.find((entry) => entry.id === "seed-workflow-review")?.component_source, "remote_a2a");
+  assert.equal(loaded.find((entry) => entry.id === "seed-workflow-review")?.runtime_binding, "remote_a2a");
+  assert.equal(loaded.find((entry) => entry.id === "seed-workflow-review")?.a2a_provider_req_id, "req-example");
   assert.equal(loaded.find((entry) => entry.id === "remote_a2a:Remote Review Agent")?.runtime_binding, "remote_a2a");
 } finally {
   await rm(repoRoot, { recursive: true, force: true });

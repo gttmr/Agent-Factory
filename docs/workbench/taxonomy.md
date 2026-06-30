@@ -75,6 +75,7 @@ Reuse Hub `등록 승인`이 `POST /api/catalog/publish`로 추가하는 entry�
 - `version`: 같은 `(category, name)`에 대해 publish마다 1씩 증가하는 정수.
 - `status`: `published` 또는 `deprecated`. 새 버전을 publish하면 같은 이름의 이전 항목이 `deprecated`로 표시된다.
 - `provenance: catalog_published`와 출처 추적용 `published_at`, `published_from`(source req-id), 선택적 `source_candidate_id`.
+- Workflow entry가 `component_source: remote_a2a` 및 `runtime_binding: remote_a2a`로 노출되면 `a2a_provider_req_id`로 제공자 artifact root를 가리킨다. `published_from`은 publish provenance로만 사용하며 provider id로 대체하지 않는다.
 
 Catalog hydration(`useCatalog`)은 이름 기준으로 중복을 제거하면서 `deprecated`를 제외하고 최고 `version`만 Reuse Hub에 노출한다. 이 필드들은 additive이며, seed 항목(버전 메타데이터 없음)도 그대로 유효하다.
 
