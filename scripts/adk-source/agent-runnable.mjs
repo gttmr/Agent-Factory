@@ -1,17 +1,22 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
+import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
 import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
 import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
 import { usesRoutes } from "./graph/routes.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
-import { assertRemoteA2aSupported, usesRemoteA2a } from "./remote-a2a.mjs";
+import { assertRemoteA2aSupported, usesRemoteA2a, usesRemoteA2aAuthInterceptor } from "./remote-a2a.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
 import { emitRunnableNodeBlocks } from "./emitters/node-registry.mjs";
 import { buildRuntimeHelperSection } from "./emitters/runtime-helpers.mjs";
+import { buildDynamicRunnableAgentPy } from "./agent-dynamic.mjs";
 
 export function buildRunnableAgentPy(context) {
   const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName, processFlow } =
     context;
+  if (hasDynamicRunnableShape(graphContext)) {
+    return buildDynamicRunnableAgentPy(context);
+  }
   assertRunnableGraphSupported(graphContext);
   assertDataChannelsSupported(graphContext);
   assertRemoteA2aSupported({ analysisResult, modules });
@@ -36,12 +41,16 @@ export function buildRunnableAgentPy(context) {
   // without those features keep an unchanged import block.
   const usesArtifacts = usesArtifactChannels(graphContext);
   const usesRouteNodes = usesRoutes(processFlow);
+  const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
   const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a(modules)
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
-  const eventImport = usesRouteNodes ? "Event, RequestInput" : "RequestInput";
+  const remoteConfigImport = usesRemoteAuth
+    ? "from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor\n"
+    : "";
+  const eventImport = usesRouteNodes || usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
 
   return `from __future__ import annotations
 
@@ -53,6 +62,7 @@ import yaml
 
 from google.adk import Context
 from google.adk.agents import LlmAgent
+${remoteConfigImport}
 ${remoteImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 ${artifactGenaiImport}

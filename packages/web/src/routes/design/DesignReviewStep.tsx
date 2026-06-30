@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { GraphEditState, Selection } from "../../components/GraphCanvas";
+import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
 import type {
   AnalysisResult,
   GraphEdge,
@@ -62,6 +63,7 @@ export interface DesignReviewHandlers {
   onSelectContract: (contractId: string) => void;
   onSelectA2AModule: (moduleId: string) => void;
   onCreateA2AContract: (candidate: ModuleCandidate) => void;
+  onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
   onAuthorNameChange: (value: string) => void;
   onAuthorRoleChange: (value: AuthorRole) => void;
   onCreateComment: (input: { stage: CommentStage; anchor: CommentAnchor; body_md: string }) => void;
@@ -167,6 +169,7 @@ export function DesignReviewStep({
         onSelectContract={handlers.onSelectContract}
         onSelectA2AModule={handlers.onSelectA2AModule}
         onCreateA2AContract={handlers.onCreateA2AContract}
+        onImportLocalA2AProvider={handlers.onImportLocalA2AProvider}
         onSaveA2AContract={handlers.onSaveA2AContract}
         onAuthorNameChange={handlers.onAuthorNameChange}
         onAuthorRoleChange={handlers.onAuthorRoleChange}

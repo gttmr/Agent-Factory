@@ -506,6 +506,7 @@ const invalidRouteContractFields = validateGraphIRSoft(
   graphWithRemoteEdge(
     [
       node({ id: "node-router", node_kind: "router", lane_id: "local_graph" }),
+      node({ id: "node-loop", node_kind: "loop_control", lane_id: "local_graph" }),
       node({ id: "node-a", node_kind: "output", lane_id: "output" }),
       node({ id: "node-b", node_kind: "output", lane_id: "output" })
     ],
@@ -542,6 +543,29 @@ const invalidRouteContractFields = validateGraphIRSoft(
         a2a_contract_id: null,
         is_remote_boundary_crossing: false,
         route_aliases: ["not allowed"]
+      } as Partial<GraphEdge>),
+      edge({
+        id: "edge-004",
+        from: "node-loop",
+        to: "node-router",
+        edge_kind: "control",
+        execution_semantics: "loop_back",
+        route_condition: "decision == retry",
+        route_aliases: ["retry"],
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
+      } as Partial<GraphEdge>),
+      edge({
+        id: "edge-005",
+        from: "node-loop",
+        to: "node-a",
+        edge_kind: "control",
+        execution_semantics: "loop_exit",
+        route_condition: "decision == done",
+        route_aliases: ["done"],
+        is_default_route: true,
+        a2a_contract_id: null,
+        is_remote_boundary_crossing: false
       } as Partial<GraphEdge>)
     ]
   )

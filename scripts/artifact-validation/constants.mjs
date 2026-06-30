@@ -184,6 +184,8 @@ export const a2aPartFields = new Set(["text", "raw", "url", "data"]);
 export const a2aRoles = new Set(["ROLE_USER", "ROLE_AGENT"]);
 export const a2aStreamWrappers = new Set(["task", "message", "taskStatusUpdate", "taskArtifactUpdate"]);
 export const a2aContractStatuses = new Set(["draft", "needs_info", "approved"]);
+export const a2aRuntimeAuthModes = new Set(["none", "bearer_env", "metadata_env"]);
+export const a2aRuntimeFallbackModes = new Set(["none", "manual_review", "local_event"]);
 export const runtimeContractKinds = new Set([
   "mcp_legacy_adapter",
   "eai_legacy_adapter",
@@ -235,7 +237,8 @@ export const a2aContractRequiredObjectFields = [
   "message_contract",
   "task_lifecycle",
   "streaming",
-  "artifact_contract"
+  "artifact_contract",
+  "adk_runtime_policy"
 ];
 
 // Stale terminology that must never appear inside a serialized contract.

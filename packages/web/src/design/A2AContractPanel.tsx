@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { buildDefaultA2ARuntimePolicy } from "../analyzer/a2aNormalize";
 import { Button, Field, SectionHeader, SelectField, TextareaField } from "../ui/primitives";
 import {
   A2A_CONTRACT_STATUSES,
@@ -6,6 +7,8 @@ import {
   A2A_OPERATION_NAMES,
   A2A_PART_FIELDS,
   A2A_ROLES,
+  A2A_RUNTIME_AUTH_MODES,
+  A2A_RUNTIME_FALLBACK_MODES,
   A2A_STREAM_WRAPPERS,
   A2A_TASK_STATES,
   type A2AContract,
@@ -14,6 +17,9 @@ import {
   type A2AOperationName,
   type A2APartField,
   type A2ARole,
+  type A2ARuntimeAuthMode,
+  type A2ARuntimeFallbackMode,
+  type A2ARuntimePolicy,
   type A2AStreamWrapper,
   type A2ATaskState,
   type ModuleCandidate
@@ -141,7 +147,10 @@ interface A2AContractEditorProps {
 }
 
 function A2AContractEditor({ candidate, contract, saving, onSave, onCancel }: A2AContractEditorProps) {
-  const [draft, setDraft] = useState<A2AContract>(contract);
+  const [draft, setDraft] = useState<A2AContract>(() => ({
+    ...contract,
+    adk_runtime_policy: contract.adk_runtime_policy ?? buildDefaultA2ARuntimePolicy()
+  }));
   const issues = a2aContractReadinessIssues(draft);
   const hasChanges = JSON.stringify(draft) !== JSON.stringify(contract);
   const blockApproval = draft.contract_status === "approved" && issues.some((issue) => !issue.startsWith("contract_status"));
@@ -434,6 +443,10 @@ function A2AContractEditor({ candidate, contract, saving, onSave, onCancel }: A2
           onUpdateScheme={updateSecurityScheme}
           onUpdateRequirement={updateSecurityRequirement}
         />
+        <RuntimePolicyEditor
+          policy={draft.adk_runtime_policy}
+          onChange={(adkRuntimePolicy) => update("adk_runtime_policy", adkRuntimePolicy)}
+        />
         <TextareaField label="auth" rows={3} value={draft.auth} onChange={(event) => update("auth", event.target.value)} />
         <TextareaField
           label="token_handling"
@@ -502,6 +515,128 @@ function A2AContractEditor({ candidate, contract, saving, onSave, onCancel }: A2
           {saving ? "저장 중…" : "이 A2A 계약 저장"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function RuntimePolicyEditor({ policy, onChange }: { policy: A2ARuntimePolicy; onChange: (policy: A2ARuntimePolicy) => void }) {
+  const authEnvDisabled = policy.auth.mode === "none";
+  return (
+    <div className="af-a2a-repeat">
+      <div className="af-a2a-repeat-header">
+        <strong>adk_runtime_policy</strong>
+        <small>ADK timeout/auth만 생성하고 retry/fallback은 handoff로 남깁니다.</small>
+      </div>
+      <div className="af-a2a-grid">
+        <Field label="timeout_seconds">
+          <input
+            type="number"
+            min="1"
+            value={formatNullableNumber(policy.timeout_seconds)}
+            onChange={(event) => onChange({ ...policy, timeout_seconds: parseNullableNumber(event.target.value) })}
+          />
+        </Field>
+        <SelectField
+          label="auth.mode"
+          value={policy.auth.mode}
+          onChange={(event) =>
+            onChange({
+              ...policy,
+              auth: { ...policy.auth, mode: event.target.value as A2ARuntimeAuthMode }
+            })
+          }
+        >
+          {A2A_RUNTIME_AUTH_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
+        </SelectField>
+        <Field label="auth.env_var">
+          <input
+            value={policy.auth.env_var ?? ""}
+            disabled={authEnvDisabled}
+            onChange={(event) =>
+              onChange({
+                ...policy,
+                auth: { ...policy.auth, env_var: nullableText(event.target.value) }
+              })
+            }
+          />
+        </Field>
+        <Field label="auth.metadata_key">
+          <input
+            value={policy.auth.metadata_key ?? ""}
+            disabled={policy.auth.mode !== "metadata_env"}
+            onChange={(event) =>
+              onChange({
+                ...policy,
+                auth: { ...policy.auth, metadata_key: nullableText(event.target.value) }
+              })
+            }
+          />
+        </Field>
+      </div>
+      <div className="af-a2a-grid">
+        <Field label="retry_handoff.max_attempts">
+          <input
+            type="number"
+            min="1"
+            value={formatNullableNumber(policy.retry_handoff.max_attempts)}
+            onChange={(event) =>
+              onChange({
+                ...policy,
+                retry_handoff: { ...policy.retry_handoff, max_attempts: parseNullableNumber(event.target.value) }
+              })
+            }
+          />
+        </Field>
+        <Field label="retry_handoff.backoff_seconds">
+          <input
+            type="number"
+            min="1"
+            value={formatNullableNumber(policy.retry_handoff.backoff_seconds)}
+            onChange={(event) =>
+              onChange({
+                ...policy,
+                retry_handoff: { ...policy.retry_handoff, backoff_seconds: parseNullableNumber(event.target.value) }
+              })
+            }
+          />
+        </Field>
+        <SelectField
+          label="fallback_handoff.mode"
+          value={policy.fallback_handoff.mode}
+          onChange={(event) =>
+            onChange({
+              ...policy,
+              fallback_handoff: { ...policy.fallback_handoff, mode: event.target.value as A2ARuntimeFallbackMode }
+            })
+          }
+        >
+          {A2A_RUNTIME_FALLBACK_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+      <TextListField
+        label="retry_handoff.retry_on"
+        values={policy.retry_handoff.retry_on}
+        onChange={(values) => onChange({ ...policy, retry_handoff: { ...policy.retry_handoff, retry_on: values } })}
+      />
+      <TextareaField
+        label="fallback_handoff.message"
+        rows={3}
+        value={policy.fallback_handoff.message ?? ""}
+        onChange={(event) =>
+          onChange({
+            ...policy,
+            fallback_handoff: { ...policy.fallback_handoff, message: nullableText(event.target.value) }
+          })
+        }
+      />
     </div>
   );
 }
@@ -647,6 +782,22 @@ function splitTextList(value: string): string[] {
     .split(/[,\n]/)
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function nullableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function formatNullableNumber(value: number | null): string {
+  return value === null ? "" : String(value);
+}
+
+function parseNullableNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function emptyInterface(): A2AContract["supported_interfaces"][number] {

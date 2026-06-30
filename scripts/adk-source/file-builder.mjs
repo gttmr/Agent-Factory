@@ -23,6 +23,8 @@ import { buildManifest as buildSupportManifest } from "./support/manifest.mjs";
 import { buildImplementationHandoff, buildReadme } from "./support/readme.mjs";
 import { buildRuntimeChatSmoke, buildSampleInputsYaml } from "./support/samples.mjs";
 import { buildContractTest } from "./support/tests.mjs";
+import { buildAgentCard } from "./support/agent-card.mjs";
+import { buildA2aLauncherPy } from "./support/a2a-launcher.mjs";
 
 export function buildFiles({
   artifactRoot,
@@ -43,6 +45,7 @@ export function buildFiles({
   const supportContext = {
     artifactRoot,
     outputRoot,
+    analysisResult,
     normalizedRequirement,
     processFlow,
     mockLabSpec,
@@ -73,6 +76,7 @@ export function buildFiles({
     [`${packageName}/mock_config.yaml`]: buildMockConfigYaml({ modules, adapterConnection }),
     [`${packageName}/sample_inputs.yaml`]: buildSampleInputsYaml(supportContext),
     [`${packageName}/README.md`]: buildReadme(supportContext),
+    [`${packageName}/agent.json`]: `${JSON.stringify(buildAgentCard({ packageName, normalizedRequirement }), null, 2)}\n`,
     [`${packageName}/nodes/__init__.py`]: "",
     [`${packageName}/nodes/agents.py`]: buildNodeHelperPy("agents"),
     [`${packageName}/nodes/adapters.py`]: buildNodeHelperPy("adapters"),
@@ -85,9 +89,11 @@ export function buildFiles({
         outputMode,
         packageName,
         normalizedRequirement,
+        analysisResult,
         connectedAdapters,
         unconnectedAdapters,
         scaffoldPlan,
+        modules,
         processFlow,
         graphContext,
         mockBindingFromModule
@@ -97,6 +103,7 @@ export function buildFiles({
     )}\n`,
     "scaffold-plan.json": `${JSON.stringify(scaffoldPlan, null, 2)}\n`,
     "implementation-handoff.md": buildImplementationHandoff(supportContext),
+    "af_adk_a2a_server.py": buildA2aLauncherPy(),
     "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(supportContext), null, 2)}\n`,
     [`${packageName}/tests/__init__.py`]: "",
     [`${packageName}/tests/test_workflow_contract.py`]: buildContractTest({ outputMode, packageName }),
@@ -104,7 +111,7 @@ export function buildFiles({
   };
   if (outputMode === "runnable") {
     files["agents.config.yaml"] = buildAgentsConfig({ modules, defaultAgentInstruction, adapterConnection });
-    files[".env.example"] = buildEnvExample();
+    files[".env.example"] = buildEnvExample({ analysisResult, modules });
     files[".gitignore"] = buildGitignore();
   }
   return files;
@@ -114,9 +121,11 @@ function buildManifest({
   outputMode,
   packageName,
   normalizedRequirement,
+  analysisResult,
   connectedAdapters,
   unconnectedAdapters,
   scaffoldPlan,
+  modules,
   processFlow,
   graphContext,
   mockBindingFromModule
@@ -125,9 +134,11 @@ function buildManifest({
     outputMode,
     packageName,
     normalizedRequirement,
+    analysisResult,
     connectedAdapters,
     unconnectedAdapters,
     scaffoldPlan,
+    modules,
     processFlow,
     startNodeIds: () => startNodeIds(graphContext),
     terminalOutputIds: () => terminalOutputIds(graphContext),

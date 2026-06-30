@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
 import { createA2AContractForCandidate, mintNextContractId, normalizeA2A } from "./a2aNormalize.ts";
+import "./localA2aProvider.test.ts";
 import type { AnalysisResult, ModuleCandidate } from "./types.ts";
+
+const placeholderRuntimePolicy = {
+  timeout_seconds: null,
+  auth: {
+    mode: "bearer_env",
+    env_var: null,
+    metadata_key: null
+  },
+  retry_handoff: {
+    max_attempts: null,
+    backoff_seconds: null,
+    retry_on: []
+  },
+  fallback_handoff: {
+    mode: "manual_review",
+    message: null
+  }
+};
 
 const remoteCandidate: ModuleCandidate = {
   id: "mod-remote",
@@ -54,7 +73,17 @@ assert.equal(next.a2aContracts.length, 2);
 assert.equal(next.a2aContracts[1]?.contract_id, "a2a-003");
 assert.equal(next.a2aContracts[1]?.remote_module_id, "mod-remote");
 assert.equal(next.a2aContracts[1]?.target_agent_name, "needs_info");
+assert.deepEqual(next.a2aContracts[1]?.adk_runtime_policy, placeholderRuntimePolicy);
 assert.equal(analysis.moduleCandidates[0]?.a2a_contract_id, null);
+
+const normalized = normalizeA2A(analysis);
+const normalizedExisting = normalized.result.a2aContracts.find((contract) => contract.contract_id === "a2a-002");
+assert.deepEqual(normalizedExisting?.adk_runtime_policy, placeholderRuntimePolicy);
+assert.ok(
+  normalized.diagnostics.some(
+    (diagnostic) => diagnostic.subjectId === "a2a-002" && diagnostic.fields?.includes("adk_runtime_policy")
+  )
+);
 
 assert.equal(mintNextContractId(new Set()), "a2a-001");
 assert.equal(mintNextContractId(new Set(["a2a-001", "a2a-002"])), "a2a-003");

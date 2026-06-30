@@ -1,37 +1,38 @@
 # 10 — Dynamic-workflow runnable lowering (loop / dynamic)
 
-상태: **일부 구현.** Reviewed `router` + `edge_kind: route` + `execution_semantics: conditional` 형태의 static user-confirmation branch는 runnable generator가 ADK `Event(route=...)`와 Workflow route map으로 lower한다. 반복·동적 워크플로는 아직 미구현이다.
+상태: **구현 완료.**
 
-## 왜 필요한가
+## 구현된 결정
 
-runnable lowering 이 아직 거부하는 Graph IR 형태:
+Public scaffold `output_mode`는 그대로 `runnable`이다. Generator가 reviewed dynamic/loop Graph IR shape를 감지하면 runnable 내부에서 ADK dynamic workflow builder를 선택한다. 별도 `output_mode`나 raw requirement 기반 dynamic codegen은 만들지 않는다.
 
-- `node_kind: "loop_control"`, `container_kind: "loop_region"`
-- `execution_semantics: "loop_back" | "loop_exit"`
-- `module_category: "workflow"` 의 `workflow_kind: "dynamic"`
+Dynamic builder는 ADK dynamic workflow 문서의 `@node` + `ctx.run_node(...)` 패턴을 따른다. Generated source는 `@node(name="dynamic_workflow", rerun_on_resume=True)` root node를 만들고, root `Workflow`는 `edges=[(START, dynamic_workflow)]`로 연결한다.
 
-ADK 2.x 기준 반복/동적 분기는 정적 그래프 `Workflow(edges=[...])` 가 아니라 **dynamic workflow**(`@node` + `ctx.run_node(...)` + 파이썬 `while`/조건 제어)로 표현한다(adk.dev/graphs/dynamic). 즉 별도의 출력 형태(빌더)가 필요하다. scenario-d(loop)·scenario-f 가 이 영역이다.
+Loop lowering은 `loop_region` 안의 정확히 하나의 `loop_control`을 요구한다. `loop_control`은 outgoing `loop_back`과 `loop_exit` edge를 모두 가져야 하며, 각 decision edge에는 reviewed `route_condition` 또는 `route_aliases`가 필요하다. `loop_exit`은 `is_default_route: true`만으로 기본 exit를 표현할 수 있다. Generator는 이 metadata만 읽고 업무 문자열을 하드코딩하지 않는다.
 
-## 무엇을 해야 하는가
+Generated loop state는 `ctx.state["af_dynamic_loop:<loop-control-id>"]`에 남긴다. Wiring skeleton은 `_MAX_DYNAMIC_LOOP_ITERATIONS = 3` 안전 상한을 둔다. Retry/fallback/escalation 같은 production business-loop policy는 generated runtime wrapper가 아니라 developer TODO boundary다.
 
-1. **출력 형태 추가**: `buildAgentPy()` 의 `AGENT_PY_BUILDERS` 맵(현재 `smoke`/`runnable`)에 동적 워크플로 빌더를 추가하거나, runnable 내부에서 "정적 DAG" vs "dynamic" 을 갈라 lower 한다. PR-0(`8a8987e`)에서 node-kind/output dispatch 를 레지스트리로 정비해 둔 것이 이 작업의 발판이다.
-2. **loop lowering**: `loop_control`/`loop_region`/`loop_back`/`loop_exit` → dynamic workflow(`@node` + `ctx.run_node` + `while` + 종료 조건). 상태 누적은 `ctx.state` 사용.
-3. **dynamic workflow 모듈**: `workflow_kind: "dynamic"` 모듈 노드를 dynamic 빌더로 lower.
-5. **가드 완화**: `assertRunnableGraphSupported` 의 `unsupportedExecSemantics`/`unsupportedEdgeKinds`/`unsupportedContainerKinds`/`unlowerableNodeKinds` 에서 해당 항목을 제거하되, **새 형태가 실제로 동적 빌더 경로로만 흐르도록** per-edge/per-node 게이팅을 추가한다(remote_a2a 게이팅 패턴 — PR-B `1a6821b`/`410b4aa` 참조).
-6. **회귀**: `scripts/generate-adk-source.test.mjs` 에 loop positive + reject 케이스 추가. scenario-d 를 runnable 로 build → `ast.parse` + 실 `google-adk` 2.2.0 import/construct + 가능하면 InMemoryRunner 실행 스모크.
+`workflow_kind: "dynamic"` 모듈과 `dynamic_workflow` container는 dynamic builder 선택 신호가 될 수 있다. 다만 `dynamic_workflow` container 자체는 runtime `adk_mapping`을 선언하지 않는다.
 
-## 건드릴 파일
+## 아직 의도적으로 제외
 
-- `scripts/generate-adk-source.mjs` (빌더/lowering/가드)
-- `scripts/generate-adk-source.test.mjs` (회귀)
-- `templates/regression-scenarios/scenario-c-*`, `scenario-d-*` (runnable 대상으로 재검토)
-- 문서: `CLAUDE.md`(build 불릿 "Loop/router stay smoke-only" 갱신), `docs/workbench/validation.md`, `docs/decision-log.md`
+- `callback_wait` runtime lowering.
+- `selected_by_llm` toolset selection을 deterministic adapter call로 변환.
+- Dynamic graph 안의 `route`/`conditional` edge 혼합 lowering. Static route-only graphs는 기존 static runnable builder가 처리한다.
+- Production-grade retry/fallback/business loop runtime policy.
+
+## 주요 파일
+
+- `scripts/adk-source/agent-dynamic.mjs`
+- `scripts/adk-source/graph/dynamic.mjs`
+- `scripts/adk-source/agent-runnable.mjs`
+- `packages/web/src/analyzer/scaffoldPlan.ts`
+- `scripts/validate-artifacts.mjs`
+- `templates/regression-scenarios/scenario-d-graph-workflow/analysis-result.json`
 
 ## 검증
 
-`node --test scripts/generate-adk-source.test.mjs`; `node scripts/validate-artifacts.mjs`; 생성 번들 `python3 -c "import ast; ..."`; 실 ADK venv(예: `/tmp/a2a-spike/.venv` 또는 신규)로 import/construct; 비-dynamic 번들이 byte-identical 유지되는지 스냅샷 diff.
-
-## 기반/주의
-
-- 직전 작업에서 generator 를 dispatch 구조로 정비(PR-0)한 의도가 바로 이 개편을 "핸들러 추가"로 흡수하기 위함이다. (memory: `feedback_generator_extensible_structure.md`)
-- 큰/위험 작업 → 격리 worktree + 서브에이전트/Codex 위임 + 커밋 경계마다 Codex 리뷰. (memory: `feedback_codex_usage.md`, `feedback_codex_incremental_review.md`)
+- `node --test scripts/generate-adk-source.test.mjs`
+- `node scripts/validate-artifacts.mjs templates/regression-scenarios/scenario-d-graph-workflow`
+- `cd packages/web && npm run test:analyzer`
+- `cd packages/web && npm run build`

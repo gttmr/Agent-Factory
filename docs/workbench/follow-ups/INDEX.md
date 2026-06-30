@@ -25,17 +25,19 @@
 | 07 | `07-onboarding-html-refresh.md` | 완료 | 정적 onboarding HTML과 새 screenshot asset이 route shell + Stage Runner 모델로 갱신됨. |
 | 08 | `08-perf-and-bundle.md` | 완료 | GraphCanvas child lazy split과 Vite build 정량 기록이 완료됨. `_perf-notes.md` 참고. |
 | 09 | `09-skill-runner-workbench.md` | 완료 | Analyze + Design Stage Runner, run evidence, diff/apply, gate 분리 구현됨. Build/Verify 확장은 brief 16에서 처리됨. |
-| 10 | `10-dynamic-workflow-lowering.md` | 마지막 예정 | route/loop/dynamic 을 ADK 2.x dynamic workflow 로 lower. generator 대규모 개편(현재 거부). |
+| 10 | `10-dynamic-workflow-lowering.md` | 완료 | route/loop/dynamic 을 public `runnable` mode 안의 내부 ADK dynamic workflow builder로 lower. |
 | 11 | `11-agent-consumer-channel-reads.md` | 완료(범위 재정의) | state channel은 agent instruction/connected MCP adapter만 소비. 비-connected state consumer와 agent/non-connected artifact consumer는 blocker. |
-| 12 | `12-a2a-contract-policy-mapping.md` | 마지막 예정 | `RemoteA2aAgent` 에 계약 auth/timeout/retry/fallback 을 `A2aRemoteAgentConfig`/interceptor 로 매핑. |
+| 12 | `12-a2a-contract-policy-mapping.md` | 완료 | `adk_runtime_policy` 추가. `RemoteA2aAgent` timeout/auth interceptor만 ADK-supported source로 lower하고 retry/fallback은 handoff policy로 기록. |
 | 13 | `13-scaffold-plan-warning-accuracy.md` | 완료 | runnable skeleton warning을 category/output_mode 인식형으로 정리. |
 | 14 | `14-runtime-stub-runtime-ux.md` | 완료 | RunSandbox stale+명시 재시작, adapter 없는 Mock Lab panel 숨김/안내 구현. |
 | 15 | `15-catalog-first-runtime-gap.md` | 코드 수정 완료(1–6) | router resume, route-map UI, runtime contract path normalization/hydration, catalog ID-first binding, Stage Runner catalog hydration, human-input 선택지 contract 최소 구현 및 ADK Web/Workbench smoke 확인. |
 | 16 | `16-build-verify-stage-runner.md` | 완료 | Build/Verify Stage Runner 확장: primitive wrapping, verify report/delta proposal, cancel endpoint, UI panel. |
+| 17 | `17-a2a-ui-error-surfacing.md` | 대기 | Local A2A provider import 화면 smoke 중 발견한 404 console noise, 422 detail opacity, React Flow type object warning 정리. |
+| TBD | 새 브리프 필요 | 대기 | Full Remote A2A HITL resume bridge. `input-required`는 interactive task state이며 plain ADK Web text chat resume은 아직 검증되지 않음. |
 
 `09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프이자 brief 09 구현 기록이다. Analyze + Design Stage Runner는 구현됐고, Build/Verify runner는 여전히 별도 후속 범위다. 기존 05의 `verify/run` / `runtime-stub/build` SSE 전환은 완료되어 BuildWorkbench/VerifyWorkbench live log 로 제공된다.
 
-브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 마지막 backlog 순서는 12 → 10이다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
+브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 브리프 17은 Local A2A provider import 화면 smoke에서 분리한 UI error-surfacing cleanup이다. Remote A2A `input-required` task를 plain ADK Web text chat으로 resume하는 bridge는 아직 검증되지 않았으므로 새 브리프로 분리한다. 마지막 backlog 순서였던 12와 10은 모두 완료됐다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
 
 ## 공통 작업 자세
 

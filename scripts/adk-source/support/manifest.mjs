@@ -1,12 +1,15 @@
 import { DEFAULT_MODEL, GEMINI_FALLBACK_MODEL, RUNTIME_MCP_LABEL, RUNTIME_MCP_NOTE } from "../context.mjs";
+import { remoteA2aRuntimeRows } from "../remote-a2a.mjs";
 
 export function buildManifest({
   outputMode,
   packageName,
   normalizedRequirement,
+  analysisResult,
   connectedAdapters,
   unconnectedAdapters,
   scaffoldPlan,
+  modules,
   processFlow,
   startNodeIds,
   terminalOutputIds,
@@ -51,6 +54,7 @@ export function buildManifest({
               api_key_env: "GOOGLE_API_KEY",
               fallback_model: GEMINI_FALLBACK_MODEL
             },
+            remote_a2a: remoteA2aRuntimeRows({ analysisResult, modules }),
             connected_adapters: connectedAdapters.map((module) => ({
               module_id: module.id,
               module_name: module.name,

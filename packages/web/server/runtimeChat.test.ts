@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -11,6 +12,12 @@ import {
   extractFinalTextFromAdkEvents,
   resolveAdkRuntimeVenv
 } from "./runtimeChat.ts";
+import {
+  DEFAULT_ADK_A2A_PORT,
+  RuntimeA2aManager,
+  buildAdkA2aServerCommand
+} from "./runtimeA2a.ts";
+import { writeFakeA2aRuntime } from "./runtimeA2aTestHelpers.ts";
 
 const repoRoot = await mkdtemp(join(tmpdir(), "af-runtime-chat-"));
 const store = new ArtifactRootStore({ repoRoot });
@@ -77,6 +84,43 @@ try {
   ]);
   assert.equal(finalText, "Synthetic loan precheck response");
 
+  await store.createRoot("req-a2a");
+  const a2aPort = await getAvailablePort();
+  const a2aStubDir = join(repoRoot, "artifacts/af/req-a2a/runtime-stub");
+  await mkdir(join(a2aStubDir, "req_a2a_adk"), { recursive: true });
+  await writeFile(
+    join(a2aStubDir, "req_a2a_adk/workflow_manifest.json"),
+    `${JSON.stringify({ package: "req_a2a_adk", requirement: { title: "A2A test provider" } }, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(join(a2aStubDir, "req_a2a_adk/agent.py"), "root_agent = object()\n", "utf8");
+  await writeFile(join(a2aStubDir, "af_adk_a2a_server.py"), "# fake launcher\n", "utf8");
+  const a2aManager = new RuntimeA2aManager({ repoRoot, store, port: a2aPort });
+  const a2aStatus = await a2aManager.status("req-a2a");
+  assert.equal(DEFAULT_ADK_A2A_PORT, 8001);
+  assert.equal(a2aStatus.port, a2aPort);
+  assert.equal(a2aStatus.rpc_url, `http://127.0.0.1:${a2aPort}/a2a/req_a2a_adk`);
+  assert.equal(
+    a2aStatus.agent_card_url,
+    `http://127.0.0.1:${a2aPort}/a2a/req_a2a_adk/.well-known/agent-card.json`
+  );
+  assert.equal(a2aStatus.server.status, "stopped");
+  const a2aCommand = buildAdkA2aServerCommand({ pythonPath: venv.pythonPath, stubDir: a2aStubDir, host: "127.0.0.1", port: a2aPort });
+  assert.deepEqual(a2aCommand.args, [
+    join(a2aStubDir, "af_adk_a2a_server.py"),
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(a2aPort),
+    "--session_service_uri",
+    "memory://",
+    "--artifact_service_uri",
+    "memory://",
+    "--no-reload",
+    "--with_ui",
+    "."
+  ]);
+
   await store.createRoot("req-adopt");
   const adoptPort = await getAvailablePort();
   const adoptStubDir = join(repoRoot, "artifacts/af/req-adopt/runtime-stub");
@@ -98,7 +142,15 @@ try {
       "const args = process.argv.slice(2);",
       "const port = Number(args[args.indexOf('--port') + 1]);",
       "const host = args[args.indexOf('--host') + 1] || '127.0.0.1';",
-      "const server = http.createServer((_req, res) => res.end('fake adk'));",
+      "const server = http.createServer((req, res) => {",
+      "  const match = req.url && req.url.match(/^\\/a2a\\/([^/]+)\\/\\.well-known\\/agent-card\\.json$/);",
+      "  if (match) {",
+      "    res.setHeader('content-type', 'application/json');",
+      "    res.end(JSON.stringify({ name: match[1], skills: [{ id: `${match[1]}_workflow` }] }));",
+      "    return;",
+      "  }",
+      "  res.end('fake adk');",
+      "});",
       "server.listen(port, host);",
       "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
       "setInterval(() => undefined, 1000);",
@@ -133,6 +185,46 @@ try {
   const stopped = await restartedManager.stop("req-adopt");
   assert.equal(stopped.ok, true);
   assert.equal(stopped.status.server.status, "stopped");
+
+  await writeFakeA2aRuntime(repoRoot, { serveAgentCard: true });
+  const a2aStarted = await a2aManager.start("req-a2a");
+  assert.equal(a2aStarted.ok, true);
+  assert.equal(a2aStarted.status.server.status, "running");
+  const generatedAgentCard = JSON.parse(readFileSync(join(a2aStubDir, "req_a2a_adk/agent.json"), "utf8")) as {
+    readonly url: string;
+    readonly name: string;
+  };
+  assert.equal(generatedAgentCard.name, "req_a2a_adk");
+  assert.equal(generatedAgentCard.url, `http://127.0.0.1:${a2aPort}/a2a/req_a2a_adk`);
+  const a2aStopped = await a2aManager.stop("req-a2a");
+  assert.equal(a2aStopped.ok, true);
+
+  await store.createRoot("req-a2a-missing-card");
+  const missingCardPort = await getAvailablePort();
+  const missingCardStubDir = join(repoRoot, "artifacts/af/req-a2a-missing-card/runtime-stub");
+  await mkdir(join(missingCardStubDir, "req_a2a_missing_card_adk"), { recursive: true });
+  await writeFile(
+    join(missingCardStubDir, "req_a2a_missing_card_adk/workflow_manifest.json"),
+    `${JSON.stringify({ package: "req_a2a_missing_card_adk", requirement: { title: "A2A missing card" } }, null, 2)}\n`,
+    "utf8"
+  );
+  await writeFile(join(missingCardStubDir, "req_a2a_missing_card_adk/agent.py"), "root_agent = object()\n", "utf8");
+  await writeFile(join(missingCardStubDir, "af_adk_a2a_server.py"), "# fake launcher\n", "utf8");
+  await writeFakeA2aRuntime(repoRoot, { serveAgentCard: false });
+  const missingCardManager = new RuntimeA2aManager({
+    repoRoot,
+    store,
+    port: missingCardPort,
+    startupProbeTimeoutMs: 250,
+    statusProbeTimeoutMs: 100
+  });
+  const missingCardStart = await missingCardManager.start("req-a2a-missing-card");
+  assert.equal(missingCardStart.ok, false);
+  assert.equal(missingCardStart.status.server.status, "failed");
+  assert.equal(missingCardStart.status.server.agent_card_ready, false);
+  assert.equal(missingCardStart.status.server.agent_card_status_code, 404);
+  assert.match(missingCardStart.status.server.message ?? "", /Agent Card/);
+  assert.equal((await missingCardManager.stop("req-a2a-missing-card")).ok, true);
 } finally {
   await rm(repoRoot, { recursive: true, force: true });
 }

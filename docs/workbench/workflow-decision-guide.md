@@ -14,7 +14,7 @@ ADK 2.0 Graph Workflow, Dynamic Workflow, Human Input 문서를 기준으로 한
 - Adapter 호출이 여러 개라는 사실만으로 Workflow가 필요한 것은 아니다. 실행 순서, 라우팅, 병렬성, 반복, 승인 gate가 설계상 의미 있을 때 Workflow를 둔다.
 - Remote A2A는 workflow pattern이 아니다. 독립 원격 agent 계약이 확인될 때만 사용한다.
 - Catalog에 등록된 공통 Workflow는 `module_category: workflow`를 유지하면서 `runtime_binding: remote_a2a`로 호출될 수 있다. 이것은 실행 binding이며, 독립 원격 Agent 후보인 `module_category: remote_a2a`와 구분한다.
-- ADK Web smoke skeleton 생성 범위에서는 Dynamic Workflow runnable codegen을 생성하지 않는다. `dynamic_workflow`는 design/contract container일 뿐이며, 동적 로직은 하위 Workflow로 분리하고 parent graph에서는 `workflow_call` 노드로 조립한다.
+- ADK Web runnable skeleton은 reviewed dynamic/loop Graph IR shape를 감지하면 public `output_mode: "runnable"` 안에서 내부 ADK dynamic workflow builder를 선택할 수 있다. `dynamic_workflow` container 자체에 runtime `adk_mapping`을 선언하지 않는 규칙은 유지한다.
 
 ## orchestration
 
@@ -64,7 +64,7 @@ Graph IR 표현:
 - target workflow가 존재하면 `workflow_ref`로 연결하고 skeleton 생성 시 workflow call stub을 만든다.
 - target workflow skeleton이 아직 없으면 placeholder workflow call stub을 만들고 README와 TODO에 수동 연결 필요를 남긴다.
 - target workflow ref가 깨졌거나 입출력 schema가 없으면 `manual_required` 또는 validation warning으로 처리한다.
-- dynamic workflow 요청은 "기존 Workflow로 분리한 뒤 workflow_call node로 추가"하도록 안내한다.
+- catalog나 외부 owner가 이미 분리한 dynamic workflow는 `workflow_call` node로 추가한다. 같은 approved artifact 안의 reviewed dynamic/loop shape는 runnable 내부 dynamic builder로 lower할 수 있다.
 
 ## dynamic classification
 
@@ -77,10 +77,9 @@ Graph IR 표현:
 - static graph로 표현하면 지나치게 복잡하거나 runtime 값이 있어야만 다음 경로를 알 수 있다.
 - ADK dynamic workflow의 `ctx.run_node` 기반 composition, checkpointing, resume semantics가 핵심이다.
 
-`workflow_kind: dynamic`은 분석 분류로는 남아 있지만 이번 skeleton 생성 범위에서는 runnable lowering 대상이 아니다.
-Graph IR의 `dynamic_workflow` container는 design/contract container로만 사용하며 runtime `adk_mapping`이나 `dynamic_*` codegen을 만들지 않는다.
-관찰 가능한 주요 호출은 별도 `workflow`로 분리하고 parent graph는 `workflow_call`로 조립한다.
-종료 조건, max iteration, fallback, escalation은 target Workflow 내부의 수동 구현 TODO로 남긴다.
+`workflow_kind: dynamic`은 분석 분류로 남아 있고, runnable mode에서는 reviewed Graph IR shape가 dynamic builder 경로를 선택하게 하는 신호가 될 수 있다.
+Graph IR의 `dynamic_workflow` container는 runtime `adk_mapping`을 선언하지 않는다. Generator는 container mapping 대신 reviewed nodes/edges를 읽어 `@node` + `ctx.run_node(...)` 기반 wiring skeleton을 만든다.
+반복 종료는 `loop_control`의 reviewed `loop_back`/`loop_exit` decision edge에 둔다. Production-grade fallback, escalation, business loop policy는 generated skeleton 밖의 developer TODO boundary다.
 
 ## ADK Component Routing
 
@@ -118,7 +117,7 @@ Mock Lab은 repo 내부 `packages/mock-lab`의 local test double 기능이며, �
 - 사용자가 입력할 수 있는 승인/반려 문구는 각 route edge의 `route_aliases`에 넣는다. 기본 fallback branch가 필요하면 같은 router에서 route edge 하나에만 `is_default_route: true`를 둔다.
 - route 이후 분석을 수행하는 경로는 Adapter/Agent node로 이어지고, 건너뛰기 경로는 다음 human confirmation 또는 handoff node로 직접 이어질 수 있다.
 
-Runnable skeleton generator는 이 static user-confirmation route를 ADK `RequestInput`, `Event(route=...)`, Workflow route map으로 lower한다. Generator는 업무별 route alias를 하드코딩하지 않고 reviewed Graph IR 필드만 사용한다. 반복, runtime-computed dynamic dispatch, Python loop는 여전히 `dynamic_workflow` 후속 범위다.
+Runnable skeleton generator는 이 static user-confirmation route를 ADK `RequestInput`, `Event(route=...)`, Workflow route map으로 lower한다. Generator는 업무별 route alias를 하드코딩하지 않고 reviewed Graph IR 필드만 사용한다. 반복은 reviewed `loop_region`/`loop_control`/`loop_back`/`loop_exit` shape가 있을 때 내부 dynamic workflow builder로 lower한다.
 
 ## ADK MCP 사용 주의
 

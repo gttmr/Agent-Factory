@@ -1,21 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, EmptyState, Panel, SectionHeader } from "../ui/primitives";
+import { useAnalysisArtifact } from "../state/useAnalysisArtifact";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { useRuntimeStub } from "../state/useScaffoldPlan";
 import {
+  useRuntimeChatInputRequired,
   useRuntimeChatStatus,
   useStartRuntimeChat,
   useStopRuntimeChat
 } from "../state/useRuntimeChat";
+import { useRuntimeA2aStatus } from "../state/useRuntimeA2a";
+import { RuntimeA2aProviderPanel } from "./run/RuntimeA2aProviderPanel";
+import { runtimeA2aProviderTarget } from "./run/runtimeA2aProviderTarget";
+import { remoteInputRequiredView } from "./run/runtimeInputRequiredView";
 
-/**
- * ADK 런타임 실행 화면 — 승인 게이트가 없는 도구 화면.
- *
- * 공유 ADK runtime venv 로 `adk api_server … --with_ui` 를 8765 포트에 띄운 뒤,
- * ADK 공식 dev UI(채팅·이벤트·트레이스) 로 링크한다.
- * AF 자체 간이 챗은 ADK dev UI 와 중복이라 제공하지 않는다.
- */
 export default function RunSandbox() {
   const params = useParams<{ reqId: string }>();
   const reqId = params.reqId;
@@ -25,9 +24,14 @@ export default function RunSandbox() {
   }, [reqId, touch]);
 
   const { data: runtimeStub } = useRuntimeStub(reqId);
+  const { data: analysisData } = useAnalysisArtifact(reqId);
   const stubReady = Boolean(runtimeStub?.exists) && (runtimeStub?.files?.length ?? 0) > 0;
   const statusReqId = reqId && stubReady ? reqId : undefined;
-  const status = useRuntimeChatStatus(statusReqId);
+  const a2aProviderTarget = reqId && analysisData !== undefined ? runtimeA2aProviderTarget(analysisData?.data, reqId) : null;
+  const a2aStatusReqId = stubReady ? a2aProviderTarget?.reqId : undefined;
+  const chatStatus = useRuntimeChatStatus(statusReqId);
+  const chatInputRequired = useRuntimeChatInputRequired(statusReqId);
+  const a2aStatus = useRuntimeA2aStatus(a2aStatusReqId);
   const startRuntime = useStartRuntimeChat(reqId);
   const stopRuntime = useStopRuntimeChat(reqId);
 
@@ -73,11 +77,12 @@ export default function RunSandbox() {
     });
   }
 
-  const serverStatus = status.data?.server.status ?? "stopped";
+  const serverStatus = chatStatus.data?.server.status ?? "stopped";
   const isRunning = serverStatus === "running";
-  const canStop = Boolean(status.data?.server.can_stop) || serverStatus === "failed";
-  const isStale = Boolean(status.data?.server.stale);
-  const webUrl = status.data?.web_url ?? null;
+  const canStop = Boolean(chatStatus.data?.server.can_stop) || serverStatus === "failed";
+  const isStale = Boolean(chatStatus.data?.server.stale);
+  const webUrl = chatStatus.data?.web_url ?? null;
+  const remoteInputRequired = remoteInputRequiredView(chatInputRequired.data?.input_required, a2aStatus.data);
 
   return (
     <div className="af-run-shell">
@@ -99,33 +104,33 @@ export default function RunSandbox() {
               개발 단계로 이동
             </Link>
           </>
-        ) : status.error ? (
-          <p className="af-landing-error">{(status.error as Error).message}</p>
+        ) : chatStatus.error ? (
+          <p className="af-landing-error">{(chatStatus.error as Error).message}</p>
         ) : (
           <>
             <ul className="af-gate-summary">
-              <li>app: {status.data?.app_name ?? "확인 중"}</li>
-              <li>shared venv: {status.data?.installed ? "준비됨" : "미준비"}</li>
-              <li>venv: {status.data?.paths.venv ?? "확인 중"}</li>
+              <li>app: {chatStatus.data?.app_name ?? "확인 중"}</li>
+              <li>shared venv: {chatStatus.data?.installed ? "준비됨" : "미준비"}</li>
+              <li>venv: {chatStatus.data?.paths.venv ?? "확인 중"}</li>
               <li>server: {serverStatus}</li>
-              <li>port: {status.data?.port ?? 8765}</li>
-              {status.data?.server.pid ? <li>pid: {status.data.server.pid}</li> : null}
-              {!status.data?.server.pid && status.data?.server.port_owner_pid ? <li>port owner pid: {status.data.server.port_owner_pid}</li> : null}
+              <li>port: {chatStatus.data?.port ?? 8765}</li>
+              {chatStatus.data?.server.pid ? <li>pid: {chatStatus.data.server.pid}</li> : null}
+              {!chatStatus.data?.server.pid && chatStatus.data?.server.port_owner_pid ? <li>port owner pid: {chatStatus.data.server.port_owner_pid}</li> : null}
             </ul>
-            {status.data?.server.message ? <p className="af-landing-error">{status.data.server.message}</p> : null}
+            {chatStatus.data?.server.message ? <p className="af-landing-error">{chatStatus.data.server.message}</p> : null}
             {isStale ? (
               <p className="af-landing-error">
                 runtime-stub 이 실행 이후 변경되었습니다. 현재 ADK runtime 은 이전 bundle 로 동작하므로 재시작해야 변경분이 반영됩니다.
               </p>
             ) : null}
-            {!status.data?.installed && status.data?.setup_hint ? (
-              <p className="af-landing-message">{status.data.setup_hint}</p>
+            {!chatStatus.data?.installed && chatStatus.data?.setup_hint ? (
+              <p className="af-landing-message">{chatStatus.data.setup_hint}</p>
             ) : null}
             <div className="af-action-row">
               <Button
                 type="button"
                 variant="primary"
-                disabled={!status.data?.installed || startRuntime.isPending}
+                disabled={!chatStatus.data?.installed || startRuntime.isPending}
                 onClick={handleStart}
               >
                 {startRuntime.isPending ? "시작 중…" : "ADK runtime 시작"}
@@ -147,10 +152,10 @@ export default function RunSandbox() {
                 {stopRuntime.isPending || startRuntime.isPending ? "재시작 중…" : "재시작"}
               </Button>
             </div>
-            {status.data?.server.stderr_tail ? (
+            {chatStatus.data?.server.stderr_tail ? (
               <details className="af-blocker-list">
                 <summary>ADK stderr</summary>
-                <pre>{status.data.server.stderr_tail}</pre>
+                <pre>{chatStatus.data.server.stderr_tail}</pre>
               </details>
             ) : null}
           </>
@@ -161,8 +166,17 @@ export default function RunSandbox() {
         <Panel>
           <SectionHeader
             title="ADK 웹 UI"
-            description="ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. 새 탭에서 전체 화면으로 엽니다."
+            description="ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 현재 같은 task resume 으로 검증되지 않았으므로 Workbench 상태를 함께 확인하세요."
           />
+          {remoteInputRequired.visible ? (
+            <div className="af-run-input-required" role="status" aria-live="polite">
+              <strong>{remoteInputRequired.title}</strong>
+              <p>{remoteInputRequired.prompt}</p>
+              {remoteInputRequired.payload ? <p>{remoteInputRequired.payload}</p> : null}
+              <small>{remoteInputRequired.detail}</small>
+              {remoteInputRequired.taskState ? <code>task state: {remoteInputRequired.taskState}</code> : null}
+            </div>
+          ) : null}
           {isRunning && webUrl ? (
             <div className="af-run-weblink">
               <a className="ui-button ui-button-primary" href={webUrl} target="_blank" rel="noreferrer">
@@ -177,6 +191,15 @@ export default function RunSandbox() {
             />
           )}
         </Panel>
+      ) : null}
+
+      {stubReady ? (
+        <RuntimeA2aProviderPanel
+          target={a2aProviderTarget}
+          status={a2aStatus.data}
+          error={a2aStatus.error}
+          onActionMessage={setActionMessage}
+        />
       ) : null}
     </div>
   );

@@ -143,8 +143,43 @@ test("validate-artifacts rejects invalid reviewed route defaults and aliases", (
 
   const result = runValidatorExpectingFailure(artifactRoot);
   assert.match(result.stderr, /route_aliases entries must be non-empty strings/);
-  assert.match(result.stderr, /route_aliases is allowed only on route edges/);
+  assert.match(result.stderr, /route_aliases is allowed only on route or loop decision edges/);
   assert.match(result.stderr, /router .* has multiple default route edges/);
+});
+
+test("validate-artifacts accepts reviewed loop decision aliases and defaults", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-loop-route-contract-");
+  const analysis = readScenarioAnalysis();
+  analysis.processFlow = processFlowWithReviewedRoutes({
+    nodes: [
+      graphNode("node-input", "input", "input"),
+      graphNode("node-body", "router", "local_graph"),
+      graphNode("node-loop", "loop_control", "local_graph"),
+      graphNode("node-output", "output", "output")
+    ],
+    edges: [
+      graphEdge("edge-001", "node-input", "node-body"),
+      graphEdge("edge-002", "node-body", "node-loop"),
+      graphEdge("edge-003", "node-loop", "node-body", {
+        edge_kind: "control",
+        execution_semantics: "loop_back",
+        route_condition: "decision == retry",
+        route_aliases: ["retry", "revise"]
+      }),
+      graphEdge("edge-004", "node-loop", "node-output", {
+        edge_kind: "control",
+        execution_semantics: "loop_exit",
+        route_condition: "decision == done",
+        route_aliases: ["approved"],
+        is_default_route: true
+      })
+    ]
+  });
+
+  writeJson(join(artifactRoot, "analysis-result.json"), analysis);
+
+  execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  rmSync(artifactRoot, { recursive: true, force: true });
 });
 
 test("validate-artifacts rejects human input contracts without reviewed message", () => {

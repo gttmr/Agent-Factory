@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
 import { RUNTIME_MCP_LABEL } from "../context.mjs";
+import { remoteA2aEnvVars, remoteA2aRuntimeRows } from "../remote-a2a.mjs";
 import { sampleConversationTranscript } from "./samples.mjs";
 
 export function buildReadme(context) {
@@ -47,6 +48,8 @@ Windows + LiteLLM 실행 환경에서는 \`PYTHONUTF8=1\`을 함께 둡니다.
 
 ${buildMockLabRunMarkdown(context)}
 
+${buildRemoteA2aRuntimePolicyMarkdown(context)}
+
 ${buildSampleDialogueMarkdown(context)}
 
 ## Adapter와 Mock Lab
@@ -66,6 +69,19 @@ adk web --host 127.0.0.1 --port 8765 --no-reload .
 curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/sessions/af-smoke -H "Content-Type: application/json" -d '{}'
 curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
 \`\`\`
+
+## ADK A2A provider
+
+\`\`\`bash
+AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
+AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
+python af_adk_a2a_server.py --host 127.0.0.1 --port 8001 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+curl http://127.0.0.1:8001/a2a/${packageName}/.well-known/agent-card.json
+\`\`\`
+
+\`af_adk_a2a_server.py\` uses ADK's FastAPI/Web runner and A2A executor, but applies a local in-memory compatibility patch for ADK CLI versions whose \`api_server --a2a\` path fails before registering \`agent.json\`.
+
+When generated \`RequestInput\` nodes pause the workflow, the local provider keeps that pause as an A2A \`input-required\` task state and exposes the ADK long-running function call as \`adk_request_input\`. Agent Card metadata advertises the ADK A2A extension used by ADK 2.3 for this local executor path, but it does not prove full remote HITL resume support; verify same-task function-response continuation before treating plain chat follow-up as resume.
 `;
   }
   return `# ${packageName}
@@ -98,7 +114,8 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 `;
 }
 
-export function buildImplementationHandoff({ scaffoldPlan, normalizedRequirement, outputMode, unconnectedAdapters }) {
+export function buildImplementationHandoff(context) {
+  const { scaffoldPlan, normalizedRequirement, outputMode, unconnectedAdapters } = context;
   const todoLines = scaffoldPlan.modules.flatMap((module) =>
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
@@ -123,6 +140,8 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 ## 미연결 adapter
 
 ${unconnected.length ? unconnected.join("\n") : "- none"}
+
+${buildRemoteA2aHandoffMarkdown(context)}
 
 ## 검토된 TODO
 
@@ -165,6 +184,37 @@ function mockSpecRelativePath({ outputRoot, artifactRoot }) {
 
 function buildSampleDialogueMarkdown(context) {
   return ["## Sample ADK Web messages", "", "```text", sampleConversationTranscript(context), "```"].join("\n");
+}
+
+function buildRemoteA2aRuntimePolicyMarkdown(context) {
+  const rows = remoteA2aRuntimeRows(context);
+  if (!rows.length) return "";
+  const lines = rows.map((row) => {
+    const auth = row.adk_runtime_policy?.auth;
+    const timeout = row.adk_runtime_policy?.timeout_seconds ?? "null";
+    const authText = auth?.mode === "none" ? "none" : `${auth?.mode ?? "missing"} via ${auth?.env_var ?? "missing env"}`;
+    return `- ${row.module_name} (${row.contract_id}): timeout_seconds=${timeout}, auth=${authText}`;
+  });
+  return `## Remote A2A runtime policy
+
+${lines.join("\n")}
+
+retry_handoff and fallback_handoff are reviewed handoff policy; this generator does not emit retry/fallback wrappers.
+`;
+}
+
+function buildRemoteA2aHandoffMarkdown(context) {
+  const rows = remoteA2aRuntimeRows(context);
+  if (!rows.length) return "";
+  const envVars = remoteA2aEnvVars(context);
+  return `## Remote A2A runtime policy
+
+${rows
+  .map((row) => `- ${row.module_name} (${row.contract_id}): set reviewed env-backed auth before smoke runs.`)
+  .join("\n")}
+${envVars.length ? `- Required env vars: ${envVars.join(", ")}` : "- Required env vars: none"}
+- Remote A2A retry/fallback policy is not generated as an ADK retry wrapper; keep it in operator handoff until an ADK-supported runtime policy is reviewed.
+`;
 }
 
 function buildMockLabRunMarkdown(context) {

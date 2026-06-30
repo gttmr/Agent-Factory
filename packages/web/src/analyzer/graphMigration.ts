@@ -1054,11 +1054,14 @@ export function validateGraphIRSoft(
         target_id: edge.id ?? null
       });
     }
+    const isRouteReviewEdge =
+      edge.edge_kind === "route" ||
+      ((edge.execution_semantics === "loop_back" || edge.execution_semantics === "loop_exit") && edge.edge_kind === "control");
     if (Array.isArray(edge.route_aliases) && edge.route_aliases.length > 0) {
-      if (edge.edge_kind !== "route") {
+      if (!isRouteReviewEdge) {
         errors.push({
           code: "route_aliases_on_non_route",
-          message: `Edge ${edge.id ?? ""} route_aliases is allowed only on route edges.`,
+          message: `Edge ${edge.id ?? ""} route_aliases is allowed only on route or loop decision edges.`,
           target_kind: "edge",
           target_id: edge.id ?? null
         });
@@ -1073,14 +1076,14 @@ export function validateGraphIRSoft(
       }
     }
     if (edge.is_default_route === true) {
-      if (edge.edge_kind !== "route") {
+      if (!isRouteReviewEdge) {
         errors.push({
           code: "default_route_on_non_route",
-          message: `Edge ${edge.id ?? ""} is_default_route is allowed only on route edges.`,
+          message: `Edge ${edge.id ?? ""} is_default_route is allowed only on route or loop decision edges.`,
           target_kind: "edge",
           target_id: edge.id ?? null
         });
-      } else if (typeof edge.from === "string") {
+      } else if (edge.edge_kind === "route" && typeof edge.from === "string") {
         const current = defaultRouteEdgesByRouter.get(edge.from) ?? [];
         current.push(edge.id ?? `${edge.from}->${edge.to}`);
         defaultRouteEdgesByRouter.set(edge.from, current);

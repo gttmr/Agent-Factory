@@ -29,5 +29,5 @@ ADK Runtime Handoff가 만드는 코드는 production generator가 아니다.
 승인된 Graph IR 또는 Scaffold Plan에서 ADK Web smoke가 가능한 skeleton, Mock Lab wiring, sample input, developer TODO를 만든다.
 전문 개발자는 이후 실제 API/EAI client, 업무 검증, 예외 처리, dynamic control logic, production prompt와 배포 설정을 수동 보강한다.
 
-Dynamic Workflow는 이번 skeleton 생성 범위에서 design/contract container일 뿐이며 runnable dynamic codegen으로 자동 생성하지 않는다.
-복잡한 동적 흐름은 하위 Workflow로 분리하고 상위 설계에서는 `workflow_call`로 조립한다.
+Reviewed dynamic/loop Graph IR shape는 runnable mode 안에서 ADK dynamic workflow wiring skeleton으로 생성될 수 있다.
+복잡한 production dynamic control, fallback, escalation은 generated TODO boundary로 남기며, 이미 분리된 업무 Workflow 재사용은 상위 설계에서 `workflow_call`로 조립한다.

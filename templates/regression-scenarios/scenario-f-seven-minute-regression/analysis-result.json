@@ -160,6 +160,23 @@
         "chunking_policy": "needs_info"
       },
       "adk_host_mapping": "needs_info",
+      "adk_runtime_policy": {
+        "timeout_seconds": null,
+        "auth": {
+          "mode": "bearer_env",
+          "env_var": null,
+          "metadata_key": null
+        },
+        "retry_handoff": {
+          "max_attempts": null,
+          "backoff_seconds": null,
+          "retry_on": []
+        },
+        "fallback_handoff": {
+          "mode": "manual_review",
+          "message": null
+        }
+      },
       "timeout": "needs_info",
       "retry": "needs_info",
       "fallback": "needs_info",

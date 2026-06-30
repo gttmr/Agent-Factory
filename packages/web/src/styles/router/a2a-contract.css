@@ -2,6 +2,8 @@
 
 .af-a2a-table {
   width: 100%;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-xs);
 }
@@ -12,6 +14,7 @@
   border-bottom: 1px solid var(--line);
   vertical-align: top;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .af-a2a-table th {
@@ -36,6 +39,8 @@
   text-align: left;
   cursor: pointer;
   color: inherit;
+  min-width: 0;
+  width: 100%;
 }
 
 .af-a2a-row-button strong {
@@ -63,6 +68,24 @@
 
 .af-a2a-readiness-pending {
   color: var(--cat-workflow);
+}
+
+.af-a2a-provider-import {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.af-a2a-provider-import .ui-field {
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+
+.af-a2a-provider-import .af-landing-error {
+  margin: 0;
+  flex: 1 1 180px;
 }
 
 .af-a2a-inspector {

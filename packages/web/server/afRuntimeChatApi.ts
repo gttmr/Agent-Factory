@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { RuntimeChatManager } from "./runtimeChat";
 import { sendJson } from "./httpApi";
+import { runtimeChatInputRequiredFromStatus } from "./runtimeChatInputRequired";
 
 export async function handleRuntimeChat(
   runtimeChat: RuntimeChatManager,
@@ -23,6 +24,14 @@ export async function handleRuntimeChat(
       error: "웹에서 ADK dependency 설치는 지원하지 않습니다. 공유 venv를 수동으로 준비하세요.",
       status: await runtimeChat.status(reqId)
     });
+    return;
+  }
+  if (action === "input-required") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
+      return;
+    }
+    sendJson(res, 200, await runtimeChatInputRequiredFromStatus(await runtimeChat.status(reqId)));
     return;
   }
   if (action === "start") {

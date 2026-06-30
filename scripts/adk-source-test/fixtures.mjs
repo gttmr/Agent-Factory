@@ -200,9 +200,9 @@ export function collectGeneratorSourceFiles() {
   return files.sort((a, b) => relative(repoRoot, a).localeCompare(relative(repoRoot, b)));
 }
 
-export function writeChannelFixture(dir, { modules, nodes, edges }) {
+export function writeChannelFixture(dir, { modules, nodes, edges, containers = [] }) {
   writeJson(join(dir, "normalized-requirement.json"), { id: "req-ch", title: "Channel workflow", status: "approved" });
-  writeJson(join(dir, "process-flow.json"), { nodes, edges, validation: { errors: [] } });
+  writeJson(join(dir, "process-flow.json"), { nodes, edges, containers, validation: { errors: [] } });
   writeJson(join(dir, "module-candidates.json"), modules.map((m) => ({ id: m.id, status: "approved", missing_information: [] })));
   writeJson(join(dir, "af-run-manifest.json"), {
     requirement_id: "req-ch",

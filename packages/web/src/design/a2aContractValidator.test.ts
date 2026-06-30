@@ -23,6 +23,23 @@ const readyContract: A2AContract = {
     ...unresolvedContract.agent_card,
     version: "2026-05-01"
   },
+  adk_runtime_policy: {
+    timeout_seconds: 60,
+    auth: {
+      mode: "bearer_env",
+      env_var: "AF_A2A_CREDIT_ANALYSIS_TOKEN",
+      metadata_key: null
+    },
+    retry_handoff: {
+      max_attempts: 2,
+      backoff_seconds: 5,
+      retry_on: ["transient_transport_error"]
+    },
+    fallback_handoff: {
+      mode: "manual_review",
+      message: "Route to the local human reviewer when the remote agent does not produce a terminal outcome."
+    }
+  },
   skills: ["credit-analysis"]
 };
 const readyAnalysis: AnalysisResult = {
@@ -37,6 +54,33 @@ const readyAnalysis: AnalysisResult = {
 
 assert.deepEqual(a2aContractReadinessIssues(readyContract), []);
 assert.equal(a2aContractsGateReady(readyAnalysis), true);
+
+assert.ok(
+  a2aContractReadinessIssues({
+    ...readyContract,
+    adk_runtime_policy: {
+      ...readyContract.adk_runtime_policy,
+      auth: {
+        mode: "bearer_env",
+        env_var: null,
+        metadata_key: null
+      }
+    }
+  }).includes("adk_runtime_policy.auth.env_var is missing")
+);
+assert.ok(
+  a2aContractReadinessIssues({
+    ...readyContract,
+    adk_runtime_policy: {
+      ...readyContract.adk_runtime_policy,
+      auth: {
+        mode: "metadata_env",
+        env_var: "AF_A2A_PARTNER_METADATA_TOKEN",
+        metadata_key: null
+      }
+    }
+  }).includes("adk_runtime_policy.auth.metadata_key is missing for metadata_env")
+);
 
 assert.equal(
   a2aContractsGateReady({

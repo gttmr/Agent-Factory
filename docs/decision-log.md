@@ -305,9 +305,34 @@
 
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
+### A2A readiness와 `input-required`는 chat-ready/final answer가 아니다
+- **결정**: Local A2A provider status는 Agent Card health와 semantic `message/send` readiness를 분리한다. Agent Card `HTTP 200`은 chat-ready가 아니며, passive status polling은 `message/send`를 호출하거나 A2A task를 생성하지 않는다. Semantic readiness는 explicit start/probe action의 cached result로만 표시한다. Missing Mock Lab prerequisite(예: `wf-page-recommendation-mock`)은 blocked/prerequisite 상태와 start action으로 노출한다. A2A `input-required`는 final answer가 아니라 interactive task state다. Plain ADK Web text chat은 아직 verified remote HITL resume bridge가 아니므로 full multi-turn remote HITL resume은 별도 후속으로 둔다.
+- **배경**: Todo 1-3 확인 결과, Mock Lab start 전 failure는 provider running 상태 뒤에 숨기면 안 되고, Mock Lab start 후 current live provider의 `working` state도 input-required proof나 chat readiness proof가 아니다.
+- **영향**: RunSandbox/provider status 문구, runtime validation docs, follow-up status. No private endpoints, credentials, deployment scripts, production persistence, or real customer data.
+
+### Local ADK A2A provider는 Agent Card health까지 검증한다
+- **결정**: generated runtime-stub에 `agent.json`과 `af_adk_a2a_server.py`를 포함한다. RunSandbox는 `python af_adk_a2a_server.py --host 127.0.0.1 --port 8001 ... --with_ui .`로 provider를 시작하고, 프로세스 생존이 아니라 Agent Card URL의 valid JSON 응답을 성공 조건으로 삼는다. Design `Remote A2A` 탭의 local provider import는 `stub_ready_for_followup` artifact의 `/runtime-a2a/agent-card`를 읽어 draft 후보/계약/Graph node를 만들며 승인은 자동화하지 않는다.
+- **배경**: ADK 2.2/2.3 `api_server --a2a` 경로가 `fast_api.py` 내부 `json` local-scope 버그로 `agent.json` route 등록 전에 실패하는 것을 로컬 source와 HTTP 404로 확인했다. Generated launcher는 ADK FastAPI/Web runner와 A2A executor를 그대로 쓰되, 해당 버그가 있는 source에서만 in-memory patch를 적용한다. 화면 smoke 중 단순 `input -> output` consumer artifact에 provider를 import하면 remote node가 고립되던 문제도 확인되어, 단순 placeholder graph만 `input -> remote -> output`으로 재배선한다.
+- **영향**: ADK source generator, RunSandbox A2A provider API/UI, Design Remote A2A local import UI, `req-page-recommendation-a2a-consumer` artifact, active runtime/review docs. 검증: ADK 2.3.0 shared venv에서 provider start `ok:true`, Agent Card `HTTP 200`, status `agent_card_ready:true`.
+
+### Remote A2A runtime policy는 ADK-supported timeout/auth만 생성한다
+- **결정**: `A2AContract.adk_runtime_policy`를 추가하고, runnable generator는 `timeout_seconds`를 `RemoteA2aAgent(timeout=...)`로, `bearer_env`/`metadata_env` auth를 `A2aRemoteAgentConfig(request_interceptors=[...])`로만 lower한다. Auth 값은 `AF_A2A_*` env var 이름만 artifact/source에 저장한다. `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 기록하고 generated retry/fallback runtime wrapper는 만들지 않는다.
+- **배경**: ADK current source/docs에서 timeout과 request interceptor는 안정적인 생성 대상이지만, Remote A2A retry/fallback wrapper는 문서화된 runtime contract가 아니었다. 과거 prose `auth/timeout/retry/fallback` 문자열을 파싱하면 reviewer가 승인하지 않은 동작을 생성할 위험이 있다.
+- **영향**: A2A schema/types/normalizer, Remote A2A edit surface/readiness gate, artifact validator, runnable generator imports/source, manifest/env/README/handoff output, `scenario-i`/`scenario-e` fixtures, active validation docs.
+
 - **결정**: `RequestInput -> router` lowering은 human-input output dict 전체가 아니라 `response` / `choice` / `value`를 우선 route decision으로 읽는다. 숫자 alias가 있는 route-choice `RequestInput`은 ADK Web의 numeric 입력을 허용하도록 `response_schema=str`를 생략하고 router에서 문자열로 정규화한다. Workbench router node/inspector는 route value, aliases, default, target을 표시한다. Stage Runner는 caller가 catalog payload를 생략하면 active server catalog를 hydrate하고 source/count/diagnostics를 기록한다.
 - **배경**: `req-page-recommendation-required` catalog-first ADK Web QA에서 `skip_analysis` 입력이 prompt 전체 문자열의 `run_analysis`에 먼저 매칭되어 분석 branch가 실행됐고, route map과 catalog/runtime contract provenance가 UI와 artifact contract에 충분히 드러나지 않았다.
 - **영향**: ADK generator router/human-input emitters, Graph IR schemas and editor/inspector UI, runtime contract normalization/hydration, scaffold catalog binding, Stage Runner request snapshot and summary UI, validation/generator regressions.
+
+### Dynamic/loop Graph IR은 public runnable mode 안의 내부 ADK dynamic builder로 lower한다
+- **결정**: `output_mode: "runnable"`을 유지하고, generator가 reviewed dynamic/loop Graph IR shape를 감지하면 내부 ADK dynamic workflow builder를 선택한다. `loop_control`은 reviewed `loop_back`/`loop_exit` decision edge의 `route_condition`/`route_aliases`/default metadata만 사용하며, `dynamic_workflow` container는 runtime `adk_mapping`을 계속 선언하지 않는다.
+- **배경**: ADK dynamic workflow는 `@node`와 `ctx.run_node(...)`로 Python control flow를 표현한다. 별도 output mode를 추가하면 기존 Build UI와 scaffold contract가 불필요하게 갈라지고, loop decision을 prose에서 추론하면 reviewer가 승인하지 않은 runtime behavior가 생성될 수 있다.
+- **영향**: ADK generator dynamic builder/guards, scaffold-plan blockers, Graph IR soft/export validators, scenario-d loop fixture, active validation/process-flow/workflow docs.
+
+### RunSandbox A2A provider 패널은 consumer가 참조하는 local provider artifact를 대상으로 한다
+- **결정**: `/af/:reqId/run`의 A2A provider 패널은 현재 route artifact의 A2A status를 무조건 보지 않는다. Remote A2A 후보가 `owner: local artifact:<providerReqId>`로 승인된 local provider를 가리키면 그 provider artifact의 status/start/stop을 대상으로 하고, 매칭 provider가 없을 때만 현재 artifact provider로 fallback한다.
+- **배경**: `req-page-recommendation-a2a-consumer` Run 화면은 실제 provider `req-page-recommendation-required`가 8001에서 실행 중인데도 consumer artifact 자신의 A2A status를 조회해 `A2A provider 가 실행 중이 아닙니다`라고 표시했다. Start 버튼도 consumer reqId로 POST해 실제 호출 대상 provider를 제어하지 못했다.
+- **영향**: RunSandbox A2A target resolution, provider panel status/start/stop UX, active runtime validation/design-system docs.
 
 ---
 

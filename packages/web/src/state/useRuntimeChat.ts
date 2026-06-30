@@ -48,6 +48,29 @@ export interface RuntimeChatStartResult {
   status: RuntimeChatStatus;
 }
 
+export interface RuntimeChatRemoteInputRequired {
+  readonly kind: "remote_input_required";
+  readonly prompt: string;
+  readonly payload: string | null;
+  readonly function_name: string;
+  readonly interrupt_id: string | null;
+  readonly task_id: string | null;
+  readonly task_state: string | null;
+  readonly remote_path: string | null;
+  readonly resume_supported: false;
+  readonly resume_note: string;
+}
+
+export interface RuntimeChatInputRequiredResult {
+  readonly input_required: RuntimeChatRemoteInputRequired | null;
+  readonly session: {
+    readonly app_name: string;
+    readonly user_id: string;
+    readonly session_id: string;
+  } | null;
+  readonly error: string | null;
+}
+
 export function useRuntimeChatStatus(reqId: string | undefined) {
   return useQuery<RuntimeChatStatus | null>({
     queryKey: ["af", reqId, "runtime-chat", "status"] as const,
@@ -61,6 +84,22 @@ export function useRuntimeChatStatus(reqId: string | undefined) {
     enabled: Boolean(reqId),
     // ADK 프로세스는 UI 밖에서도 죽거나 멈출 수 있어, server.status / web_url 이
     // stale 해지지 않도록 주기적으로 갱신한다(특히 '실행' 화면의 dev UI 링크).
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true
+  });
+}
+
+export function useRuntimeChatInputRequired(reqId: string | undefined) {
+  return useQuery<RuntimeChatInputRequiredResult | null>({
+    queryKey: ["af", reqId, "runtime-chat", "input-required"] as const,
+    queryFn: async () => {
+      if (!reqId) return null;
+      const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/runtime-chat/input-required`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new AfApiError(response.status, "ADK input-required 이벤트 조회 실패");
+      return (await response.json()) as RuntimeChatInputRequiredResult;
+    },
+    enabled: Boolean(reqId),
     refetchInterval: 5000,
     refetchOnWindowFocus: true
   });

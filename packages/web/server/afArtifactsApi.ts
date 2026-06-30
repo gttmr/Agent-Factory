@@ -18,6 +18,7 @@ import {
   handlePutText
 } from "./afArtifactCrudApi";
 import { handleArtifactSyncRun } from "./artifactSyncRunApi";
+import { handleRuntimeA2a } from "./afRuntimeA2aApi";
 import { handleRuntimeChat } from "./afRuntimeChatApi";
 import {
   handleBuildRuntimeStub,
@@ -27,6 +28,7 @@ import {
 import { handleStageRunner } from "./afStageRunnerApi";
 import { handleVerifyCommands, handleVerifyRun } from "./afVerifyRunApi";
 import { sendJson } from "./httpApi";
+import { RuntimeA2aManager } from "./runtimeA2a";
 import { RuntimeChatManager } from "./runtimeChat";
 
 type MiddlewareNext = (error?: unknown) => void;
@@ -54,6 +56,7 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
   const store = new ArtifactRootStore({ repoRoot });
   const stageRunLocks = new Set<string>();
   const stageRunControllers = new Map<string, AbortController>();
+  const runtimeA2a = new RuntimeA2aManager({ repoRoot, store });
   const runtimeChat = new RuntimeChatManager({ repoRoot, store });
 
   return async function afArtifactsMiddleware(
@@ -140,6 +143,10 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
 
       if (rest[0] === "runtime-chat") {
         return await handleRuntimeChat(runtimeChat, reqId, rest.slice(1), req, res);
+      }
+
+      if (rest[0] === "runtime-a2a") {
+        return await handleRuntimeA2a(runtimeA2a, reqId, rest.slice(1), req, res);
       }
 
       if (sub === "runtime-stub/build") {

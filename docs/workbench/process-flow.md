@@ -90,7 +90,7 @@ LLM이 MCP toolset에서 tool을 고르는 경로는 `node_kind: agent`, `invoke
 
 작은 흐름은 container와 edge semantics로 표현한다.
 병렬은 `parallel_region`, 반복은 `loop_region`, 사람 검토는 `human_review_region`, 원격 agent 경계는 `remote_boundary`다.
-`dynamic_workflow`는 이 skeleton scope에서 design/contract container다. dynamic Python runnable codegen은 생성하지 않으며, `dynamic_workflow` container는 runtime `adk_mapping`을 선언하면 안 된다.
+`dynamic_workflow`는 Graph IR container이며 runtime `adk_mapping`을 선언하면 안 된다. Runnable source generation은 reviewed dynamic/loop shape를 감지하면 public `output_mode: "runnable"` 안에서 내부 ADK dynamic workflow builder를 선택할 수 있다.
 시각화에서 container는 node를 다시 배치하는 독립 lane이 아니라, 전체 workflow 안에 있는 node bounds에서 파생되는 region overlay다.
 따라서 `parallel_region`, `human_review_region`, `remote_boundary`는 workflow 외부 슬롯으로 분리하지 않고 일반 흐름 위에 겹쳐 표시한다.
 Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/`dynamic_workflow` 컨테이너에 기본 배치된다.
@@ -122,7 +122,7 @@ Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/
 - `boundary_crossing`
 
 `route` edge에는 `route_condition`이 필요하다. `route`는 branch 선택 신호이며 업무 payload 전달은 router node의 `Event.output` 또는 별도 state/artifact edge가 담당한다.
-`route_aliases`는 사용자가 실제로 입력할 수 있는 승인/반려 문구, 숫자, 업무 용어 같은 reviewed alias 목록이다. Generator는 hard-coded 업무 문자열을 넣지 않고 `route_condition`에서 뽑은 route key와 이 alias 목록만 비교한다. 같은 router에서 fallback으로 쓸 branch는 `is_default_route: true`로 하나만 지정할 수 있다.
+`route_aliases`는 사용자가 실제로 입력할 수 있는 승인/반려 문구, 숫자, 업무 용어 같은 reviewed alias 목록이다. Generator는 hard-coded 업무 문자열을 넣지 않고 `route_condition`에서 뽑은 route key와 이 alias 목록만 비교한다. 같은 router에서 fallback으로 쓸 branch는 `is_default_route: true`로 하나만 지정할 수 있다. `loop_back`/`loop_exit` control edge도 dynamic loop decision을 위해 `route_condition`, `route_aliases`, `is_default_route`를 쓸 수 있지만 router fallback 집계에는 포함하지 않는다.
 `artifact` edge에는 `artifact_key`가 필요하다.
 `remote_a2a` edge는 `is_remote_boundary_crossing: true`와 `a2a_contract_id`가 필요하고, local graph 복잡도만으로 만들 수 없다.
 
@@ -132,7 +132,7 @@ Design 편집 모드에서 새 local node는 parent 없는 첫 `graph_workflow`/
 - 병렬: `parallel_region` + `fan_out` + `join` + `fan_in`
 - 반복: `loop_region` + `loop_control` + `loop_back` + `loop_exit`
 - 사람 검토: `human_review_region` + `human_input` + 승인/반려 `route`
-- 동적 제어: `dynamic_workflow` design/contract container와 rationale의 runtime control 설명. Runnable dynamic codegen은 만들지 않는다.
+- 동적 제어: `dynamic_workflow` container와 rationale의 runtime control 설명. Runnable mode는 reviewed dynamic/loop shape에서 내부 ADK dynamic workflow builder를 선택할 수 있으며, `dynamic_workflow` container 자체의 runtime `adk_mapping`은 계속 금지한다.
 - callback/resume: `callback_wait` node와 `flow_kind: callback|resume`, `call_control: event_callback|resume`
 
 `workflow_kind`는 `orchestration`, `graph`, `dynamic`, `unknown` 중 하나만 사용한다.

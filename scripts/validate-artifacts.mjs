@@ -11,6 +11,8 @@ import {
   a2aOperationNames,
   a2aPartFields,
   a2aRoles,
+  a2aRuntimeAuthModes,
+  a2aRuntimeFallbackModes,
   a2aStaleAllowlist,
   a2aStaleNames,
   a2aStreamWrappers,
@@ -1081,9 +1083,12 @@ function validateScaffoldGraph(graph) {
 }
 
 function validateRouteReviewContract(edge, label, defaultRouteEdgesByRouter) {
+  const isRouteReviewEdge =
+    edge.edge_kind === "route" ||
+    ((edge.execution_semantics === "loop_back" || edge.execution_semantics === "loop_exit") && edge.edge_kind === "control");
   if (Array.isArray(edge.route_aliases)) {
-    if (edge.route_aliases.length > 0 && edge.edge_kind !== "route") {
-      errors.push(`${label} route_aliases is allowed only on route edges.`);
+    if (edge.route_aliases.length > 0 && !isRouteReviewEdge) {
+      errors.push(`${label} route_aliases is allowed only on route or loop decision edges.`);
     }
     if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
       errors.push(`${label} route_aliases entries must be non-empty strings.`);
@@ -1092,12 +1097,14 @@ function validateRouteReviewContract(edge, label, defaultRouteEdgesByRouter) {
     errors.push(`${label} route_aliases must be an array of strings or null.`);
   }
   if (edge.is_default_route === true) {
-    if (edge.edge_kind !== "route") {
-      errors.push(`${label} is_default_route is allowed only on route edges.`);
+    if (!isRouteReviewEdge) {
+      errors.push(`${label} is_default_route is allowed only on route or loop decision edges.`);
     } else if (typeof edge.from === "string") {
-      const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
-      defaults.push(typeof edge.id === "string" ? edge.id : label);
-      defaultRouteEdgesByRouter.set(edge.from, defaults);
+      if (edge.edge_kind === "route") {
+        const defaults = defaultRouteEdgesByRouter.get(edge.from) ?? [];
+        defaults.push(typeof edge.id === "string" ? edge.id : label);
+        defaultRouteEdgesByRouter.set(edge.from, defaults);
+      }
     }
   } else if (
     edge.is_default_route !== undefined &&
@@ -1693,6 +1700,8 @@ function validateA2AContract(contract, label, remoteCandidateById, seenContractI
     errors.push(`${label}.push_notification_policy must be a non-empty string or explicit null.`);
   }
 
+  validateA2ARuntimePolicy(contract.adk_runtime_policy, label);
+
   // operations subset of A2A_OPERATION_NAMES.
   if (Array.isArray(contract.operations)) {
     contract.operations.forEach((op, idx) => {
@@ -1785,6 +1794,55 @@ function validateA2AContract(contract, label, remoteCandidateById, seenContractI
       : new RegExp(`(^|[^A-Za-z0-9_-])${escapeRegExp(stale)}([^A-Za-z0-9_-]|$)`).test(serialized);
     if (found) {
       errors.push(`${label} contains stale A2A terminology: ${stale}.`);
+    }
+  }
+}
+
+function validateA2ARuntimePolicy(policy, label) {
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) {
+    errors.push(`${label}.adk_runtime_policy must be an object.`);
+    return;
+  }
+  if (policy.timeout_seconds !== null && (typeof policy.timeout_seconds !== "number" || !Number.isFinite(policy.timeout_seconds) || policy.timeout_seconds <= 0)) {
+    errors.push(`${label}.adk_runtime_policy.timeout_seconds must be a positive number or null.`);
+  }
+  const auth = policy.auth;
+  if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+    errors.push(`${label}.adk_runtime_policy.auth must be an object.`);
+  } else {
+    if (typeof auth.mode !== "string" || !a2aRuntimeAuthModes.has(auth.mode)) {
+      errors.push(`${label}.adk_runtime_policy.auth.mode must be none, bearer_env, or metadata_env.`);
+    }
+    if (auth.env_var !== null && (typeof auth.env_var !== "string" || !/^AF_A2A_[A-Z0-9_]+$/.test(auth.env_var))) {
+      errors.push(`${label}.adk_runtime_policy.auth.env_var must be null or an AF_A2A_* environment variable name.`);
+    }
+    if (auth.metadata_key !== null && (typeof auth.metadata_key !== "string" || !auth.metadata_key.trim())) {
+      errors.push(`${label}.adk_runtime_policy.auth.metadata_key must be a non-empty string or null.`);
+    }
+  }
+  const retry = policy.retry_handoff;
+  if (!retry || typeof retry !== "object" || Array.isArray(retry)) {
+    errors.push(`${label}.adk_runtime_policy.retry_handoff must be an object.`);
+  } else {
+    if (retry.max_attempts !== null && (!Number.isInteger(retry.max_attempts) || retry.max_attempts < 1)) {
+      errors.push(`${label}.adk_runtime_policy.retry_handoff.max_attempts must be a positive integer or null.`);
+    }
+    if (retry.backoff_seconds !== null && (typeof retry.backoff_seconds !== "number" || !Number.isFinite(retry.backoff_seconds) || retry.backoff_seconds <= 0)) {
+      errors.push(`${label}.adk_runtime_policy.retry_handoff.backoff_seconds must be a positive number or null.`);
+    }
+    if (!Array.isArray(retry.retry_on) || retry.retry_on.some((item) => typeof item !== "string" || !item.trim())) {
+      errors.push(`${label}.adk_runtime_policy.retry_handoff.retry_on must be an array of non-empty strings.`);
+    }
+  }
+  const fallback = policy.fallback_handoff;
+  if (!fallback || typeof fallback !== "object" || Array.isArray(fallback)) {
+    errors.push(`${label}.adk_runtime_policy.fallback_handoff must be an object.`);
+  } else {
+    if (typeof fallback.mode !== "string" || !a2aRuntimeFallbackModes.has(fallback.mode)) {
+      errors.push(`${label}.adk_runtime_policy.fallback_handoff.mode must be none, manual_review, or local_event.`);
+    }
+    if (fallback.message !== null && (typeof fallback.message !== "string" || !fallback.message.trim())) {
+      errors.push(`${label}.adk_runtime_policy.fallback_handoff.message must be a non-empty string or null.`);
     }
   }
 }

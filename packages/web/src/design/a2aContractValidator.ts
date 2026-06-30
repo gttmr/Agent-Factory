@@ -1,8 +1,10 @@
 import { A2A_CONTRACT_REQUIRED_STRING_FIELDS } from "../analyzer/a2aNormalize";
-import type { A2AContract, AnalysisResult, ModuleCandidate } from "../analyzer/types";
+import { A2A_RUNTIME_AUTH_MODES, A2A_RUNTIME_FALLBACK_MODES } from "../analyzer/types";
+import type { A2AContract, A2ARuntimePolicy, AnalysisResult, ModuleCandidate } from "../analyzer/types";
 
 const AGENT_CARD_FIELDS = ["discovery_method", "agent_card_url", "version", "notes"] as const;
 const ARTIFACT_CONTRACT_FIELDS = ["mutation_rules", "chunking_policy"] as const;
+const A2A_AUTH_ENV_VAR_PATTERN = /^AF_A2A_[A-Z0-9_]+$/;
 
 export function a2aContractReadinessIssues(contract: A2AContract | null | undefined): string[] {
   if (!contract) return ["matching A2A contract is missing"];
@@ -61,6 +63,7 @@ export function a2aContractReadinessIssues(contract: A2AContract | null | undefi
   for (const field of ARTIFACT_CONTRACT_FIELDS) {
     pushStringIssue(issues, `artifact_contract.${field}`, contract.artifact_contract[field]);
   }
+  pushRuntimePolicyIssues(issues, contract.adk_runtime_policy);
 
   return issues;
 }
@@ -129,6 +132,66 @@ function pushObjectArrayIssues<T extends Record<string, unknown>>(
       }
     }
   });
+}
+
+function pushRuntimePolicyIssues(issues: string[], policy: A2ARuntimePolicy | null | undefined) {
+  if (!policy || typeof policy !== "object") {
+    issues.push("adk_runtime_policy is missing");
+    return;
+  }
+
+  if (policy.timeout_seconds !== null && (!Number.isFinite(policy.timeout_seconds) || policy.timeout_seconds <= 0)) {
+    issues.push("adk_runtime_policy.timeout_seconds must be a positive number or null");
+  }
+
+  const auth = policy.auth;
+  if (!auth || typeof auth !== "object") {
+    issues.push("adk_runtime_policy.auth is missing");
+  } else {
+    if (!A2A_RUNTIME_AUTH_MODES.includes(auth.mode)) {
+      issues.push("adk_runtime_policy.auth.mode is invalid");
+    }
+    if (auth.mode === "bearer_env" || auth.mode === "metadata_env") {
+      const envVar = auth.env_var;
+      if (typeof envVar !== "string" || !envVar.trim()) {
+        issues.push("adk_runtime_policy.auth.env_var is missing");
+      } else if (!A2A_AUTH_ENV_VAR_PATTERN.test(envVar)) {
+        issues.push("adk_runtime_policy.auth.env_var must start with AF_A2A_ and contain only A-Z, 0-9, _");
+      }
+    }
+    if (auth.mode === "metadata_env" && isBlank(auth.metadata_key)) {
+      issues.push("adk_runtime_policy.auth.metadata_key is missing for metadata_env");
+    }
+  }
+
+  const retry = policy.retry_handoff;
+  if (!retry || typeof retry !== "object") {
+    issues.push("adk_runtime_policy.retry_handoff is missing");
+  } else {
+    if (retry.max_attempts !== null && (!Number.isInteger(retry.max_attempts) || retry.max_attempts < 1)) {
+      issues.push("adk_runtime_policy.retry_handoff.max_attempts must be a positive integer or null");
+    }
+    if (retry.backoff_seconds !== null && (!Number.isFinite(retry.backoff_seconds) || retry.backoff_seconds <= 0)) {
+      issues.push("adk_runtime_policy.retry_handoff.backoff_seconds must be a positive number or null");
+    }
+    if (!Array.isArray(retry.retry_on)) {
+      issues.push("adk_runtime_policy.retry_handoff.retry_on must be an array");
+    } else if (retry.retry_on.some((entry) => typeof entry !== "string" || isBlank(entry) || isNeedsInfo(entry))) {
+      issues.push("adk_runtime_policy.retry_handoff.retry_on must not contain blank or needs_info values");
+    }
+  }
+
+  const fallback = policy.fallback_handoff;
+  if (!fallback || typeof fallback !== "object") {
+    issues.push("adk_runtime_policy.fallback_handoff is missing");
+  } else {
+    if (!A2A_RUNTIME_FALLBACK_MODES.includes(fallback.mode)) {
+      issues.push("adk_runtime_policy.fallback_handoff.mode is invalid");
+    }
+    if (fallback.mode !== "none" && isBlank(fallback.message)) {
+      issues.push("adk_runtime_policy.fallback_handoff.message is missing");
+    }
+  }
 }
 
 function isBlank(value: string | null | undefined): boolean {
