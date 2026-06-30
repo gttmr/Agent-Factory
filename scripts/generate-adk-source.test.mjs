@@ -76,6 +76,19 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   }
 });
 
+test("runnable tool input resolver traverses runtime mock output bundles", () => {
+  const { artifactRoot, outputRoot } = generate({ runnable: true, connectedAdapter: true });
+  try {
+    const { agentSource } = readBundle(outputRoot);
+    assert.match(
+      agentSource,
+      /PAYLOAD_WRAPPER_KEYS = \([\s\S]*"runtime_mock"[\s\S]*"analysis_input_bundle"[\s\S]*\)/
+    );
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test("generator source keeps hardcoded scenario literals out of generator modules", () => {
   assertGeneratorSourcesStayDomainNeutral();
 });

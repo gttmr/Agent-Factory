@@ -33,6 +33,8 @@ PAYLOAD_WRAPPER_KEYS = (
     "payload",
     "data",
     "response",
+    "runtime_mock",
+    "analysis_input_bundle",
 )
 
 
