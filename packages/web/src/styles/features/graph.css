@@ -646,7 +646,7 @@
 
 .graph-element-tabs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   align-items: end;
   width: 100%;
   border-bottom: 1px solid var(--line);
@@ -767,6 +767,166 @@
   margin: 0;
   color: var(--text-muted);
   font-size: var(--fs-xs);
+}
+
+.graph-schema-card-list {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.graph-schema-card,
+.graph-json-details {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+}
+
+.graph-schema-card > summary,
+.graph-json-details > summary {
+  display: grid;
+  gap: var(--space-3xs);
+  min-width: 0;
+  cursor: pointer;
+  padding: var(--space-sm);
+}
+
+.graph-schema-card > summary > span,
+.graph-json-details > summary {
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.graph-schema-card > summary > small {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+}
+
+.graph-schema-shape,
+.graph-contract-examples {
+  display: grid;
+  gap: var(--space-xs);
+  border-top: 1px solid var(--line);
+  padding: var(--space-sm);
+}
+
+.graph-schema-shape > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.graph-schema-required,
+.graph-field-spec-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.graph-schema-properties {
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.graph-schema-required > span {
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-heavy);
+  text-transform: uppercase;
+}
+
+.graph-schema-required code,
+.graph-schema-property,
+.graph-field-spec {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  padding: var(--space-3xs) var(--space-xs);
+}
+
+.graph-schema-property {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  width: 100%;
+}
+
+.graph-schema-property code,
+.graph-field-spec code {
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.graph-schema-property code,
+.graph-schema-property span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-schema-property small,
+.graph-field-spec small {
+  color: var(--accent-strong);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-heavy);
+}
+
+.graph-field-spec-list {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.graph-field-spec-list > strong {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.graph-json-details > pre {
+  max-height: 260px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  padding: var(--space-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+  white-space: pre-wrap;
+}
+
+.graph-mapping-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-xs);
+}
+
+.graph-mapping-table th,
+.graph-mapping-table td {
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-2xs) var(--space-xs);
+  text-align: left;
+  vertical-align: top;
+}
+
+.graph-mapping-table th {
+  color: var(--text-muted);
+  font-weight: var(--fw-heavy);
+}
+
+.graph-mapping-table code {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 /* Validation banner */

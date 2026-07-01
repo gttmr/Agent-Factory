@@ -8,19 +8,13 @@ export interface RuntimeA2aProviderTarget {
   readonly remoteModuleId: string | null;
 }
 
-export function runtimeA2aProviderTarget(analysis: AnalysisResult | null | undefined, currentReqId: string): RuntimeA2aProviderTarget {
-  const localProvider = analysis?.moduleCandidates
+export function runtimeA2aProviderTarget(analysis: AnalysisResult | null | undefined): RuntimeA2aProviderTarget | null {
+  return (
+    analysis?.moduleCandidates
     .filter((candidate) => candidate.module_category === "remote_a2a" && candidate.status === "approved")
     .sort((left, right) => left.id.localeCompare(right.id))
     .map(localProviderTargetFromCandidate)
-    .find((target) => target !== null);
-
-  return (
-    localProvider ?? {
-      reqId: currentReqId,
-      source: "current_artifact",
-      remoteModuleId: null
-    }
+      .find((target) => target !== null) ?? null
   );
 }
 

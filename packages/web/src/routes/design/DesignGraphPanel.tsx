@@ -34,6 +34,7 @@ interface DesignGraphPanelProps {
   selectedContract: RuntimeContract | null;
   selectedA2ARow: A2AReviewRow | null;
   a2aContracts: AnalysisResult["a2aContracts"];
+  catalogContracts: Record<string, unknown>;
   comments: CommentRecord[];
   highlights: HighlightRecord[];
   anchor: CommentAnchor | null;
@@ -71,6 +72,7 @@ export function DesignGraphPanel({
   selectedContract,
   selectedA2ARow,
   a2aContracts,
+  catalogContracts,
   comments,
   highlights,
   anchor,
@@ -120,6 +122,7 @@ export function DesignGraphPanel({
               editState={graphEditState}
               moduleCandidates={analysis.moduleCandidates ?? []}
               a2aContracts={a2aContracts}
+              catalogContracts={catalogContracts}
               onClose={() => onSelectionChange({ nodeId: null, edgeId: null })}
             />
           ) : (
@@ -130,6 +133,7 @@ export function DesignGraphPanel({
               nodeLabel={nodeLabel}
               candidate={selectedCandidate}
               a2aContracts={a2aContracts}
+              catalogContracts={catalogContracts}
               onNavigateToA2AContracts={() => onSetActiveTab("a2a")}
               onClose={() => onSelectionChange({ nodeId: null, edgeId: null })}
             />
@@ -152,6 +156,7 @@ export function DesignGraphPanel({
                 graphIR={graphIR}
                 moduleCandidates={analysis.moduleCandidates}
                 a2aContracts={analysis.a2aContracts ?? []}
+                catalogContracts={catalogContracts}
                 selection={selection}
                 onSelectionChange={onSelectionChange}
                 comments={comments}

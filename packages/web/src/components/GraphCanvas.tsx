@@ -41,6 +41,7 @@ interface GraphCanvasProps {
   graphIR: GraphIR;
   moduleCandidates: ModuleCandidate[];
   a2aContracts: A2AContract[];
+  catalogContracts?: Record<string, unknown>;
   onNavigateToA2AContracts?: () => void;
   onContinue?: () => void;
   continueLabel?: string;
@@ -110,6 +111,7 @@ export function GraphCanvas({
   graphIR,
   moduleCandidates,
   a2aContracts,
+  catalogContracts = {},
   onNavigateToA2AContracts,
   onContinue,
   continueLabel,
@@ -547,6 +549,7 @@ export function GraphCanvas({
           nodeLabel={nodeLabel}
           candidate={selectedCandidate}
           a2aContracts={a2aContracts}
+          catalogContracts={catalogContracts}
           onNavigateToA2AContracts={onNavigateToA2AContracts}
           onClose={() => setSelection({ nodeId: null, edgeId: null })}
         />

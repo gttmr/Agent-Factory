@@ -32,6 +32,11 @@ function hydrateEntries(category: CatalogCategory, entries: CatalogEntryRaw[]): 
   return dedupeKeepLatestPublished(entries).map((entry) => hydrate(category, entry));
 }
 
+function readContracts(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value));
+}
+
 export function useCatalog() {
   return useQuery<CatalogIndex>({
     queryKey: ["af", "catalog-index"] as const,
@@ -44,6 +49,7 @@ export function useCatalog() {
         workflows: hydrateEntries("workflow", readEntries(body.workflows, "workflows")),
         adapters: hydrateEntries("adapter", readEntries(body.adapters, "adapters")),
         remoteA2A: hydrateEntries("remote_a2a", readEntries(body.remoteA2A, "remote_a2a_contracts")),
+        contracts: readContracts(body.contracts),
         domainOwners: body.domainOwners,
         riskGates: body.riskGates
       };

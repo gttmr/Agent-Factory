@@ -27,7 +27,7 @@ export default function RunSandbox() {
   const { data: analysisData } = useAnalysisArtifact(reqId);
   const stubReady = Boolean(runtimeStub?.exists) && (runtimeStub?.files?.length ?? 0) > 0;
   const statusReqId = reqId && stubReady ? reqId : undefined;
-  const a2aProviderTarget = reqId && analysisData !== undefined ? runtimeA2aProviderTarget(analysisData?.data, reqId) : null;
+  const a2aProviderTarget = reqId && analysisData !== undefined ? runtimeA2aProviderTarget(analysisData?.data) : null;
   const a2aStatusReqId = stubReady ? a2aProviderTarget?.reqId : undefined;
   const chatStatus = useRuntimeChatStatus(statusReqId);
   const chatInputRequired = useRuntimeChatInputRequired(statusReqId);
@@ -82,7 +82,9 @@ export default function RunSandbox() {
   const canStop = Boolean(chatStatus.data?.server.can_stop) || serverStatus === "failed";
   const isStale = Boolean(chatStatus.data?.server.stale);
   const webUrl = chatStatus.data?.web_url ?? null;
-  const remoteInputRequired = remoteInputRequiredView(chatInputRequired.data?.input_required, a2aStatus.data);
+  const remoteInputRequired = a2aProviderTarget
+    ? remoteInputRequiredView(chatInputRequired.data?.input_required, a2aStatus.data)
+    : remoteInputRequiredView(null, null);
 
   return (
     <div className="af-run-shell">
@@ -166,7 +168,11 @@ export default function RunSandbox() {
         <Panel>
           <SectionHeader
             title="ADK 웹 UI"
-            description="ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 ADK Web 텍스트 채팅이 아니라 아래 Workbench resume 으로 같은 task 에 응답합니다."
+            description={
+              a2aProviderTarget
+                ? "ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 ADK Web 텍스트 채팅이 아니라 아래 Workbench resume 으로 같은 task 에 응답합니다."
+                : "ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스로 현재 artifact runtime 을 확인합니다."
+            }
           />
           {isRunning && webUrl ? (
             <div className="af-run-weblink">
@@ -184,7 +190,7 @@ export default function RunSandbox() {
         </Panel>
       ) : null}
 
-      {stubReady ? (
+      {stubReady && a2aProviderTarget ? (
         <RuntimeA2aProviderPanel
           consumerReqId={reqId}
           target={a2aProviderTarget}

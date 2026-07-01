@@ -52,6 +52,7 @@ export interface CatalogIndex {
   workflows: CatalogHubEntry[];
   adapters: CatalogHubEntry[];
   remoteA2A: CatalogHubEntry[];
+  contracts: Record<string, unknown>;
   domainOwners: unknown;
   riskGates: unknown;
 }

@@ -1,6 +1,6 @@
 import { readFile, readdir, rename, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import { buildPublishedEntry, deepEqualPublishedFields } from "./catalogPublishEntry";
 import { targetCatalogFile } from "./catalogPublishTarget";
@@ -220,24 +220,47 @@ async function readYamlFile(path: string): Promise<unknown> {
 }
 
 async function readContractsDir(dir: string): Promise<Record<string, unknown>> {
-  const entries = await readdir(dir).catch((error) => {
+  const result: Record<string, unknown> = {};
+  await readContractsInto(dir, dir, result);
+  return result;
+}
+
+async function readContractsInto(rootDir: string, currentDir: string, result: Record<string, unknown>): Promise<void> {
+  const entries = await readdir(currentDir, { withFileTypes: true }).catch((error) => {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [] as string[];
     throw error;
   });
-  const result: Record<string, unknown> = {};
-  for (const name of entries) {
+  for (const entry of entries) {
+    const name = typeof entry === "string" ? entry : entry.name;
+    const path = join(currentDir, name);
+    if (typeof entry !== "string" && entry.isDirectory()) {
+      await readContractsInto(rootDir, path, result);
+      continue;
+    }
     if (!name.endsWith(".yaml") && !name.endsWith(".yml") && !name.endsWith(".json")) continue;
-    const path = join(dir, name);
     const text = await readFile(path, "utf8").catch(() => "");
     if (!text.trim()) continue;
     try {
-      result[name] = name.endsWith(".json") ? JSON.parse(text) : parseYaml(text);
+      const parsed = name.endsWith(".json") ? JSON.parse(text) : parseYaml(text);
+      const rel = relativeContractPath(rootDir, path);
+      result[rel] = parsed;
+      const schemaRef = contractSchemaRef(parsed);
+      if (schemaRef) result[schemaRef] = parsed;
     } catch (error) {
       if (!(error instanceof Error)) throw error;
-      console.warn(`[af-catalog] contracts/${name} 파싱 실패`, error);
+      console.warn(`[af-catalog] contracts/${relativeContractPath(rootDir, path)} 파싱 실패`, error);
     }
   }
-  return result;
+}
+
+function contractSchemaRef(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const schemaRef = value.schema_ref;
+  return typeof schemaRef === "string" && schemaRef.trim() ? schemaRef : null;
+}
+
+function relativeContractPath(rootDir: string, path: string): string {
+  return relative(rootDir, path).split("\\").join("/");
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
