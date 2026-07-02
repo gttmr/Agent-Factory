@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-02 · PR TBD — validator stage run-id pattern covers build/verify
+
+- **결정**: Artifact validator의 `stage_runs.*.latest_run_id` 형식 검증은 `analyze/design/build/verify` 네 단계 Stage Runner run id를 모두 허용한다.
+- **배경**: 서버 Stage Runner는 이미 Build/Verify run history를 `YYYYMMDDTHHMMSSZ-<stage>-<6 hex>` 형식으로 기록하지만, validator의 중복 regex가 Analyze/Design만 허용해 Build/Verify 이력이 있는 artifact root 검증을 막았다.
+- **영향**: `scripts/artifact-validation/constants.mjs`, `templates/af-run-manifest.json`, active validation/harness docs.
+
 ## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
 
 - **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.

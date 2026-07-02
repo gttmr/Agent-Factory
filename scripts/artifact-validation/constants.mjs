@@ -200,7 +200,7 @@ export const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
 export const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
 export const afStageRunStatuses = new Set(["running", "completed", "failed", "applied", "canceled"]);
 export const afStageRunCodexBackends = new Set(["sdk", "fake"]);
-export const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design)-[a-f0-9]{6}$/;
+export const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design|build|verify)-[a-f0-9]{6}$/;
 
 // Required string fields on an A2AContract (top-level scalar string fields).
 // Nested object fields are validated separately.

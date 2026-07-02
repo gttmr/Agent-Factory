@@ -39,5 +39,32 @@
       "node scripts/validate-artifacts.mjs artifacts/af/req-001"
     ],
     "last_result": "not_run"
+  },
+  "stage_runs": {
+    "build": {
+      "latest_run_id": "20260702T010203Z-build-a1b2c3",
+      "status": "completed",
+      "started_at": "2026-07-02T01:02:03.000Z",
+      "finished_at": "2026-07-02T01:02:04.000Z",
+      "skill_name": "runtime-stub/build",
+      "model": "gpt-5.5",
+      "output_artifacts": [
+        "runtime-stub"
+      ],
+      "last_error": null
+    },
+    "verify": {
+      "latest_run_id": "20260702T010405Z-verify-d4e5f6",
+      "status": "completed",
+      "started_at": "2026-07-02T01:04:05.000Z",
+      "finished_at": "2026-07-02T01:04:06.000Z",
+      "skill_name": "verify/run",
+      "model": "gpt-5.5",
+      "output_artifacts": [
+        "validation-report.md",
+        "catalog-delta.yaml"
+      ],
+      "last_error": null
+    }
   }
 }
