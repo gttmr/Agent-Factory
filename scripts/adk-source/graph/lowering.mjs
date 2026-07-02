@@ -1,3 +1,4 @@
+import { agentOwnedToolsetAdapterIds } from "../adapters.mjs";
 import { nodeSymbol, pyGraphNodeName, syntheticNodeSymbol } from "../naming.mjs";
 import { toPyStr } from "../python-literals.mjs";
 import { graphIndexes } from "./indexes.mjs";
@@ -5,12 +6,14 @@ import { routeValue } from "./routes.mjs";
 
 export function buildRunnableGraph(context) {
   const graph = graphIndexes(context);
+  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(context);
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
   const explicitJoinSymbols = new Set(explicitJoinNodes.map((node) => syntheticNodeSymbol(node)));
   const resolve = (nodeId, side) => {
     const node = graph.nodesById.get(nodeId);
     if (!node) return null;
     if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
+      if (toolsetAdapterIds.has(node.module_id)) return null;
       return nodeSymbol(graph.moduleById.get(node.module_id));
     }
     if (side === "from" && node.node_kind === "input") return "START";
@@ -59,6 +62,7 @@ export function buildRunnableGraph(context) {
 
   const incoming = new Set(baseEdges.map((edge) => edge.to));
   for (const node of graph.moduleNodes) {
+    if (toolsetAdapterIds.has(node.module_id)) continue;
     const sym = nodeSymbol(graph.moduleById.get(node.module_id));
     if (!incoming.has(sym)) add("START", sym);
   }

@@ -1,4 +1,5 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
+import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
 import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
 import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
@@ -22,7 +23,8 @@ export function buildRunnableAgentPy(context) {
   assertRemoteA2aSupported({ analysisResult, modules });
   const { edges, joins } = buildRunnableGraph(graphContext);
   const graph = graphIndexes(graphContext);
-  const orderedModules = orderedGraphModules(graphContext);
+  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
+  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
@@ -50,6 +52,9 @@ export function buildRunnableAgentPy(context) {
   const remoteConfigImport = usesRemoteAuth
     ? "from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor\n"
     : "";
+  const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
+    ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
+    : "";
   const eventImport = usesRouteNodes || usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
 
   return `from __future__ import annotations
@@ -63,7 +68,7 @@ import yaml
 from google.adk import Context
 from google.adk.agents import LlmAgent
 ${remoteConfigImport}
-${remoteImport}from google.adk.events import ${eventImport}
+${remoteImport}${mcpToolsetImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 ${artifactGenaiImport}
 

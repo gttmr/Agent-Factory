@@ -1,3 +1,4 @@
+import { agentOwnedToolsetAdapterIds } from "../adapters.mjs";
 import { graphIndexes } from "./indexes.mjs";
 import { routeAliases, routeValue } from "./routes.mjs";
 import { nodeSymbol, syntheticNodeSymbol } from "../naming.mjs";
@@ -80,6 +81,7 @@ export function assertDynamicRunnableGraphSupported(context) {
 export function buildDynamicRunnablePlan(context) {
   const graph = graphIndexes(context);
   const nodes = graph.nodes;
+  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(context);
   const loopRegions = (Array.isArray(context.processFlow.containers) ? context.processFlow.containers : []).filter(
     (container) => container?.container_kind === "loop_region"
   );
@@ -93,11 +95,11 @@ export function buildDynamicRunnablePlan(context) {
   const steps = [];
   const handledRegions = new Set();
   for (const node of nodes) {
-    if (!runtimeSymbolFor(node, graph)) continue;
+    if (!runtimeSymbolFor(node, graph, toolsetAdapterIds)) continue;
     const region = loopRegionByNode.get(node.id);
     if (region) {
       if (!handledRegions.has(region.id)) {
-        steps.push(buildLoopStep(region, nodes, graph, context));
+        steps.push(buildLoopStep(region, nodes, graph, context, toolsetAdapterIds));
         handledRegions.add(region.id);
       }
       continue;
@@ -117,7 +119,7 @@ export function buildDynamicRunnablePlan(context) {
   };
 }
 
-function buildLoopStep(region, nodes, graph, context) {
+function buildLoopStep(region, nodes, graph, context, toolsetAdapterIds) {
   const contained = new Set(Array.isArray(region.contains_node_ids) ? region.contains_node_ids : []);
   const loopControlNodes = nodes.filter((node) => contained.has(node.id) && node.node_kind === "loop_control");
   if (loopControlNodes.length !== 1) {
@@ -126,7 +128,7 @@ function buildLoopStep(region, nodes, graph, context) {
   const loopControl = loopControlNodes[0];
   const body = nodes
     .filter((node) => contained.has(node.id) && node.id !== loopControl.id)
-    .map((node) => ({ node, symbol: runtimeSymbolFor(node, graph) }))
+    .map((node) => ({ node, symbol: runtimeSymbolFor(node, graph, toolsetAdapterIds) }))
     .filter((entry) => entry.symbol && entry.node.node_kind !== "join");
   if (!body.length) {
     throw new Error(`loop_region ${region.id} has no lowerable body nodes before ${loopControl.id}.`);
@@ -140,11 +142,8 @@ function buildLoopStep(region, nodes, graph, context) {
   }
   const backAliases = edgeAliases(backEdges, loopControl.id, "loop_back");
   const exitAliases = edgeAliases(exitEdges, loopControl.id, "loop_exit", { allowDefault: true });
-  const defaultAction = exitEdges.some((edge) => edge.is_default_route === true)
-    ? "loop_exit"
-    : backEdges.some((edge) => edge.is_default_route === true)
-      ? "loop_back"
-      : "loop_exit";
+  const defaultAction =
+    humanInputDefaultAction(body, backAliases, exitAliases, loopControl.id) ?? edgeDefaultAction(backEdges, exitEdges);
   return {
     kind: "loop",
     regionId: region.id,
@@ -171,9 +170,33 @@ function edgeAliases(edges, controlNodeId, semantic, options = {}) {
   return [...new Set(aliases)];
 }
 
-function runtimeSymbolFor(node, graph) {
+function humanInputDefaultAction(body, backAliases, exitAliases, controlNodeId) {
+  const defaultChoices = body
+    .map((entry) => entry.node?.human_input_contract?.default_choice)
+    .filter((choice) => typeof choice === "string" && choice.trim());
+  for (const choice of defaultChoices) {
+    const choiceAliases = routeAliases(choice);
+    const matchesBack = choiceAliases.some((alias) => backAliases.includes(alias));
+    const matchesExit = choiceAliases.some((alias) => exitAliases.includes(alias));
+    if (matchesBack && matchesExit) {
+      throw new Error(`loop_control ${controlNodeId} has ambiguous human_input default_choice ${choice}.`);
+    }
+    if (matchesBack) return "loop_back";
+    if (matchesExit) return "loop_exit";
+  }
+  return null;
+}
+
+function edgeDefaultAction(backEdges, exitEdges) {
+  if (exitEdges.some((edge) => edge.is_default_route === true)) return "loop_exit";
+  if (backEdges.some((edge) => edge.is_default_route === true)) return "loop_back";
+  return "loop_exit";
+}
+
+function runtimeSymbolFor(node, graph, excludedModuleIds = new Set()) {
   if (!node) return null;
   if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
+    if (excludedModuleIds.has(node.module_id)) return null;
     return nodeSymbol(graph.moduleById.get(node.module_id));
   }
   if (node.node_kind === "human_input" || node.node_kind === "loop_control") {
