@@ -80,10 +80,11 @@ test("runnable maps structured A2A runtime policy to ADK-supported config and ha
     const packageName = discoverGeneratedPackage(outputRoot);
     const source = readFileSync(join(outputRoot, packageName, "agent.py"), "utf8");
     assert.match(source, /from google\.adk\.a2a\.agent\.config import A2aRemoteAgentConfig, RequestInterceptor/);
-    assert.match(source, /async def _a2a_before_node_mod_r\(ctx, params\):/);
+    assert.match(source, /async def _a2a_before_node_mod_r\(ctx, a2a_request, params\):/);
     assert.match(source, /auth_value = os\.environ\.get\("AF_A2A_A2A_001_TOKEN"\)/);
     assert.match(source, /metadata\["authorization"\] = f"Bearer \{auth_value\}"/);
-    assert.match(source, /return Event\(/);
+    assert.match(source, /return Event\(\s*author="agent_factory_runtime_policy",\s*error_message="Missing required Remote A2A auth env var AF_A2A_A2A_001_TOKEN",\s*\), params/);
+    assert.match(source, /return a2a_request, params/);
     assert.match(source, /timeout=60,/);
     assert.match(source, /config=A2aRemoteAgentConfig\(\s*request_interceptors=\[RequestInterceptor\(before_request=_a2a_before_node_mod_r\)\]/);
     assert.doesNotMatch(source, /max_attempts|retry_on|fallback_handoff/);
@@ -114,6 +115,37 @@ test("runnable maps structured A2A runtime policy to ADK-supported config and ha
     const handoff = readFileSync(join(outputRoot, "implementation-handoff.md"), "utf8");
     assert.match(handoff, /AF_A2A_A2A_001_TOKEN/);
     assert.match(handoff, /Remote A2A retry\/fallback policy is not generated as an ADK retry wrapper/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable maps metadata_env A2A auth to ADK 2.3 interceptor tuple contract", () => {
+  const [agentBase] = baseModules(true);
+  const modules = [{ ...agentBase, id: "mod-a", name: "local_dispatcher_agent" }, remoteModule()];
+  const a2aContracts = [
+    approvedA2AContract({
+      adk_runtime_policy: {
+        ...approvedA2AContract().adk_runtime_policy,
+        auth: {
+          mode: "metadata_env",
+          env_var: "AF_A2A_PARTNER_METADATA_TOKEN",
+          metadata_key: "x-partner-token"
+        }
+      }
+    })
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-remote-metadata-auth-"));
+  try {
+    writeRemoteFixture(artifactRoot, { modules, nodes: remoteGraph.nodes, edges: remoteGraph.edges, a2aContracts });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const packageName = discoverGeneratedPackage(outputRoot);
+    const source = readFileSync(join(outputRoot, packageName, "agent.py"), "utf8");
+    assert.match(source, /async def _a2a_before_node_mod_r\(ctx, a2a_request, params\):/);
+    assert.match(source, /metadata\["x-partner-token"\] = auth_value/);
+    assert.match(source, /return Event\(\s*author="agent_factory_runtime_policy",\s*error_message="Missing required Remote A2A auth env var AF_A2A_PARTNER_METADATA_TOKEN",\s*\), params/);
+    assert.match(source, /return a2a_request, params/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

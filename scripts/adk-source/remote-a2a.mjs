@@ -109,17 +109,17 @@ function emitAuthInterceptor({ module, spec }) {
     spec.mode === "bearer_env"
       ? `    metadata["authorization"] = f"Bearer {auth_value}"`
       : `    metadata[${toPyStr(spec.metadataKey)}] = auth_value`;
-  return `async def ${a2aBeforeRequestName(module)}(ctx, params):
+  return `async def ${a2aBeforeRequestName(module)}(ctx, a2a_request, params):
     auth_value = os.environ.get(${toPyStr(spec.envVar)})
     if not auth_value:
         return Event(
             author="agent_factory_runtime_policy",
             error_message=${toPyStr(`Missing required Remote A2A auth env var ${spec.envVar}`)},
-        )
+        ), params
     metadata = dict(getattr(params, "request_metadata", None) or {})
 ${assignment}
     params.request_metadata = metadata
-    return None`;
+    return a2a_request, params`;
 }
 
 function a2aBeforeRequestName(module) {
