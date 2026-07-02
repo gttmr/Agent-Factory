@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   a2aContractRequiredArrayFields,
   a2aContractRequiredObjectFields,
@@ -18,16 +18,7 @@ import {
   a2aStreamWrappers,
   a2aTaskStates,
   accessProtocols,
-  adapterKinds,
-  adkHintKeys,
-  afRunStageStatuses,
-  afRunStages,
-  afRunValidationResults,
-  afStageRunCodexBackends,
-  afStageRunIdPattern,
-  afStageRunStatuses,
   agentExecutionModes,
-  agentKinds,
   callbackCallControls,
   callbackFlowKinds,
   callbackInvokeBindings,
@@ -48,8 +39,6 @@ import {
   graphStateScopePrefixByKind,
   graphStateScopePrefixPattern,
   remoteAgentNodeKinds,
-  remoteKinds,
-  remoteRequiredFields,
   runtimeBindings,
   runtimeContractKinds,
   runtimeContractStatuses,
@@ -59,7 +48,11 @@ import {
   syntheticNodeKindsStrict,
   workflowKinds
 } from "./artifact-validation/constants.mjs";
+import { validateAfRunManifest } from "./artifact-validation/af-run-manifest.mjs";
 import { collectTargets, findJsonFiles, readJson } from "./artifact-validation/files.mjs";
+import { isMcpContract, validateContractRegistry } from "./artifact-validation/contract-registry.mjs";
+import { validateModuleCandidates } from "./artifact-validation/module-candidates.mjs";
+import { validateSavedAnalysisFixtures } from "./artifact-validation/saved-analysis.mjs";
 
 const rawArg = process.argv[2] ?? "templates";
 const root = resolve(rawArg);
@@ -76,13 +69,25 @@ const targets = collectTargets(root, errors);
 validateCodexOutputSchema(resolve("schemas/analysis-draft.schema.json"));
 
 for (const target of targets) {
-  validateModuleCandidates(target);
+  validateModuleCandidates({ dir: target, errors });
   validateProcessFlow(target);
   validateAnalysisResult(target);
-  validateAfRunManifest(target);
+  validateAfRunManifest({ dir: target, errors });
   validateScaffoldPlan(target);
-  validateSavedAnalysisFixtures(target);
-  validateContractRegistry(target);
+  validateSavedAnalysisFixtures({
+    dir: target,
+    root,
+    errors,
+    validateGraphIR,
+    validateRuntimeContractObject,
+    isMcpContract
+  });
+  validateContractRegistry({
+    dir: target,
+    root,
+    errors,
+    validateA2AContract
+  });
 }
 
 if (errors.length) {
@@ -121,72 +126,6 @@ function walkCodexOutputSchema(schema, label) {
   }
 }
 
-function validateModuleCandidates(dir = root) {
-  const path = join(dir, "module-candidates.json");
-  if (!existsSync(path)) {
-    return;
-  }
-
-  const candidates = readJson(path, errors);
-  if (!Array.isArray(candidates)) {
-    errors.push("module-candidates.json must contain an array.");
-    return;
-  }
-
-  candidates.forEach((candidate, index) => {
-    const label = candidate.name ?? `module-candidates[${index}]`;
-    if (!categories.has(candidate.module_category)) {
-      errors.push(`${label} has invalid or missing module_category.`);
-    }
-    if ("recommended_type" in candidate) {
-      errors.push(`${label} uses recommended_type as a classifier; use module_category instead.`);
-    }
-    if (
-      !Array.isArray(candidate.missing_information) ||
-      candidate.missing_information.some((item) => typeof item !== "string" || !item.trim())
-    ) {
-      errors.push(`${label} missing_information must be an array of non-empty strings.`);
-    }
-    validateAdkHints(candidate.adk_hints, label);
-    if (candidate.module_category === "adapter" && !adapterKinds.has(candidate.adapter_kind)) {
-      errors.push(`${label} is adapter but has invalid or missing adapter_kind.`);
-    }
-    if (candidate.module_category === "agent" && !agentKinds.has(candidate.agent_kind)) {
-      errors.push(`${label} is agent but has invalid or missing agent_kind.`);
-    }
-    if (candidate.module_category === "workflow" && !workflowKinds.has(candidate.workflow_kind)) {
-      errors.push(`${label} is workflow but has invalid or missing workflow_kind.`);
-    }
-    if (candidate.module_category === "remote_a2a") {
-      if (!remoteKinds.has(candidate.remote_contract_kind)) {
-        errors.push(`${label} is remote_a2a but has invalid or missing remote_contract_kind.`);
-      }
-      if (candidate.risk_level !== "high") {
-        errors.push(`${label} is remote_a2a and must be high risk.`);
-      }
-      const missing = remoteRequiredFields.filter((field) => !candidate[field]);
-      if (missing.length) {
-        errors.push(`${label} is remote_a2a and is missing contract fields: ${missing.join(", ")}.`);
-      }
-      if (typeof candidate.a2a_contract_id !== "string" || !candidate.a2a_contract_id.trim()) {
-        errors.push(`${label} is remote_a2a and is missing a2a_contract_id.`);
-      } else if (!/^a2a-\d{3,}$/.test(candidate.a2a_contract_id)) {
-        errors.push(`${label}.a2a_contract_id must match a2a-NNN.`);
-      }
-    }
-    if (candidate.access_protocol !== undefined && candidate.access_protocol !== null) {
-      if (!accessProtocols.has(candidate.access_protocol)) {
-        errors.push(`${label} has invalid access_protocol.`);
-      }
-      if (candidate.access_protocol === "mcp") {
-        if (!candidate.mcp_server || !candidate.mcp_tool_name) {
-          errors.push(`${label} access_protocol mcp requires mcp_server and mcp_tool_name.`);
-        }
-      }
-    }
-  });
-}
-
 function validateProcessFlow(dir = root) {
   const path = join(dir, "process-flow.json");
   if (!existsSync(path)) {
@@ -194,171 +133,6 @@ function validateProcessFlow(dir = root) {
   }
   const flow = readJson(path, errors);
   validateGraphIR(flow, "process-flow.json", new Map(), new Map());
-}
-
-function validateAfRunManifest(dir = root) {
-  const path = join(dir, "af-run-manifest.json");
-  if (!existsSync(path)) {
-    return;
-  }
-  const manifest = readJson(path, errors);
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-    errors.push("af-run-manifest.json must contain an object.");
-    return;
-  }
-
-  const label = "af-run-manifest.json";
-  requireNonEmptyString(manifest.requirement_id, `${label}.requirement_id`);
-  const artifactRootOk = requireNonEmptyString(manifest.artifact_root, `${label}.artifact_root`);
-  if (artifactRootOk && manifest.artifact_root.includes("\\")) {
-    errors.push(`${label}.artifact_root must use POSIX-style / separators.`);
-  }
-  if (!afRunStages.has(manifest.current_stage)) {
-    errors.push(`${label}.current_stage must be one of ${Array.from(afRunStages).join(", ")}.`);
-  }
-
-  if (!manifest.stages || typeof manifest.stages !== "object" || Array.isArray(manifest.stages)) {
-    errors.push(`${label}.stages must be an object.`);
-  } else {
-    for (const stage of afRunStages) {
-      validateAfRunStage(manifest.stages[stage], `${label}.stages.${stage}`);
-    }
-  }
-
-  if (!manifest.approvals || typeof manifest.approvals !== "object" || Array.isArray(manifest.approvals)) {
-    errors.push(`${label}.approvals must be an object.`);
-  } else {
-    for (const key of [
-      "analysis_reviewed",
-      "boundaries_approved",
-      "runtime_contracts_approved",
-      "stub_ready_for_followup"
-    ]) {
-      if (typeof manifest.approvals[key] !== "boolean") {
-        errors.push(`${label}.approvals.${key} must be a boolean.`);
-      }
-    }
-  }
-
-  if (!manifest.validation || typeof manifest.validation !== "object" || Array.isArray(manifest.validation)) {
-    errors.push(`${label}.validation must be an object.`);
-  } else {
-    if (!Array.isArray(manifest.validation.commands)) {
-      errors.push(`${label}.validation.commands must be an array.`);
-    } else {
-      manifest.validation.commands.forEach((command, index) => {
-        if (typeof command !== "string" || !command.trim()) {
-          errors.push(`${label}.validation.commands[${index}] must be a non-empty string.`);
-        }
-      });
-    }
-    if (!afRunValidationResults.has(manifest.validation.last_result)) {
-      errors.push(`${label}.validation.last_result must be one of ${Array.from(afRunValidationResults).join(", ")}.`);
-    }
-  }
-
-  if (manifest.stage_runs !== undefined) {
-    validateAfStageRuns(manifest.stage_runs, `${label}.stage_runs`);
-  }
-}
-
-function validateAfRunStage(stage, label) {
-  if (!stage || typeof stage !== "object" || Array.isArray(stage)) {
-    errors.push(`${label} must be an object.`);
-    return;
-  }
-  if (!afRunStageStatuses.has(stage.status)) {
-    errors.push(`${label}.status must be one of ${Array.from(afRunStageStatuses).join(", ")}.`);
-  }
-  if (!Array.isArray(stage.outputs)) {
-    errors.push(`${label}.outputs must be an array.`);
-    return;
-  }
-  stage.outputs.forEach((output, index) => {
-    if (typeof output !== "string" || !output.trim()) {
-      errors.push(`${label}.outputs[${index}] must be a non-empty string.`);
-      return;
-    }
-    if (output.includes("\\")) {
-      errors.push(`${label}.outputs[${index}] must use POSIX-style / separators.`);
-    }
-  });
-}
-
-function validateAfStageRuns(stageRuns, label) {
-  if (!stageRuns || typeof stageRuns !== "object" || Array.isArray(stageRuns)) {
-    errors.push(`${label} must be an object when present.`);
-    return;
-  }
-  for (const [stage, entry] of Object.entries(stageRuns)) {
-    const entryLabel = `${label}.${stage}`;
-    if (!afRunStages.has(stage)) {
-      errors.push(`${entryLabel} uses an unknown stage key.`);
-      continue;
-    }
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      errors.push(`${entryLabel} must be an object.`);
-      continue;
-    }
-    if (!afStageRunIdPattern.test(entry.latest_run_id) || !entry.latest_run_id.includes(`-${stage}-`)) {
-      errors.push(`${entryLabel}.latest_run_id must be a sortable stage run id.`);
-    }
-    if (!afStageRunStatuses.has(entry.status)) {
-      errors.push(`${entryLabel}.status must be one of ${Array.from(afStageRunStatuses).join(", ")}.`);
-    }
-    requireNonEmptyString(entry.started_at, `${entryLabel}.started_at`);
-    if (entry.finished_at !== null && entry.finished_at !== undefined && typeof entry.finished_at !== "string") {
-      errors.push(`${entryLabel}.finished_at must be a string or null.`);
-    }
-    requireNonEmptyString(entry.skill_name, `${entryLabel}.skill_name`);
-    requireNonEmptyString(entry.model, `${entryLabel}.model`);
-    if (!Array.isArray(entry.output_artifacts)) {
-      errors.push(`${entryLabel}.output_artifacts must be an array.`);
-    } else {
-      entry.output_artifacts.forEach((artifactPath, index) => {
-        if (typeof artifactPath !== "string" || !artifactPath.trim()) {
-          errors.push(`${entryLabel}.output_artifacts[${index}] must be a non-empty string.`);
-          return;
-        }
-        if (artifactPath.includes("\\") || artifactPath.includes("..")) {
-          errors.push(`${entryLabel}.output_artifacts[${index}] must be a safe POSIX-style relative path.`);
-        }
-      });
-    }
-    if (entry.last_error !== null && entry.last_error !== undefined && typeof entry.last_error !== "string") {
-      errors.push(`${entryLabel}.last_error must be a string or null.`);
-    }
-    if (entry.codex !== undefined) {
-      validateAfStageRunCodex(entry.codex, `${entryLabel}.codex`);
-    }
-  }
-}
-
-function validateAfStageRunCodex(codex, label) {
-  if (!codex || typeof codex !== "object" || Array.isArray(codex)) {
-    errors.push(`${label} must be an object when present.`);
-    return;
-  }
-  if (!afStageRunCodexBackends.has(codex.backend)) {
-    errors.push(`${label}.backend must be one of ${Array.from(afStageRunCodexBackends).join(", ")}.`);
-  }
-  if (codex.thread_id !== null && typeof codex.thread_id !== "string") {
-    errors.push(`${label}.thread_id must be a string or null.`);
-  }
-  if (!Number.isInteger(codex.event_count) || codex.event_count < 0) {
-    errors.push(`${label}.event_count must be a non-negative integer.`);
-  }
-  if (codex.usage !== undefined) {
-    errors.push(`${label}.usage must not be recorded in af-run-manifest.json; keep usage in result-summary.json.`);
-  }
-}
-
-function requireNonEmptyString(value, label) {
-  if (typeof value !== "string" || !value.trim()) {
-    errors.push(`${label} must be a non-empty string.`);
-    return false;
-  }
-  return true;
 }
 
 function validateOptionalEnumValue(value, allowed, label) {
@@ -829,28 +603,6 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
   }
 }
 
-function validateAdkHints(value, label) {
-  if (value === undefined || value === null) {
-    return;
-  }
-  if (typeof value !== "object" || Array.isArray(value)) {
-    errors.push(`${label} adk_hints must be an object or null.`);
-    return;
-  }
-  Object.entries(value).forEach(([key, hint]) => {
-    if (!adkHintKeys.has(key)) {
-      errors.push(`${label} adk_hints has unknown key: ${key}.`);
-      return;
-    }
-    if (hint === null) {
-      return;
-    }
-    if (typeof hint !== "string" || !hint.trim()) {
-      errors.push(`${label} adk_hints.${key} must be a non-empty string or null.`);
-    }
-  });
-}
-
 function validateHumanInputContract(node, label) {
   if (node.node_kind !== "human_input" && node.human_input_contract !== undefined && node.human_input_contract !== null) {
     errors.push(`${label}.human_input_contract is allowed only on human_input nodes.`);
@@ -1147,137 +899,6 @@ function validateScaffoldMcpBinding(module, label) {
   }
 }
 
-function validateSavedAnalysisFixtures(dir = root) {
-  for (const path of findJsonFiles(dir)) {
-    const record = readJson(path, errors);
-    if (!isSavedAnalysisFixture(record)) continue;
-    validateSavedAnalysisRecord(record, relative(root, path) || path);
-  }
-}
-
-function isSavedAnalysisFixture(value) {
-  return (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    typeof value.id === "string" &&
-    typeof value.savedAt === "string" &&
-    value.analysis &&
-    typeof value.analysis === "object" &&
-    Array.isArray(value.catalogEntries) &&
-    typeof value.scaffoldReady === "boolean"
-  );
-}
-
-function validateSavedAnalysisRecord(record, label) {
-  const requiredStrings = ["id", "title", "savedAt", "analyzerModel", "activeStep"];
-  for (const field of requiredStrings) {
-    if (typeof record[field] !== "string" || !record[field].trim()) {
-      errors.push(`${label}.${field} must be a non-empty string.`);
-    }
-  }
-  if (!["intake", "analysis", "modules", "graph", "runtimeContracts", "a2aContracts", "catalog", "saved", "export"].includes(record.activeStep)) {
-    errors.push(`${label}.activeStep is not a known workbench step.`);
-  }
-  if (!Array.isArray(record.acceptedMissing) || record.acceptedMissing.some((item) => typeof item !== "string")) {
-    errors.push(`${label}.acceptedMissing must be an array of strings.`);
-  }
-  if (!record.input || typeof record.input !== "object" || typeof record.input.rawText !== "string") {
-    errors.push(`${label}.input.rawText is required.`);
-  }
-
-  const analysis = record.analysis;
-  if (!analysis || typeof analysis !== "object" || Array.isArray(analysis)) {
-    errors.push(`${label}.analysis must be an object.`);
-    return;
-  }
-  if (!analysis.normalizedRequirement || typeof analysis.normalizedRequirement !== "object") {
-    errors.push(`${label}.analysis.normalizedRequirement is required.`);
-  }
-  if (!analysis.evidence || typeof analysis.evidence !== "object") {
-    errors.push(`${label}.analysis.evidence is required.`);
-  }
-  if (!Array.isArray(analysis.moduleCandidates)) {
-    errors.push(`${label}.analysis.moduleCandidates must be an array.`);
-    return;
-  }
-  if (!Array.isArray(record.moduleCandidates)) {
-    errors.push(`${label}.moduleCandidates must be an array.`);
-    return;
-  }
-
-  const embeddedIds = analysis.moduleCandidates.map((candidate) => candidate?.id).filter(Boolean).join("|");
-  const recordIds = record.moduleCandidates.map((candidate) => candidate?.id).filter(Boolean).join("|");
-  if (embeddedIds !== recordIds) {
-    errors.push(`${label}.moduleCandidates must mirror analysis.moduleCandidates by id and order.`);
-  }
-
-  const catalogById = new Map();
-  record.catalogEntries.forEach((entry, index) => {
-    validateCatalogEntryObject(entry, `${label}.catalogEntries[${index}]`);
-    if (entry && typeof entry.id === "string") catalogById.set(entry.id, entry);
-  });
-
-  const candidatesById = new Map();
-  let needsInfoCount = 0;
-  for (const [index, candidate] of analysis.moduleCandidates.entries()) {
-    const candidateLabel = `${label}.analysis.moduleCandidates[${index}]`;
-    validateModuleCandidateObject(candidate, candidateLabel);
-    if (candidate && typeof candidate.id === "string") candidatesById.set(candidate.id, candidate);
-    if (candidate?.status === "needs_info") needsInfoCount += 1;
-    if (typeof candidate?.missing_information_resolution !== "string") {
-      errors.push(`${candidateLabel}.missing_information_resolution must be present as a string in saved-analysis fixtures.`);
-    }
-    if (!Array.isArray(candidate?.resolved_missing_information)) {
-      errors.push(`${candidateLabel}.resolved_missing_information must be present as an array in saved-analysis fixtures.`);
-    } else if (candidate.resolved_missing_information.some((item) => typeof item !== "string" || !item.trim())) {
-      errors.push(`${candidateLabel}.resolved_missing_information must contain non-empty strings.`);
-    }
-    if (candidate?.status === "approved" && Array.isArray(candidate.missing_information) && candidate.missing_information.length > 0) {
-      errors.push(`${candidateLabel} is approved but still has candidate-level missing_information.`);
-    }
-    if (typeof candidate?.catalog_entry_id === "string" && candidate.catalog_entry_id) {
-      const catalogEntry = catalogById.get(candidate.catalog_entry_id);
-      if (!catalogEntry) {
-        errors.push(`${candidateLabel}.catalog_entry_id ${candidate.catalog_entry_id} is not in the saved catalog snapshot.`);
-      } else if (catalogEntry.module_category !== candidate.module_category) {
-        errors.push(`${candidateLabel}.catalog_entry_id category does not match saved catalog entry.`);
-      }
-    }
-    if (candidate?.access_protocol === "mcp" && candidate.mcp_schema_ref) {
-      const refs = collectMcpSchemaRefs(resolve("catalog/contracts"));
-      if (refs.size > 0 && !refs.has(candidate.mcp_schema_ref)) {
-        errors.push(`${candidateLabel}.mcp_schema_ref ${candidate.mcp_schema_ref} has no catalog/contracts/mcp contract.`);
-      }
-    }
-  }
-
-  if (record.scaffoldReady && needsInfoCount > 0) {
-    errors.push(`${label}.scaffoldReady cannot be true while needs_info candidates remain.`);
-  }
-  if (record.scaffoldReady && record.activeStep !== "export") {
-    errors.push(`${label}.scaffoldReady fixtures should land on export.`);
-  }
-
-  const contracts = Array.isArray(analysis.a2aContracts) ? analysis.a2aContracts : [];
-  const contractsById = new Map();
-  for (const contract of contracts) {
-    if (contract && typeof contract.contract_id === "string") contractsById.set(contract.contract_id, contract);
-  }
-  if (analysis.processFlow !== undefined) {
-    validateGraphIR(analysis.processFlow, `${label}.analysis.processFlow`, candidatesById, contractsById);
-  }
-  if (analysis.runtimeContracts !== undefined) {
-    if (!Array.isArray(analysis.runtimeContracts)) {
-      errors.push(`${label}.analysis.runtimeContracts must be an array when present.`);
-    } else {
-      analysis.runtimeContracts.forEach((contract, index) =>
-        validateRuntimeContractObject(contract, `${label}.analysis.runtimeContracts[${index}]`)
-      );
-    }
-  }
-}
-
 function validateRuntimeContractObject(contract, label) {
   if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
     errors.push(`${label} must be an object.`);
@@ -1312,219 +933,6 @@ function validateRuntimeContractObject(contract, label) {
       errors.push(`${label}.${field} must be an object.`);
     }
   });
-}
-
-function validateCatalogEntryObject(entry, label) {
-  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    errors.push(`${label} must be an object.`);
-    return;
-  }
-  if (typeof entry.id !== "string" || !entry.id.trim()) errors.push(`${label}.id is required.`);
-  if (typeof entry.name !== "string" || !entry.name.trim()) errors.push(`${label}.name is required.`);
-  if (!categories.has(entry.module_category)) errors.push(`${label}.module_category is invalid.`);
-  if (entry.module_category === "adapter" && !adapterKinds.has(entry.adapter_kind)) {
-    errors.push(`${label}.adapter_kind is invalid.`);
-  }
-  if (entry.module_category === "agent" && !agentKinds.has(entry.agent_kind)) {
-    errors.push(`${label}.agent_kind is invalid.`);
-  }
-  if (entry.module_category === "workflow" && !workflowKinds.has(entry.workflow_kind)) {
-    errors.push(`${label}.workflow_kind is invalid.`);
-  }
-  if (!["seeded", "session_added", "session_edited", "session_deleted"].includes(entry.provenance)) {
-    errors.push(`${label}.provenance is invalid.`);
-  }
-}
-
-function validateModuleCandidateObject(candidate, label) {
-  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-    errors.push(`${label} must be an object.`);
-    return;
-  }
-  if (typeof candidate.id !== "string" || !candidate.id.trim()) errors.push(`${label}.id is required.`);
-  if (!categories.has(candidate.module_category)) errors.push(`${label}.module_category is invalid.`);
-  if (!["needs_info", "approved", "deferred", "rejected"].includes(candidate.status)) {
-    errors.push(`${label}.status is invalid.`);
-  }
-  if (!Array.isArray(candidate.inputs)) errors.push(`${label}.inputs must be an array.`);
-  if (!Array.isArray(candidate.outputs)) errors.push(`${label}.outputs must be an array.`);
-  if (!Array.isArray(candidate.missing_information)) errors.push(`${label}.missing_information must be an array.`);
-  if (
-    candidate.missing_information_resolution !== undefined &&
-    typeof candidate.missing_information_resolution !== "string"
-  ) {
-    errors.push(`${label}.missing_information_resolution must be a string when present.`);
-  }
-  if (
-    candidate.resolved_missing_information !== undefined &&
-    (!Array.isArray(candidate.resolved_missing_information) ||
-      candidate.resolved_missing_information.some((item) => typeof item !== "string" || !item.trim()))
-  ) {
-    errors.push(`${label}.resolved_missing_information must be an array of non-empty strings when present.`);
-  }
-  if (candidate.module_category === "adapter" && !adapterKinds.has(candidate.adapter_kind)) {
-    errors.push(`${label}.adapter_kind is invalid.`);
-  }
-  if (candidate.module_category === "agent" && !agentKinds.has(candidate.agent_kind)) {
-    errors.push(`${label}.agent_kind is invalid.`);
-  }
-  if (candidate.module_category === "workflow" && !workflowKinds.has(candidate.workflow_kind)) {
-    errors.push(`${label}.workflow_kind is invalid.`);
-  }
-  if (candidate.access_protocol === "mcp" && (!candidate.mcp_server || !candidate.mcp_tool_name || !candidate.mcp_schema_ref)) {
-    errors.push(`${label} access_protocol=mcp requires mcp_server, mcp_tool_name, and mcp_schema_ref.`);
-  }
-}
-
-function validateContractRegistry(dir = root) {
-  for (const path of findJsonFiles(dir)) {
-    const normalizedPath = path.replace(/\\/g, "/");
-    if (!normalizedPath.includes("/catalog/contracts/")) continue;
-    const contract = readJson(path, errors);
-    if (isMcpContract(contract)) {
-      validateMcpContract(contract, relative(root, path) || path);
-    } else if (isA2ARegistryContract(contract)) {
-      validateA2ARegistryContract(contract, relative(root, path) || path);
-    }
-  }
-}
-
-function isMcpContract(value) {
-  return (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    typeof value.schema_ref === "string" &&
-    typeof value.server === "string" &&
-    typeof value.tool === "string" &&
-    value.inputSchema &&
-    value.outputSchema
-  );
-}
-
-function validateMcpContract(contract, label) {
-  for (const field of ["schema_ref", "server", "tool", "title", "description"]) {
-    if (typeof contract[field] !== "string" || !contract[field].trim()) {
-      errors.push(`${label}.${field} must be a non-empty string.`);
-    }
-  }
-  validateJsonSchemaObject(contract.inputSchema, `${label}.inputSchema`);
-  validateJsonSchemaObject(contract.outputSchema, `${label}.outputSchema`);
-  if (!Array.isArray(contract.success_examples) || contract.success_examples.length === 0) {
-    errors.push(`${label}.success_examples must be a non-empty array.`);
-  } else {
-    contract.success_examples.forEach((example, index) => {
-      if (!example || typeof example !== "object" || Array.isArray(example)) {
-        errors.push(`${label}.success_examples[${index}] must be an object.`);
-        return;
-      }
-      validateSchemaInstance(example.arguments, contract.inputSchema, `${label}.success_examples[${index}].arguments`);
-      validateSchemaInstance(example.structuredContent, contract.outputSchema, `${label}.success_examples[${index}].structuredContent`);
-    });
-  }
-  if (!Array.isArray(contract.error_examples) || contract.error_examples.length === 0) {
-    errors.push(`${label}.error_examples must be a non-empty array.`);
-  } else {
-    contract.error_examples.forEach((example, index) => {
-      if (example?.isError !== true) {
-        errors.push(`${label}.error_examples[${index}].isError must be true.`);
-      }
-      if (typeof example?.message !== "string" || !example.message.trim()) {
-        errors.push(`${label}.error_examples[${index}].message is required.`);
-      }
-    });
-  }
-  if (!contract.mock_response || typeof contract.mock_response !== "object" || Array.isArray(contract.mock_response)) {
-    errors.push(`${label}.mock_response must be an object.`);
-    return;
-  }
-  if (contract.mock_response.isError !== false) {
-    errors.push(`${label}.mock_response.isError must be false for the default deterministic response.`);
-  }
-  if (!Array.isArray(contract.mock_response.content) || contract.mock_response.content.length === 0) {
-    errors.push(`${label}.mock_response.content must be a non-empty array.`);
-  }
-  validateSchemaInstance(contract.mock_response.structuredContent, contract.outputSchema, `${label}.mock_response.structuredContent`);
-}
-
-function isA2ARegistryContract(value) {
-  return (
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    typeof value.contract_id === "string" &&
-    value.agent_card &&
-    value.task_lifecycle &&
-    value.artifact_contract
-  );
-}
-
-function validateA2ARegistryContract(contract, label) {
-  validateA2AContract(contract, label, new Map(), new Set(), new Map());
-  for (const field of ["success_task_example", "auth_required_example", "failed_task_example"]) {
-    if (!contract[field] || typeof contract[field] !== "object" || Array.isArray(contract[field])) {
-      errors.push(`${label}.${field} must be an object.`);
-    }
-  }
-}
-
-function validateJsonSchemaObject(schema, label) {
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-    errors.push(`${label} must be an object.`);
-    return;
-  }
-  if (schema.type !== "object") {
-    errors.push(`${label}.type must be object.`);
-  }
-  if (!schema.properties || typeof schema.properties !== "object" || Array.isArray(schema.properties)) {
-    errors.push(`${label}.properties must be an object.`);
-  }
-  if (schema.required !== undefined && !Array.isArray(schema.required)) {
-    errors.push(`${label}.required must be an array when present.`);
-  }
-}
-
-function validateSchemaInstance(value, schema, label) {
-  if (!schema || typeof schema !== "object") return;
-  const type = schema.type;
-  if (type === "object") {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      errors.push(`${label} must be an object.`);
-      return;
-    }
-    const required = Array.isArray(schema.required) ? schema.required : [];
-    for (const key of required) {
-      if (!(key in value)) errors.push(`${label}.${key} is required by schema.`);
-    }
-    const properties = schema.properties && typeof schema.properties === "object" ? schema.properties : {};
-    for (const [key, childSchema] of Object.entries(properties)) {
-      if (value[key] !== undefined) validateSchemaInstance(value[key], childSchema, `${label}.${key}`);
-    }
-    return;
-  }
-  if (type === "array") {
-    if (!Array.isArray(value)) {
-      errors.push(`${label} must be an array.`);
-      return;
-    }
-    if (schema.items) {
-      value.forEach((item, index) => validateSchemaInstance(item, schema.items, `${label}[${index}]`));
-    }
-    return;
-  }
-  if (type === "string" && typeof value !== "string") errors.push(`${label} must be a string.`);
-  if (type === "number" && typeof value !== "number") errors.push(`${label} must be a number.`);
-  if (type === "boolean" && typeof value !== "boolean") errors.push(`${label} must be a boolean.`);
-}
-
-function collectMcpSchemaRefs(dir) {
-  const refs = new Set();
-  if (!existsSync(dir)) return refs;
-  for (const path of findJsonFiles(dir)) {
-    const contract = readJson(path, errors);
-    if (isMcpContract(contract)) refs.add(contract.schema_ref);
-  }
-  return refs;
 }
 
 // ---------------------------------------------------------------------------

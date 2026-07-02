@@ -81,15 +81,15 @@ Needed code change:
 - Router lowering must extract a route decision from a structured human-input output first, e.g. `node_input["response"]`, `node_input["choice"]`, `node_input["value"]`, or a configured field path, before falling back to full text.
 - Add generator regression covering a `RequestInput -> router` flow where the prompt mentions both aliases and the user response is `skip_analysis`.
 
-### 2. Router branch information is not visible enough in Workbench graph editing
+### 2. Original router branch visibility finding (resolved)
 
 Severity: SHOULD-FIX
 
-The ADK Web graph image shows edge labels `run_analysis` and `skip_analysis`, but the Workbench graph node itself only renders the router label. `packages/web/src/components/graph/nodeTypes.tsx:135` renders `RouterNode` without outgoing route summary, default route, alias list, or prompt-to-route mapping.
+This was the original finding. Current `RouterNode` renders outgoing route value, target, default marker, and aliases; keep this section as QA history rather than active work.
 
-The edge inspector does have raw fields (`route_condition`, `route_aliases`, `is_default_route`), but this is not enough for a user to understand, from the router area itself, which input drives which branch.
+The original edge inspector had raw fields (`route_condition`, `route_aliases`, `is_default_route`), but that was not enough for a user to understand, from the router area itself, which input drove which branch.
 
-Needed code change:
+Original code change:
 
 - Add a router route map surface in `GraphCanvas`/`RouterNode`: outgoing route value, aliases, default marker, and target node.
 - Add route prompt preview that combines the upstream `human_input_contract.message` with outgoing route aliases.
