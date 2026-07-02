@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — active docs refreshed for current Stage Runner and Build flow
+
+- **결정**: CLAUDE.md와 Agent Factory harness는 Stage Runner를 `analyze/design/build/verify` 네 단계 surface로 설명한다. Analyze/Design만 proposed-first apply contract를 갖고, Build Stage Runner는 `applyMode="none"`으로 `runtime-stub/build` primitive의 canonical `runtime-stub/` side effect를 기록한다. Build 화면의 primary path는 `POST /api/af/:reqId/artifact-sync/run`이며, manual scaffold/runtime controls는 advanced path로 남는다.
+- **배경**: 코드 기준 `skillRunnerStages`는 네 단계이고, `BuildRunStep`은 `계약 동기화 + runtime-stub 재생성`을 primary panel로 렌더한다. `syncArtifactRoot`는 canonical `analysis-result.json`을 읽어 split artifacts와 `scaffold-plan.json`을 쓰며, Graph IR payload를 저장하지 않는다. `StageShell`은 left rail이 아니라 header-row stepper를 렌더한다.
+- **영향**: `CLAUDE.md`, `docs/workbench/agent-factory-harness.md`. Runtime/source behavior는 변경하지 않는다.
+
 ## 2026-07-03 · PR TBD — ADK baseline documented as 2.3
 
 - **결정**: active docs의 ADK baseline을 ADK 2.3으로 정렬한다. 현재 target은 installed `google-adk` 2.3.0이고, ADK Python 2.0 GA(2026-05-19)는 graph/dynamic/A2A taxonomy의 역사적 기준으로 유지한다. `requirements/adk-runtime.txt`의 floor는 `google-adk[a2a,mcp]>=2.1.0`으로 남긴다. 2.1 -> 2.3 사이 generated code에 영향을 주는 API rename이 없고 extras `a2a,mcp`가 2.3에서 확인되었기 때문이다.
