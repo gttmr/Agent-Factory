@@ -38,10 +38,11 @@ Runtime Handoff currently targets ADK 2.x source bundles:
 
 - smoke mode emits TODO/runtime-wiring handoff code
 - reviewed `output_mode: runnable` emits synthetic local ADK Workflow wiring
-- runnable DAG, human-input, static route, connected Mock Lab MCP adapter, and
+- runnable DAG, human-input, static route, reviewed loop/dynamic, connected
+  Mock Lab MCP adapter, agent state-channel instruction reads, and
   contract-backed Remote A2A paths are generated only from approved artifacts
-- dynamic workflow and loop lowering remain follow-up work unless the active
-  generator proves otherwise
+- non-connected state consumers and agent/non-connected artifact consumers stay
+  explicit blockers unless a reviewed contract extends the generator
 
 ## MCP And Mock Lab Boundary
 

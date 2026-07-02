@@ -1,6 +1,6 @@
 # 13 — scaffold-plan 워닝 문구 정확화 (카테고리/모드 인식)
 
-상태: **미구현.** `collectWarnings`(`packages/web/src/analyzer/scaffoldPlan.ts`)가 catalog binding 없는 **모든** 모듈에 동일 문구를 단다: `"<name>: 선택된 catalog binding이 없어 새 코드 TODO boundary로 생성됩니다."`
+상태: **완료.** 이 파일은 당시 문제 브리프를 보존한 기록이다. 현재 `collectWarnings`(`packages/web/src/analyzer/scaffoldPlan.ts`)는 category/output_mode를 반영한 runnable skeleton warning을 낸다.
 
 ## 왜 필요한가
 

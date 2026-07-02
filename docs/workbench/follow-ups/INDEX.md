@@ -33,11 +33,11 @@
 | 15 | `15-catalog-first-runtime-gap.md` | 코드 수정 완료(1–6) | router resume, route-map UI, runtime contract path normalization/hydration, catalog ID-first binding, Stage Runner catalog hydration, human-input 선택지 contract 최소 구현 및 ADK Web/Workbench smoke 확인. |
 | 16 | `16-build-verify-stage-runner.md` | 완료 | Build/Verify Stage Runner 확장: primitive wrapping, verify report/delta proposal, cancel endpoint, UI panel. |
 | 17 | `17-a2a-ui-error-surfacing.md` | 대기 | Local A2A provider import 화면 smoke 중 발견한 404 console noise, 422 detail opacity, React Flow type object warning 정리. |
-| TBD | 새 브리프 필요 | 대기 | Full Remote A2A HITL resume bridge. `input-required`는 interactive task state이며 plain ADK Web text chat resume은 아직 검증되지 않음. |
+| TBD | 새 브리프 필요 | 대기 | Plain ADK Web text-chat same-task resume bridge. Workbench `/runtime-a2a/resume` bridge는 지원 이벤트에서 검증됐고, `input-required` task를 ADK Web 일반 채팅으로 같은 remote task에 이어 보내는 경로만 아직 검증되지 않음. |
 
-`09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프이자 brief 09 구현 기록이다. Analyze + Design Stage Runner는 구현됐고, Build/Verify runner는 여전히 별도 후속 범위다. 기존 05의 `verify/run` / `runtime-stub/build` SSE 전환은 완료되어 BuildWorkbench/VerifyWorkbench live log 로 제공된다.
+`09-skill-runner-workbench.md` 는 Skill Runner 상위 브리프이자 brief 09 구현 기록이다. Analyze + Design Stage Runner는 먼저 구현됐고, Build/Verify runner 확장은 brief 16에서 완료됐다. 기존 05의 `verify/run` / `runtime-stub/build` SSE 전환은 완료되어 BuildWorkbench/VerifyWorkbench live log 로 제공된다.
 
-브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 브리프 17은 Local A2A provider import 화면 smoke에서 분리한 UI error-surfacing cleanup이다. Remote A2A `input-required` task를 plain ADK Web text chat으로 resume하는 bridge는 아직 검증되지 않았으므로 새 브리프로 분리한다. 마지막 backlog 순서였던 12와 10은 모두 완료됐다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
+브리프 10–14 는 2026-06 엣지 데이터 전달 / A2A 작업(PR #30–#33)에서 도출된 후속이다. 브리프 15 는 2026-06-29 `req-page-recommendation-required` catalog-first 재생성/ADK Web QA에서 도출됐다. 브리프 16은 Build/Verify Stage Runner 확장이다. 브리프 17은 Local A2A provider import 화면 smoke에서 분리한 UI error-surfacing cleanup이다. Workbench `/runtime-a2a/resume`는 지원 이벤트에서 검증됐지만, Remote A2A `input-required` task를 plain ADK Web text chat으로 resume하는 bridge는 아직 검증되지 않았으므로 새 브리프로 분리한다. 마지막 backlog 순서였던 12와 10은 모두 완료됐다. 자세한 배경·완료 작업은 `STATUS.md` 의 해당 섹션 참고. 새 후속 작업은 이 디렉터리에 새 번호로 추가한다.
 
 ## 공통 작업 자세
 
