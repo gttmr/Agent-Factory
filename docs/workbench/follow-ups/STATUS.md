@@ -166,7 +166,7 @@ MCP 스모크 (req-pr-analyze 에 scenario-a 임포트 → 재분석 클릭 → 
 ### brief 12 — A2A 계약 정책 매핑
 
 - `A2AContract.adk_runtime_policy`를 추가해 ADK runtime policy를 prose `auth/timeout/retry/fallback` 필드와 분리했다.
-- Runnable generator는 `RemoteA2aAgent(timeout=...)`와 `A2aRemoteAgentConfig(request_interceptors=[...])` env-backed auth만 생성한다.
+- Runnable generator는 `RemoteA2aAgent(timeout=...)`와 ADK 2.3 tuple contract의 `A2aRemoteAgentConfig(request_interceptors=[...])` env-backed auth만 생성한다.
 - `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 남기며 generated retry/fallback wrapper는 만들지 않는다.
 - Remote A2A 편집 UI와 readiness gate는 `AF_A2A_*` env var 이름, metadata key, timeout/retry/fallback handoff shape를 검토한다.
 

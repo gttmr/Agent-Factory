@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-02 · PR TBD — generated A2A interceptor aligned to ADK 2.3 tuple contract
+
+- **결정**: generated Remote A2A auth interceptor는 ADK 2.3 `before_request(ctx, a2a_request, params)` tuple contract를 따른다. `bearer_env`/`metadata_env` auth hook은 `params.request_metadata`를 mutate하고 성공 시 `(a2a_request, params)`, env var 누락 시 `(Event(error_message=...), params)`를 반환한다.
+- **배경**: installed `google-adk` 2.3.0 introspection에서 ADK가 `result, params = await interceptor.before_request(ctx, a2a_request, params)` 형태로 호출함을 확인했다. 기존 generator는 `(ctx, params)`와 `Event`/`None` 반환을 emit해 첫 remote call에서 arity 또는 tuple-unpack 오류를 낼 수 있었다.
+- **영향**: `bearer_env`/`metadata_env`를 쓰는 runnable Remote A2A generated bundle, generator regression, active validation/follow-up docs.
+
 ## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
 
 - **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.
