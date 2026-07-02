@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — ADK baseline documented as 2.3
+
+- **결정**: active docs의 ADK baseline을 ADK 2.3으로 정렬한다. 현재 target은 installed `google-adk` 2.3.0이고, ADK Python 2.0 GA(2026-05-19)는 graph/dynamic/A2A taxonomy의 역사적 기준으로 유지한다. `requirements/adk-runtime.txt`의 floor는 `google-adk[a2a,mcp]>=2.1.0`으로 남긴다. 2.1 -> 2.3 사이 generated code에 영향을 주는 API rename이 없고 extras `a2a,mcp`가 2.3에서 확인되었기 때문이다.
+- **배경**: ADK 2.0 GA 이후 2.1(2026-05-23), 2.2(2026-06-04), 2.3(2026-06-18)이 나왔고, 이 branch의 Runtime/A2A 검증은 2.3.0 기준으로 진행됐다. `scripts/adk-source/agent-runnable.mjs`와 `scripts/adk-source/agent-dynamic.mjs`의 generated bundle description literal은 아직 ADK 2.1 문자열을 담고 있으므로 별도 code cluster에서 고친다. ADK 2.2/2.3 `api_server --a2a` function-local `import json` bug에 대한 launcher in-memory patch 문서는 2.3.0에서도 계속 유효하다.
+- **영향**: `AGENTS.md`, `CLAUDE.md`, active workbench docs, target-agent protocol reference. Runtime dependency floor는 변경하지 않는다.
+
 ## 2026-07-03 · PR TBD — stage status is a pure projection of approvals including demotion on revoke
 
 - **결정**: `PATCH /api/af/:id/manifest/approvals` treats approval booleans as the source of truth and projects analyze/design/build stage status to `complete` when the gate is true and `pending` when the gate is false.

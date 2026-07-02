@@ -29,7 +29,7 @@ concerns unless an independent remote agent boundary is proven.
 ## ADK Local Boundary
 
 Treat ADK as the local construction/runtime layer for reviewed artifacts. Agent
-Factory's classification baseline is ADK 2.0: `workflow_kind` stays
+Factory's classification baseline is ADK 2.3: `workflow_kind` stays
 `orchestration`, `graph`, `dynamic`, or `unknown`, while sequence, route,
 fan-out/fan-in, loop intent, join, human input, and callback wait live in Graph
 IR nodes, containers, and edges.

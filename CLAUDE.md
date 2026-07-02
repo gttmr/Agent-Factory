@@ -83,7 +83,7 @@ Adapter `adapter_kind`: `legacy_api`, `retrieval`, `rule_registry`, `data_query`
 
 Rules baked into the schemas, validator, and analyzer:
 
-- ADK runtime baseline: ADK 2.0. ADK Python 2.0 is GA as of May 19, 2026. `graph` and `dynamic` represent 2.0 graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
+- ADK runtime baseline: ADK 2.3. The current target is `google-adk` 2.3.0; ADK Python 2.0 GA on May 19, 2026 remains the historical origin for the graph/dynamic taxonomy. `graph` and `dynamic` represent ADK graph and dynamic workflows respectively. Sequence, fan-out/fan-in, loop, and human input are Graph IR details, not `workflow_kind` values.
 - Tool/Adapter, Knowledge Retrieval, and Metadata Registry are **no longer** top-level categories. Retrieval and rule registries appear only as `adapter_kind` subtypes.
 - `legacy_recommended_type` is migration metadata; never use it as the primary classifier.
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.

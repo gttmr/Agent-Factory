@@ -47,7 +47,7 @@ Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마�
 - `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
 - `af-run-manifest.json`: `artifacts/af/<req-id>/` 안에서 단계 상태, 출력 경로, 승인 상태, 검증 evidence를 연결하는 가벼운 manifest다.
 - `runs/<stage>/<run-id>/`: Stage Runner 실행 evidence다. `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, 실패 시 `diagnostics.md`를 담는다.
-- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 source bundle이다. 기본 smoke 모드는 TODO source이고 runtime wiring/business logic은 후속 구현 task에서 채운다. 승인된 `output_mode: runnable` 은 `LlmAgent` + Mock Lab MCP 어댑터로 실행 가능한 ADK 2.1 `Workflow` 를 생성한다(둘 다 raw requirement가 아닌 승인 artifact에서만 생성).
+- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 source bundle이다. 기본 smoke 모드는 TODO source이고 runtime wiring/business logic은 후속 구현 task에서 채운다. 승인된 `output_mode: runnable` 은 `LlmAgent` + Mock Lab MCP 어댑터로 실행 가능한 ADK 2.3 `Workflow` 를 생성한다(둘 다 raw requirement가 아닌 승인 artifact에서만 생성).
 - `validation-report.md`: 검증 명령과 결과, 남은 위험을 기록한다.
 - `catalog-delta.yaml`: catalog 재사용/등록/수정 제안이다. 실제 `catalog/*.yaml` 반영은 Reuse Hub `등록 승인` publish 경로 또는 human PR merge 로만 처리한다.
 
@@ -78,7 +78,7 @@ Analyze Stage Runner는 raw requirement 입력 경로에서 Codex TypeScript SDK
 ## ADK 문서 사용
 
 ADK 공식 문서는 repo에 모두 복제하지 않는다.
-필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. ADK 2.0 문서(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)를 우선 조회한다.
-이 저장소의 활성 문서는 ADK 2.0을 기본 baseline으로 작성한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화되어 있다.
+필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. 현재 target은 ADK 2.3이며, ADK 2.0 문서(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)는 GA 역사와 분류 축을 확인할 때 사용한다.
+이 저장소의 활성 문서는 ADK 2.3을 기본 baseline으로 작성한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화되어 있고, 현재 Runtime Handoff target은 `google-adk` 2.3.0이다.
 작은 순차, 병렬, 반복, 사람 입력 흐름은 `workflow_kind`가 아니라 Graph IR node/container/edge로 표현한다.
 MCP 결과와 직접 내려받은 공식 문서가 다르거나 현재 taxonomy와 충돌하면 구현을 멈추고 사용자에게 질문한다.

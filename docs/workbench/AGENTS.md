@@ -20,7 +20,7 @@ project harness rules.
 
 ## Local Rules
 
-- Keep ADK 2.0 classification baseline separate from ADK 2.1 generated runtime details.
+- Keep the ADK 2.3 target baseline separate from historical ADK 2.0 GA notes and from generated-template literal follow-ups.
 - Keep retrieval, rule registry, and tools as adapter subtypes unless the active taxonomy changes everywhere.
 - Remote A2A remains high-friction and contract-backed.
 - Build/Verify/Run docs must preserve the split: Build generates/edits handoff, Verify runs allow-list checks, Run links to ADK dev UI.

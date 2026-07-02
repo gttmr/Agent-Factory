@@ -6,14 +6,15 @@
 ## ADK 확인 기준
 
 2026-05-22 기준으로 `adk-docs-mcp`에서 `list_doc_sources -> https://adk.dev/llms.txt -> fetch_docs` 순서로 다음 문서를 확인했다.
-ADK 2.0 문서가 GA 기준을 제공하므로 active taxonomy는 ADK 2.0을 기본 baseline으로 둔다.
+2026-07-03 기준 active taxonomy와 Runtime Handoff target은 ADK 2.3이다. ADK Python 2.0 GA는 Graph/Dynamic/A2A 분류의 역사적 기준이고, 현재 설치·검증 target은 `google-adk` 2.3.0이다.
 
 - `https://adk.dev/2.0/index.md`: ADK Python 2.0 GA는 2026년 5월 19일 release로 문서화되어 있고, graph-based workflows, dynamic workflows, collaborative workflows를 핵심 기능으로 둔다.
 - `https://adk.dev/graphs/index.md`: graph-based workflows는 Agents, Tools, Functions를 node로 두고 edge로 routing, branching, state management를 정의한다.
 - `https://adk.dev/workflows/index.md`: ADK workflows는 graph-based, dynamic, collaborative, template workflow를 구분한다.
 - `https://adk.dev/a2a/index.md`: ADK A2A는 remote A2A agent와의 통신을 다루며 local sub-agent, adapter, MCP tool 호출과 구분한다.
+- 릴리스 기준: ADK Python 2.0 GA(2026-05-19) 이후 2.1(2026-05-23), 2.2(2026-06-04), 2.3(2026-06-18)을 거쳐 현재 target을 2.3으로 둔다. 2.1 -> 2.3 사이에 generated code에 영향을 주는 API rename은 확인되지 않았다.
 
-이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
+이 워크벤치는 ADK 2.3 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
 
 ## Workbench Graph Model
 
@@ -114,7 +115,7 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 그 작은 흐름은 `processFlow` Graph IR의 `node_kind`, `container_kind`, `edge_kind`, `execution_semantics`로 표현한다.
 
 - `orchestration`: 여러 Agent/Adapter/Workflow를 상위에서 조율하지만 아직 명시적 graph topology가 핵심 산출물이 아닐 때.
-- `graph`: ADK 2.0 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
+- `graph`: ADK 2.3 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
 - `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
 - `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
 
