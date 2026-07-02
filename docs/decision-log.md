@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — stage status is a pure projection of approvals including demotion on revoke
+
+- **결정**: `PATCH /api/af/:id/manifest/approvals` treats approval booleans as the source of truth and projects analyze/design/build stage status to `complete` when the gate is true and `pending` when the gate is false.
+- **배경**: Previously, a revoked approval preserved the prior `complete` stage status, so external stage-status readers could still treat the stage as complete.
+- **영향**: External stage-status readers, including runtime-stub generation gates, now see revoked approvals as non-complete stage state.
+
 ## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
 
 - **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.
