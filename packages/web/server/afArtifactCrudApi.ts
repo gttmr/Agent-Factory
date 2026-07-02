@@ -9,6 +9,27 @@ import { ArtifactValidationError } from "./artifactRootStore";
 import { ifMatchHeader, isRecord, readJsonBody, readRawBody, sendJson } from "./httpApi";
 import { validateAnalysisResult } from "./validators";
 
+export function projectApprovalStageStatuses(
+  manifest: AfRunManifest,
+  approvals: AfRunManifest["approvals"]
+): AfRunManifest["stages"] {
+  return {
+    ...manifest.stages,
+    analyze: {
+      ...manifest.stages.analyze,
+      status: approvals.analysis_reviewed ? "complete" : "pending"
+    },
+    design: {
+      ...manifest.stages.design,
+      status: approvals.boundaries_approved && approvals.runtime_contracts_approved ? "complete" : "pending"
+    },
+    build: {
+      ...manifest.stages.build,
+      status: approvals.stub_ready_for_followup ? "complete" : "pending"
+    }
+  };
+}
+
 export async function handleListRoots(store: ArtifactRootStore, res: ServerResponse): Promise<void> {
   const summaries = await store.listRoots();
   sendJson(res, 200, summaries);
@@ -78,24 +99,7 @@ export async function handlePatchApprovals(
   const next: AfRunManifest = {
     ...manifest,
     approvals,
-    stages: {
-      ...manifest.stages,
-      analyze: {
-        ...manifest.stages.analyze,
-        status: approvals.analysis_reviewed ? "complete" : manifest.stages.analyze.status
-      },
-      design: {
-        ...manifest.stages.design,
-        status:
-          approvals.boundaries_approved && approvals.runtime_contracts_approved
-            ? "complete"
-            : manifest.stages.design.status
-      },
-      build: {
-        ...manifest.stages.build,
-        status: approvals.stub_ready_for_followup ? "complete" : manifest.stages.build.status
-      }
-    }
+    stages: projectApprovalStageStatuses(manifest, approvals)
   };
   const written = await store.writeManifest(reqId, next, ifMatchHeader(ifMatch));
   res.setHeader("ETag", written.etag);

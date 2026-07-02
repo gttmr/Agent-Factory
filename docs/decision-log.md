@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — stage status is a pure projection of approvals including demotion on revoke
+
+- **결정**: `PATCH /api/af/:id/manifest/approvals` treats approval booleans as the source of truth and projects analyze/design/build stage status to `complete` when the gate is true and `pending` when the gate is false.
+- **배경**: Previously, a revoked approval preserved the prior `complete` stage status, so external stage-status readers could still treat the stage as complete.
+- **영향**: External stage-status readers, including runtime-stub generation gates, now see revoked approvals as non-complete stage state.
+
 ## 2026-07-02 · PR TBD — runnable node symbols derived per-node to allow module reuse across nodes
 
 - **결정**: Runnable/smoke ADK source generation derives Python node/function symbols from the Graph IR node when the same approved module is reused by multiple nodes. Single-use modules keep the previous module-derived names. State channel semantics stay unchanged: fallback `{module_id}_output` and reviewed edge `state_key` values remain module/edge contracts, not automatically node-scoped channels.
