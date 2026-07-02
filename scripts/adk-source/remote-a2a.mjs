@@ -60,22 +60,23 @@ export function remoteA2aRuntimeRows({ analysisResult, modules }) {
     });
 }
 
-export function emitRemoteA2aNode({ analysisResult, module }) {
+export function emitRemoteA2aNode({ analysisResult, target }) {
+  const module = target.module ?? target;
   const contract = a2aContractForModule(analysisResult, module);
   const url = a2aAgentCardUrl(contract);
   const policy = contract?.adk_runtime_policy ?? null;
   const description = (contract && contract.target_agent_name) || module.name;
   const authSpec = authInterceptorSpec(policy);
-  const beforeRequest = authSpec ? `${emitAuthInterceptor({ module, spec: authSpec })}\n\n` : "";
+  const beforeRequest = authSpec ? `${emitAuthInterceptor({ target, spec: authSpec })}\n\n` : "";
   const timeoutLine = hasTimeoutPolicy(policy) ? `    timeout=${formatPythonNumber(policy.timeout_seconds)},\n` : "";
   const configLine = authSpec
     ? `    config=A2aRemoteAgentConfig(
-        request_interceptors=[RequestInterceptor(before_request=${a2aBeforeRequestName(module)})]
+        request_interceptors=[RequestInterceptor(before_request=${a2aBeforeRequestName(target)})]
     ),
 `
     : "";
-  return `${beforeRequest}${nodeSymbol(module)} = RemoteA2aAgent(
-    name=${toPyStr(pyNodeName(module))},
+  return `${beforeRequest}${nodeSymbol(target)} = RemoteA2aAgent(
+    name=${toPyStr(pyNodeName(target))},
     description=${toPyStr(truncate(description))},
     agent_card=${toPyStr(url)},
 ${timeoutLine}${configLine}    use_legacy=False,
@@ -104,12 +105,13 @@ export function assertRemoteA2aSupported({ analysisResult, modules }) {
   }
 }
 
-function emitAuthInterceptor({ module, spec }) {
+function emitAuthInterceptor({ target, spec }) {
+  const module = target.module ?? target;
   const assignment =
     spec.mode === "bearer_env"
       ? `    metadata["authorization"] = f"Bearer {auth_value}"`
       : `    metadata[${toPyStr(spec.metadataKey)}] = auth_value`;
-  return `async def ${a2aBeforeRequestName(module)}(ctx, params):
+  return `async def ${a2aBeforeRequestName(target)}(ctx, params):
     auth_value = os.environ.get(${toPyStr(spec.envVar)})
     if not auth_value:
         return Event(
@@ -122,8 +124,8 @@ ${assignment}
     return None`;
 }
 
-function a2aBeforeRequestName(module) {
-  return `_a2a_before_${nodeSymbol(module)}`;
+function a2aBeforeRequestName(target) {
+  return `_a2a_before_${nodeSymbol(target)}`;
 }
 
 function authInterceptorSpec(policy) {

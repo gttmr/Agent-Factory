@@ -12,11 +12,13 @@ import {
   assertSmokeBundle
 } from "./assertions.mjs";
 import {
+  baseModules,
   discoverGeneratedPackage,
   generate,
   generator,
   readBundle,
   repoRoot,
+  writeChannelFixture,
   writeFixture,
   writeJson
 } from "./fixtures.mjs";
@@ -58,6 +60,101 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   try {
     assertConnectedMcpRuntimeLabels(outputRoot);
     assertManifestStageUpdated(artifactRoot);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable mode gives reused adapter module nodes unique Python symbols", () => {
+  const [, adapter] = baseModules(true);
+  const modules = [
+    {
+      ...adapter,
+      id: "mod-applicant-notification-adapter",
+      name: "Applicant Notification Adapter"
+    }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-reused-module-runnable-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "notify-initial", node_kind: "adapter_call", module_id: "mod-applicant-notification-adapter" },
+        { id: "notify-final", node_kind: "adapter_call", module_id: "mod-applicant-notification-adapter" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "notify-initial" },
+        { from: "in1", to: "notify-final" },
+        { from: "notify-initial", to: "out1" },
+        { from: "notify-final", to: "out1" }
+      ]
+    });
+
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(
+      source,
+      /node_mod_applicant_notification_adapter__notify_initial = FunctionNode\(func=_fn_mod_applicant_notification_adapter__notify_initial/
+    );
+    assert.match(
+      source,
+      /node_mod_applicant_notification_adapter__notify_final = FunctionNode\(func=_fn_mod_applicant_notification_adapter__notify_final/
+    );
+    assert.match(source, /\(START, node_mod_applicant_notification_adapter__notify_initial\)/);
+    assert.match(source, /\(START, node_mod_applicant_notification_adapter__notify_final\)/);
+    assert.match(source, /ctx\.state\["mod_applicant_notification_adapter_output"\] = payload/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("smoke mode graph edges keep reused adapter module nodes distinct", () => {
+  const [, adapter] = baseModules(false);
+  const modules = [
+    {
+      ...adapter,
+      id: "mod-applicant-notification-adapter",
+      name: "Applicant Notification Adapter"
+    }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-reused-module-smoke-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "notify-initial", node_kind: "adapter_call", module_id: "mod-applicant-notification-adapter" },
+        { id: "notify-final", node_kind: "adapter_call", module_id: "mod-applicant-notification-adapter" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "notify-initial" },
+        { from: "in1", to: "notify-final" },
+        { from: "notify-initial", to: "out1" },
+        { from: "notify-final", to: "out1" }
+      ]
+    });
+    const planPath = join(artifactRoot, "scaffold-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    plan.output_mode = "smoke";
+    plan.modules = plan.modules.map((module) => ({
+      ...module,
+      scaffold_output: "contract_or_stub_only",
+      no_runnable_business_logic: true
+    }));
+    writeJson(planPath, plan);
+
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /\("START", "node_mod_applicant_notification_adapter__notify_initial"\)/);
+    assert.match(source, /\("START", "node_mod_applicant_notification_adapter__notify_final"\)/);
+    assert.match(source, /def node_mod_applicant_notification_adapter__notify_initial\(node_input: Any = None\):/);
+    assert.match(source, /def node_mod_applicant_notification_adapter__notify_final\(node_input: Any = None\):/);
+    assert.match(source, /output\["todo_function"\] = "TODO_IMPLEMENT_HERE_mod_applicant_notification_adapter"/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

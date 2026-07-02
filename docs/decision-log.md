@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-02 · PR TBD — runnable node symbols derived per-node to allow module reuse across nodes
+
+- **결정**: Runnable/smoke ADK source generation derives Python node/function symbols from the Graph IR node when the same approved module is reused by multiple nodes. Single-use modules keep the previous module-derived names. State channel semantics stay unchanged: fallback `{module_id}_output` and reviewed edge `state_key` values remain module/edge contracts, not automatically node-scoped channels.
+- **배경**: Vacation-approval E2E reproduced a runnable generator collision where two normal adapter_call nodes referenced `mod-applicant-notification-adapter` and both lowered to `node_mod_applicant_notification_adapter`.
+- **영향**: ADK generator naming/lowering/emitters, smoke graph edge emission, reused-adapter regression scenario, generator regression tests, and `docs/workbench/validation.md`.
+
 ## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
 
 - **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.
