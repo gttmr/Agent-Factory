@@ -1,4 +1,4 @@
-import { nodeFunctionName, nodeSymbol } from "../naming.mjs";
+import { nodeFunctionName } from "../naming.mjs";
 
 export function graphIndexes({ modules, processFlow }) {
   const moduleById = new Map(modules.map((module) => [module.id, module]));
@@ -39,6 +39,7 @@ export function validateGraphCoverage(context) {
 
 export function buildGraphWorkflowEdges(context) {
   const graph = graphIndexes(context);
+  const counts = moduleNodeCounts(graph);
   const rows = [];
   const seen = new Set();
   const push = (from, to) => {
@@ -51,14 +52,14 @@ export function buildGraphWorkflowEdges(context) {
 
   if (Array.isArray(context.processFlow.edges)) {
     for (const edge of context.processFlow.edges) {
-      push(graphEndpoint(edge.from, "from", graph), graphEndpoint(edge.to, "to", graph));
+      push(graphEndpoint(edge.from, "from", graph, counts), graphEndpoint(edge.to, "to", graph, counts));
     }
   }
 
   const incoming = new Set(rows.map(([, to]) => to));
   const outgoing = new Set(rows.map(([from]) => from));
   for (const node of graph.moduleNodes) {
-    const fn = nodeFunctionName(graph.moduleById.get(node.module_id));
+    const fn = nodeFunctionName(moduleNodeSpec(node, graph, counts));
     if (!incoming.has(fn)) push("START", fn);
     if (!outgoing.has(fn)) push(fn, "emit_workflow_result");
   }
@@ -69,15 +70,40 @@ export function buildGraphWorkflowEdges(context) {
   return rows;
 }
 
-function graphEndpoint(nodeId, side, graph) {
+function graphEndpoint(nodeId, side, graph, counts) {
   const node = graph.nodesById.get(nodeId);
   if (!node) return null;
   if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
-    return nodeFunctionName(graph.moduleById.get(node.module_id));
+    return nodeFunctionName(moduleNodeSpec(node, graph, counts));
   }
   if (side === "from" && node.node_kind === "input") return "START";
   if (side === "to" && node.node_kind === "output") return "emit_workflow_result";
   return null;
+}
+
+export function moduleNodeCounts(context) {
+  const graph = isGraphIndex(context) ? context : graphIndexes(context);
+  const counts = new Map();
+  for (const node of graph.moduleNodes) {
+    counts.set(node.module_id, (counts.get(node.module_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function moduleNodeSpec(node, graph, counts = moduleNodeCounts(graph)) {
+  if (!node || typeof node.module_id !== "string") return null;
+  const module = graph.moduleById.get(node.module_id);
+  if (!module) return null;
+  return { node, module, moduleNodeCount: counts.get(module.id) ?? 1 };
+}
+
+export function orderedGraphNodeSpecs(context, options = {}) {
+  const graph = graphIndexes(context);
+  const counts = moduleNodeCounts(graph);
+  const excludeModuleIds = options.excludeModuleIds ?? new Set();
+  return graph.moduleNodes
+    .map((node) => moduleNodeSpec(node, graph, counts))
+    .filter((spec) => spec && !excludeModuleIds.has(spec.module.id));
 }
 
 export function orderedGraphModules(context, options = {}) {
@@ -94,6 +120,10 @@ export function orderedGraphModules(context, options = {}) {
     }
   }
   return ordered;
+}
+
+function isGraphIndex(value) {
+  return Boolean(value?.moduleById && value?.nodesById && Array.isArray(value?.moduleNodes));
 }
 
 export function graphNodeSemantics({ processFlow }) {

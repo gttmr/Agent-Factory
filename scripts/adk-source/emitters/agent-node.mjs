@@ -5,13 +5,14 @@ import { graphIndexes } from "../graph/indexes.mjs";
 import { nodeSymbol, pyNodeName } from "../naming.mjs";
 import { toPyStr, truncate } from "../python-literals.mjs";
 
-export function emitAgentNode(module, context) {
-  const sym = nodeSymbol(module);
+export function emitAgentNode(target, context) {
+  const module = target.module ?? target;
+  const sym = nodeSymbol(target);
   const instruction = agentInstruction(module, context);
-  const mode = agentExecutionMode(module, context);
+  const mode = agentExecutionMode(target, context);
   const toolsBlock = emitAgentTools(agentOwnedToolsetAdapters(context.graphContext, module));
   return `${sym} = LlmAgent(
-    name=${toPyStr(pyNodeName(module))},
+    name=${toPyStr(pyNodeName(target))},
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
     instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
     description=${toPyStr(truncate(module.name))},
@@ -43,11 +44,12 @@ export function agentInstruction(module, context) {
   ].join("\n");
 }
 
-export function agentExecutionMode(module, context) {
+export function agentExecutionMode(target, context) {
+  const module = target.module ?? target;
   if (module?.agent_execution_mode === "chat" || module?.agent_execution_mode === "single_turn") {
     return module.agent_execution_mode;
   }
-  const graphNode = graphIndexes(context.graphContext).moduleNodes.find((node) => node.module_id === module.id);
+  const graphNode = target.node ?? graphIndexes(context.graphContext).moduleNodes.find((node) => node.module_id === module.id);
   return graphNode?.agent_execution_mode === "chat" ? "chat" : "single_turn";
 }
 

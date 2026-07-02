@@ -1,11 +1,12 @@
-import { buildGraphWorkflowEdges, terminalOutputIds } from "./graph/indexes.mjs";
+import { buildGraphWorkflowEdges, orderedGraphNodeSpecs, terminalOutputIds } from "./graph/indexes.mjs";
 import { nodeFunctionName, todoFunctionName } from "./naming.mjs";
 import { escapePythonString, toPythonEdgeTupleLiteral, toPythonLiteral } from "./python-literals.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
 
 export function buildSmokeAgentPy(context) {
   const { graphContext, modules, packageName } = context;
-  const functions = modules.map(buildNodeFunction).join("\n\n");
+  const nodeSpecs = orderedGraphNodeSpecs(graphContext);
+  const functions = [...modules.map(buildTodoFunction), ...nodeSpecs.map(buildNodeFunction)].join("\n\n");
   const graphEdges = buildGraphWorkflowEdges(graphContext);
 
   return `from __future__ import annotations
@@ -120,13 +121,15 @@ root_agent = SyntheticRuntimeSmokeAgent(
 `;
 }
 
-function buildNodeFunction(module) {
+function buildTodoFunction(module) {
   return `def ${todoFunctionName(module)}(node_input: Any = None):
     """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("${escapePythonString(module.name)} requires developer implementation")
+    raise NotImplementedError("${escapePythonString(module.name)} requires developer implementation")`;
+}
 
-
-def ${nodeFunctionName(module)}(node_input: Any = None):
+function buildNodeFunction(target) {
+  const module = target.module ?? target;
+  return `def ${nodeFunctionName(target)}(node_input: Any = None):
     contract = COMPONENT_CONTRACTS["${module.id}"]
     output = _event_output("${module.id}", "${escapePythonString(module.name)}", node_input)
     output["developer_todos"] = contract["developer_todos"]

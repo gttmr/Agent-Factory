@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-02 · PR TBD — runnable node symbols derived per-node to allow module reuse across nodes
+
+- **결정**: Runnable/smoke ADK source generation derives Python node/function symbols from the Graph IR node when the same approved module is reused by multiple nodes. Single-use modules keep the previous module-derived names. State channel semantics stay unchanged: fallback `{module_id}_output` and reviewed edge `state_key` values remain module/edge contracts, not automatically node-scoped channels.
+- **배경**: Vacation-approval E2E reproduced a runnable generator collision where two normal adapter_call nodes referenced `mod-applicant-notification-adapter` and both lowered to `node_mod_applicant_notification_adapter`.
+- **영향**: ADK generator naming/lowering/emitters, smoke graph edge emission, reused-adapter regression scenario, generator regression tests, and `docs/workbench/validation.md`.
+
 ## 2026-07-02 · PR TBD — validator stage run-id pattern covers build/verify
 
 - **결정**: Artifact validator의 `stage_runs.*.latest_run_id` 형식 검증은 `analyze/design/build/verify` 네 단계 Stage Runner run id를 모두 허용한다.

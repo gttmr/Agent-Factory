@@ -2,7 +2,7 @@ import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mj
 import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
 import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
-import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
+import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
 import { usesRoutes } from "./graph/routes.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
@@ -24,13 +24,13 @@ export function buildRunnableAgentPy(context) {
   const { edges, joins } = buildRunnableGraph(graphContext);
   const graph = graphIndexes(graphContext);
   const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
+  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
   const autoJoins = joins.filter((join) => join.explicit === false);
-  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes });
+  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes });
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = workflowEdgeLiteral(edges);

@@ -1,7 +1,7 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
 import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions } from "./graph/guards.mjs";
-import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
+import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import {
   assertDynamicRunnableGraphSupported,
   buildDynamicRunnablePlan
@@ -23,11 +23,11 @@ export function buildDynamicRunnableAgentPy(context) {
 
   const graph = graphIndexes(graphContext);
   const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
+  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const loopPlan = buildDynamicRunnablePlan(graphContext);
-  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...loopPlan.loopControls]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes: [] });
+  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...loopPlan.loopControls]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes: [] });
   const loopControlBlocks = loopPlan.loopControls.map(emitLoopControlNode);
 
   const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.1 dynamic workflow wiring입니다: ${truncate(
