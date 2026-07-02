@@ -72,8 +72,10 @@ MCP, callback, side effect, policy는 category가 아니라 Graph IR 실행 메�
 - `mock_binding`: Mock Lab smoke 연결이다. MCP를 category로 바꾸지 않고 `provider: mock_lab` binding만 저장한다.
 - `side_effect`, `policy`: graph review용 node-level governance summary다. 실제 auth/timeout/retry/fallback/data policy/callback resume 계약의 source of truth는 `AnalysisResult.runtimeContracts`와 Remote A2A contract artifact다.
 
-고정 MCP Adapter 호출은 `node_kind: adapter_call`, `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`로 표현한다.
-LLM이 MCP toolset에서 tool을 고르는 경로는 `node_kind: agent`, `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`으로 표현한다.
+고정 MCP Adapter 호출은 `node_kind: adapter_call`, `invoke_binding: mcp_tool`, `decision_owner: workflow_code`, `call_control: fixed_by_workflow`로 표현한다.
+LLM이 agent 소유 MCP toolset에서 tool을 고르는 경로는 `node_kind: agent`, `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`으로 표현한다.
+`node_kind: adapter_call`과 `call_control: selected_by_llm`의 조합은 invalid/out of scope다. LLM 선택권이 필요하면 Adapter 호출 노드를 넓히지 않고 agent 노드가 reviewed MCP toolset을 소유한다.
+Runnable ADK source generator는 reviewed agent-owned MCP toolset을 ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`로 lower한다. 생성자는 `toolsets` 인자가 아니라 `tools` 인자를 사용해야 한다.
 `input_mapping`과 `output_mapping`은 module-bound node의 runnable 입력/출력 계약이다. key는 대상 node/module의 field 이름이고 value는 upstream payload, named state channel, 또는 workflow context 안에서 찾을 source field 이름이다. ADK source generator는 connected MCP adapter 입력을 해석할 때 이 reviewed mapping을 `agents.config.yaml input_map`보다 먼저 적용한다.
 `node_kind: workflow_call`은 공식 subworkflow/existing workflow 호출 노드이며 `workflow_ref`, `input_schema`, `output_schema`, `input_mapping`, `output_mapping`, `adk_skeleton_contract`를 가질 수 있다.
 

@@ -1,4 +1,4 @@
-import { adapterConnection } from "../adapters.mjs";
+import { adapterConnection, agentOwnedToolsetAdapters } from "../adapters.mjs";
 import { agentOutputStateKey, incomingStateChannelKeys } from "../channels.mjs";
 import { DEFAULT_MODEL } from "../context.mjs";
 import { graphIndexes } from "../graph/indexes.mjs";
@@ -9,14 +9,26 @@ export function emitAgentNode(module, context) {
   const sym = nodeSymbol(module);
   const instruction = agentInstruction(module, context);
   const mode = agentExecutionMode(module, context);
+  const toolsBlock = emitAgentTools(agentOwnedToolsetAdapters(context.graphContext, module));
   return `${sym} = LlmAgent(
     name=${toPyStr(pyNodeName(module))},
     model=_model_for(${toPyStr(module.id)}, ${toPyStr(module.model || DEFAULT_MODEL)}),
     instruction=_agent_cfg(${toPyStr(module.id)}, "instruction", ${toPyStr(instruction)}),
     description=${toPyStr(truncate(module.name))},
     output_key=${toPyStr(agentOutputStateKey(context.graphContext, module))},
-    mode=${toPyStr(mode)},
+    mode=${toPyStr(mode)},${toolsBlock}
 )`;
+}
+
+function emitAgentTools(adapters) {
+  if (!adapters.length) return "";
+  const rows = adapters
+    .map(
+      (adapter) =>
+        `        McpToolset(connection_params=StreamableHTTPConnectionParams(url=_mcp_url(${toPyStr(adapter.id)}, ${toPyStr(adapter.mcp_server)}))),`
+    )
+    .join("\n");
+  return `\n    tools=[\n${rows}\n    ],`;
 }
 
 export function agentInstruction(module, context) {

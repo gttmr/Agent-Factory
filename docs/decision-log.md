@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
+
+- **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.
+- **배경**: Parameter-extraction demos need a generic chat-agent path where the agent owns selectable MCP tools, without broadening fixed adapter-call semantics or reviving contradictory edge/node ownership shapes.
+- **영향**: `docs/workbench/process-flow.md`, `docs/workbench/agent-factory-harness.md`, runnable generator review expectations, and future artifact authoring for agent-owned MCP toolsets.
+
 ## 2026-06-30 · 로컬 작업 — catalog publish는 provider Agent Card를 read-only로 검증한다
 
 - **결정**: `POST /api/catalog/publish`의 workflow A2A provider validation은 provider artifact root와 이미 존재하는 `runtime-stub/<app>/agent.json`만 read-only로 확인한다. Catalog publish는 provider `agent.json`을 생성하거나 refresh하지 않는다.

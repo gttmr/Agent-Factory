@@ -1,4 +1,5 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
+import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions } from "./graph/guards.mjs";
 import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
 import {
@@ -21,7 +22,8 @@ export function buildDynamicRunnableAgentPy(context) {
   assertRemoteA2aSupported({ analysisResult, modules });
 
   const graph = graphIndexes(graphContext);
-  const orderedModules = orderedGraphModules(graphContext);
+  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
+  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const loopPlan = buildDynamicRunnablePlan(graphContext);
   assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...loopPlan.loopControls]);
@@ -41,6 +43,9 @@ export function buildDynamicRunnableAgentPy(context) {
   const remoteConfigImport = usesRemoteAuth
     ? "from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor\n"
     : "";
+  const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
+    ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
+    : "";
   const eventImport = usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
   const dynamicWorkflow = emitDynamicWorkflow(loopPlan.steps);
 
@@ -55,7 +60,7 @@ import yaml
 from google.adk import Context
 from google.adk.agents import LlmAgent
 ${remoteConfigImport}
-${remoteImport}from google.adk.events import ${eventImport}
+${remoteImport}${mcpToolsetImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, START, Workflow, node
 ${artifactGenaiImport}
 
@@ -134,7 +139,7 @@ def _dynamic_decision_text(value: Any) -> str:
 
 def _dynamic_matches(value: Any, aliases: list[str]) -> bool:
     text = _dynamic_decision_text(value)
-    return any(alias and alias in text for alias in aliases)
+    return any(alias and alias == text for alias in aliases)
 
 
 def _dynamic_should_continue(value: Any, back_aliases: list[str], exit_aliases: list[str], default_action: str) -> bool:
