@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — Design stepper separates runner completion from Graph IR availability
+
+- **결정**: Design StageShell의 `1. 실행` 완료 표시는 Graph IR 존재가 아니라 completed/applied `stage_runs.design` 또는 reviewer의 명시적 step 진행을 기준으로 한다. Imported `analysis-result.json.processFlow`는 `2. 검토` 접근 가능 조건으로만 쓰며, active `3. 승인` step은 review 조건이 부족해도 `잠김`이 아니라 `현재`로 표시한다.
+- **배경**: 분석 결과 import나 Analyze 단계 산출물에 `processFlow`가 이미 있으면 Design runner를 실행하지 않았는데도 `1. 실행`이 완료로 보였고, `?step=approve`에서는 active step과 `잠김` label이 동시에 표시됐다.
+- **영향**: Design stage step-status UI model and tests. `manifest.approvals.*` gate derivation, schemas, generator, validator behavior는 변경하지 않는다.
+
 ## 2026-07-03 · PR TBD — taxonomy serialized enum tables completed
 
 - **결정**: `docs/workbench/taxonomy.md`에 serialized `runtime_binding`, `runtime_contract_kind`, `node_kind`, `edge_kind`, `invoke_binding`, `decision_owner`, `call_control` enum tables를 추가하고 `runtime_binding: mcp`를 문서화한다.
