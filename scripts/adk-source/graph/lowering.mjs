@@ -18,10 +18,15 @@ export function buildRunnableGraph(context) {
       return nodeSymbol(moduleNodeSpec(node, graph, counts));
     }
     if (side === "from" && node.node_kind === "input") return "START";
-    if (node.node_kind === "human_input" || node.node_kind === "join" || node.node_kind === "router") {
+    if (
+      node.node_kind === "human_input" ||
+      node.node_kind === "join" ||
+      node.node_kind === "router" ||
+      (side === "to" && node.node_kind === "output")
+    ) {
       return syntheticNodeSymbol(node);
     }
-    return null; // output nodes (terminal markers) and unknowns are dropped
+    return null; // unknown synthetic nodes are not runnable workflow nodes
   };
 
   const baseEdges = [];

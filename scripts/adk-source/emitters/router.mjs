@@ -11,7 +11,7 @@ export function emitRouteFunc(node, context) {
     .map(({ value, aliases }) => {
       const aliasLiteral = `[${aliases.map((alias) => toPyStr(alias)).join(", ")}]`;
       return `    if any(alias and alias in text for alias in ${aliasLiteral}):
-        return Event(route=${toPyStr(value)}, output=node_input)`;
+        return Event(route=${toPyStr(value)}, output=_json_safe_node_value(node_input))`;
     })
     .join("\n");
   const fallback = routeCases.find((route) => route.isDefault) ?? routeCases[0];
@@ -28,7 +28,7 @@ export function emitRouteFunc(node, context) {
 def ${routeFuncName(node)}(node_input=None):
     text = _route_decision_text(node_input)
 ${checks}
-    return Event(route=${toPyStr(fallback.value)}, output=node_input)`;
+    return Event(route=${toPyStr(fallback.value)}, output=_json_safe_node_value(node_input))`;
 }
 
 export function emitRouterNodeDecl(node) {

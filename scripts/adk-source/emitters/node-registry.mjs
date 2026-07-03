@@ -4,8 +4,9 @@ import { emitConnectedAdapterFunc } from "./connected-adapter.mjs";
 import { emitFunctionNodeDecl, emitStubFunc } from "./function-node.mjs";
 import { emitHumanInputFunc, emitHumanInputNodeDecl } from "./hitl.mjs";
 import { emitRouteFunc, emitRouterNodeDecl } from "./router.mjs";
+import { emitTerminalOutputFunc, emitTerminalOutputNodeDecl } from "./terminal-output.mjs";
 
-export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes }) {
+export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes, terminalOutputNodes = [] }) {
   const nodeBlocks = [];
   const funcBlocks = [];
 
@@ -26,6 +27,7 @@ export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNo
     stub_function: { emitFunc: (target) => emitStubFunc(target, context), emitDecl: emitFunctionNodeDecl },
     human_input: { emitFunc: (node) => emitHumanInputFunc(node, context), emitDecl: emitHumanInputNodeDecl },
     router: { emitFunc: (node) => emitRouteFunc(node, context), emitDecl: emitRouterNodeDecl },
+    terminal_output: { emitFunc: emitTerminalOutputFunc, emitDecl: emitTerminalOutputNodeDecl },
     remote_a2a: {
       emitFunc: () => null,
       emitDecl: (target) => emitRemoteA2aNode({ analysisResult: context.analysisResult, target })
@@ -42,6 +44,7 @@ export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNo
   for (const spec of orderedNodeSpecs) emitNode(moduleLoweringRole(spec.module), spec);
   for (const node of humanInputNodes) emitNode("human_input", node);
   for (const node of routerNodes) emitNode("router", node);
+  for (const node of terminalOutputNodes) emitNode("terminal_output", node);
 
   return { nodeBlocks, funcBlocks };
 }
