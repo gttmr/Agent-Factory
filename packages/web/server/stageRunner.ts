@@ -312,7 +312,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
       validationErrors = result.ok ? [] : [`verify command failed with exit code ${result.exit_code}`];
       await writeVerifyProposedArtifacts({ proposedDir, reqId: input.reqId, runId, result });
     } else if (body.execution_mode === "fake") {
-      await runFakeStage({ store: input.store, reqId: input.reqId, stage, body, proposedDir });
+      await runFakeStage({ store: input.store, reqId: input.reqId, stage, body, proposedDir, emit });
     } else {
       const runner = input.codexRunner ?? new SdkCodexStageRunner();
       codexMetadata = await runner.run({
@@ -720,7 +720,44 @@ async function runFakeStage(input: {
   stage: SkillRunnerStage;
   body: StageRunRequestBody;
   proposedDir: string;
+  emit: (event: Omit<StageRunEvent, "at" | "elapsedMs">) => Promise<void>;
 }): Promise<void> {
+  const todoText = {
+    first: "입력과 현재 artifact 확인",
+    second: "제안 artifact 초안 작성",
+    third: "검토 메모 정리"
+  };
+  await input.emit({
+    phase: "codex_event",
+    title: "todo list",
+    message: "todo list in_progress",
+    rawEventType: "item.started",
+    itemType: "todo_list",
+    status: "in_progress",
+    snippet: [`todo ${todoText.first}`, `todo ${todoText.second}`, `todo ${todoText.third}`].join("\n")
+  });
+  await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 275));
+  await input.emit({
+    phase: "codex_event",
+    title: "agent message",
+    message: "agent message completed",
+    rawEventType: "item.completed",
+    itemType: "agent_message",
+    status: "completed",
+    snippet: "현재 입력과 artifact를 확인하며 제안 초안을 준비하고 있습니다."
+  });
+  await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 275));
+  await input.emit({
+    phase: "codex_event",
+    title: "todo list",
+    message: "todo list in_progress",
+    rawEventType: "item.updated",
+    itemType: "todo_list",
+    status: "in_progress",
+    snippet: [`done ${todoText.first}`, `todo ${todoText.second}`, `todo ${todoText.third}`].join("\n")
+  });
+  await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 275));
+
   if (input.stage === "analyze") {
     const rawText = input.body.input?.rawText?.trim();
     if (!rawText) throw new ArtifactValidationError(400, "Analyze run 에는 rawText 가 필요합니다.");
@@ -737,6 +774,15 @@ async function runFakeStage(input: {
       }
     });
     await writeJsonFile(join(input.proposedDir, "analysis-result.json"), proposed);
+    await input.emit({
+      phase: "codex_event",
+      title: "todo list",
+      message: "todo list completed",
+      rawEventType: "item.completed",
+      itemType: "todo_list",
+      status: "completed",
+      snippet: [`done ${todoText.first}`, `done ${todoText.second}`, `done ${todoText.third}`].join("\n")
+    });
     return;
   }
 
@@ -765,6 +811,15 @@ async function runFakeStage(input: {
     ].join("\n"),
     "utf8"
   );
+  await input.emit({
+    phase: "codex_event",
+    title: "todo list",
+    message: "todo list completed",
+    rawEventType: "item.completed",
+    itemType: "todo_list",
+    status: "completed",
+    snippet: [`done ${todoText.first}`, `done ${todoText.second}`, `done ${todoText.third}`].join("\n")
+  });
 }
 
 function buildCodexStagePrompt(input: Pick<CodexStageRunnerInput, "rootDir" | "runDir" | "stage" | "skillPath">): string {
