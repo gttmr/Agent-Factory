@@ -524,7 +524,7 @@ export interface CatalogBinding {
 
 /**
  * Scaffold output mode. `smoke` (default) keeps the synthetic, no-runnable-logic
- * handoff. `runnable` emits the reviewed ADK 2.1 LlmAgent/Workflow graph that
+ * handoff. `runnable` emits the reviewed ADK 2.3 LlmAgent/Workflow graph that
  * selects its LLM from runtime env and calls live Mock Lab MCP servers. In BOTH
  * modes the source is still the approved workbench artifacts —
  * `raw_requirement_to_code` stays false and raw requirements never drive code
@@ -661,7 +661,7 @@ export interface ScaffoldPlan {
 }
 
 // ---------------------------------------------------------------------------
-// ADK 2.0 Graph IR — replaces the legacy stage-based ProcessFlow.
+// ADK Graph IR — replaces the legacy stage-based ProcessFlow.
 //
 // The persisted field name remains `processFlow` for migration compatibility,
 // but the inner shape is native Graph IR. New artifacts must use

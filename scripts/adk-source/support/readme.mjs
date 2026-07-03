@@ -11,7 +11,7 @@ export function buildReadme(context) {
   if (outputMode === "runnable") {
     return `# ${packageName}
 
-${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 runnable ADK 2.1 Workflow입니다.
+${normalizedRequirement.title}의 승인된 scaffold-plan.json에서 생성한 runnable ADK 2.3 Workflow입니다.
 
 \`\`\`bash
 # repository root

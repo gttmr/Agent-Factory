@@ -200,7 +200,7 @@ function runtimeSymbolFor(node, graph, excludedModuleIds = new Set(), counts = m
     if (excludedModuleIds.has(node.module_id)) return null;
     return nodeSymbol(moduleNodeSpec(node, graph, counts));
   }
-  if (node.node_kind === "human_input" || node.node_kind === "loop_control") {
+  if (node.node_kind === "human_input" || node.node_kind === "loop_control" || node.node_kind === "output") {
     return syntheticNodeSymbol(node);
   }
   return null;

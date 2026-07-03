@@ -15,7 +15,7 @@
       <h1 class="page-title">8. Build와 Verify</h1>
       <p class="page-lede">
         승인된 산출물이 모이면 BuildWorkbench는 <code>scaffold-plan.json</code>을 만들고
-        <code>runtime-stub/</code> source bundle을 생성한다(기본 smoke TODO 번들, 승인된 <code>output_mode: runnable</code> 에서는 실행형 ADK 2.1 <code>Workflow</code>). VerifyWorkbench는 고정된
+        <code>runtime-stub/</code> source bundle을 생성한다(기본 smoke TODO 번들, 승인된 <code>output_mode: runnable</code> 에서는 실행형 ADK 2.3 <code>Workflow</code>). VerifyWorkbench는 고정된
         검증 명령을 실행하고 evidence를 남긴다. 이 단계는 배포가 아니라 review-gated
         source-bundle handoff다.
       </p>
@@ -26,7 +26,7 @@
           <thead><tr><th style="width:220px">작업</th><th>의미</th></tr></thead>
           <tbody>
             <tr><td><code>scaffold-plan.json</code> 생성</td><td>승인된 <code>AnalysisResult</code>, module candidate, Runtime 계약, Graph IR, catalog decision만 입력으로 삼는다.</td></tr>
-            <tr><td><code>runtime-stub/</code> 생성</td><td><code>scripts/generate-adk-source.mjs</code>를 artifact root 기준으로 실행해 source bundle을 만든다. 기본 smoke는 TODO/runtime wiring 번들, <code>output_mode: runnable</code> 은 <code>LlmAgent</code> + Mock Lab MCP 어댑터 ADK 2.1 <code>Workflow</code>.</td></tr>
+            <tr><td><code>runtime-stub/</code> 생성</td><td><code>scripts/generate-adk-source.mjs</code>를 artifact root 기준으로 실행해 source bundle을 만든다. 기본 smoke는 TODO/runtime wiring 번들, <code>output_mode: runnable</code> 은 <code>LlmAgent</code> + Mock Lab MCP 어댑터 ADK 2.3 <code>Workflow</code>.</td></tr>
             <tr><td><code>implementation-handoff.md</code></td><td>후속 구현자가 실제 wiring과 business logic을 채울 때 볼 handoff notes를 inline 편집한다.</td></tr>
             <tr><td><code>stub_ready_for_followup</code></td><td>stub directory가 비어 있지 않고 reviewer가 결과를 확인한 뒤에만 토글하는 manifest gate다.</td></tr>
           </tbody>

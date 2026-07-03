@@ -1,5 +1,5 @@
 // Pure, dependency-free helpers for migrating legacy stage-flow process flows
-// into ADK 2.0 Graph IR, plus a soft structural validator that mirrors the
+// into ADK Graph IR, plus a soft structural validator that mirrors the
 // validate-artifacts.mjs structural checks without throwing.
 //
 // Both Vite (browser) and Node consume this module. Do NOT add `node:` imports.

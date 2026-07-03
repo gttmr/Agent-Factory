@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/schemas/process-flow.schema.json",
-  "title": "Graph IR (ADK 2.0)",
+  "title": "Graph IR (ADK)",
   "description": "Graph IR replaces the legacy stage-based ProcessFlow. Stored on AnalysisResult.processFlow for migration compatibility; the field name is intentionally unchanged while the inner shape is rewritten.",
   "type": "object",
   "additionalProperties": false,
