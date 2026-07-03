@@ -7,7 +7,18 @@ import {
   runtimeContractKindLabels,
   workflowKindLabels
 } from "../analyzer/classificationRules";
-import type { AccessProtocol, ModuleCandidate, ModuleCategory } from "../analyzer/types";
+import type {
+  AccessProtocol,
+  AdapterKind,
+  AgentKind,
+  ModuleCandidate,
+  ModuleCategory,
+  RemoteContractKind,
+  RuntimeContractKind,
+  WorkflowKind
+} from "../analyzer/types";
+
+type SubtypeGlyphKey = AdapterKind | AgentKind | WorkflowKind | RemoteContractKind | RuntimeContractKind;
 
 export const categoryGlyph: Record<ModuleCategory, string> = {
   agent: "◆",
@@ -16,7 +27,7 @@ export const categoryGlyph: Record<ModuleCategory, string> = {
   remote_a2a: "⇨"
 };
 
-export const subtypeGlyph: Record<string, string> = {
+export const subtypeGlyph = {
   orchestration: "⋈",
   graph: "⬢",
   dynamic: "λ",
@@ -37,7 +48,13 @@ export const subtypeGlyph: Record<string, string> = {
   shared: "★",
   a2a: "A2A",
   unknown: "·"
-};
+} satisfies Record<SubtypeGlyphKey, string>;
+
+const subtypeGlyphKeys = new Set<string>(Object.keys(subtypeGlyph));
+
+function isSubtypeGlyphKey(value: string): value is SubtypeGlyphKey {
+  return subtypeGlyphKeys.has(value);
+}
 
 export const protocolGlyph: Record<AccessProtocol, string> = {
   local: "·",
@@ -79,7 +96,7 @@ export function SubtypeBadge({ value }: { value: string }) {
   return (
     <span className="subtype-badge">
       <span className="cat-glyph subtype-glyph" aria-hidden="true">
-        {subtypeGlyph[value] ?? "·"}
+        {isSubtypeGlyphKey(value) ? subtypeGlyph[value] : "·"}
       </span>
       {formatSubtypeLabel(value)}
     </span>

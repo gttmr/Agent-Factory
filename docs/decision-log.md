@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — subtype glyph coverage is compile-time guarded
+
+- **결정**: `CategoryBadge` subtype glyph table is typed exhaustively over analyzer subtype/runtime contract unions so newly added enum values must declare a glyph before build succeeds.
+- **배경**: The previous `Record<string, string>` silently rendered missing glyphs as `·`, hiding taxonomy drift in review UI.
+- **영향**: Maintenance guard only. Badge component props and Korean UI labels are unchanged.
+
 ## 2026-07-03 · PR TBD — server import validator accepts reviewed loop decisions
 
 - **결정**: `PUT /api/af/:id/analysis-result.json`의 server import validator는 `route_aliases`와 `is_default_route`를 route edge뿐 아니라 reviewed loop decision edge(`edge_kind: "control"` + `execution_semantics: "loop_back" | "loop_exit"`)에서도 허용한다.
