@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — dead legacy Analyze client hook removed
+
+- **결정**: The unused client-side `useAnalyze` direct analyzer hook was removed while preserving the `AnalyzeCatalogEntry` type export. The server `/api/analyze-requirement` endpoint remains as an internal/direct primitive.
+- **배경**: The Analyze screen uses Stage Runner; repo-wide usage of `packages/web/src/state/useAnalyze.ts` was limited to the catalog-entry type.
+- **영향**: Maintenance cleanup only. Main Analyze UI path and server endpoint behavior are unchanged.
+
 ## 2026-07-03 · PR TBD — subtype glyph coverage is compile-time guarded
 
 - **결정**: `CategoryBadge` subtype glyph table is typed exhaustively over analyzer subtype/runtime contract unions so newly added enum values must declare a glyph before build succeeds.
