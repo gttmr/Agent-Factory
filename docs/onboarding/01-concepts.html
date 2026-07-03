@@ -91,10 +91,10 @@
 
       <section class="block">
         <h2>ADK (Agent Development Kit)란?</h2>
-        <p>ADK는 Google이 만든 에이전트 구축 프레임워크다. 이 워크벤치의 baseline은 <strong>ADK Python 2.0 GA</strong>(2026년 5월 19일 기준)이며, 다음을 제공한다.</p>
+        <p>ADK는 Google이 만든 에이전트 구축 프레임워크다. 이 워크벤치의 current target은 <strong>ADK 2.3</strong>이며, 다음을 제공한다.</p>
         <ul>
           <li><strong>LLM Agent</strong> — 추론을 맡는 에이전트.</li>
-          <li><strong>Workflow Agent</strong> — 여러 노드/엣지로 흐름을 만든다. ADK 2.0에서는 graph workflow와 dynamic workflow로 표현.</li>
+          <li><strong>Workflow Agent</strong> — 여러 노드/엣지로 흐름을 만든다. ADK에서는 graph workflow와 dynamic workflow로 표현.</li>
           <li><strong>Tools</strong> — 결정적인 외부 동작을 부른다 (워크벤치에서는 <code>adapter</code>로 분류).</li>
           <li><strong>State / Artifact / Event</strong> — 노드 사이에 데이터를 전달하는 채널. Graph IR의 <code>edge_kind</code>에 대응.</li>
         </ul>
@@ -111,7 +111,7 @@
           <tbody>
             <tr><td>분석</td><td><code>af-analyze-requirement</code></td><td><code>analysis-result.json</code>, <code>module-candidates.json</code>, <code>process-flow.json</code></td></tr>
             <tr><td>설계</td><td><code>af-design-boundaries</code></td><td>승인된 module boundary, Runtime 계약, catalog reuse, <code>scaffold-plan.json</code></td></tr>
-            <tr><td>개발</td><td><code>af-build-runtime-stub</code></td><td>ADK source bundle (기본 smoke TODO; <code>runnable</code> 모드는 실행형 ADK 2.1 Workflow)</td></tr>
+            <tr><td>개발</td><td><code>af-build-runtime-stub</code></td><td>ADK source bundle (기본 smoke TODO; <code>runnable</code> 모드는 실행형 ADK 2.3 Workflow)</td></tr>
             <tr><td>검증</td><td><code>af-verify-feedback</code></td><td><code>validation-report.md</code>, <code>catalog-delta.yaml</code></td></tr>
           </tbody>
         </table>

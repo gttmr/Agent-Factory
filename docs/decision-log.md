@@ -129,7 +129,7 @@
 ### Build/Verify도 Stage Runner run history로 기록한다
 - **결정**: Stage Runner stage surface를 `analyze/design/build/verify`로 확장한다. `build`는 기존 `runtime-stub/build` primitive를 감싸 canonical `runtime-stub/` side effect와 run evidence를 남기고, `verify`는 기존 allowlist verify primitive를 감싸 `validation-report.md`와 `catalog-delta.yaml` proposal template을 생성한다. Verify catalog delta는 자동 추론하지 않는다. `cancel`은 active stage run AbortController에만 적용하며 ADK runtime process 제어와 분리한다.
 - **배경**: Analyze/Design은 Stage Runner 기록과 diff/apply 흐름이 있었지만 Build/Verify는 별도 수동 실행만 있어 run evidence와 follow-up artifact 기록 방식이 갈라졌다.
-- **영향**: `packages/web/server/stageRunner.ts`, `afStageRunnerApi.ts`, `afRuntimeStubApi.ts`, `afVerifyRunApi.ts`, `BuildRunStep.tsx`, `VerifyWorkbench.tsx`, `StageRunnerPanel.tsx`, `docs/workbench/follow-ups/16-build-verify-stage-runner.md`.
+- **영향**: `packages/web/server/stageRunner.ts`, `afStageRunnerApi.ts`, `afRuntimeStubApi.ts`, `afVerifyRunApi.ts`, `BuildRunStep.tsx`, `VerifyWorkbench.tsx`, `StageRunnerPanel.tsx`, `docs/archive/follow-ups/16-build-verify-stage-runner.md`.
 
 ### Runnable skeleton과 data channel의 안전 경계를 명시한다
 - **결정**: Runnable scaffold warning은 category/output mode별 smoke TODO skeleton 문구를 낸다. Named state channel은 agent instruction 또는 connected MCP adapter consumer로만 읽고, 비-connected state consumer와 agent/non-connected artifact consumer는 runnable generation blocker로 처리한다. RunSandbox는 started runtime-stub fingerprint와 current fingerprint를 비교해 stale을 표시하고, 자동 재시작 대신 사용자가 누르는 재시작 버튼만 제공한다.

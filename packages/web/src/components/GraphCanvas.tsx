@@ -475,7 +475,7 @@ export function GraphCanvas({
       <section className="panel graph-canvas-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">ADK 2.0 Graph Workflow</p>
+            <p className="eyebrow">ADK Graph Workflow</p>
             <h2>그래프 워크플로우 검토</h2>
           </div>
           <span className="graph-canvas-stats">

@@ -36,7 +36,7 @@ export function buildDynamicRunnableAgentPy(context) {
   });
   const loopControlBlocks = loopPlan.loopControls.map(emitLoopControlNode);
 
-  const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.1 dynamic workflow wiring입니다: ${truncate(
+  const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
   const usesArtifacts = usesArtifactChannels(graphContext);

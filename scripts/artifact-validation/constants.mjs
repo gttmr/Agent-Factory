@@ -27,7 +27,7 @@ export const smokeScaffoldOutputs = {
   remote_a2a: "contract_placeholder_only"
 };
 
-// Graph IR (ADK 2.0). Mirrors the GRAPH_* constant exports in
+// Graph IR (ADK). Mirrors the GRAPH_* constant exports in
 // packages/web/src/analyzer/types.ts. The validator must stay
 // dependency-free, so the lists are duplicated here.
 export const graphNodeKinds = new Set([
