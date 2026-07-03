@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — taxonomy serialized enum tables completed
+
+- **결정**: `docs/workbench/taxonomy.md`에 serialized `runtime_binding`, `runtime_contract_kind`, `node_kind`, `edge_kind`, `invoke_binding`, `decision_owner`, `call_control` enum tables를 추가하고 `runtime_binding: mcp`를 문서화한다.
+- **배경**: `packages/web/src/analyzer/types.ts`, `schemas/*.json`, `scripts/artifact-validation/constants.mjs`가 허용하는 Graph IR/runtime 값보다 taxonomy prose가 좁았다. `selected_by_human`은 `decision_owner`가 아니라 `call_control` 값으로 확인했다.
+- **영향**: Taxonomy documentation only. Schema, validator, TypeScript enums, generator behavior는 변경하지 않는다.
+
 ## 2026-07-03 · PR TBD — active docs refreshed for current Stage Runner and Build flow
 
 - **결정**: CLAUDE.md와 Agent Factory harness는 Stage Runner를 `analyze/design/build/verify` 네 단계 surface로 설명한다. Analyze/Design만 proposed-first apply contract를 갖고, Build Stage Runner는 `applyMode="none"`으로 `runtime-stub/build` primitive의 canonical `runtime-stub/` side effect를 기록한다. Build 화면의 primary path는 `POST /api/af/:reqId/artifact-sync/run`이며, manual scaffold/runtime controls는 advanced path로 남는다.
