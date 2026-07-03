@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — server import validator accepts reviewed loop decisions
+
+- **결정**: `PUT /api/af/:id/analysis-result.json`의 server import validator는 `route_aliases`와 `is_default_route`를 route edge뿐 아니라 reviewed loop decision edge(`edge_kind: "control"` + `execution_semantics: "loop_back" | "loop_exit"`)에서도 허용한다.
+- **배경**: Graph IR canonical validator와 `scripts/validate-artifacts.mjs`는 scenario-d loop decision metadata를 허용하지만 server import validator만 route edge로 제한해 같은 artifact가 import surface에서 422로 거부됐다.
+- **영향**: Server import gate parity only. Plain non-route/non-loop-decision edge metadata는 계속 거부한다.
+
 ## 2026-07-03 · PR TBD — Design stepper separates runner completion from Graph IR availability
 
 - **결정**: Design StageShell의 `1. 실행` 완료 표시는 Graph IR 존재가 아니라 completed/applied `stage_runs.design` 또는 reviewer의 명시적 step 진행을 기준으로 한다. Imported `analysis-result.json.processFlow`는 `2. 검토` 접근 가능 조건으로만 쓰며, active `3. 승인` step은 review 조건이 부족해도 `잠김`이 아니라 `현재`로 표시한다.

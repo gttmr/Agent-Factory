@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fixture from "../../../templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json" with { type: "json" };
+import graphWorkflowFixture from "../../../templates/regression-scenarios/scenario-d-graph-workflow/analysis-result.json" with { type: "json" };
 import { runCodexAnalyzer, validateAnalysisResult, type CodexAnalyzerRunner } from "./codexAnalyzer.ts";
 
 const repoRoot = await mkdtemp(join(tmpdir(), "af-codex-analyzer-"));
@@ -88,5 +89,8 @@ assert.match(invalidReviewedAdkFieldErrors.join("\n"), /human_input_contract\.me
 assert.match(invalidReviewedAdkFieldErrors.join("\n"), /payload_schema_ref/);
 assert.match(invalidReviewedAdkFieldErrors.join("\n"), /response_mapping/);
 assert.match(invalidReviewedAdkFieldErrors.join("\n"), /response_schema_ref/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /route_aliases/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /is_default_route/);
+assert.match(invalidReviewedAdkFieldErrors.join("\n"), /route_aliases is allowed only on route or loop decision edges/);
+assert.match(invalidReviewedAdkFieldErrors.join("\n"), /is_default_route is allowed only on route or loop decision edges/);
+
+const loopDecisionRouteMetadataErrors = validateAnalysisResult(graphWorkflowFixture);
+assert.deepEqual(loopDecisionRouteMetadataErrors, []);
