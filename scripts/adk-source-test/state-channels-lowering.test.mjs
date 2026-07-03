@@ -129,7 +129,7 @@ test("runnable connected MCP adapters resolve inputs from agent-authored JSON st
     assert.match(source, /"adapter_arguments"/, "connected adapter receives the named channel");
     assert.match(source, /async def _fn_mod_lookup\(ctx: Context, node_input=None\) -> dict:/);
     assert.match(source, /node_input=node_input/);
-    assert.match(source, /"arguments": arguments/, "audit payload records actual MCP arguments");
+    assert.match(source, /"arguments": _json_safe_node_value\(arguments\)/, "audit payload records JSON-safe MCP arguments");
     assert.doesNotMatch(source, /for key, value in structured_content\.items\(\):/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });

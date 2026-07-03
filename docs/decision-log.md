@@ -408,6 +408,12 @@
 - **배경**: 마우스 드래그는 `node.position`을 dirty draft에 반영했지만, 키보드 이동은 화면 위치만 바꾸고 저장 버튼을 활성화하지 않아 reload/save 후 위치가 사라졌다.
 - **영향**: `GraphCanvas.tsx`의 ReactFlow `onNodesChange` 처리. `analysis-result.json.processFlow.nodes[].position` 스키마와 저장 API 계약은 변경하지 않는다.
 
+## 2026-07-03 · 작업 브랜치 `codex/generator-runtime-robustness-v3` — connected MCP adapter 실패를 JSON-safe synthetic payload로 degrade
+
+- **결정**: connected Mock Lab MCP adapter `FunctionNode`는 streamable HTTP 연결, session initialize, tool call 실패를 잡아 `mcp_degraded` / `mcp_unreachable_degraded` payload를 반환한다. Payload는 server/url/tool/reason, arguments/input_resolution, reviewed runtime mock/developer_todos만 JSON-safe 값으로 담고 raw `node_input`이나 `google.genai.types.Content`를 포함하지 않는다. Unconnected adapter/HITL/router output도 raw `node_input`을 그대로 payload에 넣지 않고 JSON-safe helper를 거친다.
+- **배경**: ADK 2.3 `LlmAgent` node input 준비 경로가 downstream dict/list payload를 `json.dumps`로 변환하므로, upstream FunctionNode payload 안에 `Content` 또는 raw `node_input`이 들어가면 runtime에서 `TypeError: Object of type Content is not JSON serializable`로 중단된다. Mock Lab MCP server가 꺼진 경우도 opaque `ExceptionGroup` 대신 검토 가능한 synthetic degraded output이어야 한다.
+- **영향**: ADK source generator connected adapter/function/HITL/router emitters, generated runtime helper, generator regression tests. Generator defaults remain runtime-neutral and artifact-driven.
+
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
 ### A2A readiness와 `input-required`는 chat-ready/final answer가 아니다

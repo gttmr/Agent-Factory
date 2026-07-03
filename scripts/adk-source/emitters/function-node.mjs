@@ -29,7 +29,7 @@ export function emitStubFunc(target, context) {
         "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
         "runtime_mock": contract.get("runtime_mock"),
         "developer_todos": contract.get("developer_todos", []),
-        "previous": node_input,
+        "input_status": "received" if node_input is not None else "empty",
     }
     ctx.state[${toPyStr(stateKey(module))}] = payload
 ${emitOutgoingStateChannelWrites(context.graphContext, module.id)}${emitOutgoingArtifactChannelWrites(context.graphContext, module.id)}    return payload`;
