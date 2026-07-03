@@ -1560,10 +1560,18 @@ interface RouteReviewValidationContext {
   readonly errors: string[];
 }
 
+function isRouteReviewEdge(edge: Record<string, unknown>) {
+  return (
+    edge.edge_kind === "route" ||
+    ((edge.execution_semantics === "loop_back" || edge.execution_semantics === "loop_exit") && edge.edge_kind === "control")
+  );
+}
+
 function validateRouteReviewContract(edge: Record<string, unknown>, label: string, context: RouteReviewValidationContext) {
+  const routeReviewEdge = isRouteReviewEdge(edge);
   if (Array.isArray(edge.route_aliases)) {
-    if (edge.route_aliases.length > 0 && edge.edge_kind !== "route") {
-      context.errors.push(`${label}.route_aliases is allowed only on route edges.`);
+    if (edge.route_aliases.length > 0 && !routeReviewEdge) {
+      context.errors.push(`${label}.route_aliases is allowed only on route or loop decision edges.`);
     }
     if (edge.route_aliases.some((alias) => typeof alias !== "string" || !alias.trim())) {
       context.errors.push(`${label}.route_aliases entries must be non-empty strings.`);
@@ -1572,12 +1580,14 @@ function validateRouteReviewContract(edge: Record<string, unknown>, label: strin
     context.errors.push(`${label}.route_aliases must be an array of strings or null.`);
   }
   if (edge.is_default_route === true) {
-    if (edge.edge_kind !== "route") {
-      context.errors.push(`${label}.is_default_route is allowed only on route edges.`);
+    if (!routeReviewEdge) {
+      context.errors.push(`${label}.is_default_route is allowed only on route or loop decision edges.`);
     } else if (typeof edge.from === "string") {
-      const defaults = context.defaultRouteEdgesByRouter.get(edge.from) ?? [];
-      defaults.push(typeof edge.id === "string" ? edge.id : label);
-      context.defaultRouteEdgesByRouter.set(edge.from, defaults);
+      if (edge.edge_kind === "route") {
+        const defaults = context.defaultRouteEdgesByRouter.get(edge.from) ?? [];
+        defaults.push(typeof edge.id === "string" ? edge.id : label);
+        context.defaultRouteEdgesByRouter.set(edge.from, defaults);
+      }
     }
   } else if (edge.is_default_route !== undefined && edge.is_default_route !== null && edge.is_default_route !== false) {
     context.errors.push(`${label}.is_default_route must be boolean or null.`);
