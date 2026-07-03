@@ -7,6 +7,8 @@ import type { Readable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import type { ArtifactRootStore } from "./artifactRootStore";
+import { mockLabPrerequisites } from "./runtimeA2aMockLabPrerequisites";
+import type { RuntimeA2aMockLabPrerequisite } from "./runtimeA2aTypes";
 import { buildRuntimeProcessEnv } from "./runtimeEnv";
 import { collectRuntimeStubFiles } from "./runtimeStubFiles";
 
@@ -26,6 +28,7 @@ export interface RuntimeChatStatus {
   installed: boolean;
   install_supported: boolean;
   setup_hint: string;
+  mock_lab_prerequisites: RuntimeA2aMockLabPrerequisite[];
   paths: {
     runtime_stub_dir: string;
     venv: string;
@@ -367,6 +370,7 @@ export class RuntimeChatManager {
       installed: (await isFile(ctx.pythonPath)) && (await isFile(ctx.adkPath)),
       install_supported: false,
       setup_hint: setupHint(ctx),
+      mock_lab_prerequisites: await mockLabPrerequisites({ repoRoot: this.repoRoot, stubDir: ctx.stubDir }),
       paths: {
         runtime_stub_dir: ctx.stubDir,
         venv: ctx.venvDir,
