@@ -401,6 +401,13 @@
 - **배경**: 기존 고정 탭은 대부분의 선택에서 빈 `Mock`/`ADK` 탭을 보여 주고, schema ref 이름만 노출해 reviewer가 입출력 구조를 확인할 수 없었다. `input_mapping`/`output_mapping`도 raw JSON으로만 보였고 대상 필드와 source field 방향이 불분명했다.
 - **영향**: Design Graph IR `GraphInspector`/`GraphElementEditor`, `/api/catalog` contract index, active visualization design-system docs. Graph IR artifact schema와 approval gate semantics는 바꾸지 않는다.
 
+## 2026-07-03 · 작업 브랜치 `codex/canvas-keyboard-move-persist` — Graph IR 키보드 이동 위치 영속화
+
+### 키보드로 이동한 노드도 편집 드래프트 위치로 저장한다
+- **결정**: Graph IR edit mode에서 선택 노드를 화살표 키로 이동할 때 ReactFlow `position` change의 committed 이벤트(`dragging: false`)를 기존 `updateNodePosition` 저장 경로로 연결한다. 마우스 드래그 중간 이벤트는 계속 로컬 렌더 상태만 갱신하고, 최종 위치는 기존 drag-stop 경로가 저장한다.
+- **배경**: 마우스 드래그는 `node.position`을 dirty draft에 반영했지만, 키보드 이동은 화면 위치만 바꾸고 저장 버튼을 활성화하지 않아 reload/save 후 위치가 사라졌다.
+- **영향**: `GraphCanvas.tsx`의 ReactFlow `onNodesChange` 처리. `analysis-result.json.processFlow.nodes[].position` 스키마와 저장 API 계약은 변경하지 않는다.
+
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
 ### A2A readiness와 `input-required`는 chat-ready/final answer가 아니다
