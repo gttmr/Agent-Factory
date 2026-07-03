@@ -35,6 +35,10 @@ export function routeFuncName(node) {
   return `_route_${toPythonIdentifier(node.id)}`;
 }
 
+export function terminalFuncName(node) {
+  return `_terminal_${toPythonIdentifier(node.id)}`;
+}
+
 export function pyGraphNodeName(node) {
   return toPythonIdentifier(node.id);
 }

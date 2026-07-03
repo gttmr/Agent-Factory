@@ -414,6 +414,12 @@
 - **배경**: ADK 2.3 `LlmAgent` node input 준비 경로가 downstream dict/list payload를 `json.dumps`로 변환하므로, upstream FunctionNode payload 안에 `Content` 또는 raw `node_input`이 들어가면 runtime에서 `TypeError: Object of type Content is not JSON serializable`로 중단된다. Mock Lab MCP server가 꺼진 경우도 opaque `ExceptionGroup` 대신 검토 가능한 synthetic degraded output이어야 한다.
 - **영향**: ADK source generator connected adapter/function/HITL/router emitters, generated runtime helper, generator regression tests. Generator defaults remain runtime-neutral and artifact-driven.
 
+## 2026-07-03 · 작업 브랜치 `codex/generator-runtime-robustness-v3` — terminal output completion을 Content return 대신 ADK event로 emit
+
+- **결정**: runnable Graph IR `output` node를 더 이상 drop하지 않고 terminal `FunctionNode`로 lower한다. Terminal node는 chat-visible `Event(content=types.Content(role="model", ...))`를 먼저 yield하고, 별도 JSON-safe structured output dict(`node_kind`, `terminal_output_node_id`, `status`, `final_state_keys`)를 yield한다. README/sample transcript는 같은 terminal-node completion 형식을 보여 준다.
+- **배경**: `types.Content`를 FunctionNode return/output으로 쓰면 downstream node input 또는 event output serialization에서 JSON-safety 문제가 생길 수 있다. Completion text는 user-visible event로만 노출하고 structured node output은 JSON-serializable dict로 유지해야 ADK Web/runtime smoke가 chat-visible completion과 graph output을 동시에 갖는다.
+- **영향**: ADK runnable graph lowering, node registry, terminal output emitter, import gates for `Event`/`types`, README/sample generator output, generator regression tests.
+
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 
 ### A2A readiness와 `input-required`는 chat-ready/final answer가 아니다

@@ -27,10 +27,22 @@ export function buildRunnableAgentPy(context) {
   const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
+  const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
   const autoJoins = joins.filter((join) => join.explicit === false);
-  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes });
+  assertNoSymbolCollisions(orderedNodeSpecs, [
+    ...humanInputNodes,
+    ...routerNodes,
+    ...terminalOutputNodes,
+    ...explicitJoinNodes,
+    ...autoJoins
+  ]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
+    orderedNodeSpecs,
+    humanInputNodes,
+    routerNodes,
+    terminalOutputNodes
+  });
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = workflowEdgeLiteral(edges);
@@ -45,7 +57,8 @@ export function buildRunnableAgentPy(context) {
   const usesRouteNodes = usesRoutes(processFlow);
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
-  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+  const usesTerminalOutputs = terminalOutputNodes.length > 0;
+  const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a(modules)
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
@@ -55,7 +68,7 @@ export function buildRunnableAgentPy(context) {
   const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
     ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
     : "";
-  const eventImport = usesRouteNodes || usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
+  const eventImport = usesRouteNodes || usesRemoteAuth || usesTerminalOutputs ? "Event, RequestInput" : "RequestInput";
 
   return `from __future__ import annotations
 
