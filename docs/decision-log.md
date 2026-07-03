@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-03 · PR TBD — dynamic runnable workflows emit terminal completion
+
+- **결정**: Dynamic runnable generator는 reviewed Graph IR `output` node를 shared terminal-output emitter로 낮추고, `dynamic_workflow`가 loop exit 이후 terminal `FunctionNode`를 실행한 뒤 JSON-safe payload를 반환한다.
+- **배경**: Static runnable path는 terminal output node에서 chat-visible `Event(content=types.Content(...))` 완료 메시지를 emit했지만, dynamic/loop runnable path는 `output` node를 plan과 emitter에 포함하지 않아 완료 이벤트를 조용히 누락했다.
+- **영향**: `scripts/adk-source/agent-dynamic.mjs`, dynamic Graph IR lowering, generator regression tests. Terminal chat text는 `Event(content=...)`로만 나가고 node return은 JSON-safe dict로 유지한다.
+
 ## 2026-07-03 · PR TBD — dead legacy Analyze client hook removed
 
 - **결정**: The unused client-side `useAnalyze` direct analyzer hook was removed while preserving the `AnalyzeCatalogEntry` type export. The server `/api/analyze-requirement` endpoint remains as an internal/direct primitive.
