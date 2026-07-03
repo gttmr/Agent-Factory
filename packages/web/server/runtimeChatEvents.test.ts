@@ -118,6 +118,7 @@ function runtimeChatStatus(stubDir: string, port: number): RuntimeChatStatus {
     installed: true,
     install_supported: false,
     setup_hint: "",
+    mock_lab_prerequisites: [],
     paths: {
       runtime_stub_dir: stubDir,
       venv: join(repoRoot, ".venv"),

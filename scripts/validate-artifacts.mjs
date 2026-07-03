@@ -188,7 +188,7 @@ function llmToolsetEdgeIssue(edge) {
 }
 
 /**
- * Structural validation for an ADK 2.0 Graph IR object.
+ * Structural validation for an ADK Graph IR object.
  *
  * @param {unknown} graph - the GraphIR document
  * @param {string} label - prefix used in error messages

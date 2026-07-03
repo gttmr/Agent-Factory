@@ -1,5 +1,5 @@
 import { agentOwnedToolsetAdapterIds } from "../adapters.mjs";
-import { graphIndexes } from "./indexes.mjs";
+import { graphIndexes, moduleNodeCounts, moduleNodeSpec } from "./indexes.mjs";
 import { routeAliases, routeValue } from "./routes.mjs";
 import { nodeSymbol, syntheticNodeSymbol } from "../naming.mjs";
 
@@ -80,6 +80,7 @@ export function assertDynamicRunnableGraphSupported(context) {
 
 export function buildDynamicRunnablePlan(context) {
   const graph = graphIndexes(context);
+  const counts = moduleNodeCounts(graph);
   const nodes = graph.nodes;
   const toolsetAdapterIds = agentOwnedToolsetAdapterIds(context);
   const loopRegions = (Array.isArray(context.processFlow.containers) ? context.processFlow.containers : []).filter(
@@ -95,11 +96,11 @@ export function buildDynamicRunnablePlan(context) {
   const steps = [];
   const handledRegions = new Set();
   for (const node of nodes) {
-    if (!runtimeSymbolFor(node, graph, toolsetAdapterIds)) continue;
+    if (!runtimeSymbolFor(node, graph, toolsetAdapterIds, counts)) continue;
     const region = loopRegionByNode.get(node.id);
     if (region) {
       if (!handledRegions.has(region.id)) {
-        steps.push(buildLoopStep(region, nodes, graph, context, toolsetAdapterIds));
+        steps.push(buildLoopStep(region, nodes, graph, context, toolsetAdapterIds, counts));
         handledRegions.add(region.id);
       }
       continue;
@@ -107,7 +108,7 @@ export function buildDynamicRunnablePlan(context) {
     if (node.node_kind === "loop_control") {
       throw new Error(`dynamic runnable mode cannot lower loop_control ${node.id} unless it belongs to a loop_region container.`);
     }
-    steps.push({ kind: "run", symbol: runtimeSymbolFor(node, graph), nodeId: node.id });
+    steps.push({ kind: "run", symbol: runtimeSymbolFor(node, graph, toolsetAdapterIds, counts), nodeId: node.id });
   }
 
   if (!steps.length) {
@@ -119,7 +120,7 @@ export function buildDynamicRunnablePlan(context) {
   };
 }
 
-function buildLoopStep(region, nodes, graph, context, toolsetAdapterIds) {
+function buildLoopStep(region, nodes, graph, context, toolsetAdapterIds, counts) {
   const contained = new Set(Array.isArray(region.contains_node_ids) ? region.contains_node_ids : []);
   const loopControlNodes = nodes.filter((node) => contained.has(node.id) && node.node_kind === "loop_control");
   if (loopControlNodes.length !== 1) {
@@ -128,7 +129,7 @@ function buildLoopStep(region, nodes, graph, context, toolsetAdapterIds) {
   const loopControl = loopControlNodes[0];
   const body = nodes
     .filter((node) => contained.has(node.id) && node.id !== loopControl.id)
-    .map((node) => ({ node, symbol: runtimeSymbolFor(node, graph, toolsetAdapterIds) }))
+    .map((node) => ({ node, symbol: runtimeSymbolFor(node, graph, toolsetAdapterIds, counts) }))
     .filter((entry) => entry.symbol && entry.node.node_kind !== "join");
   if (!body.length) {
     throw new Error(`loop_region ${region.id} has no lowerable body nodes before ${loopControl.id}.`);
@@ -193,13 +194,13 @@ function edgeDefaultAction(backEdges, exitEdges) {
   return "loop_exit";
 }
 
-function runtimeSymbolFor(node, graph, excludedModuleIds = new Set()) {
+function runtimeSymbolFor(node, graph, excludedModuleIds = new Set(), counts = moduleNodeCounts(graph)) {
   if (!node) return null;
   if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
     if (excludedModuleIds.has(node.module_id)) return null;
-    return nodeSymbol(graph.moduleById.get(node.module_id));
+    return nodeSymbol(moduleNodeSpec(node, graph, counts));
   }
-  if (node.node_kind === "human_input" || node.node_kind === "loop_control") {
+  if (node.node_kind === "human_input" || node.node_kind === "loop_control" || node.node_kind === "output") {
     return syntheticNodeSymbol(node);
   }
   return null;

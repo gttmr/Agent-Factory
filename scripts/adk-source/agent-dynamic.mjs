@@ -1,7 +1,7 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
 import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions } from "./graph/guards.mjs";
-import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
+import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import {
   assertDynamicRunnableGraphSupported,
   buildDynamicRunnablePlan
@@ -23,20 +23,27 @@ export function buildDynamicRunnableAgentPy(context) {
 
   const graph = graphIndexes(graphContext);
   const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
+  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
+  const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
   const loopPlan = buildDynamicRunnablePlan(graphContext);
-  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...loopPlan.loopControls]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes: [] });
+  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...terminalOutputNodes, ...loopPlan.loopControls]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
+    orderedNodeSpecs,
+    humanInputNodes,
+    routerNodes: [],
+    terminalOutputNodes
+  });
   const loopControlBlocks = loopPlan.loopControls.map(emitLoopControlNode);
 
-  const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.1 dynamic workflow wiring입니다: ${truncate(
+  const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
   const usesArtifacts = usesArtifactChannels(graphContext);
+  const usesTerminalOutputs = terminalOutputNodes.length > 0;
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
-  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+  const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a(modules)
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
@@ -46,7 +53,7 @@ export function buildDynamicRunnableAgentPy(context) {
   const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
     ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
     : "";
-  const eventImport = usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
+  const eventImport = usesRemoteAuth || usesTerminalOutputs ? "Event, RequestInput" : "RequestInput";
   const dynamicWorkflow = emitDynamicWorkflow(loopPlan.steps);
 
   return `from __future__ import annotations

@@ -45,6 +45,29 @@ def _content_text(value: Any) -> str:
     return "".join(getattr(part, "text", "") or "" for part in parts).strip()
 
 
+def _json_safe_node_value(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    content_text = _content_text(value)
+    if content_text:
+        return {"content_text": content_text}
+    if isinstance(value, dict):
+        return {str(key): _json_safe_node_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_node_value(item) for item in value]
+    if hasattr(value, "model_dump"):
+        try:
+            return _json_safe_node_value(value.model_dump(mode="json"))
+        except TypeError:
+            return _json_safe_node_value(value.model_dump())
+    return str(value)
+
+
+def _short_error_reason(exc: Exception) -> str:
+    text = f"{type(exc).__name__}: {exc}".strip()
+    return text[:240] if len(text) > 240 else text
+
+
 def _json_payload(value: Any) -> Any:
     if not isinstance(value, str):
         return None

@@ -27,7 +27,7 @@ export const smokeScaffoldOutputs = {
   remote_a2a: "contract_placeholder_only"
 };
 
-// Graph IR (ADK 2.0). Mirrors the GRAPH_* constant exports in
+// Graph IR (ADK). Mirrors the GRAPH_* constant exports in
 // packages/web/src/analyzer/types.ts. The validator must stay
 // dependency-free, so the lists are duplicated here.
 export const graphNodeKinds = new Set([
@@ -200,7 +200,7 @@ export const afRunStageStatuses = new Set(["pending", "complete", "blocked"]);
 export const afRunValidationResults = new Set(["not_run", "passed", "failed"]);
 export const afStageRunStatuses = new Set(["running", "completed", "failed", "applied", "canceled"]);
 export const afStageRunCodexBackends = new Set(["sdk", "fake"]);
-export const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design)-[a-f0-9]{6}$/;
+export const afStageRunIdPattern = /^\d{8}T\d{6}Z-(analyze|design|build|verify)-[a-f0-9]{6}$/;
 
 // Required string fields on an A2AContract (top-level scalar string fields).
 // Nested object fields are validated separately.

@@ -8,12 +8,12 @@ export function emitHumanInputFunc(node, context = null) {
   return `def ${hitlFuncName(node)}(ctx: Context, node_input=None):
     _hitl_response = _first_resume_input(ctx)
     if _hitl_response is None:
-        yield RequestInput(message=${prompt}, payload=node_input${responseSchema})
+        yield RequestInput(message=${prompt}, payload=_json_safe_node_value(node_input)${responseSchema})
         return
     yield {
         "node_kind": "human_input",
         "prompt": ${prompt},
-        "previous": node_input,
+        "input_status": "received" if node_input is not None else "empty",
         "response": _hitl_response,
     }`;
 }

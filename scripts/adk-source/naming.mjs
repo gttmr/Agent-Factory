@@ -7,15 +7,19 @@ export function toPythonIdentifier(value) {
 }
 
 export function nodeSymbol(module) {
-  return `${module.module_category === "agent" ? "agent_" : "node_"}${toPythonIdentifier(module.id)}`;
+  const resolvedModule = targetModule(module);
+  return `${resolvedModule.module_category === "agent" ? "agent_" : "node_"}${targetIdentifier(module)}`;
 }
 
 export function funcName(module) {
-  return `_fn_${toPythonIdentifier(module.id)}`;
+  return `_fn_${targetIdentifier(module)}`;
 }
 
 export function pyNodeName(module) {
-  return toPythonIdentifier(module.name || module.id);
+  const resolvedModule = targetModule(module);
+  const name = toPythonIdentifier(resolvedModule.name || resolvedModule.id);
+  const node = targetNode(module);
+  return node && targetModuleNodeCount(module) > 1 ? `${name}__${pyGraphNodeName(node)}` : name;
 }
 
 export function syntheticNodeSymbol(node) {
@@ -31,18 +35,42 @@ export function routeFuncName(node) {
   return `_route_${toPythonIdentifier(node.id)}`;
 }
 
+export function terminalFuncName(node) {
+  return `_terminal_${toPythonIdentifier(node.id)}`;
+}
+
 export function pyGraphNodeName(node) {
   return toPythonIdentifier(node.id);
 }
 
 export function stateKey(module) {
-  return `${toPythonIdentifier(module.id)}_output`;
+  return `${toPythonIdentifier(targetModule(module).id)}_output`;
 }
 
 export function nodeFunctionName(module) {
-  return `node_${toPythonIdentifier(module.id)}`;
+  return `node_${targetIdentifier(module)}`;
 }
 
 export function todoFunctionName(module) {
-  return `TODO_IMPLEMENT_HERE_${toPythonIdentifier(module.id)}`;
+  return `TODO_IMPLEMENT_HERE_${toPythonIdentifier(targetModule(module).id)}`;
+}
+
+function targetModule(target) {
+  return target?.module ?? target;
+}
+
+function targetNode(target) {
+  return target?.node ?? null;
+}
+
+function targetModuleNodeCount(target) {
+  return Number.isInteger(target?.moduleNodeCount) && target.moduleNodeCount > 0 ? target.moduleNodeCount : 1;
+}
+
+function targetIdentifier(target) {
+  const module = targetModule(target);
+  const base = toPythonIdentifier(module.id);
+  const node = targetNode(target);
+  if (!node || targetModuleNodeCount(target) <= 1) return base;
+  return `${base}__${toPythonIdentifier(node.id)}`;
 }

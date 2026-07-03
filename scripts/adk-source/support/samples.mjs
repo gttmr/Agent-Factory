@@ -178,9 +178,10 @@ function sampleConversationMessages(context) {
     messages.push({ role: "Assistant", text: reply.prompt });
     messages.push({ role: "User", text: reply.response });
   }
-  const summary = ["합성 실행을 완료했습니다."];
   const terminals = context.terminalOutputIds();
-  if (terminals.length) summary.push(`- 최종 출력 노드: ${terminals.join(", ")}`);
+  const summary = terminals.length
+    ? terminals.map((terminal) => `Terminal output node ${terminal} completed. Final state keys: <runtime state keys>.`)
+    : ["Terminal output node none completed. Final state keys: <runtime state keys>."];
   const unresolved = firstWorkflowPlaceholder(context);
   if (unresolved) summary.push(`- 미확정 후속 workflow: ${unresolved} (placeholder_only)`);
   messages.push({ role: "Assistant", text: summary.join("\n") });

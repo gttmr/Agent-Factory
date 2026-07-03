@@ -475,7 +475,7 @@ export function GraphCanvas({
       <section className="panel graph-canvas-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">ADK 2.0 Graph Workflow</p>
+            <p className="eyebrow">ADK Graph Workflow</p>
             <h2>그래프 워크플로우 검토</h2>
           </div>
           <span className="graph-canvas-stats">
@@ -519,7 +519,7 @@ export function GraphCanvas({
                 onConnect={createDraftEdge}
                 onEdgeClick={handleEdgeInteraction}
                 onNodeClick={handleNodeInteraction}
-                onNodeDragStop={updateNodePosition}
+                onNodePositionCommit={updateNodePosition}
                 onPaneClick={() => {
                   if (editModeActive && connectMode) return;
                   setSelection({ nodeId: null, edgeId: null });
@@ -725,7 +725,7 @@ interface GraphFlowStageProps {
   onConnect: (sourceId: string, targetId: string) => void;
   onEdgeClick: (edgeId: string) => void;
   onNodeClick: (nodeId: string) => void;
-  onNodeDragStop: (nodeId: string, position: XYPosition) => void;
+  onNodePositionCommit: (nodeId: string, position: XYPosition) => void;
   onPaneClick: () => void;
   onPositionsChange: (positions: Record<string, XYPosition>) => void;
 }
@@ -740,12 +740,13 @@ function GraphFlowStage({
   onConnect,
   onEdgeClick,
   onNodeClick,
-  onNodeDragStop,
+  onNodePositionCommit,
   onPaneClick,
   onPositionsChange
 }: GraphFlowStageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GraphNodeData>(baseNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdgeData>(baseEdges);
+  const dragPositionNodeIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setNodes(baseNodes);
@@ -791,9 +792,20 @@ function GraphFlowStage({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      if (editModeActive) onNodesChange(changes);
+      if (!editModeActive) return;
+      onNodesChange(changes);
+      for (const change of changes) {
+        if (change.type !== "position" || !change.position) continue;
+        if (change.dragging === true) {
+          dragPositionNodeIdsRef.current.add(change.id);
+          continue;
+        }
+        if (change.dragging !== false) continue;
+        if (dragPositionNodeIdsRef.current.delete(change.id)) continue;
+        onNodePositionCommit(change.id, change.position);
+      }
     },
-    [editModeActive, onNodesChange]
+    [editModeActive, onNodePositionCommit, onNodesChange]
   );
 
   const handleEdgesChange = useCallback(
@@ -829,7 +841,7 @@ function GraphFlowStage({
       onNodeClick={(_, node) => onNodeClick(node.id)}
       onEdgeClick={(_, edge) => onEdgeClick(edge.id)}
       onNodeDragStop={(_, node) => {
-        if (editModeActive) onNodeDragStop(node.id, node.position);
+        if (editModeActive) onNodePositionCommit(node.id, node.position);
       }}
     >
       <Background gap={18} size={1} />

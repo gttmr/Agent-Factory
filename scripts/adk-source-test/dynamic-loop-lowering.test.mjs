@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { channelModules, generator, writeChannelFixture } from "./fixtures.mjs";
+import { channelModules, generateBundle, writeChannelFixture } from "./fixtures.mjs";
 
 test("runnable lowers reviewed loop control through an ADK dynamic workflow node", () => {
   const { agentBase, unconnectedAdapter } = channelModules();
@@ -56,10 +55,11 @@ test("runnable lowers reviewed loop control through an ADK dynamic workflow node
       ]
     });
     const outputRoot = join(artifactRoot, "out");
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    generateBundle(artifactRoot, outputRoot);
     const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
-    execFileSync("python3", ["-c", "import ast, sys; ast.parse(sys.stdin.read())"], { input: source, stdio: "pipe" });
     assert.match(source, /from google\.adk\.workflow import FunctionNode, START, Workflow, node/);
+    assert.match(source, /from google\.genai import types/);
+    assert.match(source, /from google\.adk\.events import Event, RequestInput/);
     assert.match(source, /@node\(name="dynamic_workflow", rerun_on_resume=True\)/);
     assert.match(source, /while True:/);
     assert.match(source, /await ctx\.run_node\(agent_mod_draft, payload\)/);
@@ -69,6 +69,10 @@ test("runnable lowers reviewed loop control through an ADK dynamic workflow node
       source,
       /_dynamic_should_continue\(_loop_decision, \["retry", "revise"\], \["done", "approved"\], "loop_exit"\)/
     );
+    assert.match(source, /def _terminal_out1\(ctx: Context, node_input=None\):/);
+    assert.match(source, /yield Event\(\s*author="agent_factory_terminal",\s*content=types\.Content\(/s);
+    assert.match(source, /node_out1 = FunctionNode\(func=_terminal_out1, name="out1"\)/);
+    assert.match(source, /payload = await ctx\.run_node\(node_out1, payload\)\s*return payload/s);
     assert.match(source, /root_agent = Workflow\(\s*name="req_ch_adk",\s*description=.*,\s*edges=\[\(START, dynamic_workflow\)\],\s*\)/s);
     assert.doesNotMatch(source, /loop Graph IR yet|wait for loop lowering/);
   } finally {

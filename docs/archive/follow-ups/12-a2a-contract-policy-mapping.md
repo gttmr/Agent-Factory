@@ -1,12 +1,12 @@
 # 12 — A2A 계약 정책 매핑 (auth / timeout / retry / fallback)
 
-상태: **완료.** `A2AContract.adk_runtime_policy`가 schema/type/UI/validator/generator에 추가됐다. Generator는 ADK가 직접 지원하는 범위만 lower한다: `RemoteA2aAgent(timeout=...)`와 `A2aRemoteAgentConfig(request_interceptors=[...])` 기반 env-backed auth 주입. `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 남기며 generated retry/fallback runtime wrapper는 만들지 않는다.
+상태: **완료.** `A2AContract.adk_runtime_policy`가 schema/type/UI/validator/generator에 추가됐다. Generator는 ADK가 직접 지원하는 범위만 lower한다: `RemoteA2aAgent(timeout=...)`와 `A2aRemoteAgentConfig(request_interceptors=[...])` 기반 env-backed auth 주입. ADK 2.3 기준 request interceptor는 `(ctx, a2a_request, params)`를 받아 `params.request_metadata`를 mutate하고 `(a2a_request, params)`를 반환한다. env var 누락 시에는 `Event(error_message=...)`와 `params`를 반환한다. `retry_handoff`와 `fallback_handoff`는 `workflow_manifest.json`, README, `implementation-handoff.md`에 handoff policy로 남기며 generated retry/fallback runtime wrapper는 만들지 않는다.
 
 ## 왜 필요한가
 
 `A2AContract` 는 high-friction 계약으로 `auth`, `token_handling`, `timeout`, `retry`, `fallback`, `cancellation`, `audit`, `data_policy`, `security_schemes`/`security_requirements`, `push_notification_policy` 등을 담는다(`schemas/a2a-contract.schema.json`, `analyzer/types.ts:A2AContract`). 현재 `emitRemoteA2aNode` 는 그중 `agent_card.agent_card_url` 만 사용한다. 운영-충실 번들이 되려면 계약의 auth/timeout/retry/fallback 이 실제 호출 동작에 반영돼야 한다.
 
-ADK 의 `RemoteA2aAgent` 는 `timeout`과 `config=A2aRemoteAgentConfig(...)`의 `request_interceptors`를 지원한다. 이번 구현은 이 두 표면만 생성 코드로 사용한다. 재시도와 fallback 동작은 ADK 문서/소스에서 안정적인 wrapper contract를 확인하지 못했으므로 명시적 handoff policy로만 기록한다.
+ADK 의 `RemoteA2aAgent` 는 `timeout`과 `config=A2aRemoteAgentConfig(...)`의 `request_interceptors`를 지원한다. 이번 구현은 이 두 표면만 생성 코드로 사용한다. ADK 2.3 request interceptor는 `before_request(ctx, a2a_request, params)` tuple contract이므로 generated auth hook도 성공 시 `(a2a_request, params)`, 중단 시 `(Event(error_message=...), params)`를 반환한다. 재시도와 fallback 동작은 ADK 문서/소스에서 안정적인 wrapper contract를 확인하지 못했으므로 명시적 handoff policy로만 기록한다.
 
 ## 무엇을 해야 하는가
 

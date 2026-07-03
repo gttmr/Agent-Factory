@@ -16,6 +16,8 @@ import "./adk-source-test/state-channels-lowering.test.mjs";
 import "./adk-source-test/state-channel-guards.test.mjs";
 import "./adk-source-test/artifact-channels.test.mjs";
 import "./adk-source-test/remote-a2a.test.mjs";
+import "./adk-source-test/runtime-robustness.test.mjs";
+import "./adk-source-test/terminal-output.test.mjs";
 
 const cliOutputRoot = process.argv[2];
 if (cliOutputRoot) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import type { GraphEditState, Selection } from "../components/GraphCanvas";
 import type { GraphEdge, GraphNode, ModuleCandidate } from "../analyzer/types";
 import { CatalogWorkflowPicker } from "../design/CatalogWorkflowPicker";
@@ -40,6 +40,7 @@ import {
 
 export default function DesignWorkbench() {
   const { reqId } = useParams<{ reqId: string }>();
+  const [searchParams] = useSearchParams();
   const { touch } = useRecentRoots();
   useEffect(() => {
     if (reqId) touch(reqId);
@@ -99,6 +100,12 @@ export default function DesignWorkbench() {
   const defaultStep: DesignStepId = !hasGraph ? "run" : !reviewReady ? "review" : "approve";
   const [rawActiveStep, setActiveStep] = useStageStep(DESIGN_STEP_IDS, defaultStep);
   const activeStep = rawActiveStep as DesignStepId;
+  const requestedStep = searchParams.get("step");
+  const hasExplicitDesignStep = DESIGN_STEP_IDS.some((stepId) => stepId === requestedStep);
+  const designRun = manifest?.stage_runs?.design;
+  const hasCompletedDesignRun =
+    Boolean(designRun?.latest_run_id) && (designRun?.status === "completed" || designRun?.status === "applied");
+  const designRunComplete = hasCompletedDesignRun || (hasGraph && hasExplicitDesignStep && activeStep !== "run");
   const bothApproved = boundariesApproved && runtimeApproved;
   const anchor = useMemo<CommentAnchor | null>(() => commentAnchorFromSelection(selection), [selection]);
   const nodeById = useMemo(() => new Map<string, GraphNode>((graphIR?.nodes ?? []).map((node) => [node.id, node])), [graphIR]);
@@ -166,7 +173,7 @@ export default function DesignWorkbench() {
     <StageShell
       eyebrow={`설계 · ${reqId}`}
       title="설계"
-      steps={buildDesignSteps({ hasGraph, reviewReady, bothApproved, activeStep })}
+      steps={buildDesignSteps({ hasGraph, designRunComplete, reviewReady, bothApproved, activeStep })}
       activeStep={activeStep}
       onStepChange={setActiveStep}
       summary={

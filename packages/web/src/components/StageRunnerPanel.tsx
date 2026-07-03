@@ -9,6 +9,7 @@ import {
   useStartStageRun
 } from "../state/useStageRunner";
 import { Button, Panel, SectionHeader, SelectField } from "../ui/primitives";
+import { selectStageRunnerNarrative } from "./stageRunnerNarrative";
 
 interface RunnerMetric {
   label: string;
@@ -73,6 +74,8 @@ export function StageRunnerPanel({
   const selectedRun = detailQuery.data?.summary ?? runs.find((run) => run.run_id === selectedRunId) ?? null;
   const detail = detailQuery.data;
   const displayedEvents = startMutation.isPending ? liveEvents : detail?.events ?? [];
+  const narrative = useMemo(() => selectStageRunnerNarrative(displayedEvents), [displayedEvents]);
+  const showNarrative = startMutation.isPending && (narrative.agentMessage || narrative.todoProgress);
   const canRun = !disabledReason && !startMutation.isPending;
   const canApply = Boolean(
     applyMode === "proposed" &&
@@ -185,6 +188,29 @@ export function StageRunnerPanel({
           ))}
         </dl>
       </div>
+
+      {showNarrative ? (
+        <section className="af-runner-narrative" aria-label="실행 진행 메모">
+          {narrative.agentMessage ? (
+            <div className="af-runner-narrative-note">
+              <span>진행 메모</span>
+              <p>{narrative.agentMessage}</p>
+            </div>
+          ) : null}
+          {narrative.todoProgress ? (
+            <div className="af-runner-narrative-todo">
+              <strong>
+                할 일 {narrative.todoProgress.completedCount}/{narrative.todoProgress.totalCount} 완료
+              </strong>
+              {narrative.todoProgress.currentItem ? (
+                <span>현재: {narrative.todoProgress.currentItem}</span>
+              ) : (
+                <span>현재: 모든 항목 완료</span>
+              )}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="af-runner-detail-grid">
         <section className="af-runner-history" aria-label="최근 stage run">

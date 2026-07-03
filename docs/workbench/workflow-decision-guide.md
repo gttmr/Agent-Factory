@@ -1,7 +1,7 @@
 # Workflow Decision Guide
 
 이 문서는 requirement에서 Workflow Agent 경계를 어떻게 판단하고 Graph IR로 어떻게 내리는지 설명한다.
-ADK 2.0 Graph Workflow, Dynamic Workflow, Human Input 문서를 기준으로 한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화되어 있다.
+ADK 2.3 Graph Workflow, Dynamic Workflow, Human Input 문서를 기준으로 한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화된 역사적 기준이고, 현재 Runtime Handoff target은 `google-adk` 2.3.0이다.
 
 ## 기본 원칙
 
@@ -30,7 +30,7 @@ Graph IR에는 관찰 가능한 흐름을 최소한으로 드러낸다. 불명�
 
 ## graph
 
-`workflow_kind: graph`는 ADK 2.0 graph-based workflow처럼 node와 edge가 명시적인 설계 산출물일 때 사용한다.
+`workflow_kind: graph`는 ADK 2.3 graph-based workflow처럼 node와 edge가 명시적인 설계 산출물일 때 사용한다.
 
 사용 신호:
 

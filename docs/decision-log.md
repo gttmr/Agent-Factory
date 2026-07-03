@@ -10,6 +10,84 @@
 
 ---
 
+## 2026-07-03 · PR TBD — dynamic runnable workflows emit terminal completion
+
+- **결정**: Dynamic runnable generator는 reviewed Graph IR `output` node를 shared terminal-output emitter로 낮추고, `dynamic_workflow`가 loop exit 이후 terminal `FunctionNode`를 실행한 뒤 JSON-safe payload를 반환한다.
+- **배경**: Static runnable path는 terminal output node에서 chat-visible `Event(content=types.Content(...))` 완료 메시지를 emit했지만, dynamic/loop runnable path는 `output` node를 plan과 emitter에 포함하지 않아 완료 이벤트를 조용히 누락했다.
+- **영향**: `scripts/adk-source/agent-dynamic.mjs`, dynamic Graph IR lowering, generator regression tests. Terminal chat text는 `Event(content=...)`로만 나가고 node return은 JSON-safe dict로 유지한다.
+
+## 2026-07-03 · PR TBD — dead legacy Analyze client hook removed
+
+- **결정**: The unused client-side `useAnalyze` direct analyzer hook was removed while preserving the `AnalyzeCatalogEntry` type export. The server `/api/analyze-requirement` endpoint remains as an internal/direct primitive.
+- **배경**: The Analyze screen uses Stage Runner; repo-wide usage of `packages/web/src/state/useAnalyze.ts` was limited to the catalog-entry type.
+- **영향**: Maintenance cleanup only. Main Analyze UI path and server endpoint behavior are unchanged.
+
+## 2026-07-03 · PR TBD — subtype glyph coverage is compile-time guarded
+
+- **결정**: `CategoryBadge` subtype glyph table is typed exhaustively over analyzer subtype/runtime contract unions so newly added enum values must declare a glyph before build succeeds.
+- **배경**: The previous `Record<string, string>` silently rendered missing glyphs as `·`, hiding taxonomy drift in review UI.
+- **영향**: Maintenance guard only. Badge component props and Korean UI labels are unchanged.
+
+## 2026-07-03 · PR TBD — server import validator accepts reviewed loop decisions
+
+- **결정**: `PUT /api/af/:id/analysis-result.json`의 server import validator는 `route_aliases`와 `is_default_route`를 route edge뿐 아니라 reviewed loop decision edge(`edge_kind: "control"` + `execution_semantics: "loop_back" | "loop_exit"`)에서도 허용한다.
+- **배경**: Graph IR canonical validator와 `scripts/validate-artifacts.mjs`는 scenario-d loop decision metadata를 허용하지만 server import validator만 route edge로 제한해 같은 artifact가 import surface에서 422로 거부됐다.
+- **영향**: Server import gate parity only. Plain non-route/non-loop-decision edge metadata는 계속 거부한다.
+
+## 2026-07-03 · PR TBD — RunSandbox surfaces Mock Lab prerequisites before runtime start
+
+- **결정**: `/af/:reqId/run`의 runtime-chat status도 reviewed `runtime-stub/scaffold-plan.json`에서 요구되는 Mock Lab MCP server를 보고하고, RunSandbox는 미실행 prerequisite을 ADK runtime 시작 버튼 위에 `시작` action과 함께 표시한다. A2A provider 패널도 이미 status에 포함된 prerequisite entry와 start action을 같은 행 패턴으로 렌더한다.
+- **배경**: generated ADK bundle은 Mock Lab MCP adapter가 중지되어도 `mcp_degraded` payload로 graceful degrade할 수 있지만, 사용자는 실행 전에 필수 Mock Lab server가 꺼져 있다는 힌트를 받지 못했다.
+- **영향**: runtime-chat status API/client type, RunSandbox prerequisite row, A2A provider prerequisite row, active run-screen docs. Generator, schemas, approvals, stage logic은 변경하지 않는다.
+
+## 2026-07-03 · PR TBD — Design stepper separates runner completion from Graph IR availability
+
+- **결정**: Design StageShell의 `1. 실행` 완료 표시는 Graph IR 존재가 아니라 completed/applied `stage_runs.design` 또는 reviewer의 명시적 step 진행을 기준으로 한다. Imported `analysis-result.json.processFlow`는 `2. 검토` 접근 가능 조건으로만 쓰며, active `3. 승인` step은 review 조건이 부족해도 `잠김`이 아니라 `현재`로 표시한다.
+- **배경**: 분석 결과 import나 Analyze 단계 산출물에 `processFlow`가 이미 있으면 Design runner를 실행하지 않았는데도 `1. 실행`이 완료로 보였고, `?step=approve`에서는 active step과 `잠김` label이 동시에 표시됐다.
+- **영향**: Design stage step-status UI model and tests. `manifest.approvals.*` gate derivation, schemas, generator, validator behavior는 변경하지 않는다.
+
+## 2026-07-03 · PR TBD — taxonomy serialized enum tables completed
+
+- **결정**: `docs/workbench/taxonomy.md`에 serialized `runtime_binding`, `runtime_contract_kind`, `node_kind`, `edge_kind`, `invoke_binding`, `decision_owner`, `call_control` enum tables를 추가하고 `runtime_binding: mcp`를 문서화한다.
+- **배경**: `packages/web/src/analyzer/types.ts`, `schemas/*.json`, `scripts/artifact-validation/constants.mjs`가 허용하는 Graph IR/runtime 값보다 taxonomy prose가 좁았다. `selected_by_human`은 `decision_owner`가 아니라 `call_control` 값으로 확인했다.
+- **영향**: Taxonomy documentation only. Schema, validator, TypeScript enums, generator behavior는 변경하지 않는다.
+
+## 2026-07-03 · PR TBD — active docs refreshed for current Stage Runner and Build flow
+
+- **결정**: CLAUDE.md와 Agent Factory harness는 Stage Runner를 `analyze/design/build/verify` 네 단계 surface로 설명한다. Analyze/Design만 proposed-first apply contract를 갖고, Build Stage Runner는 `applyMode="none"`으로 `runtime-stub/build` primitive의 canonical `runtime-stub/` side effect를 기록한다. Build 화면의 primary path는 `POST /api/af/:reqId/artifact-sync/run`이며, manual scaffold/runtime controls는 advanced path로 남는다.
+- **배경**: 코드 기준 `skillRunnerStages`는 네 단계이고, `BuildRunStep`은 `계약 동기화 + runtime-stub 재생성`을 primary panel로 렌더한다. `syncArtifactRoot`는 canonical `analysis-result.json`을 읽어 split artifacts와 `scaffold-plan.json`을 쓰며, Graph IR payload를 저장하지 않는다. `StageShell`은 left rail이 아니라 header-row stepper를 렌더한다.
+- **영향**: `CLAUDE.md`, `docs/workbench/agent-factory-harness.md`. Runtime/source behavior는 변경하지 않는다.
+
+## 2026-07-03 · PR TBD — ADK baseline documented as 2.3
+
+- **결정**: active docs의 ADK baseline을 ADK 2.3으로 정렬한다. 현재 target은 installed `google-adk` 2.3.0이고, ADK Python 2.0 GA(2026-05-19)는 graph/dynamic/A2A taxonomy의 역사적 기준으로 유지한다. `requirements/adk-runtime.txt`의 floor는 `google-adk[a2a,mcp]>=2.1.0`으로 남긴다. 2.1 -> 2.3 사이 generated code에 영향을 주는 API rename이 없고 extras `a2a,mcp`가 2.3에서 확인되었기 때문이다.
+- **배경**: ADK 2.0 GA 이후 2.1(2026-05-23), 2.2(2026-06-04), 2.3(2026-06-18)이 나왔고, 이 branch의 Runtime/A2A 검증은 2.3.0 기준으로 진행됐다. `scripts/adk-source/agent-runnable.mjs`와 `scripts/adk-source/agent-dynamic.mjs`의 generated bundle description literal은 아직 ADK 2.1 문자열을 담고 있으므로 별도 code cluster에서 고친다. ADK 2.2/2.3 `api_server --a2a` function-local `import json` bug에 대한 launcher in-memory patch 문서는 2.3.0에서도 계속 유효하다.
+- **영향**: `AGENTS.md`, `CLAUDE.md`, active workbench docs, target-agent protocol reference. Runtime dependency floor는 변경하지 않는다.
+
+## 2026-07-03 · PR TBD — stage status is a pure projection of approvals including demotion on revoke
+
+- **결정**: `PATCH /api/af/:id/manifest/approvals` treats approval booleans as the source of truth and projects analyze/design/build stage status to `complete` when the gate is true and `pending` when the gate is false.
+- **배경**: Previously, a revoked approval preserved the prior `complete` stage status, so external stage-status readers could still treat the stage as complete.
+- **영향**: External stage-status readers, including runtime-stub generation gates, now see revoked approvals as non-complete stage state.
+
+## 2026-07-02 · PR TBD — runnable node symbols derived per-node to allow module reuse across nodes
+
+- **결정**: Runnable/smoke ADK source generation derives Python node/function symbols from the Graph IR node when the same approved module is reused by multiple nodes. Single-use modules keep the previous module-derived names. State channel semantics stay unchanged: fallback `{module_id}_output` and reviewed edge `state_key` values remain module/edge contracts, not automatically node-scoped channels.
+- **배경**: Vacation-approval E2E reproduced a runnable generator collision where two normal adapter_call nodes referenced `mod-applicant-notification-adapter` and both lowered to `node_mod_applicant_notification_adapter`.
+- **영향**: ADK generator naming/lowering/emitters, smoke graph edge emission, reused-adapter regression scenario, generator regression tests, and `docs/workbench/validation.md`.
+
+## 2026-07-02 · PR TBD — validator stage run-id pattern covers build/verify
+
+- **결정**: Artifact validator의 `stage_runs.*.latest_run_id` 형식 검증은 `analyze/design/build/verify` 네 단계 Stage Runner run id를 모두 허용한다.
+- **배경**: 서버 Stage Runner는 이미 Build/Verify run history를 `YYYYMMDDTHHMMSSZ-<stage>-<6 hex>` 형식으로 기록하지만, validator의 중복 regex가 Analyze/Design만 허용해 Build/Verify 이력이 있는 artifact root 검증을 막았다.
+- **영향**: `scripts/artifact-validation/constants.mjs`, `templates/af-run-manifest.json`, active validation/harness docs.
+
+## 2026-07-02 · PR TBD — generated A2A interceptor aligned to ADK 2.3 tuple contract
+
+- **결정**: generated Remote A2A auth interceptor는 ADK 2.3 `before_request(ctx, a2a_request, params)` tuple contract를 따른다. `bearer_env`/`metadata_env` auth hook은 `params.request_metadata`를 mutate하고 성공 시 `(a2a_request, params)`, env var 누락 시 `(Event(error_message=...), params)`를 반환한다.
+- **배경**: installed `google-adk` 2.3.0 introspection에서 ADK가 `result, params = await interceptor.before_request(ctx, a2a_request, params)` 형태로 호출함을 확인했다. 기존 generator는 `(ctx, params)`와 `Event`/`None` 반환을 emit해 첫 remote call에서 arity 또는 tuple-unpack 오류를 낼 수 있었다.
+- **영향**: `bearer_env`/`metadata_env`를 쓰는 runnable Remote A2A generated bundle, generator regression, active validation/follow-up docs.
+
 ## 2026-07-01 · 작업 브랜치 `codex/adk-parameter-extraction-workflow-examples` — agent-owned MCP toolset lowering contract
 
 - **결정**: LLM-selected MCP tool use is represented only as `agent` + `mcp_toolset` + `selected_by_llm`; fixed workflow adapter execution remains `adapter_call` + `mcp_tool` + `fixed_by_workflow`; `adapter_call` + `selected_by_llm` stays invalid/out of scope. Runnable ADK lowering for reviewed agent-owned MCP toolsets targets ADK 2.3.0 `LlmAgent(..., tools=[McpToolset(...)])`, using `tools` rather than a `toolsets` constructor argument.
@@ -51,7 +129,7 @@
 ### Build/Verify도 Stage Runner run history로 기록한다
 - **결정**: Stage Runner stage surface를 `analyze/design/build/verify`로 확장한다. `build`는 기존 `runtime-stub/build` primitive를 감싸 canonical `runtime-stub/` side effect와 run evidence를 남기고, `verify`는 기존 allowlist verify primitive를 감싸 `validation-report.md`와 `catalog-delta.yaml` proposal template을 생성한다. Verify catalog delta는 자동 추론하지 않는다. `cancel`은 active stage run AbortController에만 적용하며 ADK runtime process 제어와 분리한다.
 - **배경**: Analyze/Design은 Stage Runner 기록과 diff/apply 흐름이 있었지만 Build/Verify는 별도 수동 실행만 있어 run evidence와 follow-up artifact 기록 방식이 갈라졌다.
-- **영향**: `packages/web/server/stageRunner.ts`, `afStageRunnerApi.ts`, `afRuntimeStubApi.ts`, `afVerifyRunApi.ts`, `BuildRunStep.tsx`, `VerifyWorkbench.tsx`, `StageRunnerPanel.tsx`, `docs/workbench/follow-ups/16-build-verify-stage-runner.md`.
+- **영향**: `packages/web/server/stageRunner.ts`, `afStageRunnerApi.ts`, `afRuntimeStubApi.ts`, `afVerifyRunApi.ts`, `BuildRunStep.tsx`, `VerifyWorkbench.tsx`, `StageRunnerPanel.tsx`, `docs/archive/follow-ups/16-build-verify-stage-runner.md`.
 
 ### Runnable skeleton과 data channel의 안전 경계를 명시한다
 - **결정**: Runnable scaffold warning은 category/output mode별 smoke TODO skeleton 문구를 낸다. Named state channel은 agent instruction 또는 connected MCP adapter consumer로만 읽고, 비-connected state consumer와 agent/non-connected artifact consumer는 runnable generation blocker로 처리한다. RunSandbox는 started runtime-stub fingerprint와 current fingerprint를 비교해 stale을 표시하고, 자동 재시작 대신 사용자가 누르는 재시작 버튼만 제공한다.
@@ -352,6 +430,25 @@
 - **결정**: Design Graph IR 선택 패널의 `기본/계약/실행/정책/Mock/ADK` 고정 탭을 `요약`, `입출력`, `흐름`, `호출·런타임`, `검토·리스크`, 조건부 `ADK Skeleton`, `원본` 그룹으로 바꾼다. 선택된 노드/엣지에 실제 데이터가 있는 그룹만 표시한다. Schema ref는 `/api/catalog.contracts`의 contract body를 찾아 인라인 확장 카드로 보여 주고, body가 없으면 연결된 module candidate의 input/output field spec을 fallback schema로 펼친다. `Mock Lab` binding은 Adapter 호출의 런타임 정보로 접고, ADK Skeleton은 `workflow`/`workflow_call` 선택에 관련 contract가 있을 때만 보인다.
 - **배경**: 기존 고정 탭은 대부분의 선택에서 빈 `Mock`/`ADK` 탭을 보여 주고, schema ref 이름만 노출해 reviewer가 입출력 구조를 확인할 수 없었다. `input_mapping`/`output_mapping`도 raw JSON으로만 보였고 대상 필드와 source field 방향이 불분명했다.
 - **영향**: Design Graph IR `GraphInspector`/`GraphElementEditor`, `/api/catalog` contract index, active visualization design-system docs. Graph IR artifact schema와 approval gate semantics는 바꾸지 않는다.
+
+## 2026-07-03 · 작업 브랜치 `codex/canvas-keyboard-move-persist` — Graph IR 키보드 이동 위치 영속화
+
+### 키보드로 이동한 노드도 편집 드래프트 위치로 저장한다
+- **결정**: Graph IR edit mode에서 선택 노드를 화살표 키로 이동할 때 ReactFlow `position` change의 committed 이벤트(`dragging: false`)를 기존 `updateNodePosition` 저장 경로로 연결한다. 마우스 드래그 중간 이벤트는 계속 로컬 렌더 상태만 갱신하고, 최종 위치는 기존 drag-stop 경로가 저장한다.
+- **배경**: 마우스 드래그는 `node.position`을 dirty draft에 반영했지만, 키보드 이동은 화면 위치만 바꾸고 저장 버튼을 활성화하지 않아 reload/save 후 위치가 사라졌다.
+- **영향**: `GraphCanvas.tsx`의 ReactFlow `onNodesChange` 처리. `analysis-result.json.processFlow.nodes[].position` 스키마와 저장 API 계약은 변경하지 않는다.
+
+## 2026-07-03 · 작업 브랜치 `codex/generator-runtime-robustness-v3` — connected MCP adapter 실패를 JSON-safe synthetic payload로 degrade
+
+- **결정**: connected Mock Lab MCP adapter `FunctionNode`는 streamable HTTP 연결, session initialize, tool call 실패를 잡아 `mcp_degraded` / `mcp_unreachable_degraded` payload를 반환한다. Payload는 server/url/tool/reason, arguments/input_resolution, reviewed runtime mock/developer_todos만 JSON-safe 값으로 담고 raw `node_input`이나 `google.genai.types.Content`를 포함하지 않는다. Unconnected adapter/HITL/router output도 raw `node_input`을 그대로 payload에 넣지 않고 JSON-safe helper를 거친다.
+- **배경**: ADK 2.3 `LlmAgent` node input 준비 경로가 downstream dict/list payload를 `json.dumps`로 변환하므로, upstream FunctionNode payload 안에 `Content` 또는 raw `node_input`이 들어가면 runtime에서 `TypeError: Object of type Content is not JSON serializable`로 중단된다. Mock Lab MCP server가 꺼진 경우도 opaque `ExceptionGroup` 대신 검토 가능한 synthetic degraded output이어야 한다.
+- **영향**: ADK source generator connected adapter/function/HITL/router emitters, generated runtime helper, generator regression tests. Generator defaults remain runtime-neutral and artifact-driven.
+
+## 2026-07-03 · 작업 브랜치 `codex/generator-runtime-robustness-v3` — terminal output completion을 Content return 대신 ADK event로 emit
+
+- **결정**: runnable Graph IR `output` node를 더 이상 drop하지 않고 terminal `FunctionNode`로 lower한다. Terminal node는 chat-visible `Event(content=types.Content(role="model", ...))`를 먼저 yield하고, 별도 JSON-safe structured output dict(`node_kind`, `terminal_output_node_id`, `status`, `final_state_keys`)를 yield한다. README/sample transcript는 같은 terminal-node completion 형식을 보여 준다.
+- **배경**: `types.Content`를 FunctionNode return/output으로 쓰면 downstream node input 또는 event output serialization에서 JSON-safety 문제가 생길 수 있다. Completion text는 user-visible event로만 노출하고 structured node output은 JSON-serializable dict로 유지해야 ADK Web/runtime smoke가 chat-visible completion과 graph output을 동시에 갖는다.
+- **영향**: ADK runnable graph lowering, node registry, terminal output emitter, import gates for `Event`/`types`, README/sample generator output, generator regression tests.
 
 ## 2026-06-29 · 로컬 작업 — catalog-first runtime gap 보정
 

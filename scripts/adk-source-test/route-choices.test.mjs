@@ -72,9 +72,9 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.match(source, /_hitl_response = _first_resume_input\(ctx\)/);
     assert.match(
       source,
-      /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.", payload=node_input, response_schema=str\)/
+      /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.", payload=_json_safe_node_value\(node_input\), response_schema=str\)/
     );
-    assert.match(source, /"previous": node_input/);
+    assert.doesNotMatch(source, /"previous": node_input/);
     assert.match(source, /"response": _hitl_response/);
     assert.match(source, /node_confirm = FunctionNode\(func=_hitl_confirm, name="confirm", rerun_on_resume=True\)/);
     assert.match(source, /def _route_analysis_router\(node_input=None\):/);
@@ -82,8 +82,8 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.match(source, /text = _route_decision_text\(node_input\)/);
     assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "담당자 승인"\]\):/);
     assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "분석 생략"\]\):/);
-    assert.match(source, /Event\(route="run_analysis", output=node_input\)/);
-    assert.match(source, /return Event\(route="skip_analysis", output=node_input\)/);
+    assert.match(source, /Event\(route="run_analysis", output=_json_safe_node_value\(node_input\)\)/);
+    assert.match(source, /return Event\(route="skip_analysis", output=_json_safe_node_value\(node_input\)\)/);
     assert.doesNotMatch(source, /"분석 실행"/);
     assert.doesNotMatch(source, /"분석 없이 진행"/);
     assert.match(source, /\(node_analysis_router,\s*\{\s*"run_analysis": node_mod_analysis,\s*"skip_analysis": node_mod_final,\s*\}\s*\)/s);
@@ -164,7 +164,7 @@ test("runnable leaves numeric route-choice input untyped so ADK Web accepts numb
     execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
     const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
     assert.match(source, /def _hitl_confirm\(ctx: Context, node_input=None\):/);
-    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.\\n선택지: run_analysis, skip_analysis\\n기본값: skip_analysis\\nalias: run_analysis=1\/분석 실행; skip_analysis=2\/분석 없이 진행", payload=node_input\)/);
+    assert.match(source, /yield RequestInput\(message="추가 분석을 수행할까요\? run_analysis 또는 skip_analysis 중 하나로 답하세요\.\\n선택지: run_analysis, skip_analysis\\n기본값: skip_analysis\\nalias: run_analysis=1\/분석 실행; skip_analysis=2\/분석 없이 진행", payload=_json_safe_node_value\(node_input\)\)/);
     assert.doesNotMatch(source, /RequestInput\([^)]*response_schema=str/s);
     assert.match(source, /for key in \("response", "choice", "value"\):/);
     assert.match(source, /return str\(value\)\.strip\(\)\.lower\(\)/);

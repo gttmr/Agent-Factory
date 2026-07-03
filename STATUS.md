@@ -1,6 +1,6 @@
 # STATUS — Agent Factory Workbench
 
-Last updated: 2026-06-28 (KST).
+Last updated: 2026-07-03 (KST).
 
 This file is a branch-neutral status entrypoint. It is not a live cleanliness or
 PR tracker. For the current checkout, always run:
@@ -16,7 +16,7 @@ git rev-parse --short HEAD
 - Model-facing rules: `AGENTS.md` plus the nearest child `AGENTS.md`.
 - Human overview: `README.md`.
 - Active docs: `docs/README.md`, `docs/workbench/*.md`, `docs/visualization/design-system.md`, `docs/mock-lab/local-mcp-mock-lab.md`.
-- Follow-up backlog: `docs/workbench/follow-ups/INDEX.md` and `docs/workbench/follow-ups/STATUS.md`.
+- Follow-up backlog: `docs/workbench/follow-ups/STATUS.md` is the single live queue. `docs/workbench/follow-ups/INDEX.md` indexes that queue and points to archived historical briefs.
 - Historical material: `docs/archive/**` and old branch-specific status snapshots in git history.
 
 ## Current Posture
@@ -29,14 +29,8 @@ git rev-parse --short HEAD
 
 ## Follow-Up Backlog
 
-The active follow-up queue is in `docs/workbench/follow-ups/STATUS.md`.
-As of this update, briefs 10-14 remain the tracked backlog:
-
-- 10 dynamic workflow lowering
-- 11 agent/non-connected consumer channel reads
-- 12 A2A policy mapping
-- 13 scaffold-plan warning accuracy
-- 14 runtime-stub runtime UX
+The active follow-up queue is tracked only in `docs/workbench/follow-ups/STATUS.md`.
+Do not duplicate the brief list here; read that file with current code and active docs before starting follow-up work.
 
 ## Local Safety
 

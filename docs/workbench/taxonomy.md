@@ -6,14 +6,15 @@
 ## ADK 확인 기준
 
 2026-05-22 기준으로 `adk-docs-mcp`에서 `list_doc_sources -> https://adk.dev/llms.txt -> fetch_docs` 순서로 다음 문서를 확인했다.
-ADK 2.0 문서가 GA 기준을 제공하므로 active taxonomy는 ADK 2.0을 기본 baseline으로 둔다.
+2026-07-03 기준 active taxonomy와 Runtime Handoff target은 ADK 2.3이다. ADK Python 2.0 GA는 Graph/Dynamic/A2A 분류의 역사적 기준이고, 현재 설치·검증 target은 `google-adk` 2.3.0이다.
 
 - `https://adk.dev/2.0/index.md`: ADK Python 2.0 GA는 2026년 5월 19일 release로 문서화되어 있고, graph-based workflows, dynamic workflows, collaborative workflows를 핵심 기능으로 둔다.
 - `https://adk.dev/graphs/index.md`: graph-based workflows는 Agents, Tools, Functions를 node로 두고 edge로 routing, branching, state management를 정의한다.
 - `https://adk.dev/workflows/index.md`: ADK workflows는 graph-based, dynamic, collaborative, template workflow를 구분한다.
 - `https://adk.dev/a2a/index.md`: ADK A2A는 remote A2A agent와의 통신을 다루며 local sub-agent, adapter, MCP tool 호출과 구분한다.
+- 릴리스 기준: ADK Python 2.0 GA(2026-05-19) 이후 2.1(2026-05-23), 2.2(2026-06-04), 2.3(2026-06-18)을 거쳐 현재 target을 2.3으로 둔다. 2.1 -> 2.3 사이에 generated code에 영향을 주는 API rename은 확인되지 않았다.
 
-이 워크벤치는 ADK 2.0 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
+이 워크벤치는 ADK 2.3 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
 
 ## Workbench Graph Model
 
@@ -47,13 +48,18 @@ Skill-led 실행은 검토 artifact를 `artifacts/af/<req-id>/` 아래에 둘 �
 `module_category`는 책임의 종류를 나타내고, `runtime_binding`은 module candidate 또는 catalog entry의 실행/연결 방식을 나타낸다.
 Graph IR 노드별 실제 호출 방식은 `invoke_binding`과 `call_control`을 우선 읽는다.
 
-- `runtime_binding: direct_api`: 실제 API/EAI client로 보강될 호출 경계다. 생성 skeleton에는 endpoint나 credential을 넣지 않는다.
-- `runtime_binding: mcp_tool`: MCP server/tool 계약으로 호출한다. 로컬 skeleton smoke에서는 Mock Lab binding을 통해 synthetic tool을 호출할 수 있다.
-- `runtime_binding: local_function`: 로컬 함수 placeholder 또는 개발자 보강 경계다.
-- `runtime_binding: workflow_call`: 기존 Workflow 또는 생성 예정 Workflow skeleton을 호출하는 parent graph node다.
-- `runtime_binding: remote_a2a`: Remote A2A 방식으로 호출되는 runtime contract다.
-- `runtime_binding: ui_input`: 사람 입력/승인 지점이다.
-- `runtime_binding: unresolved`: 실행 방식이 아직 확정되지 않았다.
+Serialized `runtime_binding` enum:
+
+| value | meaning |
+| --- | --- |
+| `unresolved` | 실행 방식이 아직 확정되지 않았다. |
+| `direct_api` | 실제 API/EAI client로 보강될 호출 경계다. 생성 skeleton에는 endpoint나 credential을 넣지 않는다. |
+| `mcp` | MCP server-level binding 또는 legacy MCP catalog/runtime binding을 나타내는 compatibility 값이다. Graph IR 노드 호출은 가능하면 `invoke_binding`으로 더 구체화한다. |
+| `mcp_tool` | MCP server/tool 계약으로 호출한다. 로컬 skeleton smoke에서는 Mock Lab binding을 통해 synthetic tool을 호출할 수 있다. |
+| `local_function` | 로컬 함수 placeholder 또는 개발자 보강 경계다. |
+| `remote_a2a` | Remote A2A 방식으로 호출되는 runtime contract다. |
+| `workflow_call` | 기존 Workflow 또는 생성 예정 Workflow skeleton을 호출하는 parent graph node다. |
+| `ui_input` | 사람 입력/승인 지점이다. |
 
 공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
 이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
@@ -61,6 +67,47 @@ Graph IR 노드별 실제 호출 방식은 `invoke_binding`과 `call_control`을
 ### Graph invoke binding
 
 Graph IR의 호출 축은 category가 아니라 node-level binding이다.
+
+Serialized `invoke_binding` enum:
+
+| value | meaning |
+| --- | --- |
+| `unresolved` | 호출 방식 미확정. |
+| `local_python` | generated/local Python wiring boundary. |
+| `direct_api` | API/EAI 등 직접 호출 경계. |
+| `mcp_tool` | Workflow가 고정한 단일 MCP tool 호출. |
+| `mcp_toolset` | Agent가 LLM으로 선택할 수 있는 MCP toolset. |
+| `local_function` | local function placeholder 또는 utility call. |
+| `internal_workflow` | 기존 Workflow 또는 생성 예정 Workflow skeleton 호출. |
+| `ui_input` | Workbench/user input boundary. |
+| `remote_a2a` | Remote A2A protocol call. |
+| `callback_wait` | callback wait/resume boundary. |
+| `unknown` | 호출 방식이 알려지지 않음. |
+
+Serialized `decision_owner` enum:
+
+| value | meaning |
+| --- | --- |
+| `workflow_code` | Workflow code 또는 deterministic graph가 선택한다. |
+| `llm` | LLM이 선택한다. |
+| `human` | 사람이 선택한다. |
+| `remote_agent` | remote agent가 선택한다. |
+| `system` | runtime/system policy가 선택한다. |
+| `unknown` | 선택 주체가 알려지지 않았다. |
+
+Serialized `call_control` enum:
+
+| value | meaning |
+| --- | --- |
+| `none` | 별도 호출 제어가 없다. |
+| `fixed_by_workflow` | Workflow가 호출 대상을 고정한다. |
+| `selected_by_llm` | LLM이 호출 대상을 선택한다. |
+| `selected_by_human` | 사람이 호출 대상을 선택한다. |
+| `event_callback` | callback event로 재개된다. |
+| `resume` | resume path를 나타낸다. |
+| `unknown` | 호출 제어가 알려지지 않았다. |
+
+Common combinations:
 
 - `invoke_binding: mcp_tool` + `call_control: fixed_by_workflow`: Workflow가 정한 단일 MCP tool을 `adapter_call` 노드가 호출한다. Mock Lab smoke 연결은 `mock_binding.provider: mock_lab`로만 저장한다.
 - `invoke_binding: mcp_toolset` + `call_control: selected_by_llm`: Agent가 승인된 MCP toolset 중에서 런타임에 tool을 선택한다. 이 경우 호출 선택권은 `decision_owner: llm`인 agent/toolset path에 있고, deterministic `adapter_call`로 모델링하지 않는다.
@@ -83,11 +130,16 @@ Catalog hydration(`useCatalog`)은 이름 기준으로 중복을 제거하면서
 
 `AnalysisResult.runtimeContracts`는 callback과 runtime support 경계를 검토하는 별도 artifact다. 다음 항목은 top-level `module_category`를 새로 만들지 않아도 Runtime 계약으로 검토할 수 있다.
 
-- MCP/EAI/Legacy Adapter contract
-- Context Manager contract
-- Callback Broker contract
-- ADK callback responsibilities
-- async resume contract
+Serialized `runtime_contract_kind` enum:
+
+| value | meaning |
+| --- | --- |
+| `mcp_legacy_adapter` | MCP 또는 legacy adapter runtime contract. |
+| `eai_legacy_adapter` | EAI/legacy adapter runtime contract. |
+| `context_manager` | Context Manager contract. |
+| `callback_broker` | Callback Broker contract. |
+| `adk_callback` | ADK callback responsibilities. |
+| `async_resume` | async resume contract. |
 
 필수 Runtime 계약은 `contract_status: approved`가 되기 전까지 scaffold-plan의 blocker로 남는다. 실제 endpoint, credential, private customer payload, deployment script는 이 artifact에 넣지 않는다.
 
@@ -114,7 +166,7 @@ Workflow는 큰 의미의 Workflow Agent 경계다.
 그 작은 흐름은 `processFlow` Graph IR의 `node_kind`, `container_kind`, `edge_kind`, `execution_semantics`로 표현한다.
 
 - `orchestration`: 여러 Agent/Adapter/Workflow를 상위에서 조율하지만 아직 명시적 graph topology가 핵심 산출물이 아닐 때.
-- `graph`: ADK 2.0 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
+- `graph`: ADK 2.3 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
 - `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
 - `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
 
@@ -125,6 +177,29 @@ Generator가 만드는 dynamic Python은 `@node` + `ctx.run_node(...)` wiring sk
 ## Graph IR call nodes
 
 Workbench Graph IR는 책임 분류와 실행 노드를 분리한다.
+
+Serialized `node_kind` enum:
+
+| value | meaning |
+| --- | --- |
+| `input` | graph input boundary. |
+| `output` | graph output boundary. |
+| `agent` | Workflow 안의 판단/추론 노드. |
+| `function` | local function or generated helper node. |
+| `tool` | legacy/tool compatibility node. |
+| `adapter` | legacy adapter compatibility node. |
+| `adapter_call` | Workflow가 고정 호출하는 Adapter capability node. |
+| `human_input` | 사람 입력/승인 node. |
+| `callback_wait` | callback wait/resume node. |
+| `workflow` | legacy workflow compatibility node. |
+| `workflow_call` | 공식 subworkflow/existing workflow call node. |
+| `remote_a2a` | Remote A2A endpoint/facade node. |
+| `remote_agent_call` | Remote A2A 계약을 가진 외부 Agent call node. |
+| `join` | fan-in/join node. |
+| `router` | 조건 분기 node. |
+| `loop_control` | loop decision/control node. |
+
+The bullets below are authoring guidance for the primary call-node patterns, not a complete enum list.
 
 - `node_kind: agent`: Workflow 안의 판단/추론 노드다. LLM이 toolset을 고르는 경우 `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`으로 표현한다.
 - `node_kind: adapter_call`: Workflow가 고정 호출하는 Adapter capability 노드다. 단일 MCP tool 호출은 `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`로 표현하고 Mock Lab 연계는 `mock_binding`에 저장한다.
@@ -146,6 +221,23 @@ Mock Lab은 `packages/mock-lab`의 local test double이며 catalog runtime contr
 
 `side_effect`와 `policy`는 node-level governance summary다.
 이 필드는 그래프 검토와 UI 배지에 필요한 요약만 담고, auth/timeout/retry/fallback/data policy/callback resume 같은 source of truth는 `AnalysisResult.runtimeContracts`와 Remote A2A contract artifact에 둔다.
+
+## Graph IR edge kinds
+
+Serialized `edge_kind` enum:
+
+| value | meaning |
+| --- | --- |
+| `event_output` | normal event/output transition. |
+| `event_message` | event/message transition. |
+| `session_state` | ADK session state channel. |
+| `temp_state` | ADK temporary state channel. |
+| `user_state` | ADK user state channel. |
+| `app_state` | ADK app state channel. |
+| `artifact` | artifact save/load channel. |
+| `route` | router branch decision edge. |
+| `control` | control-flow edge such as loop/back/exit. |
+| `remote_a2a` | Remote A2A boundary-crossing edge. |
 
 ## adapter_kind
 

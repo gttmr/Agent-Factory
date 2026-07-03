@@ -4,8 +4,9 @@ import { emitConnectedAdapterFunc } from "./connected-adapter.mjs";
 import { emitFunctionNodeDecl, emitStubFunc } from "./function-node.mjs";
 import { emitHumanInputFunc, emitHumanInputNodeDecl } from "./hitl.mjs";
 import { emitRouteFunc, emitRouterNodeDecl } from "./router.mjs";
+import { emitTerminalOutputFunc, emitTerminalOutputNodeDecl } from "./terminal-output.mjs";
 
-export function emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes }) {
+export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes, terminalOutputNodes = [] }) {
   const nodeBlocks = [];
   const funcBlocks = [];
 
@@ -18,17 +19,18 @@ export function emitRunnableNodeBlocks(context, { orderedModules, humanInputNode
   // agents are declared inline). Emission order — module nodes in graph order,
   // then human-input nodes — is preserved.
   const NODE_LOWERING = {
-    agent: { emitFunc: () => null, emitDecl: (module) => emitAgentNode(module, context) },
+    agent: { emitFunc: () => null, emitDecl: (target) => emitAgentNode(target, context) },
     connected_adapter: {
-      emitFunc: (module) => emitConnectedAdapterFunc(module, context),
+      emitFunc: (target) => emitConnectedAdapterFunc(target, context),
       emitDecl: emitFunctionNodeDecl
     },
-    stub_function: { emitFunc: (module) => emitStubFunc(module, context), emitDecl: emitFunctionNodeDecl },
+    stub_function: { emitFunc: (target) => emitStubFunc(target, context), emitDecl: emitFunctionNodeDecl },
     human_input: { emitFunc: (node) => emitHumanInputFunc(node, context), emitDecl: emitHumanInputNodeDecl },
     router: { emitFunc: (node) => emitRouteFunc(node, context), emitDecl: emitRouterNodeDecl },
+    terminal_output: { emitFunc: emitTerminalOutputFunc, emitDecl: emitTerminalOutputNodeDecl },
     remote_a2a: {
       emitFunc: () => null,
-      emitDecl: (module) => emitRemoteA2aNode({ analysisResult: context.analysisResult, module })
+      emitDecl: (target) => emitRemoteA2aNode({ analysisResult: context.analysisResult, target })
     }
   };
   const emitNode = (role, target) => {
@@ -39,9 +41,10 @@ export function emitRunnableNodeBlocks(context, { orderedModules, humanInputNode
     nodeBlocks.push(handler.emitDecl(target));
   };
 
-  for (const module of orderedModules) emitNode(moduleLoweringRole(module), module);
+  for (const spec of orderedNodeSpecs) emitNode(moduleLoweringRole(spec.module), spec);
   for (const node of humanInputNodes) emitNode("human_input", node);
   for (const node of routerNodes) emitNode("router", node);
+  for (const node of terminalOutputNodes) emitNode("terminal_output", node);
 
   return { nodeBlocks, funcBlocks };
 }

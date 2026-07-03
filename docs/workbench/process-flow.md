@@ -1,6 +1,6 @@
 # Process Flow
 
-Process Flow는 `AnalysisResult.processFlow`에 저장되는 ADK 2.0 Graph IR artifact다.
+Process Flow는 `AnalysisResult.processFlow`에 저장되는 ADK 2.3 Graph IR artifact다.
 필드 이름은 migration compatibility 때문에 `processFlow`를 유지하지만, 내부 shape는 legacy stage-flow가 아니다.
 
 ## Graph IR Root

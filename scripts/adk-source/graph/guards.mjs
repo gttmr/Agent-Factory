@@ -122,7 +122,7 @@ export function assertRunnableGraphSupported(context) {
   }
 }
 
-export function assertNoSymbolCollisions(orderedModules, syntheticNodes = []) {
+export function assertNoSymbolCollisions(orderedNodeSpecs, syntheticNodes = []) {
   const seen = new Map();
   const check = (owner, symbols) => {
     for (const [kind, value] of symbols) {
@@ -133,13 +133,19 @@ export function assertNoSymbolCollisions(orderedModules, syntheticNodes = []) {
       seen.set(key, owner);
     }
   };
-  for (const module of orderedModules) {
-    check(module.id, [
-      ["node symbol", nodeSymbol(module)],
-      ["function name", funcName(module)],
-      ["node name", pyNodeName(module)],
-      ["state key", stateKey(module)]
+  const modulesById = new Map();
+  for (const spec of orderedNodeSpecs) {
+    const module = spec.module ?? spec;
+    const owner = spec.node?.id ?? module.id;
+    modulesById.set(module.id, module);
+    check(owner, [
+      ["node symbol", nodeSymbol(spec)],
+      ["function name", funcName(spec)],
+      ["node name", pyNodeName(spec)]
     ]);
+  }
+  for (const module of modulesById.values()) {
+    check(module.id, [["state key", stateKey(module)]]);
   }
   for (const node of syntheticNodes) {
     if (!node || node.explicit === false) {

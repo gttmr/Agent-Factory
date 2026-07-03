@@ -6,6 +6,7 @@ import {
   useStartRuntimeA2a,
   useStopRuntimeA2a
 } from "../../state/useRuntimeA2a";
+import { MockLabPrerequisiteRows } from "./MockLabPrerequisiteRows";
 import type { RuntimeA2aProviderTarget } from "./runtimeA2aProviderTarget";
 import { type RemoteInputRequiredView, remoteInputRequiredView, runtimeResumeFormView } from "./runtimeInputRequiredView";
 
@@ -114,6 +115,11 @@ export function RuntimeA2aProviderPanel({ consumerReqId, target, status, inputRe
       {!status?.installed && status?.setup_hint ? (
         <p className="af-landing-message">{status.setup_hint}</p>
       ) : null}
+      <MockLabPrerequisiteRows
+        prerequisites={status?.server.mock_lab_prerequisites}
+        invalidateQueryKeys={target ? [["af", target.reqId, "runtime-a2a"]] : []}
+        onActionMessage={onActionMessage}
+      />
       <div className="af-action-row">
         <Button type="button" variant="primary" disabled={!status?.installed || startA2a.isPending} onClick={handleStartA2a}>
           {startA2a.isPending ? "시작 중…" : "A2A provider 시작"}

@@ -10,6 +10,7 @@ export interface RuntimeChatStatus {
   installed: boolean;
   install_supported: boolean;
   setup_hint: string;
+  mock_lab_prerequisites: RuntimeChatMockLabPrerequisite[];
   paths: {
     runtime_stub_dir: string;
     venv: string;
@@ -32,6 +33,18 @@ export interface RuntimeChatStatus {
     stdout_tail: string;
     stderr_tail: string;
   };
+}
+
+export interface RuntimeChatMockLabPrerequisite {
+  readonly mock_server_id: string;
+  readonly status: "missing" | "stopped" | "running";
+  readonly running: boolean;
+  readonly start_action: {
+    readonly method: "POST";
+    readonly url: string;
+  };
+  readonly mcp_url: string;
+  readonly message: string | null;
 }
 
 export interface RuntimeChatInstallResult {

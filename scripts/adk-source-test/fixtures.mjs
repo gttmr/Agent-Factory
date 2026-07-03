@@ -1,8 +1,11 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeBundleFiles } from "../adk-source/bundle-writer.mjs";
+import { loadArtifactContext } from "../adk-source/context.mjs";
+import { buildFiles } from "../adk-source/file-builder.mjs";
+import { updateRunManifest } from "../adk-source/run-manifest.mjs";
 
 export const scriptsRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const repoRoot = join(scriptsRoot, "..");
@@ -148,12 +151,20 @@ export function generate({ runnable, connectedAdapter = false, agentExecutionMod
   try {
     writeFixture(artifactRoot, { runnable, connectedAdapter, agentExecutionMode });
     const outputRoot = join(artifactRoot, "runtime-stub");
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    generateBundle(artifactRoot, outputRoot);
     return { artifactRoot, outputRoot };
   } catch (error) {
     rmSync(artifactRoot, { recursive: true, force: true });
     throw error;
   }
+}
+
+export function generateBundle(artifactRoot, outputRoot) {
+  const artifactContext = loadArtifactContext(artifactRoot);
+  const { runManifest, packageName } = artifactContext;
+  const files = buildFiles({ artifactRoot, outputRoot, ...artifactContext });
+  writeBundleFiles(outputRoot, files);
+  updateRunManifest({ artifactRoot, outputRoot, packageName, runManifest });
 }
 
 export function discoverGeneratedPackage(root) {

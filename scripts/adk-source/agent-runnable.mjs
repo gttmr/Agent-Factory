@@ -2,7 +2,7 @@ import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mj
 import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
 import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
-import { graphIndexes, orderedGraphModules } from "./graph/indexes.mjs";
+import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
 import { usesRoutes } from "./graph/routes.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
@@ -24,17 +24,29 @@ export function buildRunnableAgentPy(context) {
   const { edges, joins } = buildRunnableGraph(graphContext);
   const graph = graphIndexes(graphContext);
   const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedModules = orderedGraphModules(graphContext, { excludeModuleIds: toolsetAdapterIds });
+  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
+  const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
   const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
   const autoJoins = joins.filter((join) => join.explicit === false);
-  assertNoSymbolCollisions(orderedModules, [...humanInputNodes, ...routerNodes, ...explicitJoinNodes, ...autoJoins]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, { orderedModules, humanInputNodes, routerNodes });
+  assertNoSymbolCollisions(orderedNodeSpecs, [
+    ...humanInputNodes,
+    ...routerNodes,
+    ...terminalOutputNodes,
+    ...explicitJoinNodes,
+    ...autoJoins
+  ]);
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
+    orderedNodeSpecs,
+    humanInputNodes,
+    routerNodes,
+    terminalOutputNodes
+  });
 
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = workflowEdgeLiteral(edges);
-  const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.1 워크플로우입니다: ${truncate(
+  const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.3 워크플로우입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
 
@@ -45,7 +57,8 @@ export function buildRunnableAgentPy(context) {
   const usesRouteNodes = usesRoutes(processFlow);
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
-  const artifactGenaiImport = usesArtifacts ? "from google.genai import types\n" : "";
+  const usesTerminalOutputs = terminalOutputNodes.length > 0;
+  const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a(modules)
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
@@ -55,7 +68,7 @@ export function buildRunnableAgentPy(context) {
   const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
     ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
     : "";
-  const eventImport = usesRouteNodes || usesRemoteAuth ? "Event, RequestInput" : "RequestInput";
+  const eventImport = usesRouteNodes || usesRemoteAuth || usesTerminalOutputs ? "Event, RequestInput" : "RequestInput";
 
   return `from __future__ import annotations
 

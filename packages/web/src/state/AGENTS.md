@@ -14,7 +14,7 @@ discovery.
 | HTTP wrapper | `apiClient.ts` |
 | Query client setup | `queryClient.ts` |
 | Artifact root and recent roots | `useArtifactRoot.ts`, `useRecentRoots.ts` |
-| Analysis artifact lifecycle | `useAnalysisArtifact.ts`, `useAnalyze.ts` |
+| Analysis artifact lifecycle | `useAnalysisArtifact.ts` |
 | Manifest approval gates | `useApprovalGate.ts` |
 | Stage Runner | `useStageRunner.ts`, `useStreamingProcess.ts` |
 | Catalog and publish | `useCatalog.ts`, `useCatalogDelta.ts`, `useCatalogPublish.ts` |

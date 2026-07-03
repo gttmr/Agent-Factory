@@ -10,7 +10,7 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 2. [Taxonomy](./workbench/taxonomy.md)
    `module_category`, subtype enum, catalog runtime binding의 단일 활성 기준이다.
 3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
-   ADK 2.0 baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
+   ADK 2.3 baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
 4. [ADK Agent Execution Modes](./workbench/adk-agent-execution-modes.md)
    ADK `LlmAgent.mode`를 Graph IR와 runnable source 생성에서 해석하는 기준이다. Graph node 기본은 `single_turn`, `chat`은 session-history를 암묵 입력으로 받는 stateful node, `task`는 static graph node가 아니라 coordinator/sub-agent topology라는 정책을 정의한다.
 5. [Process Flow](./workbench/process-flow.md)
@@ -55,5 +55,5 @@ Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로�
 - Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
 - Shared schemas: [../schemas](../schemas)
 - Live analyzer compact draft schema: [../schemas/analysis-draft.schema.json](../schemas/analysis-draft.schema.json)
-- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. ADK 2.0 문서를 우선 조회하고 ADK 1.x 문서는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
+- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. 현재 target은 ADK 2.3이며, ADK 2.0 GA 문서는 graph/dynamic/A2A 분류의 역사적 기준으로만 사용한다. ADK 1.x 문서는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
 - Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files. The AF DLC stage skills are active operating entrypoints; `_shared` is reference material only.
