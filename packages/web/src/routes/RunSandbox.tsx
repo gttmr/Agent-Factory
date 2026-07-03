@@ -11,6 +11,7 @@ import {
   useStopRuntimeChat
 } from "../state/useRuntimeChat";
 import { useRuntimeA2aStatus } from "../state/useRuntimeA2a";
+import { MockLabPrerequisiteRows } from "./run/MockLabPrerequisiteRows";
 import { RuntimeA2aProviderPanel } from "./run/RuntimeA2aProviderPanel";
 import { runtimeA2aProviderTarget } from "./run/runtimeA2aProviderTarget";
 import { remoteInputRequiredView } from "./run/runtimeInputRequiredView";
@@ -128,6 +129,11 @@ export default function RunSandbox() {
             {!chatStatus.data?.installed && chatStatus.data?.setup_hint ? (
               <p className="af-landing-message">{chatStatus.data.setup_hint}</p>
             ) : null}
+            <MockLabPrerequisiteRows
+              prerequisites={chatStatus.data?.mock_lab_prerequisites}
+              invalidateQueryKeys={[["af", reqId, "runtime-chat"]]}
+              onActionMessage={setActionMessage}
+            />
             <div className="af-action-row">
               <Button
                 type="button"

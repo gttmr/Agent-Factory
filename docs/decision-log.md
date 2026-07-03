@@ -28,6 +28,12 @@
 - **배경**: Graph IR canonical validator와 `scripts/validate-artifacts.mjs`는 scenario-d loop decision metadata를 허용하지만 server import validator만 route edge로 제한해 같은 artifact가 import surface에서 422로 거부됐다.
 - **영향**: Server import gate parity only. Plain non-route/non-loop-decision edge metadata는 계속 거부한다.
 
+## 2026-07-03 · PR TBD — RunSandbox surfaces Mock Lab prerequisites before runtime start
+
+- **결정**: `/af/:reqId/run`의 runtime-chat status도 reviewed `runtime-stub/scaffold-plan.json`에서 요구되는 Mock Lab MCP server를 보고하고, RunSandbox는 미실행 prerequisite을 ADK runtime 시작 버튼 위에 `시작` action과 함께 표시한다. A2A provider 패널도 이미 status에 포함된 prerequisite entry와 start action을 같은 행 패턴으로 렌더한다.
+- **배경**: generated ADK bundle은 Mock Lab MCP adapter가 중지되어도 `mcp_degraded` payload로 graceful degrade할 수 있지만, 사용자는 실행 전에 필수 Mock Lab server가 꺼져 있다는 힌트를 받지 못했다.
+- **영향**: runtime-chat status API/client type, RunSandbox prerequisite row, A2A provider prerequisite row, active run-screen docs. Generator, schemas, approvals, stage logic은 변경하지 않는다.
+
 ## 2026-07-03 · PR TBD — Design stepper separates runner completion from Graph IR availability
 
 - **결정**: Design StageShell의 `1. 실행` 완료 표시는 Graph IR 존재가 아니라 completed/applied `stage_runs.design` 또는 reviewer의 명시적 step 진행을 기준으로 한다. Imported `analysis-result.json.processFlow`는 `2. 검토` 접근 가능 조건으로만 쓰며, active `3. 승인` step은 review 조건이 부족해도 `잠김`이 아니라 `현재`로 표시한다.

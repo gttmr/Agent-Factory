@@ -32,6 +32,8 @@ try {
     `${JSON.stringify({ package: "req_chat_adk" }, null, 2)}\n`,
     "utf8"
   );
+  await writeRequiredMockScaffoldPlan(stubDir, "wf-chat-mock");
+  await writeMockLabServerState("wf-chat-mock", "stopped");
   const statusPort = await getAvailablePort();
   const manager = new RuntimeChatManager({ repoRoot, store, port: statusPort });
   const status = await manager.status("req-chat");
@@ -49,6 +51,22 @@ try {
   assert.equal(status.paths.venv, join(repoRoot, ".agent-factory/runtime/.venv"));
   assert.equal(status.paths.python, join(repoRoot, ".agent-factory/runtime/.venv/bin/python"));
   assert.equal(status.paths.adk, join(repoRoot, ".agent-factory/runtime/.venv/bin/adk"));
+  assert.deepEqual(
+    status.mock_lab_prerequisites.map((prerequisite) => ({
+      mock_server_id: prerequisite.mock_server_id,
+      status: prerequisite.status,
+      running: prerequisite.running,
+      start_url: prerequisite.start_action.url
+    })),
+    [
+      {
+        mock_server_id: "wf-chat-mock",
+        status: "stopped",
+        running: false,
+        start_url: "/api/mock-lab/wf-chat-mock/server/start"
+      }
+    ]
+  );
 
   const venv = resolveAdkRuntimeVenv({ repoRoot, platform: "linux", env: {} });
   assert.equal(venv.venvDir, join(repoRoot, ".agent-factory/runtime/.venv"));
@@ -296,4 +314,50 @@ async function waitForListApps(port: number, expected: readonly string[]): Promi
     await delay(50);
   }
   return lastValue;
+}
+
+async function writeRequiredMockScaffoldPlan(stubDir: string, mockServerId: string): Promise<void> {
+  await writeFile(
+    join(stubDir, "scaffold-plan.json"),
+    `${JSON.stringify(
+      {
+        modules: [
+          {
+            id: "mod-required-mock",
+            module_category: "adapter",
+            access_protocol: "mcp",
+            mcp_server: mockServerId,
+            mock_binding: {
+              provider: "mock_lab",
+              mock_server_id: mockServerId,
+              tool_name: "get_scenario_taxonomy",
+              status: "linked"
+            }
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+}
+
+async function writeMockLabServerState(mockServerId: string, status: "running" | "stopped"): Promise<void> {
+  const mockDir = join(repoRoot, "artifacts/mock-lab", mockServerId);
+  await mkdir(mockDir, { recursive: true });
+  await writeFile(join(mockDir, "mock-spec.json"), `${JSON.stringify({ mock_id: mockServerId, tools: [] }, null, 2)}\n`, "utf8");
+  await writeFile(
+    join(mockDir, "server-state.json"),
+    `${JSON.stringify(
+      {
+        mock_id: mockServerId,
+        status,
+        pid: status === "running" ? process.pid : null
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
 }
