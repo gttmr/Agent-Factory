@@ -12,6 +12,12 @@ For Agent Factory-specific harness rules, also read `docs/workbench/agent-factor
 
 Before source-code edits, check whether the change affects active `docs/` Markdown. Taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, and operating policy changes must update the relevant docs in the same change set. When a change alters a design decision (interface, schema, gate, or UX contract), also append an entry to `docs/decision-log.md` (date · PR · decision · rationale · impact). Leave `docs/archive/**` untouched unless the task explicitly asks for archival or migration work.
 
+## Session environment handoff (new machine bootstrap)
+
+Some project context lives only in the local Claude Code home (`~/.claude/**`), not in git — session memory, plan files, the global development charter, project-local permissions, and MCP/plugin definitions. A synced snapshot of that context is committed under **`docs/handoff/claude-home/`** so a fresh clone on another machine can restore it. On first session in a fresh clone, read `docs/handoff/claude-home/README.md` and follow its restore procedure (memory → `~/.claude/projects/<escaped-repo-path>/memory/`, plans → `~/.claude/plans/`, permissions → `.claude/settings.local.json`, MCP servers per `settings/mcp-servers.md`). That README also lists local-only prerequisites the snapshot deliberately excludes (the `GOOGLE_API_KEY` in `.agent-factory/runtime.env`, the ADK venv, `node_modules`, Codex/gh/Chrome logins).
+
+The snapshot is a mirror, not the source of truth — the live originals are each machine's `~/.claude/**`. When memory or plans change meaningfully, re-copy them into `docs/handoff/claude-home/` and commit ("sync the handoff snapshot"). Treat `docs/handoff/claude-home/**` as a session-environment mirror, **not** workbench product documentation — exclude it from doc-audit / doc-currency sweeps, and never commit secrets into it.
+
 ## Common Commands
 
 The web package is the only buildable artifact. All commands run from `packages/web` unless noted.

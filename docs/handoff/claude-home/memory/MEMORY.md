@@ -1,0 +1,13 @@
+- [Use Codex actively](feedback_codex_usage.md) — delegate non-trivial drafts to codex skill, Claude verifies and integrates
+- [Codex "limit" = Claude's own session](feedback_codex_retry_loop.md) — "hit your session limit · resets HH:mm" from a Codex call is CLAUDE's session cap, not Codex; after resume, re-run Codex freely
+- [Codex-first delegation](feedback_codex_first_delegation.md) — exploration/implementation via codex gpt-5.5 high (xhigh by difficulty); Claude subagents only for MCP-bound work; supersedes old opus default
+- [Commit per PR boundary](feedback_commit_per_pr.md) — Agent Factory workbench refactor: one commit per PR (PR1–PR6), no batching, no push without ask
+- [Worktree merge + final audit](feedback_worktree_merge_and_final_audit.md) — verify clean merge-back before done; end big tasks with subagent+Codex whole-repo doc/contract audit
+- [Codex incremental review](feedback_codex_incremental_review.md) — on big tasks, Codex-review every commit boundary / large source change as it lands, not just at the end; docs in lockstep
+- [chrome-devtools first for UI verify](feedback_browser_tooling_priority.md) — prefer chrome-devtools MCP; Playwright only as temporary fallback when MCP disconnected
+- [Generator must be extensible](feedback_generator_extensible_structure.md) — structure generate-adk-source.mjs as edge/node-kind dispatch; large dynamic-workflow rewrite is coming, additions = one handler
+- [Fresh worktree node_modules](project_fresh_worktree_node_modules.md) — fresh worktree has no deps; symlink web + mock-lab node_modules from main checkout; symlink isn't gitignored so never `git add -A`, stage explicit paths
+- [North star + truth hierarchy](project_north_star_truth_hierarchy.md) — 5 live-demo criteria (graph collab, NL via skill path, manual edit, friendly UX, adk web real demo); runtime > adk.dev > code > repo docs
+- [ADK runtime env](project_adk_runtime_env.md) — baseline ADK 2.3 (venv has 2.3.0); GOOGLE_API_KEY in .agent-factory/runtime.env (never print); requirements floor still >=2.1.0
+- [2026-07 audit landed](project_integration_branch_2026_07.md) — PR #56 merged to main 23dd34b (15 clusters + stage-run narrative); branches/worktrees cleaned; next backlog in ~/.claude/plans/af-next-steps-2026-07-04.md
+- [ADK node JSON-serializable constraint](reference_adk_node_json_serializable.md) — node outputs feeding an LlmAgent must be JSON-safe (no genai Content/node_input echo); emit chat text via yield Event(content=...); verify generator changes at real adk runtime, not just unit tests

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(codex:rescue)",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__close_page",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__adk-docs__list_doc_sources",
+      "mcp__adk-docs__fetch_docs",
+      "Bash(printf '\\\\n# GitHub MCP server \\(plugin:github\\) token, pulled from gh credential store\\\\nexport GITHUB_PERSONAL_ACCESS_TOKEN=\"$\\(gh auth token\\)\"\\\\n')",
+      "Read(//home/ilmaswsl/**)"
+    ]
+  }
+}
