@@ -12,7 +12,12 @@ export function routeCasesFor(processFlow, nodeId) {
     const value = routeValue(edge);
     if (seen.has(value)) continue;
     seen.add(value);
-    routes.push({ value, aliases: routeAliases(value, edge), isDefault: edge.is_default_route === true });
+    routes.push({
+      value,
+      aliases: routeAliases(value, edge),
+      isDefault: edge.is_default_route === true,
+      stateKey: typeof edge.state_key === "string" && edge.state_key.trim() ? edge.state_key.trim() : null
+    });
   }
   return routes;
 }
@@ -27,7 +32,7 @@ export function routeValue(edge) {
 
 export function routeAliases(value, edge = null) {
   const normalized = String(value).trim().toLowerCase();
-  const aliases = new Set([normalized, normalized.replace(/_/g, " ")]);
+  const aliases = new Set([normalized, normalized.replace(/_/g, " "), normalized.replace(/_/g, "-")]);
   for (const alias of Array.isArray(edge?.route_aliases) ? edge.route_aliases : []) {
     if (typeof alias === "string" && alias.trim()) aliases.add(alias.trim().toLowerCase());
   }

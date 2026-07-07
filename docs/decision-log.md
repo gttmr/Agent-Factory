@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-07 · PR TBD — Remote A2A owner state gates precede Super Agent routing
+
+- **결정**: Remote A2A를 호출한 workflow는 Super Agent LLM 판단 전에 `active_a2a_task` 같은 ADK session state를 읽는 owner route를 둔다. Active task가 있으면 task-state router와 Remote A2A continuation/resume lane으로 보내고, Super Agent는 첫 입력·일반 채팅·terminal task state 이후에만 다시 진입한다.
+- **배경**: Super Agent가 먼저 실행되면 A2A task가 `input-required` 또는 `working` 상태인 다음 사용자 입력도 새 일반 채팅/새 A2A 판단으로 흘러가 기존 task/context를 잃을 수 있다. 미해결 task는 완료 기준이 충족될 때까지 같은 A2A owner 아래에서 반복되어야 한다.
+- **영향**: `req-adk-a2a-chat-ui-workflow` Graph IR, runtime handoff projection, route generator state-key lowering, workflow decision guide. Canonical artifact에는 unresolved-task loop를 유지하고, 현재 static runnable handoff는 acyclic projection warning을 남긴다.
+
 ## 2026-07-03 · PR TBD — dynamic runnable workflows emit terminal completion
 
 - **결정**: Dynamic runnable generator는 reviewed Graph IR `output` node를 shared terminal-output emitter로 낮추고, `dynamic_workflow`가 loop exit 이후 terminal `FunctionNode`를 실행한 뒤 JSON-safe payload를 반환한다.

@@ -119,6 +119,18 @@ Mock Lab은 repo 내부 `packages/mock-lab`의 local test double 기능이며, �
 
 Runnable skeleton generator는 이 static user-confirmation route를 ADK `RequestInput`, `Event(route=...)`, Workflow route map으로 lower한다. Generator는 업무별 route alias를 하드코딩하지 않고 reviewed Graph IR 필드만 사용한다. 반복은 reviewed `loop_region`/`loop_control`/`loop_back`/`loop_exit` shape가 있을 때 내부 dynamic workflow builder로 lower한다.
 
+## State-first owner gates
+
+Remote A2A task를 시작한 workflow는 다음 사용자 turn을 바로 LLM 판단으로 보내지 않는다. 먼저 ADK session state에 저장한 `active_a2a_task` 같은 owner/task key를 읽는 `router` node를 둔다.
+
+표현 방식:
+
+- 첫 입력, active task 없음, terminal task state는 Super Agent 또는 일반 chat agent branch로 보낸다.
+- submitted, working, input-required, auth-required 같은 active task state는 A2A task-state router로 보낸다.
+- 사용자가 main composer에 입력했더라도 active task가 terminal이 아니면 같은 task/context로 continuation 또는 resume을 보낸다.
+- 문제 해결 여부가 불확실하면 `loop_region`, `loop_control`, `loop_back`, `loop_exit`로 canonical loop를 표현한다.
+- Runnable generator가 현재 static Workflow 제약 때문에 loop를 직접 lower하지 못하면 reviewed artifact에는 canonical loop를 유지하고, runtime handoff는 acyclic projection과 validation warning으로 제한을 드러낸다.
+
 ## ADK MCP 사용 주의
 
 ADK 공식 문서는 repo에 복제하지 않는다.
