@@ -77,11 +77,11 @@ test("runnable lowers a user-confirmation route without joining branch convergen
     assert.doesNotMatch(source, /"previous": node_input/);
     assert.match(source, /"response": _hitl_response/);
     assert.match(source, /node_confirm = FunctionNode\(func=_hitl_confirm, name="confirm", rerun_on_resume=True\)/);
-    assert.match(source, /def _route_analysis_router\(node_input=None\):/);
+    assert.match(source, /def _route_analysis_router\(ctx: Context, node_input=None\):/);
     assert.match(source, /for key in \("response", "choice", "value"\):/);
     assert.match(source, /text = _route_decision_text\(node_input\)/);
-    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "담당자 승인"\]\):/);
-    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "분석 생략"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "run-analysis", "담당자 승인"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "skip-analysis", "분석 생략"\]\):/);
     assert.match(source, /Event\(route="run_analysis", output=_json_safe_node_value\(node_input\)\)/);
     assert.match(source, /return Event\(route="skip_analysis", output=_json_safe_node_value\(node_input\)\)/);
     assert.doesNotMatch(source, /"분석 실행"/);
@@ -168,8 +168,68 @@ test("runnable leaves numeric route-choice input untyped so ADK Web accepts numb
     assert.doesNotMatch(source, /RequestInput\([^)]*response_schema=str/s);
     assert.match(source, /for key in \("response", "choice", "value"\):/);
     assert.match(source, /return str\(value\)\.strip\(\)\.lower\(\)/);
-    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "1", "분석 실행"\]\):/);
-    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "2", "분석 없이 진행"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["run_analysis", "run analysis", "run-analysis", "1", "분석 실행"\]\):/);
+    assert.match(source, /if any\(alias and alias in text for alias in \["skip_analysis", "skip analysis", "skip-analysis", "2", "분석 없이 진행"\]\):/);
+  } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("runnable lowers state-key route edges as ADK session-state ownership checks", () => {
+  const { agentBase, unconnectedAdapter } = channelModules();
+  const modules = [
+    { ...unconnectedAdapter, id: "mod-registry", name: "Registry_Adapter" },
+    { ...agentBase, id: "mod-super", name: "Super_Agent" },
+    { ...unconnectedAdapter, id: "mod-task", name: "Task_State_Adapter" }
+  ];
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-state-route-"));
+  try {
+    writeChannelFixture(artifactRoot, {
+      modules,
+      nodes: [
+        { id: "in1", node_kind: "input" },
+        { id: "registry", node_kind: "adapter", module_id: "mod-registry" },
+        { id: "owner-route", node_kind: "router", module_id: null, label: "active owner route" },
+        { id: "super", node_kind: "agent", module_id: "mod-super" },
+        { id: "task", node_kind: "adapter", module_id: "mod-task" },
+        { id: "out1", node_kind: "output" }
+      ],
+      edges: [
+        { from: "in1", to: "registry" },
+        { from: "registry", to: "owner-route" },
+        {
+          from: "owner-route",
+          to: "task",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "session_state.active_a2a_task is active",
+          route_aliases: ["TASK_STATE_INPUT_REQUIRED", "TASK_STATE_WORKING"],
+          state_key: "active_a2a_task",
+          is_default_route: false
+        },
+        {
+          from: "owner-route",
+          to: "super",
+          edge_kind: "route",
+          execution_semantics: "conditional",
+          route_condition: "session_state.active_a2a_task missing_or_complete",
+          route_aliases: ["super_agent_turn"],
+          is_default_route: true
+        },
+        { from: "task", to: "out1" },
+        { from: "super", to: "out1" }
+      ]
+    });
+    const outputRoot = join(artifactRoot, "out");
+    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
+    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    assert.match(source, /def _route_owner_route\(ctx: Context, node_input=None\):/);
+    assert.match(source, /def _route_state_text\(ctx: Context, state_key: str\) -> str:/);
+    assert.match(source, /ctx\.state\.get\(state_key\)/);
+    assert.match(source, /_state_text_session_state_active_a2a_task_is_active = _route_state_text\(ctx, "active_a2a_task"\)/);
+    assert.match(source, /if any\(alias and alias in _state_text_session_state_active_a2a_task_is_active for alias in \["session_state_active_a2a_task_is_active", "session state active a2a task is active", "session-state.active-a2a-task-is-active", "task_state_input_required", "task_state_working"\]\):/);
+    assert.match(source, /return Event\(route="session_state_active_a2a_task_is_active", output=_json_safe_node_value\(_route_output_value\(ctx, node_input, "active_a2a_task"\)\)\)/);
+    assert.match(source, /\(node_owner_route,\s*\{\s*"session_state_active_a2a_task_is_active": node_mod_task,\s*"session_state_active_a2a_task_missing_or_complete": agent_mod_super,\s*\}\s*\)/s);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
