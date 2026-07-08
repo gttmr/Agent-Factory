@@ -62,17 +62,6 @@ export const runtimeContractKindLabels: Record<RuntimeContractKind, string> = {
   async_resume: "Async Resume"
 };
 
-export const classificationRules: Record<ModuleCategory, string> = {
-  agent:
-    "판단, 요약, 분류, 추천, triage처럼 reasoning responsibility가 있는 단위에 사용합니다.",
-  workflow:
-    "큰 의미의 Workflow Agent입니다. orchestration, graph, dynamic 중 하나로 분류하고, 순차/병렬/반복/사람 승인 같은 작은 흐름은 Graph IR 노드와 엣지로 표현합니다.",
-  adapter:
-    "API call, retrieval, managed rules, data query, template, computation, external service처럼 Agent나 Workflow가 호출하는 capability에 사용합니다.",
-  remote_a2a:
-    "독립 소유 remote agent boundary가 있고 protocol contract, lifecycle, auth, timeout, retry, fallback, audit 세부 정보가 있을 때만 사용합니다."
-};
-
 export function getCandidateSubtype(candidate: ModuleCandidate): string | null {
   if (candidate.module_category === "adapter" && candidate.adapter_kind) {
     return adapterKindLabels[candidate.adapter_kind];

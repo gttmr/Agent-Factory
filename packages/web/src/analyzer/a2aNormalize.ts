@@ -14,6 +14,7 @@
 // - Drop orphan contracts whose `remote_module_id` does not match any
 //   candidate, and report each removal.
 
+import { A2A_RUNTIME_AUTH_MODES, A2A_RUNTIME_FALLBACK_MODES } from "./types";
 import type { AnalysisResult, A2AContract, A2ARuntimePolicy, ModuleCandidate } from "./types";
 
 // Required candidate fields that must carry a non-empty string per spec §5.
@@ -49,9 +50,6 @@ export const A2A_CONTRACT_REQUIRED_STRING_FIELDS = [
   "audit",
   "data_policy"
 ] as const;
-
-const A2A_RUNTIME_AUTH_MODES = ["none", "bearer_env", "metadata_env"] as const;
-const A2A_RUNTIME_FALLBACK_MODES = ["none", "manual_review", "local_event"] as const;
 
 export interface A2ANormalizationDiagnostic {
   /** "candidate_filled" | "contract_filled" | "contract_minted" | "contract_orphan_removed" */
@@ -98,7 +96,7 @@ export function buildDefaultA2ARuntimePolicy(): A2ARuntimePolicy {
  * (spec §5 explicitly allows null). The `remote_module_id` and `contract_id`
  * are filled by the caller.
  */
-export function buildPlaceholderContract(contractId: string, remoteModuleId: string): A2AContract {
+function buildPlaceholderContract(contractId: string, remoteModuleId: string): A2AContract {
   return {
     contract_id: contractId,
     remote_module_id: remoteModuleId,
