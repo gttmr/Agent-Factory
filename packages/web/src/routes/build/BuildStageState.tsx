@@ -38,7 +38,7 @@ export function useBuildStageState(reqId: string | undefined): BuildStageState {
   const stubReady = runtimeStubFileCount > 0;
   const stubApproved = manifest?.approvals.stub_ready_for_followup ?? false;
   const defaultStep: BuildStepId = !stubReady ? "run" : !stubApproved ? "review" : "approve";
-  const [activeStep, setActiveStep] = useStageStep([...BUILD_STEP_IDS], defaultStep);
+  const [activeStep, setActiveStep] = useStageStep(BUILD_STEP_IDS, defaultStep);
 
   return {
     activeStep,

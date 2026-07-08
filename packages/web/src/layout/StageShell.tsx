@@ -56,7 +56,7 @@ const stepStatusLabel: Record<StageStepStatus, string> = {
  * `?step=` 쿼리 파라미터로 활성 스텝을 얕게 관리한다. 파라미터가 없거나
  * 유효하지 않으면 `fallback`(보통 첫 미완료 스텝)으로 착지한다 — 강한 가이드.
  */
-export function useStageStep(stepIds: string[], fallback: string): [string, (id: string) => void] {
+export function useStageStep(stepIds: readonly string[], fallback: string): [string, (id: string) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get("step");
   const active = raw && stepIds.includes(raw) ? raw : fallback;

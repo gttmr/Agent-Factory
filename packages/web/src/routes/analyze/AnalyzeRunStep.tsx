@@ -1,6 +1,6 @@
 import { StageRunnerPanel } from "../../components/StageRunnerPanel";
 import { Button, Field, TextareaField } from "../../ui/primitives";
-import type { AnalyzeCatalogEntry } from "../../state/useAnalyze";
+import type { AnalyzeCatalogEntry } from "./analyzeStageModel";
 
 interface AnalyzeRunStepProps {
   reqId: string;

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LocalA2AAgentCard } from "../analyzer/localA2aProvider";
 import { AfApiError } from "./apiClient";
+import type { MockLabPrerequisiteEntry } from "./useRuntimeChat";
 import {
   invalidateRuntimeA2aResumeQueries,
   postRuntimeA2aResumeRequest,
@@ -34,7 +35,7 @@ export interface RuntimeA2aStatus {
     message_send_status: "not_checked" | "ready" | "working" | "interactive_required" | "failed";
     message_send_task_state: string | null;
     message_send_resume: RuntimeA2aMessageSendResume | null;
-    mock_lab_prerequisites: RuntimeA2aMockLabPrerequisite[];
+    mock_lab_prerequisites: MockLabPrerequisiteEntry[];
     message: string | null;
     started_stub_fingerprint: string | null;
     current_stub_fingerprint: string | null;
@@ -49,18 +50,6 @@ export interface RuntimeA2aMessageSendResume {
   readonly interrupt_id: string;
   readonly function_name: string;
   readonly response_schema: unknown | null;
-}
-
-export interface RuntimeA2aMockLabPrerequisite {
-  readonly mock_server_id: string;
-  readonly status: "missing" | "stopped" | "running";
-  readonly running: boolean;
-  readonly start_action: {
-    readonly method: "POST";
-    readonly url: string;
-  };
-  readonly mcp_url: string;
-  readonly message: string | null;
 }
 
 export interface RuntimeA2aAgentCardResult {
