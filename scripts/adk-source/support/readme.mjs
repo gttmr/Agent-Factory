@@ -1,5 +1,6 @@
 import { join, relative } from "node:path";
 import { RUNTIME_MCP_LABEL } from "../context.mjs";
+import { graphIndexes } from "../graph/indexes.mjs";
 import { remoteA2aEnvVars, remoteA2aRuntimeRows } from "../remote-a2a.mjs";
 import { sampleConversationTranscript } from "./samples.mjs";
 
@@ -121,6 +122,7 @@ export function buildImplementationHandoff(context) {
   );
   if (outputMode === "runnable") {
     const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: Mock Lab MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
+    const chatProjection = buildChatProjectionHandoffMarkdown(context);
     return `# 구현 Handoff (runnable mode)
 
 ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었습니다.
@@ -130,6 +132,8 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 - Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Adapter node는 실제 실행 시점에 Mock Lab MCP tool을 호출합니다.
 - 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
 - 모든 실행은 합성 input만 사용합니다.
+
+${chatProjection}
 
 ## 반드시 유지할 경계
 
@@ -162,6 +166,34 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 
 ${todoLines.length ? todoLines.join("\n") : "- 구현 전에 generated TODO_IMPLEMENT_HERE function을 검토하세요."}
 `;
+}
+
+function buildChatProjectionHandoffMarkdown(context) {
+  const rows = projectedChatAgents(context);
+  if (!rows.length) return "";
+  return `## ADK workflow projection
+
+- ADK 2.3 rejects static Workflow wiring where a chat-mode LlmAgent has a non-START predecessor.
+- The generator lowers these reviewed chat agents as \`single_turn\` and adds session-state/history guidance to the agent instruction: ${rows.join(", ")}.
+- Multi-turn continuity must come from reviewed workflow session state/history inputs, not from an extra local HITL branch.
+`;
+}
+
+function projectedChatAgents(context) {
+  const graph = graphIndexes(context.graphContext);
+  const modules = new Map(context.scaffoldPlan.modules.map((module) => [module.id, module]));
+  return graph.moduleNodes
+    .filter((node) => {
+      const module = modules.get(node.module_id);
+      if (!module || module.module_category !== "agent") return false;
+      const mode = module.agent_execution_mode === "chat" || node.agent_execution_mode === "chat" ? "chat" : "single_turn";
+      if (mode !== "chat") return false;
+      return (context.graphContext.processFlow.edges ?? []).some((edge) => {
+        if (edge?.to !== node.id) return false;
+        return graph.nodesById.get(edge.from)?.node_kind !== "input";
+      });
+    })
+    .map((node) => modules.get(node.module_id)?.name ?? node.module_id);
 }
 
 function runtimeEnvRelativePath({ outputRoot }) {

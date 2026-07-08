@@ -101,6 +101,18 @@ def _agent_cfg(module_id: str, key: str, default: Any) -> Any:
     return _override("agents", module_id, key, default)
 
 
+def _agent_cfg_for_node(node_id: str, module_id: str, key: str, default: Any) -> Any:
+    for entry in _CONFIG.get("agents", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("id") != node_id and entry.get("node_id") != node_id:
+            continue
+        value = entry.get(key)
+        if value is not None:
+            return value
+    return _agent_cfg(module_id, key, default)
+
+
 def _llm_cfg() -> dict:
     llm = _CONFIG.get("llm")
     return llm if isinstance(llm, dict) else {}

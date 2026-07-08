@@ -10,11 +10,17 @@
 
 ---
 
+## 2026-07-08 · PR TBD — Route decision prompts expose reviewed route aliases
+
+- **결정**: Agent node가 downstream router를 선택하는 Graph IR에서 generated instruction은 reviewed route edge의 canonical lower-case `route_decision.route_type` 값과 accepted alias를 노출한다. Runtime route matching은 계속 structured fields(`route_decision`, `route_type`, `action`, `route`, `decision`, `choice`, `value`, `response`)에서 추출한 값과 reviewed `route_aliases`만 비교하며, 업무별 route 문자열은 generator에 하드코딩하지 않는다.
+- **배경**: Live QA에서 Super Agent가 structured action `DELEGATE_TO_REMOTE_A2A`를 냈지만, reviewed Remote A2A route alias에는 lower-case `delegate_to_remote_a2a`가 없어 default `super_agent_response` branch로 떨어졌다. Action-style label은 artifact alias로 승인하고, future model output은 canonical `route_decision.route_type` 값을 우선 쓰도록 안내해야 한다.
+- **영향**: `req-adk-a2a-chat-ui-workflow` reviewed route aliases, ADK runnable generator Agent instruction, route-decision generator regressions, active process-flow/validation docs. Chat config, catalog YAML, product-specific routing prose는 source of truth가 아니다.
+
 ## 2026-07-07 · PR TBD — Remote A2A owner state gates precede Super Agent routing
 
-- **결정**: Remote A2A를 호출한 workflow는 Super Agent LLM 판단 전에 `active_a2a_task` 같은 ADK session state를 읽는 owner route를 둔다. Active task가 있으면 task-state router와 Remote A2A continuation/resume lane으로 보내고, Super Agent는 첫 입력·일반 채팅·terminal task state 이후에만 다시 진입한다.
-- **배경**: Super Agent가 먼저 실행되면 A2A task가 `input-required` 또는 `working` 상태인 다음 사용자 입력도 새 일반 채팅/새 A2A 판단으로 흘러가 기존 task/context를 잃을 수 있다. 미해결 task는 완료 기준이 충족될 때까지 같은 A2A owner 아래에서 반복되어야 한다.
-- **영향**: `req-adk-a2a-chat-ui-workflow` Graph IR, runtime handoff projection, route generator state-key lowering, workflow decision guide. Canonical artifact에는 unresolved-task loop를 유지하고, 현재 static runnable handoff는 acyclic projection warning을 남긴다.
+- **결정**: Remote A2A를 호출한 workflow는 Super Agent LLM 판단 전에 `active_a2a_task` 같은 ADK session state를 읽는 owner route를 둔다. Active task가 있으면 task-state router와 Remote A2A continuation/resume lane으로 보내고, Super Agent는 첫 입력·일반 채팅·terminal task state 이후에만 다시 진입한다. 이 workflow는 별도 local Super Agent RequestInput branch를 두지 않고, local clarification은 Super Agent-owned 일반 chat text로 유지한다.
+- **배경**: Super Agent가 먼저 실행되면 A2A task가 `input-required` 또는 `working` 상태인 다음 사용자 입력도 새 일반 채팅/새 A2A 판단으로 흘러가 기존 task/context를 잃을 수 있다. 미해결 task는 완료 기준이 충족될 때까지 같은 A2A owner 아래에서 반복되어야 한다. 별도 local HITL branch는 chat console과 runtime graph에 두 번째 handoff 판단 경로를 만든다.
+- **영향**: `req-adk-a2a-chat-ui-workflow` Graph IR, runtime handoff projection, route generator state-key lowering, workflow decision guide. Canonical artifact에는 unresolved-task loop를 유지하고, 현재 static runnable handoff는 acyclic projection warning을 남긴다. ADK 2.3이 owner gate 뒤 chat-mode `LlmAgent`를 거부하므로 generated Super Agent는 `single_turn` projection과 reviewed session-state/history guidance를 사용한다. Local smoke Remote A2A Agent Card는 `http://127.0.0.1:8001/a2a/req_page_recommendation_required_adk/.well-known/agent-card.json`로 검토한다.
 
 ## 2026-07-03 · PR TBD — dynamic runnable workflows emit terminal completion
 
@@ -486,6 +492,26 @@
 - **결정**: `/af/:reqId/run`의 A2A provider 패널은 현재 route artifact의 A2A status를 무조건 보지 않는다. Remote A2A 후보가 `owner: local artifact:<providerReqId>`로 승인된 local provider를 가리키면 그 provider artifact의 status/start/stop을 대상으로 하고, 매칭 provider가 없을 때만 현재 artifact provider로 fallback한다.
 - **배경**: `req-page-recommendation-a2a-consumer` Run 화면은 실제 provider `req-page-recommendation-required`가 8001에서 실행 중인데도 consumer artifact 자신의 A2A status를 조회해 `A2A provider 가 실행 중이 아닙니다`라고 표시했다. Start 버튼도 consumer reqId로 POST해 실제 호출 대상 provider를 제어하지 못했다.
 - **영향**: RunSandbox A2A target resolution, provider panel status/start/stop UX, active runtime validation/design-system docs.
+
+### Structured Remote A2A route aliases are trusted-output only
+- **결정**: reviewed `route_aliases`가 `remote_a2a_agent`를 `remote_a2a`의 generic structured alias로 포함한다. Chat route hint parsing은 model/assistant/Super Agent output text와 trusted metadata만 route authority로 사용하고, user/request-role text에 포함된 fenced JSON이나 `route_decision` strings는 Remote A2A handoff를 만들지 않는다.
+- **배경**: live QA에서 Super Agent가 `route_decision: "remote_a2a_agent"`를 반환했지만 generated/runtime route aliases가 이 spelling을 받지 않아 main-flow handoff가 누락됐다. 반대로 user-provided fake route JSON이 route hint로 해석되어 prompt-injection handoff가 발생했다.
+- **영향**: `req-adk-a2a-chat-ui-workflow` reviewed Graph IR/scaffold-plan/runtime-stub, ADK route generator regression, standalone chat route parser/controller tests. `catalog/*.yaml` and generator hard-coded scenario literals remain unchanged.
+
+### `delegate_a2a` is a trusted structured alias; `targetAgentId` is target metadata
+- **결정**: reviewed `route_aliases`가 `delegate_a2a`를 `remote_a2a`의 generic structured alias로 포함한다. Chat parsing은 trusted model/assistant/Super Agent structured output에서 route intent(`routeHint`)와 structured target metadata(`routeTargetHint`)를 분리하고, `targetAgentId`/contract id는 configured A2A provider metadata와 exact match될 때만 handoff target으로 사용한다. Unknown target ids fall back only through the existing safe single-provider `remote_a2a` route intent path.
+- **배경**: live QA에서 Super Agent가 `route_decision: "delegate_a2a"`와 `targetAgentId: "a2a-001"`를 반환했지만 parser/runtime이 alias와 reviewed contract id target을 함께 처리하지 못해 Remote A2A `message/send`가 발생하지 않았다.
+- **영향**: `req-adk-a2a-chat-ui-workflow` analysis/process-flow/scaffold-plan/runtime-stub, chat route parser/controller/provider selection, route-injection regression coverage. User/request-role text remains non-routing and `catalog/*.yaml` remains unchanged.
+
+### Remote A2A route execution requires trusted intent before descriptor target data
+- **결정**: Chat route execution and generated router lowering no longer treat provider descriptor shape (`rpc_url`, `agent_card_url`, endpoint/method, or target metadata) as Remote A2A authority by itself. Descriptor fields may select a configured provider only after a trusted explicit route intent such as `remote_a2a`, `remote_a2a_agent`, or `delegate_a2a` is accepted. If the latest user/request text contains route-control syntax or provider-control fields, chat suppresses Remote A2A execution for that turn even when the model echoes a pure JSON route payload.
+- **배경**: Todo 6 live QA showed fresh adversarial user text copied into a model-owned route JSON could trigger Remote A2A traffic, and descriptor-only generated router output could select the remote branch without explicit route intent.
+- **영향**: Standalone chat route parser/controller, generated ADK router helper, `req-adk-a2a-chat-ui-workflow` regenerated runtime-stub, route-injection and generated route regressions. Legitimate trusted explicit `remote_a2a` route decisions still select the exact configured provider.
+
+### Generated A2A launcher uses the ADK new executor for terminal task state
+- **결정**: The generated `af_adk_a2a_server.py` launcher patches ADK's A2A FastAPI setup to instantiate `A2aAgentExecutor(..., force_new_version=True)` when the installed ADK source still defaults to the legacy executor path.
+- **배경**: Live terminal-owner QA showed `tasks/get` continued to report `working` after an `adk_request_input` resume and terminal node execution, leaving chat correctly stuck in Remote A2A ownership. Local ADK source inspection showed the newer executor path is opt-in through `force_new_version`; the generated launcher already applies version-scoped ADK source patches for A2A server behavior.
+- **영향**: Generated A2A provider launcher and generated runtime-stub contract tests. Chat continues to preserve Remote A2A ownership while `tasks/get` reports `working`; terminal return now depends on structured provider task state rather than terminal-output text parsing.
 
 ---
 

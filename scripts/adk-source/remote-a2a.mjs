@@ -60,6 +60,30 @@ export function remoteA2aRuntimeRows({ analysisResult, modules }) {
     });
 }
 
+export function remoteA2aRegistrySnapshotRows({ analysisResult, modules }) {
+  return modules
+    .filter((module) => module.module_category === "remote_a2a")
+    .map((module) => {
+      const contract = a2aContractForModule(analysisResult, module);
+      if (contract?.contract_status !== "approved") return null;
+      const agentCardUrl = a2aAgentCardUrl(contract);
+      const rpcUrl = firstString([contract.rpc_url, contract.endpoint_url, firstInterfaceUrl(contract)]);
+      if (!agentCardUrl && !rpcUrl) return null;
+      return {
+        module_id: module.id,
+        contract_id: contract.contract_id ?? null,
+        target_agent_name: firstString([contract.target_agent_name, module.name]),
+        agent_card_url: agentCardUrl,
+        rpc_url: rpcUrl,
+        skills: stringArray(contract.skills),
+        operations: stringArray(contract.operations),
+        task_states: stringArray(contract.task_lifecycle?.states),
+        connection_status: "configured"
+      };
+    })
+    .filter(Boolean);
+}
+
 export function emitRemoteA2aNode({ analysisResult, target }) {
   const module = target.module ?? target;
   const contract = a2aContractForModule(analysisResult, module);
@@ -144,6 +168,25 @@ function authInterceptorSpec(policy) {
 
 function hasTimeoutPolicy(policy) {
   return Boolean(policy && typeof policy.timeout_seconds === "number" && Number.isFinite(policy.timeout_seconds) && policy.timeout_seconds > 0);
+}
+
+function firstInterfaceUrl(contract) {
+  const interfaces = Array.isArray(contract?.supported_interfaces) ? contract.supported_interfaces : [];
+  for (const entry of interfaces) {
+    if (typeof entry?.url === "string" && entry.url.trim()) return entry.url.trim();
+  }
+  return null;
+}
+
+function firstString(values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function stringArray(value) {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()) : [];
 }
 
 function formatPythonNumber(value) {

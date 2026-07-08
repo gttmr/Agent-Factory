@@ -44,6 +44,7 @@ export function buildRunnableAgentPy(context) {
     terminalOutputNodes
   });
 
+  const projectionNotes = runtimeProjectionNotes(processFlow);
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = workflowEdgeLiteral(edges);
   const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.3 워크플로우입니다: ${truncate(
@@ -56,7 +57,7 @@ export function buildRunnableAgentPy(context) {
   const usesArtifacts = usesArtifactChannels(graphContext);
   const usesRouteNodes = usesRoutes(processFlow);
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
-  const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
+  const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 || usesRouteNodes ? "import json\n" : "";
   const usesTerminalOutputs = terminalOutputNodes.length > 0;
   const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
   const remoteImport = usesRemoteA2a(modules)
@@ -91,7 +92,7 @@ ${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}# ----------------
 # Graph nodes
 # ---------------------------------------------------------------------------
 
-${nodeBlocks.join("\n\n")}
+${projectionNotes}${nodeBlocks.join("\n\n")}
 ${joinDecls.length ? `\n${joinDecls.join("\n")}\n` : ""}
 
 root_agent = Workflow(
@@ -100,4 +101,13 @@ root_agent = Workflow(
     edges=${edgeLiteral},
 )
 `;
+}
+
+function runtimeProjectionNotes(processFlow) {
+  const warnings = processFlow?.validation?.warnings;
+  if (!Array.isArray(warnings) || warnings.length === 0) return "";
+  const lines = warnings
+    .filter((warning) => typeof warning === "string" && warning.trim())
+    .map((warning) => `# Runtime projection note: ${warning.replaceAll("\n", " ")}`);
+  return lines.length ? `${lines.join("\n")}\n\n` : "";
 }

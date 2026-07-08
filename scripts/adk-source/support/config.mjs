@@ -3,7 +3,7 @@ import { pyNodeName } from "../naming.mjs";
 import { toPyStr, toPythonLiteral, yamlScalar } from "../python-literals.mjs";
 import { remoteA2aEnvVars } from "../remote-a2a.mjs";
 
-export function buildAgentsConfig({ modules, defaultAgentInstruction, adapterConnection }) {
+export function buildAgentsConfig({ modules, agentNodeTargets = [], defaultAgentInstruction, adapterConnection }) {
   const lines = [];
   lines.push("# agents.config.yaml — runnable ADK bundle의 노드별 override 파일입니다.");
   lines.push("# 한글 우선 instruction을 여기에서 검토/수정하세요. model / instruction / mcp_url 변경은");
@@ -18,15 +18,16 @@ export function buildAgentsConfig({ modules, defaultAgentInstruction, adapterCon
   lines.push("  model_env: AF_VLLM_MODEL");
   lines.push("  api_key_env: AF_VLLM_API_KEY");
 
-  const agents = modules.filter(isAgentModule);
+  const agents = agentConfigEntries({ modules, agentNodeTargets });
   lines.push("agents:");
   if (!agents.length) lines.push("  []");
-  for (const module of agents) {
-    lines.push(`  - id: ${module.id}`);
-    lines.push(`    name: ${pyNodeName(module)}`);
-    lines.push(`    model: ${module.model || DEFAULT_MODEL}`);
+  for (const agent of agents) {
+    lines.push(`  - id: ${agent.id}`);
+    if (agent.moduleId) lines.push(`    module_id: ${agent.moduleId}`);
+    lines.push(`    name: ${pyNodeName(agent.target)}`);
+    lines.push(`    model: ${agent.module.model || DEFAULT_MODEL}`);
     lines.push("    instruction: |");
-    const instruction = module.instruction || defaultAgentInstruction(module);
+    const instruction = defaultAgentInstruction(agent.target);
     for (const line of String(instruction).split("\n")) lines.push(`      ${line}`);
   }
 
@@ -58,6 +59,25 @@ export function buildAgentsConfig({ modules, defaultAgentInstruction, adapterCon
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function agentConfigEntries({ modules, agentNodeTargets }) {
+  const entries = modules.filter(isAgentModule).map((module) => ({
+    id: module.id,
+    moduleId: null,
+    module,
+    target: module
+  }));
+  for (const target of agentNodeTargets) {
+    if (!isAgentModule(target.module) || target.node.id === target.module.id) continue;
+    entries.push({
+      id: target.node.id,
+      moduleId: target.module.id,
+      module: target.module,
+      target
+    });
+  }
+  return entries;
 }
 
 export function buildWorkflowPy() {

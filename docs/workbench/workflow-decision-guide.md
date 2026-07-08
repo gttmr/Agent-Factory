@@ -128,8 +128,10 @@ Remote A2A task를 시작한 workflow는 다음 사용자 turn을 바로 LLM 판
 - 첫 입력, active task 없음, terminal task state는 Super Agent 또는 일반 chat agent branch로 보낸다.
 - submitted, working, input-required, auth-required 같은 active task state는 A2A task-state router로 보낸다.
 - 사용자가 main composer에 입력했더라도 active task가 terminal이 아니면 같은 task/context로 continuation 또는 resume을 보낸다.
+- 이 owner-gated A2A workflow에서 Super Agent clarification은 Super Agent가 owner인 turn의 일반 chat text로 남기며, 별도 local Super Agent `human_input`/RequestInput branch를 만들지 않는다.
 - 문제 해결 여부가 불확실하면 `loop_region`, `loop_control`, `loop_back`, `loop_exit`로 canonical loop를 표현한다.
 - Runnable generator가 현재 static Workflow 제약 때문에 loop를 직접 lower하지 못하면 reviewed artifact에는 canonical loop를 유지하고, runtime handoff는 acyclic projection과 validation warning으로 제한을 드러낸다.
+- ADK 2.3이 non-START predecessor 뒤의 chat-mode `LlmAgent` static wiring을 거부하면, Super Agent는 `single_turn` projection으로 lower하고 reviewed session-state/history 입력을 prompt context로 주입한다. 이 projection은 chat console이 아니라 ADK owner gate가 계속 권한을 갖는다는 뜻이다.
 
 ## ADK MCP 사용 주의
 
