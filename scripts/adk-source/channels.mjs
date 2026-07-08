@@ -3,7 +3,7 @@ import { toPyStr } from "./python-literals.mjs";
 import { adapterConnection } from "./adapters.mjs";
 import { graphIndexes } from "./graph/indexes.mjs";
 
-export function edgeDataChannel(edge) {
+function edgeDataChannel(edge) {
   if (!edge) return null;
   const STATE_EDGE_SCOPE = {
     session_state: "",
@@ -25,7 +25,7 @@ export function edgeDataChannel(edge) {
   return null;
 }
 
-export function moduleDataChannels(context) {
+function moduleDataChannels(context) {
   const graph = graphIndexes(context);
   const moduleIdOf = (nodeId) => {
     const node = graph.nodesById.get(nodeId);
@@ -85,7 +85,7 @@ export function emitOutgoingStateChannelWrites(context, moduleId, indent = "    
     .join("");
 }
 
-export function outgoingArtifactChannelKeys(context, moduleId) {
+function outgoingArtifactChannelKeys(context, moduleId) {
   return [
     ...new Set(
       (moduleDataChannels(context).outgoing.get(moduleId) ?? [])

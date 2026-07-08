@@ -106,22 +106,6 @@ export function orderedGraphNodeSpecs(context, options = {}) {
     .filter((spec) => spec && !excludeModuleIds.has(spec.module.id));
 }
 
-export function orderedGraphModules(context, options = {}) {
-  const graph = graphIndexes(context);
-  const excludeModuleIds = options.excludeModuleIds ?? new Set();
-  const ordered = graph.moduleNodes
-    .map((node) => graph.moduleById.get(node.module_id))
-    .filter((module) => module && !excludeModuleIds.has(module.id));
-  const seen = new Set(ordered.map((module) => module.id));
-  for (const module of context.modules) {
-    if (!excludeModuleIds.has(module.id) && !seen.has(module.id)) {
-      ordered.push(module);
-      seen.add(module.id);
-    }
-  }
-  return ordered;
-}
-
 function isGraphIndex(value) {
   return Boolean(value?.moduleById && value?.nodesById && Array.isArray(value?.moduleNodes));
 }

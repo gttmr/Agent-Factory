@@ -3,7 +3,7 @@ import { toPyStr, truncate } from "./python-literals.mjs";
 
 const AUTH_ENV_PATTERN = /^AF_A2A_[A-Z0-9_]+$/;
 
-export function a2aContractForModule(analysisResult, module) {
+function a2aContractForModule(analysisResult, module) {
   const contracts = Array.isArray(analysisResult?.a2aContracts) ? analysisResult.a2aContracts : [];
   return (
     contracts.find((contract) => contract && contract.remote_module_id === module.id) ??
@@ -14,7 +14,7 @@ export function a2aContractForModule(analysisResult, module) {
   );
 }
 
-export function a2aAgentCardUrl(contract) {
+function a2aAgentCardUrl(contract) {
   const url = contract?.agent_card?.agent_card_url;
   return typeof url === "string" && url.trim() ? url.trim() : null;
 }

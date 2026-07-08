@@ -101,7 +101,7 @@ function reviewedRouteDecisionNotes(targetNode, context) {
   return notes;
 }
 
-export function agentExecutionMode(target, context) {
+function agentExecutionMode(target, context) {
   const module = target.module ?? target;
   if (usesSingleTurnChatProjection(module, context, target.node)) return "single_turn";
   return requestedAgentExecutionMode(module, context, target.node);
@@ -127,7 +127,7 @@ function usesSingleTurnChatProjection(module, context, targetNode = null) {
   });
 }
 
-export function defaultAgentInstruction(module) {
+function defaultAgentInstruction(module) {
   return [
     `당신은 "${module.name}" Agent입니다.`,
     "검토된 synthetic 입력과 session state 안의 데이터만 사용하세요.",

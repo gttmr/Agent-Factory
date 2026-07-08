@@ -1,5 +1,5 @@
-export const DEFAULT_A2A_PROVIDER_URL = "http://127.0.0.1:8001";
-export const ADK_A2A_EXTENSION_URI = "https://google.github.io/adk-docs/a2a/a2a-extension/";
+const DEFAULT_A2A_PROVIDER_URL = "http://127.0.0.1:8001";
+const ADK_A2A_EXTENSION_URI = "https://google.github.io/adk-docs/a2a/a2a-extension/";
 
 export function buildAgentCard({ packageName, normalizedRequirement, baseUrl = DEFAULT_A2A_PROVIDER_URL }) {
   const rpcUrl = `${baseUrl}/a2a/${packageName}`;
