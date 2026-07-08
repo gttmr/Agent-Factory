@@ -1,9 +1,10 @@
 import { buildAgentPy } from "./agent.mjs";
 import { adapterConnection } from "./adapters.mjs";
-import { defaultAgentInstruction } from "./emitters/agent-node.mjs";
+import { agentInstruction } from "./emitters/agent-node.mjs";
 import {
   graphEdgeSemantics,
   graphNodeSemantics,
+  orderedGraphNodeSpecs,
   startNodeIds,
   terminalOutputIds,
   validateGraphCoverage
@@ -53,10 +54,22 @@ export function buildFiles({
     modules,
     outputMode,
     packageName,
+    graphContext,
     unconnectedAdapters,
     terminalOutputIds: () => terminalOutputIds(graphContext)
   };
   const mockBindingFromModule = (module) => supportMockBindingFromModule(module, { adapterConnection });
+  const defaultAgentInstructionForConfig = (target) => {
+    const module = target.module ?? target;
+    return agentInstruction(
+      {
+        module,
+        node: target.node ?? processFlow.nodes.find((node) => node?.module_id === module.id) ?? null,
+        moduleNodeCount: target.moduleNodeCount
+      },
+      { graphContext }
+    );
+  };
   const files = {
     [`${packageName}/__init__.py`]: "from .agent import root_agent\n",
     [`${packageName}/agent.py`]: buildAgentPy({
@@ -110,7 +123,12 @@ export function buildFiles({
     "README.md": buildReadme(supportContext)
   };
   if (outputMode === "runnable") {
-    files["agents.config.yaml"] = buildAgentsConfig({ modules, defaultAgentInstruction, adapterConnection });
+    files["agents.config.yaml"] = buildAgentsConfig({
+      modules,
+      agentNodeTargets: orderedGraphNodeSpecs(graphContext),
+      defaultAgentInstruction: defaultAgentInstructionForConfig,
+      adapterConnection
+    });
     files[".env.example"] = buildEnvExample({ analysisResult, modules });
     files[".gitignore"] = buildGitignore();
   }

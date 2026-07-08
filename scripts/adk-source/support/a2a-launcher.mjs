@@ -27,6 +27,19 @@ def _patch_adk_a2a_json_scope_bug() -> None:
     exec(compile(patched, adk_fast_api.__file__, "exec"), adk_fast_api.__dict__)
 
 
+def _patch_adk_a2a_resume_executor_version() -> None:
+    source = inspect.getsource(adk_fast_api.get_fast_api_app)
+    needle = "          agent_executor = A2aAgentExecutor(\\n              runner=create_a2a_runner_loader(app_name),\\n          )"
+    if needle not in source:
+        return
+    patched = source.replace(
+        needle,
+        "          agent_executor = A2aAgentExecutor(\\n              runner=create_a2a_runner_loader(app_name),\\n              force_new_version=True,\\n          )",
+        1,
+    )
+    exec(compile(patched, adk_fast_api.__file__, "exec"), adk_fast_api.__dict__)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Agent Factory ADK A2A launcher")
     parser.add_argument("agents_dir", nargs="?", default=".")
@@ -41,6 +54,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     logs.setup_adk_logger(logging.INFO)
     _patch_adk_a2a_json_scope_bug()
+    _patch_adk_a2a_resume_executor_version()
     app = adk_fast_api.get_fast_api_app(
         agents_dir=args.agents_dir,
         session_service_uri=args.session_service_uri,

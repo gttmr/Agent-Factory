@@ -33,6 +33,11 @@ def test_runtime_chat_smoke_contract_is_present():
     assert '"port": 8765' in smoke
 
 
+def test_a2a_launcher_forces_new_executor_for_terminal_task_state():
+    source = (ROOT / "af_adk_a2a_server.py").read_text(encoding="utf-8")
+    assert "force_new_version=True" in source
+
+
 @pytest.mark.skipif(importlib.util.find_spec("google.adk") is None, reason="google-adk not installed")
 def test_root_agent_is_a_workflow():
     from google.adk.workflow import Workflow

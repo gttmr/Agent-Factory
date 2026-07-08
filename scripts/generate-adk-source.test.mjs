@@ -5,6 +5,7 @@ import { assertPregeneratedRunnableBundle, assertSmokeBundle } from "./adk-sourc
 import { readBundle } from "./adk-source-test/fixtures.mjs";
 
 import "./adk-source-test/basic-bundle.test.mjs";
+import "./adk-source-test/reused-chat-projection.test.mjs";
 import "./adk-source-test/route-choices.test.mjs";
 import "./adk-source-test/toolsets.test.mjs";
 import "./adk-source-test/workflow-call.test.mjs";
@@ -16,6 +17,8 @@ import "./adk-source-test/state-channels-lowering.test.mjs";
 import "./adk-source-test/state-channel-guards.test.mjs";
 import "./adk-source-test/artifact-channels.test.mjs";
 import "./adk-source-test/remote-a2a.test.mjs";
+import "./adk-source-test/cdp-a2a-super-agent-simplification.test.mjs";
+import "./adk-source-test/route-type-decision.test.mjs";
 import "./adk-source-test/runtime-robustness.test.mjs";
 import "./adk-source-test/terminal-output.test.mjs";
 

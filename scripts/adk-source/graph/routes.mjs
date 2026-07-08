@@ -16,7 +16,8 @@ export function routeCasesFor(processFlow, nodeId) {
       value,
       aliases: routeAliases(value, edge),
       isDefault: edge.is_default_route === true,
-      stateKey: typeof edge.state_key === "string" && edge.state_key.trim() ? edge.state_key.trim() : null
+      stateKey: typeof edge.state_key === "string" && edge.state_key.trim() ? edge.state_key.trim() : null,
+      to: typeof edge.to === "string" ? edge.to : null
     });
   }
   return routes;
