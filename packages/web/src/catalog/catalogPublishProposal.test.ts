@@ -75,7 +75,7 @@ assert.deepEqual(buildPublishProposal(remoteA2aWorkflowProposal, ""), {
 });
 
 const activeWorkflowA2aDelta = readFileSync(
-  new URL("../../../../artifacts/af/req-page-recommendation-required/catalog-delta.yaml", import.meta.url),
+  new URL("./__fixtures__/workflow-a2a-catalog-delta.yaml", import.meta.url),
   "utf8"
 );
 const activeWorkflowA2aProposal = parseCatalogDelta(activeWorkflowA2aDelta).proposals[0];

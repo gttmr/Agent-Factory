@@ -19,6 +19,7 @@ import { ensureRuntimeContracts } from "../src/analyzer/runtimeContracts";
 import { SdkCodexAnalyzerRunner } from "./codexAnalyzerSdkRunner";
 import { createAnalyzerError, isAnalyzerError, progressFromError, summarizeProcessFailure } from "./codexAnalyzerRunner";
 import type { AnalyzerDiagnostics, AnalyzerProgressEvent, CodexAnalyzerRunner } from "./codexAnalyzerRunner";
+import { isRecord, readJsonBody, sendJson } from "./httpApi";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
@@ -103,7 +104,11 @@ export function createCodexAnalyzerMiddleware(repoRoot: string) {
     }
 
     try {
-      const body = await readJsonBody(req);
+      const body = await readJsonBody(req, {
+        maxBytes: 1_000_000,
+        sizeLimitMessage: "요청 본문이 너무 큽니다.",
+        treatWhitespaceAsEmpty: false
+      });
       const input = isRecord(body) ? body.input : null;
       const model = isRecord(body) ? body.model : null;
       const catalog = isRecord(body) ? sanitizeCatalogPayload(body.catalog) : [];
@@ -1789,43 +1794,4 @@ function normalizeCandidate(candidate: Record<string, unknown>): Record<string, 
 
 function omitNullProperties(record: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== null));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolvePromise, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    req.on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > 1_000_000) {
-        reject(new Error("요청 본문이 너무 큽니다."));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => {
-      const text = Buffer.concat(chunks).toString("utf8");
-      if (!text) {
-        resolvePromise({});
-        return;
-      }
-      try {
-        resolvePromise(JSON.parse(text));
-      } catch (error) {
-        reject(error);
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function sendJson(res: ServerResponse, statusCode: number, payload: unknown) {
-  res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(payload));
 }
