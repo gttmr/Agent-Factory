@@ -4,31 +4,29 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AGENT_EXECUTION_MODES,
   GRAPH_EDGE_KINDS,
-  GRAPH_INVOKE_BINDINGS,
   type AgentExecutionMode,
   type A2AContract,
   type EdgeKind,
   type GraphEdge,
-  type GraphInvokeBinding,
   type GraphNode,
   type ModuleCandidate,
-  type ModuleCategory,
   type NodeKind
 } from "../analyzer/types";
 import { CategoryBadge } from "./CategoryBadge";
+import { GraphElementTabs } from "./graph/GraphElementTabs";
 import type { GraphEditState } from "./GraphCanvas";
 import {
   availableGraphElementGroups,
   isEdgeKindEditable,
   isModuleBoundNodeKind,
   isNodeModuleLinkEditable,
-  isNodeRuntimeControlEditable,
   nextGraphElementGroupAfterSelectionChange,
   type GraphElementGroup,
   type GraphElementGroupId
 } from "./graphElementEditorModel";
 import { FieldSpecList, JsonDetails, MappingTable, SchemaRefCards } from "./GraphSchemaDetails";
 import { Button, Field, SelectField, TextareaField } from "../ui/primitives";
+import { graphEdgeId, graphNodeKindToModuleCategory } from "../graph/graphDisplay";
 
 interface GraphElementEditorProps {
   editState: GraphEditState;
@@ -66,20 +64,6 @@ const AGENT_EXECUTION_MODE_LABEL: Record<AgentExecutionMode, string> = {
 const AGENT_EXECUTION_MODE_HELP: Record<AgentExecutionMode, string> = {
   single_turn: "현재 입력과 연결된 edge 데이터만 사용합니다.",
   chat: "같은 ADK session의 이전 대화 흐름을 함께 봅니다."
-};
-
-const INVOKE_BINDING_LABEL: Record<GraphInvokeBinding, string> = {
-  unresolved: "미정",
-  local_python: "Local Python",
-  direct_api: "Direct API",
-  mcp_tool: "MCP tool",
-  mcp_toolset: "MCP toolset",
-  local_function: "Local function",
-  internal_workflow: "Internal workflow",
-  ui_input: "UI input",
-  remote_a2a: "Remote A2A",
-  callback_wait: "Callback wait",
-  unknown: "Unknown"
 };
 
 // "데이터 전달 방식" picker metadata. edge_kind is how a connected edge passes
@@ -179,33 +163,6 @@ export function GraphElementEditor({ editState, moduleCandidates, a2aContracts, 
     <aside className="graph-element-editor empty">
       <p>편집할 노드 또는 엣지를 선택하세요.</p>
     </aside>
-  );
-}
-
-function GraphElementTabs({
-  activeGroup,
-  groups,
-  onGroupChange
-}: {
-  activeGroup: GraphElementGroupId;
-  groups: readonly GraphElementGroup[];
-  onGroupChange: (group: GraphElementGroupId) => void;
-}) {
-  return (
-    <div className="graph-element-tabs" role="tablist" aria-label="그래프 요소 편집 그룹">
-      {groups.map((group) => (
-        <button
-          key={group.id}
-          type="button"
-          role="tab"
-          aria-selected={activeGroup === group.id}
-          className={`graph-element-tab${activeGroup === group.id ? " is-active" : ""}`}
-          onClick={() => onGroupChange(group.id)}
-        >
-          {group.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -382,12 +339,11 @@ function NodeForm({
   onGroupChange: (group: GraphElementGroupId) => void;
   onClose: () => void;
 }) {
-  const category = moduleCategoryFromNodeKind(node.node_kind);
+  const category = graphNodeKindToModuleCategory(node.node_kind);
   const canLinkModule = isModuleBoundNodeKind(node.node_kind);
   const moduleLinkEditable = isNodeModuleLinkEditable(node, editState.draft.edges);
-  const runtimeControlEditable = isNodeRuntimeControlEditable(node);
   const matchingCandidates = canLinkModule
-    ? moduleCandidates.filter((candidate) => candidate.module_category === moduleCategoryFromNodeKind(node.node_kind))
+    ? moduleCandidates.filter((candidate) => candidate.module_category === graphNodeKindToModuleCategory(node.node_kind))
     : [];
   const selectedCandidate = node.module_id ? moduleCandidates.find((candidate) => candidate.id === node.module_id) ?? null : null;
   const agentExecutionMode: AgentExecutionMode = node.agent_execution_mode === "chat" ? "chat" : "single_turn";
@@ -417,7 +373,12 @@ function NodeForm({
         </Button>
       </header>
 
-      <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={onGroupChange} />
+      <GraphElementTabs
+        activeGroup={activeGroup}
+        groups={groups}
+        ariaLabel="그래프 요소 편집 그룹"
+        onGroupChange={onGroupChange}
+      />
 
       {activeGroup === "summary" ? (
       <EditorSection title="요약">
@@ -567,28 +528,9 @@ function NodeForm({
             />
           </Field>
         ) : null}
-        {runtimeControlEditable ? (
-          <SelectField
-            label="invoke_binding"
-            value={node.invoke_binding ?? ""}
-            onChange={(event) =>
-              editState.updateNodeFields(node.id, {
-                invoke_binding: nullableEnum<GraphInvokeBinding>(event.target.value)
-              })
-            }
-          >
-            <option value="">없음</option>
-            {GRAPH_INVOKE_BINDINGS.map((binding) => (
-              <option key={binding} value={binding}>
-                {INVOKE_BINDING_LABEL[binding]} ({binding})
-              </option>
-            ))}
-          </SelectField>
-        ) : (
-          <Field label="invoke_binding" hint="node_kind와 runtime contract에서 고정">
-            <ReadonlyInput value={node.invoke_binding ?? "없음"} />
-          </Field>
-        )}
+        <Field label="invoke_binding" hint="node_kind와 runtime contract에서 고정">
+          <ReadonlyInput value={node.invoke_binding ?? "없음"} />
+        </Field>
 
         {node.runtime_binding ? (
           <Field label="runtime_binding" hint="legacy/compat">
@@ -718,7 +660,12 @@ function EdgeForm({
         </Button>
       </header>
 
-      <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={onGroupChange} />
+      <GraphElementTabs
+        activeGroup={activeGroup}
+        groups={groups}
+        ariaLabel="그래프 요소 편집 그룹"
+        onGroupChange={onGroupChange}
+      />
 
       {activeGroup === "summary" ? (
       <EditorSection title="요약">
@@ -894,14 +841,6 @@ function EditorSection({ title, children }: { title: string; children: ReactNode
   );
 }
 
-function moduleCategoryFromNodeKind(kind: GraphNode["node_kind"]): ModuleCategory | null {
-  if (kind === "workflow_call") return "workflow";
-  if (kind === "adapter_call") return "adapter";
-  if (kind === "remote_agent_call") return "remote_a2a";
-  if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") return kind;
-  return null;
-}
-
 // 매 keystroke마다 호출되므로 trim 하지 않는다 — trim 하면 공백 포함 값(route_condition 등)을 입력할 수 없다.
 function nullableString(value: string): string | null {
   return value === "" ? null : value;
@@ -997,5 +936,5 @@ function nodeLabel(nodes: GraphNode[], nodeId: string): string {
 
 function selectedEdgeId(editState: GraphEditState, edge: GraphEdge): string {
   const index = editState.draft.edges.findIndex((candidate) => candidate === edge);
-  return edge.id ?? (index >= 0 ? `edge-${index}` : "");
+  return index >= 0 ? graphEdgeId(edge, index) : edge.id ?? "";
 }

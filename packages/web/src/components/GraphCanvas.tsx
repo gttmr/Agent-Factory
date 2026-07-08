@@ -30,6 +30,7 @@ import type {
 import { GRAPH_NODE_KINDS, type NodeKind } from "../analyzer/types";
 import { ContainerOverlay } from "./graph/containerOverlay";
 import { appendNodeToContainer, moveNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
+import { graphEdgeId, graphModuleSubtype } from "../graph/graphDisplay";
 import { edgeTypes } from "./graph/edgeTypes";
 import { freezeGraphLayout, layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
 import { nodeTypes } from "./graph/nodeTypes";
@@ -385,20 +386,30 @@ export function GraphCanvas({
     () => buildCollaborationMarks(activeGraphIR, comments, highlights),
     [activeGraphIR, comments, highlights]
   );
+  const candidateByModuleId = useMemo(() => {
+    const map = new Map<string, ModuleCandidate>();
+    for (const c of moduleCandidates) map.set(c.id, c);
+    return map;
+  }, [moduleCandidates]);
 
   const baseNodes = useMemo<ReactFlowNode<GraphNodeData>[]>(
     () =>
-      layout.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...(node.data as GraphNodeData),
-          selected: false,
-          commentCount: collaborationMarks.nodeCommentCounts.get(node.id) ?? 0,
-          commentTooltip: collaborationMarks.nodeCommentTooltips.get(node.id),
-          highlightCount: collaborationMarks.nodeHighlightCounts.get(node.id) ?? 0
-        }
-      })),
-    [layout.nodes, collaborationMarks]
+      layout.nodes.map((node) => {
+        const data = node.data as GraphNodeData;
+        const candidate = data.graphNode.module_id ? candidateByModuleId.get(data.graphNode.module_id) : null;
+        return {
+          ...node,
+          data: {
+            ...data,
+            selected: false,
+            commentCount: collaborationMarks.nodeCommentCounts.get(node.id) ?? 0,
+            commentTooltip: collaborationMarks.nodeCommentTooltips.get(node.id),
+            highlightCount: collaborationMarks.nodeHighlightCounts.get(node.id) ?? 0,
+            moduleSubtype: graphModuleSubtype(candidate)
+          }
+        };
+      }),
+    [layout.nodes, collaborationMarks, candidateByModuleId]
   );
   const baseEdges = useMemo<ReactFlowEdge<GraphEdgeData>[]>(
     () =>
@@ -425,17 +436,9 @@ export function GraphCanvas({
 
   const nodeById = useMemo(() => new Map((activeGraphIR.nodes ?? []).map((n) => [n.id, n])), [activeGraphIR]);
   const edgeById = useMemo(
-    () =>
-      new Map<string, GraphEdge>(
-        (activeGraphIR.edges ?? []).map((e, i) => [e.id ?? `edge-${i}`, e])
-      ),
+    () => new Map<string, GraphEdge>((activeGraphIR.edges ?? []).map((e, i) => [graphEdgeId(e, i), e])),
     [activeGraphIR]
   );
-  const candidateByModuleId = useMemo(() => {
-    const map = new Map<string, ModuleCandidate>();
-    for (const c of moduleCandidates) map.set(c.id, c);
-    return map;
-  }, [moduleCandidates]);
 
   const selectedNode: GraphNode | null = selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null;
   const selectedEdge: GraphEdge | null = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
@@ -1019,7 +1022,7 @@ function deleteFromGraph(graphIR: GraphIR, selection: Selection): GraphIR {
   if (selection.edgeId) {
     return {
       ...graphIR,
-      edges: (graphIR.edges ?? []).filter((edge, index) => edgeKey(edge, index) !== selection.edgeId)
+      edges: (graphIR.edges ?? []).filter((edge, index) => graphEdgeId(edge, index) !== selection.edgeId)
     };
   }
   return graphIR;
@@ -1057,7 +1060,7 @@ function applyEdgeFields(graphIR: GraphIR, edgeId: string, patch: EdgeFieldPatch
   return {
     ...graphIR,
     edges: (graphIR.edges ?? []).map((edge, index) => {
-      if (edgeKey(edge, index) !== edgeId) return edge;
+      if (graphEdgeId(edge, index) !== edgeId) return edge;
       const next = { ...edge, ...patch };
       if (next.edge_kind === "remote_a2a") {
         return { ...next, is_remote_boundary_crossing: true };
@@ -1115,10 +1118,6 @@ function isFinitePoint(value: unknown): value is XYPosition {
   );
 }
 
-function edgeKey(edge: GraphEdge, index: number): string {
-  return edge.id ?? `edge-${index}`;
-}
-
 interface CollaborationMarks {
   nodeCommentCounts: Map<string, number>;
   edgeCommentCounts: Map<string, number>;
@@ -1131,11 +1130,11 @@ interface CollaborationMarks {
 }
 
 const HIGHLIGHT_COLORS: Record<HighlightRecord["color_token"], string> = {
-  agent: "var(--cat-agent-line, #2c6ec0)",
-  workflow: "var(--cat-workflow-line, #2f8a68)",
-  adapter: "var(--cat-adapter-line, #8a6a2f)",
-  remote: "var(--cat-remote-line, #c0432c)",
-  neutral: "var(--line-strong, #64736b)"
+  agent: "var(--cat-agent-line)",
+  workflow: "var(--cat-workflow-line)",
+  adapter: "var(--cat-adapter-line)",
+  remote: "var(--cat-remote-line)",
+  neutral: "var(--line-strong)"
 };
 
 function buildCollaborationMarks(
@@ -1153,7 +1152,7 @@ function buildCollaborationMarks(
     edgeHighlightColors: new Map(),
     containerHighlightIds: new Set()
   };
-  const edgeIdByPair = new Map((graphIR.edges ?? []).map((edge) => [`${edge.from}->${edge.to}`, edge.id]));
+  const edgeIdByPair = new Map((graphIR.edges ?? []).map((edge, index) => [`${edge.from}->${edge.to}`, graphEdgeId(edge, index)]));
 
   const inc = (map: Map<string, number>, id: string | undefined) => {
     if (!id) return;

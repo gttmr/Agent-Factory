@@ -14,7 +14,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
   switch (kind) {
     case "event_message":
       return {
-        stroke: "var(--amber, #c08a2c)",
+        stroke: "var(--amber)",
         strokeWidth: 2,
         strokeDasharray: "6 4",
         className: "graph-edge-event_message",
@@ -22,7 +22,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "session_state":
       return {
-        stroke: "var(--blue, #2c6ec0)",
+        stroke: "var(--blue)",
         strokeWidth: 2,
         strokeDasharray: "1 5",
         className: "graph-edge-state",
@@ -31,7 +31,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "temp_state":
       return {
-        stroke: "var(--blue, #2c6ec0)",
+        stroke: "var(--blue)",
         strokeWidth: 2,
         strokeDasharray: "1 5",
         className: "graph-edge-state",
@@ -40,7 +40,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "user_state":
       return {
-        stroke: "var(--blue, #2c6ec0)",
+        stroke: "var(--blue)",
         strokeWidth: 2,
         strokeDasharray: "1 5",
         className: "graph-edge-state",
@@ -49,7 +49,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "app_state":
       return {
-        stroke: "var(--blue, #2c6ec0)",
+        stroke: "var(--blue)",
         strokeWidth: 2,
         strokeDasharray: "1 5",
         className: "graph-edge-state",
@@ -58,7 +58,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "artifact":
       return {
-        stroke: "var(--cat-input-line, #6b8e7f)",
+        stroke: "var(--cat-input-line)",
         strokeWidth: 4,
         className: "graph-edge-artifact",
         showLabel: true,
@@ -66,14 +66,14 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "route":
       return {
-        stroke: "var(--accent-strong, #1e7a4d)",
+        stroke: "var(--accent-strong)",
         strokeWidth: 2,
         className: "graph-edge-route",
         showLabel: true
       };
     case "control":
       return {
-        stroke: "var(--red, #c0432c)",
+        stroke: "var(--red)",
         strokeWidth: 2,
         strokeDasharray: "4 4",
         className: "graph-edge-control",
@@ -81,7 +81,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
       };
     case "remote_a2a":
       return {
-        stroke: "var(--cat-remote-line, #c0432c)",
+        stroke: "var(--cat-remote-line)",
         strokeWidth: 5,
         className: "graph-edge-remote",
         showLabel: true
@@ -89,7 +89,7 @@ function specForKind(kind: string | undefined): EdgeStyleSpec {
     case "event_output":
     default:
       return {
-        stroke: "var(--cat-agent-line, #2c6ec0)",
+        stroke: "var(--cat-agent-line)",
         strokeWidth: 2,
         className: "graph-edge-event_output",
         showLabel: false
@@ -143,7 +143,7 @@ function GraphEdgeBase(props: EdgeProps<GraphEdgeData>) {
   const isHighlighted = Boolean(data?.highlightCount);
   const hasComment = Boolean(data?.commentCount);
   const selectedStrokeWidth = Math.max(spec.strokeWidth + 3, spec.strokeWidth * 1.8);
-  const highlightStroke = data?.highlightColor ?? "var(--cat-workflow-line, #2f8a68)";
+  const highlightStroke = data?.highlightColor ?? "var(--cat-workflow-line)";
 
   return (
     <>

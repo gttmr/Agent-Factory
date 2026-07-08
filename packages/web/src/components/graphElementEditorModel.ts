@@ -54,10 +54,6 @@ export function isNodeModuleLinkEditable(node: GraphNode, edges: GraphEdge[]): b
   return isModuleBoundNodeKind(node.node_kind) && !hasIncidentEdge(node.id, edges) && !hasNodeContract(node);
 }
 
-export function isNodeRuntimeControlEditable(_node: GraphNode): boolean {
-  return false;
-}
-
 export function isEdgeKindEditable(edge: GraphEdge): boolean {
   return edge.edge_kind !== "route" && edge.edge_kind !== "remote_a2a";
 }

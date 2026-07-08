@@ -9,6 +9,7 @@ import type {
   GraphNode,
   LaneId
 } from "../../analyzer/types";
+import { graphEdgeId } from "../../graph/graphDisplay";
 
 export interface GraphNodeData {
   graphNode: GraphNode;
@@ -19,6 +20,7 @@ export interface GraphNodeData {
   commentCount?: number;
   commentTooltip?: string;
   highlightCount?: number;
+  moduleSubtype?: string | null;
 }
 
 export interface GraphRouteSummary {
@@ -280,7 +282,7 @@ export function layoutGraphIR(
   });
 
   const rfEdges: ReactFlowEdge<GraphEdgeData>[] = allEdges.map((e, i) => {
-    const id = e.id ?? `edge-${i}`;
+    const id = graphEdgeId(e, i);
     return {
       id,
       source: e.from,

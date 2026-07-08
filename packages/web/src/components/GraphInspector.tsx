@@ -4,18 +4,18 @@ import type {
   GraphEdge,
   GraphIR,
   GraphNode,
-  ModuleCandidate,
-  ModuleCategory
+  ModuleCandidate
 } from "../analyzer/types";
 import { CategoryBadge, SubtypeBadge, getSubtypeValue } from "./CategoryBadge";
+import { GraphElementTabs } from "./graph/GraphElementTabs";
 import {
   availableGraphElementGroups,
   nextGraphElementGroupAfterSelectionChange,
-  type GraphElementGroup,
   type GraphElementGroupId
 } from "./graphElementEditorModel";
 import { routeMapForNode, upstreamHumanPromptForRouter, type GraphRouteSummary } from "./graph/layout";
 import { FieldSpecList, JsonDetails, MappingTable, SchemaRefCards } from "./GraphSchemaDetails";
+import { graphNodeKindToModuleCategory } from "../graph/graphDisplay";
 
 interface GraphInspectorProps {
   selectedNode: GraphNode | null;
@@ -27,16 +27,6 @@ interface GraphInspectorProps {
   catalogContracts?: Record<string, unknown>;
   onNavigateToA2AContracts?: () => void;
   onClose: () => void;
-}
-
-function moduleCatFromKind(kind: string | undefined): ModuleCategory | null {
-  if (kind === "workflow_call") return "workflow";
-  if (kind === "adapter_call") return "adapter";
-  if (kind === "remote_agent_call") return "remote_a2a";
-  if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") {
-    return kind;
-  }
-  return null;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -97,33 +87,6 @@ function RouteMapTable({ routes }: { routes: readonly GraphRouteSummary[] }) {
   );
 }
 
-function GraphElementTabs({
-  activeGroup,
-  groups,
-  onGroupChange
-}: {
-  activeGroup: GraphElementGroupId;
-  groups: readonly GraphElementGroup[];
-  onGroupChange: (group: GraphElementGroupId) => void;
-}) {
-  return (
-    <div className="graph-element-tabs" role="tablist" aria-label="그래프 요소 상세 그룹">
-      {groups.map((group) => (
-        <button
-          key={group.id}
-          type="button"
-          role="tab"
-          aria-selected={activeGroup === group.id}
-          className={`graph-element-tab${activeGroup === group.id ? " is-active" : ""}`}
-          onClick={() => onGroupChange(group.id)}
-        >
-          {group.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function GraphInspector(props: GraphInspectorProps) {
   const {
     selectedNode,
@@ -160,7 +123,7 @@ export function GraphInspector(props: GraphInspectorProps) {
   }
 
   if (selectedNode) {
-    const cat = moduleCatFromKind(selectedNode.node_kind);
+    const cat = graphNodeKindToModuleCategory(selectedNode.node_kind);
     const subtype = candidate ? getSubtypeValue(candidate) : null;
     const agentMode = selectedNode.node_kind === "agent"
       ? selectedNode.agent_execution_mode === "chat"
@@ -187,7 +150,12 @@ export function GraphInspector(props: GraphInspectorProps) {
           </button>
         </header>
 
-        <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={setActiveGroup} />
+        <GraphElementTabs
+          activeGroup={activeGroup}
+          groups={groups}
+          ariaLabel="그래프 요소 상세 그룹"
+          onGroupChange={setActiveGroup}
+        />
 
         {activeGroup === "summary" ? (
           <Section title="요약">
@@ -397,7 +365,12 @@ export function GraphInspector(props: GraphInspectorProps) {
           </button>
         </header>
 
-        <GraphElementTabs activeGroup={activeGroup} groups={groups} onGroupChange={setActiveGroup} />
+        <GraphElementTabs
+          activeGroup={activeGroup}
+          groups={groups}
+          ariaLabel="그래프 요소 상세 그룹"
+          onGroupChange={setActiveGroup}
+        />
 
         {activeGroup === "summary" ? (
           <Section title="요약">

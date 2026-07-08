@@ -24,6 +24,7 @@ import {
   type CommentAnchor
 } from "../state/useCollaboration";
 import { useGraphIR } from "../state/useGraphIR";
+import { graphEdgeId } from "../graph/graphDisplay";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { DesignApprovalStep } from "./design/DesignApprovalStep";
 import { DesignReviewStep, type DesignReviewHandlers } from "./design/DesignReviewStep";
@@ -110,7 +111,7 @@ export default function DesignWorkbench() {
   const anchor = useMemo<CommentAnchor | null>(() => commentAnchorFromSelection(selection), [selection]);
   const nodeById = useMemo(() => new Map<string, GraphNode>((graphIR?.nodes ?? []).map((node) => [node.id, node])), [graphIR]);
   const edgeById = useMemo(
-    () => new Map<string, GraphEdge>((graphIR?.edges ?? []).map((edge, index) => [edge.id ?? `edge-${index}`, edge])),
+    () => new Map<string, GraphEdge>((graphIR?.edges ?? []).map((edge, index) => [graphEdgeId(edge, index), edge])),
     [graphIR]
   );
   const candidateById = useMemo(() => {

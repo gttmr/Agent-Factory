@@ -90,9 +90,9 @@
 }
 
 .subtype-badge {
-  background: #f3f5f1;
+  background: var(--surface-muted);
   border-color: var(--line);
-  color: #26313d;
+  color: var(--text-strong);
 }
 
 /* ---- protocol badge ---- */
@@ -107,13 +107,13 @@
   width: fit-content;
   white-space: nowrap;
   border: 1px solid var(--line);
-  background: #f8faf6;
-  color: #26313d;
+  background: var(--surface);
+  color: var(--text-strong);
 }
 
 .protocol-badge.protocol-mcp {
   background: var(--tint-lavender);
-  border-color: #c5b6ec;
+  border-color: var(--line-strong);
   color: var(--accent);
 }
 
@@ -195,19 +195,19 @@
 }
 
 .affinity.high {
-  background: #c5ecd5;
-  border-color: #74c699;
-  color: #0e562e;
+  background: var(--success-soft);
+  border-color: var(--success-line);
+  color: var(--success-text);
 }
 
 .affinity.medium {
-  background: #fbe6c2;
-  border-color: #d6a55b;
-  color: #7a4500;
+  background: var(--warning-soft);
+  border-color: var(--warning-line);
+  color: var(--warning-text);
 }
 
 .affinity.low {
-  background: #eef0eb;
+  background: var(--surface-muted);
   border-color: var(--line);
   color: var(--text-muted);
 }
