@@ -1,36 +1,16 @@
 ---
 name: af-design-boundaries
-description: Refine Agent Factory analysis artifacts into approved module, workflow, runtime contract, catalog reuse, and Remote A2A boundary decisions. Use when Codex must review module candidates, Graph IR, runtimeContracts, A2A contracts, schema I/O, and reuse decisions before any Runtime Handoff or stub generation.
+description: Use when Agent Factory analysis artifacts need module approval decisions, Graph IR review, runtime/A2A contract readiness, missing-information closure, or Stage Runner design proposals before Runtime Handoff.
 ---
 
 # AF Design Boundaries
 
-## Overview
+Use this second DLC stage after analysis exists and before Runtime Handoff. Stage Runner proposed-first mode writes only design proposals; standalone canonical mode is secondary. The skill may report approval readiness, but it never toggles manifest approvals or stage statuses.
 
-Use this skill for the second DLC stage: reviewed analysis artifacts -> approved boundary design.
-This is the human-review gate before Runtime Handoff or source stub generation.
-
-## Required Reading
-
-- Read `../_shared/agent-factory-dlc.md`.
-- Read `../_shared/artifact-contracts.md`.
-- Read `../_shared/boundary-rules.md`.
-- Read `../_shared/runtime-support-rules.md`.
-- Read `references/design-review.md`.
-- Read repo-root `<repo>/docs/workbench/taxonomy.md`, `<repo>/docs/workbench/workflow-decision-guide.md`, and relevant `<repo>/schemas/` files when artifact fields are uncertain.
-
-## Workflow
-
-1. Load `artifacts/af/<req-id>/af-run-manifest.json` and `analysis-result.json`.
-2. Verify the previous stage exists. If the user supplies only a canonical `analysis-result.json` fixture for dry-run or continuation, treat it as a read-only stand-in for missing split artifacts and report that no manifest-backed approval can be recorded until an artifact root exists. If no canonical analysis artifact exists, stop and ask for the analysis artifact path.
-3. Review each module candidate for category, subtype, ownership, I/O schema, risk, reuse, and missing information.
-4. Update Graph IR only through valid node, container, edge, lane, and execution semantics from the repo schemas.
-5. Add or refine `runtimeContracts` for MCP/EAI/Legacy adapters, Context Manager, Callback Broker, ADK callbacks, and async resume when evidence requires them.
-6. Add or refine `a2aContracts` only when the Remote A2A high-friction contract is present.
-7. Write `boundary-design.md`, update `analysis-result.json`, and refresh split artifacts.
-8. Record human approval status in `af-run-manifest.json`.
-
-## Gate
-
-Do not approve a candidate with unresolved candidate-level `missing_information`.
-Do not move to `af-build-runtime-stub` until approved modules, required runtime contracts, Graph IR, and Remote A2A contracts are coherent.
+1. Read `../_shared/artifact-root-stage-runner.md` -> determine Stage Runner proposed-output mode or standalone canonical mode -> verify with `test -f <artifact-root>/af-run-manifest.json` -> stop if canonical design lacks a reviewed analysis artifact.
+2. Read `references/module-approval-rubric.md` -> approve, defer, or reject module candidates using existing taxonomy fields -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop on invalid category, subtype, owner, I/O, or risk fields.
+3. Read `../_shared/missing-information-gates.md` -> close or preserve candidate missing-information gates -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop before scaffold/build if approved candidates still have unresolved `missing_information`.
+4. Read `references/runtime-contract-review.md` -> review required `runtimeContracts` and runtime support decisions -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop if required runtime contracts remain unapproved or incoherent.
+5. Read `references/remote-a2a-review.md` -> review Remote A2A candidates and embedded `a2aContracts` -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop if high-friction fields or 1:1 contract pairing are missing.
+6. Read `references/graph-ir-review.md` -> review nodes, edges, route, state, artifact, human input, dynamic, callback, and remote edges -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop on Graph IR validation errors.
+7. Read `references/design-stage-output.md` -> emit only allowed Stage Runner proposal files or standalone canonical design edits -> verify with `find <run-dir>/proposed-artifacts -maxdepth 1 -type f -print` -> gate: do not write `catalog/*.yaml`, do not toggle approval booleans, and do not generate runtime source.

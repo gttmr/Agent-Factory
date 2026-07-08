@@ -1,34 +1,16 @@
 ---
 name: af-analyze-requirement
-description: Convert raw Agent Factory requirements into schema-first reviewed analysis artifacts. Use when Codex must normalize a request, extract evidence, classify first-pass module candidates, draft Graph IR, record missing information, and write artifact files under artifacts/af without generating runtime code.
+description: Use when a raw or imported Agent Factory requirement must become schema-first analysis artifacts, including evidence extraction, taxonomy classification, Graph IR draft, missing-information records, and Stage Runner analysis proposals without runtime code.
 ---
 
 # AF Analyze Requirement
 
-## Overview
+Use this first DLC stage to turn raw or imported requirements into reviewable analysis artifacts. Stage Runner proposed-first mode is primary; standalone canonical mode is secondary. Do not generate runtime source, catalog writes, deployment files, or production business logic.
 
-Use this skill for the first DLC stage: raw requirement -> reviewed analysis artifacts.
-The workbench can later import, visualize, and edit the artifacts, but this skill is responsible for producing the schema-first draft.
-
-## Required Reading
-
-- Read `../_shared/agent-factory-dlc.md`.
-- Read `../_shared/artifact-contracts.md`.
-- Read `../_shared/boundary-rules.md`.
-- Read `references/analysis-artifacts.md`.
-- Read repo-root docs only as needed: `<repo>/docs/workbench/analysis-guide.md`, `<repo>/docs/workbench/taxonomy.md`, `<repo>/schemas/analysis-result.schema.json`, `<repo>/schemas/normalized-requirement.schema.json`, `<repo>/schemas/module-candidate.schema.json`, and `<repo>/schemas/process-flow.schema.json`.
-
-## Workflow
-
-1. Resolve `repo_path` to the current Agent Factory repository and choose `artifacts/af/<req-id>/` as the output root.
-2. Capture the raw requirement, requester/domain/system hints, explicit constraints, and source paths.
-3. Produce factual evidence first. Put guesses in `assumptions`; put blockers in `missing_information`.
-4. Classify candidates only with `module_category`: `agent`, `workflow`, `adapter`, or `remote_a2a`.
-5. Draft Graph IR using existing schema vocabulary. Model sequence, fan-out/fan-in, loop, route, join, and human input as Graph IR details, not new taxonomy values.
-6. Write `analysis-result.json` and convenience split artifacts listed in `../_shared/artifact-contracts.md`.
-7. Update `af-run-manifest.json` with stage status, output paths, assumptions, and validation commands to run next.
-
-## Gate
-
-Do not generate runtime code, stubs, catalog edits, or deployment files in this stage.
-If the requirement lacks enough information for safe classification, keep the candidate as `needs_info` rather than inventing contract details.
+1. Read `../_shared/workflow-invariants.md` -> identify the artifact root or Stage Runner run context -> verify with `test -d <artifact-root>` -> stop if the target root or run directory is ambiguous.
+2. Read `references/stage-runner-analyze-output.md` -> choose proposed-only output or standalone canonical output -> verify with `test -d <run-dir>/proposed-artifacts` -> stop if Stage Runner mode lacks a run folder.
+3. Read `references/evidence-and-normalization.md` -> extract factual evidence, assumptions, contradictions, requester/domain hints, inputs, outputs, systems, and requirement-level missing information -> verify with `node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' <analysis-result-path>` -> stop if facts and assumptions are mixed.
+4. Read `../_shared/taxonomy-boundaries.md` -> classify candidates only as `agent`, `workflow`, `adapter`, or `remote_a2a` with valid subtype fields -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop on invalid category or inferred Remote A2A without contract evidence.
+5. Read `../_shared/missing-information-gates.md` -> record requirement-level and candidate-level missing information separately -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop if unresolved candidate missing information is marked approved.
+6. Read `references/analysis-result-shape.md` -> write only `analysis-result.json` in the allowed location -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> stop if runtime source, catalog, docs, or approval fields changed.
+7. Read `references/graph-ir-draft.md` -> draft process flow and Graph IR only from reviewed evidence -> verify with `node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>` -> gate: no code, no catalog write, no approval toggle.
