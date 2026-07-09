@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { selectStageRunnerNarrative } from "./stageRunnerNarrative.ts";
+import test from "node:test";
+import { selectProcessLog, selectStageRunnerNarrative } from "./stageRunnerNarrative.ts";
 
 const events = [
   {
@@ -55,6 +56,61 @@ assert.deepEqual(
     }
   }
 );
+
+test("selectProcessLog concatenates process chunks in event order", () => {
+  const processLog = selectProcessLog([
+    { phase: "process_event", snippet: "first line\n" },
+    { phase: "process_event", snippet: "second line\n" }
+  ]);
+
+  assert.equal(processLog, "first line\nsecond line\n");
+});
+
+test("selectProcessLog excludes codex event snippets", () => {
+  const processLog = selectProcessLog([
+    { phase: "process_event", snippet: "process output\n" },
+    { phase: "codex_event", snippet: "internal narrative\n" },
+    { phase: "process_event", snippet: "process error\n" }
+  ]);
+
+  assert.equal(processLog, "process output\nprocess error\n");
+});
+
+test("selectProcessLog returns null when there are no process events", () => {
+  assert.equal(selectProcessLog([]), null);
+});
+
+test("selectProcessLog labels transitions when stdout and stderr are mixed", () => {
+  const processLog = selectProcessLog([
+    { phase: "process_event", title: "stdout", snippet: "ok" },
+    { phase: "process_event", title: "stderr", snippet: "warning\n" }
+  ]);
+
+  assert.equal(processLog, "[stdout]\nok\n[stderr]\nwarning\n");
+});
+
+test("selectProcessLog preserves whitespace-only chunks in a single stream", () => {
+  const processLog = selectProcessLog([
+    { phase: "process_event", title: "stdout", snippet: " " },
+    { phase: "process_event", title: "stdout", snippet: "x" }
+  ]);
+
+  assert.equal(processLog, " x");
+});
+
+test("selectProcessLog keeps only the latest 200 process chunks", () => {
+  const processLog = selectProcessLog(
+    Array.from({ length: 250 }, (_, index) => ({
+      phase: "process_event",
+      title: "stdout",
+      snippet: `c${index}\n`
+    }))
+  );
+
+  assert.ok(processLog?.startsWith("[이전 출력 생략]\n"));
+  assert.ok(processLog?.includes("c249\n"));
+  assert.ok(!processLog?.includes("c0\n"));
+});
 
 assert.deepEqual(
   selectStageRunnerNarrative([

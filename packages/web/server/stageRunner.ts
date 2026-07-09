@@ -312,6 +312,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     catalogContext: catalogSnapshot.context
   });
   const events: StageRunEvent[] = [];
+  let appendChain: Promise<void> = Promise.resolve();
   const emit = async (event: Omit<StageRunEvent, "at" | "elapsedMs">) => {
     const full: StageRunEvent = {
       ...event,
@@ -320,7 +321,8 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     };
     events.push(full);
     input.onEvent?.(full);
-    await appendEvent(runDir, full);
+    appendChain = appendChain.then(() => appendEvent(runDir, full));
+    await appendChain;
   };
 
   await mkdir(proposedDir, { recursive: true });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { codexAnalyzerModels, type CodexAnalyzerModel } from "../analyzer/types";
 import type { StageRunEvent, StageRunRequestBody, StageRunStage, StageRunSummary } from "../state/apiClient";
 import {
@@ -9,7 +9,7 @@ import {
   useStartStageRun
 } from "../state/useStageRunner";
 import { Button, Panel, SectionHeader, SelectField } from "../ui/primitives";
-import { selectStageRunnerNarrative } from "./stageRunnerNarrative";
+import { selectProcessLog, selectStageRunnerNarrative } from "./stageRunnerNarrative";
 
 interface RunnerMetric {
   label: string;
@@ -54,15 +54,20 @@ export function StageRunnerPanel({
 }: StageRunnerPanelProps) {
   const [selectedModel, setSelectedModel] = useState<CodexAnalyzerModel>(codexAnalyzerModels[0]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [liveRunId, setLiveRunId] = useState<string | null>(null);
   const [liveEvents, setLiveEvents] = useState<StageRunEvent[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const processLogRef = useRef<HTMLPreElement | null>(null);
   const runsQuery = useStageRuns(reqId, stage);
   const runs = runsQuery.data ?? [];
   const detailQuery = useStageRunDetail(reqId, stage, selectedRunId);
   const applyMutation = useApplyStageRun(reqId, stage, currentArtifactEtag);
   const cancelMutation = useCancelStageRun(reqId, stage);
   const startMutation = useStartStageRun(reqId, stage, (event) => {
-    setLiveEvents((prev) => [...prev, event]);
+    setLiveEvents((prev) => {
+      const next = [...prev, event];
+      return next.length > 500 ? next.slice(-500) : next;
+    });
   });
 
   useEffect(() => {
@@ -73,8 +78,11 @@ export function StageRunnerPanel({
 
   const selectedRun = detailQuery.data?.summary ?? runs.find((run) => run.run_id === selectedRunId) ?? null;
   const detail = detailQuery.data;
-  const displayedEvents = startMutation.isPending ? liveEvents : detail?.events ?? [];
+  const displayedEvents = startMutation.isPending
+    ? liveEvents
+    : detail?.events ?? (selectedRunId === liveRunId ? liveEvents : []);
   const narrative = useMemo(() => selectStageRunnerNarrative(displayedEvents), [displayedEvents]);
+  const processLog = useMemo(() => selectProcessLog(displayedEvents), [displayedEvents]);
   const showNarrative = startMutation.isPending && (narrative.agentMessage || narrative.todoProgress);
   const canRun = !disabledReason && !startMutation.isPending;
   const canApply = Boolean(
@@ -85,12 +93,20 @@ export function StageRunnerPanel({
   );
   const latest = runs[0] ?? null;
 
+  useEffect(() => {
+    if (!startMutation.isPending || processLog === null) return;
+    const log = processLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [processLog, startMutation.isPending]);
+
   function handleRun() {
     setActionMessage(null);
+    setLiveRunId(null);
     setLiveEvents([]);
     startMutation.mutate(buildRunBody(selectedModel), {
       onSuccess: (summary) => {
         setSelectedRunId(summary.run_id);
+        setLiveRunId(summary.run_id);
         setActionMessage(
           summary.status === "failed"
             ? summary.last_error ?? "stage run 실패"
@@ -301,10 +317,22 @@ export function StageRunnerPanel({
                 <span>{event.phase}</span>
                 <strong>{event.title ?? event.message}</strong>
                 {typeof event.elapsedMs === "number" ? <small>{event.elapsedMs}ms</small> : null}
+                {event.phase === "validation" && event.title && event.message ? (
+                  <p className="af-runner-event-message">{event.message}</p>
+                ) : null}
               </li>
             ))}
           </ol>
         </section>
+
+        {processLog !== null ? (
+          <section className="af-runner-process-log" aria-label="실행 로그">
+            <h3>실행 로그</h3>
+            <pre ref={processLogRef} className="af-stream-log">
+              {processLog}
+            </pre>
+          </section>
+        ) : null}
       </div>
     </Panel>
   );
