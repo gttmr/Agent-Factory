@@ -6,6 +6,7 @@ import {
   ArtifactValidationError,
   REQ_ID_PATTERN
 } from "./artifactRootStore";
+import { isRecord, readJsonBody, sendJson } from "./httpApi";
 
 type MiddlewareNext = (error?: unknown) => void;
 
@@ -444,24 +445,4 @@ function handleError(error: unknown, res: ServerResponse, next: MiddlewareNext):
     return;
   }
   next(error);
-}
-
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-  }
-  const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw.trim()) return {};
-  return JSON.parse(raw);
-}
-
-function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
-  res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(`${JSON.stringify(body)}\n`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

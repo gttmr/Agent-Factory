@@ -10,7 +10,6 @@ import {
   DEFAULT_ADK_CHAT_PORT,
   RuntimeChatManager,
   buildAdkServerCommand,
-  extractFinalTextFromAdkEvents,
   resolveAdkRuntimeVenv
 } from "./runtimeChat.ts";
 import {
@@ -96,12 +95,6 @@ try {
     "--with_ui",
     "."
   ]);
-
-  const finalText = extractFinalTextFromAdkEvents([
-    { content: { parts: [{ functionCall: { name: "demo_tool" } }], role: "model" } },
-    { content: { parts: [{ text: "Synthetic loan precheck response" }], role: "model" } }
-  ]);
-  assert.equal(finalText, "Synthetic loan precheck response");
 
   await store.createRoot("req-a2a");
   const a2aPort = await getAvailablePort();

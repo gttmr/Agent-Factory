@@ -4,6 +4,7 @@ import { join, relative, resolve } from "node:path";
 import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import { buildPublishedEntry, deepEqualPublishedFields } from "./catalogPublishEntry";
 import { targetCatalogFile } from "./catalogPublishTarget";
+import { isRecord, readJsonBody, sendJson } from "./httpApi";
 import {
   validatePublishedProposalSource,
   validatePublishRequest,
@@ -263,20 +264,6 @@ function relativeContractPath(rootDir: string, path: string): string {
   return relative(rootDir, path).split("\\").join("/");
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
-  }
-  const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw.trim()) return {};
-  return JSON.parse(raw);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
 function handleError(error: unknown, res: ServerResponse, next: MiddlewareNext): void {
   if (error instanceof Error) {
     console.error("[af-catalog] 실패:", error);
@@ -284,10 +271,4 @@ function handleError(error: unknown, res: ServerResponse, next: MiddlewareNext):
     return;
   }
   next(error);
-}
-
-function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
-  res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(`${JSON.stringify(body)}\n`);
 }

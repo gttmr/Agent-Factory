@@ -47,14 +47,6 @@ export interface RuntimeChatMockLabPrerequisite {
   readonly message: string | null;
 }
 
-export interface RuntimeChatInstallResult {
-  ok: boolean;
-  command: string;
-  stdout: string;
-  stderr: string;
-  status: RuntimeChatStatus;
-}
-
 export interface RuntimeChatStartResult {
   ok: boolean;
   command: string;

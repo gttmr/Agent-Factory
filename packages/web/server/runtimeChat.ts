@@ -53,14 +53,6 @@ export interface RuntimeChatStatus {
   };
 }
 
-export interface RuntimeChatInstallResult {
-  ok: boolean;
-  command: string;
-  stdout: string;
-  stderr: string;
-  status: RuntimeChatStatus;
-}
-
 export interface RuntimeChatStartResult {
   ok: boolean;
   command: string;
@@ -169,17 +161,6 @@ export class RuntimeChatManager {
 
   async status(reqId: string): Promise<RuntimeChatStatus> {
     return await this.buildStatus(await this.context(reqId));
-  }
-
-  async install(reqId: string): Promise<RuntimeChatInstallResult> {
-    const ctx = await this.context(reqId);
-    return {
-      ok: false,
-      command: "manual shared ADK runtime setup",
-      stdout: "",
-      stderr: setupHint(ctx),
-      status: await this.buildStatus(ctx)
-    };
   }
 
   async start(reqId: string): Promise<RuntimeChatStartResult> {
@@ -425,19 +406,6 @@ export function buildAdkServerCommand(input: { adkPath: string; host: string; po
     args,
     display: `${command} ${args.join(" ")}`
   };
-}
-
-export function extractFinalTextFromAdkEvents(events: unknown[]): string {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (!isRecord(event) || !isRecord(event.content) || !Array.isArray(event.content.parts)) continue;
-    const text = event.content.parts
-      .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text : ""))
-      .join("")
-      .trim();
-    if (text) return text;
-  }
-  return "";
 }
 
 async function discoverAppName(stubDir: string): Promise<string> {
