@@ -138,7 +138,7 @@ export function buildRunnableGraph(context) {
   return { edges: finalEdges, joins };
 }
 
-export function runtimePairs(edgeSpecs) {
+function runtimePairs(edgeSpecs) {
   const pairs = [];
   for (const spec of edgeSpecs) {
     if (spec.kind === "pair") {
@@ -164,7 +164,7 @@ export function workflowEdgeLiteral(edgeSpecs) {
   return `[\n${rows.join("\n")}\n    ]`;
 }
 
-export function assertAcyclic(edges) {
+function assertAcyclic(edges) {
   const adjacency = new Map();
   const inDegree = new Map();
   const nodes = new Set();

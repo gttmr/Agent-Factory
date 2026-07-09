@@ -44,7 +44,7 @@ export function buildRuntimeChatSmoke({ modules, normalizedRequirement, outputMo
   };
 }
 
-export function firstSmokeSample({ modules }) {
+function firstSmokeSample({ modules }) {
   for (const module of modules) {
     const sample = module.smoke_spec?.sample_user_message;
     if (typeof sample === "string" && sample.trim()) return sample.trim();
