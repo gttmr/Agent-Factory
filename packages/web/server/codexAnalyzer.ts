@@ -3,13 +3,19 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  adapterKinds as analyzerAdapterKinds,
+  agentKinds as analyzerAgentKinds,
+  AGENT_EXECUTION_MODES,
   GRAPH_CONTAINER_KINDS,
   GRAPH_EDGE_KINDS,
   GRAPH_EXECUTION_SEMANTICS,
   GRAPH_LANE_IDS,
   GRAPH_LAYOUT_POLICIES,
   GRAPH_NODE_KINDS,
-  AGENT_EXECUTION_MODES
+  moduleCategories as analyzerModuleCategories,
+  remoteContractKinds as analyzerRemoteContractKinds,
+  riskSignals as analyzerRiskSignals,
+  workflowKinds as analyzerWorkflowKinds
 } from "../src/analyzer/types";
 import { normalizeA2A } from "../src/analyzer/a2aNormalize";
 import type { A2ANormalizationDiagnostic } from "../src/analyzer/a2aNormalize";
@@ -21,20 +27,11 @@ import { createAnalyzerError, isAnalyzerError, progressFromError, summarizeProce
 import type { AnalyzerDiagnostics, AnalyzerProgressEvent, CodexAnalyzerRunner } from "./codexAnalyzerRunner";
 
 const allowedModels = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
-const moduleCategories = new Set(["agent", "workflow", "adapter", "remote_a2a"]);
-const adapterKinds = new Set([
-  "legacy_api",
-  "retrieval",
-  "rule_registry",
-  "data_query",
-  "template",
-  "computation",
-  "external_service",
-  "unknown"
-]);
-const agentKinds = new Set(["specialist", "shared"]);
-const workflowKinds = new Set(["orchestration", "graph", "dynamic", "unknown"]);
-const remoteContractKinds = new Set(["a2a", "unknown"]);
+const moduleCategories: ReadonlySet<string> = new Set(analyzerModuleCategories);
+const adapterKinds: ReadonlySet<string> = new Set(analyzerAdapterKinds);
+const agentKinds: ReadonlySet<string> = new Set(analyzerAgentKinds);
+const workflowKinds: ReadonlySet<string> = new Set(analyzerWorkflowKinds);
+const remoteContractKinds: ReadonlySet<string> = new Set(analyzerRemoteContractKinds);
 const runtimeContractKinds = new Set([
   "mcp_legacy_adapter",
   "eai_legacy_adapter",
@@ -47,16 +44,7 @@ const runtimeContractStatuses = new Set(["draft", "needs_info", "approved", "rej
 const riskLevels = new Set(["low", "medium", "high"]);
 const moduleStatuses = new Set(["needs_info", "approved", "deferred", "rejected"]);
 const requirementStatuses = new Set(["draft", "reviewed", "approved", "rejected"]);
-const riskSignals = new Set([
-  "personal_data",
-  "financial_data",
-  "credit_decision_support",
-  "customer_impact",
-  "external_message",
-  "transaction_write",
-  "human_approval_required",
-  "audit_required"
-]);
+const riskSignals: ReadonlySet<string> = new Set(analyzerRiskSignals);
 const systemAccess = new Set(["unknown", "read", "write", "read_write", "not_required"]);
 const graphNodeKinds: ReadonlySet<string> = new Set(GRAPH_NODE_KINDS);
 const graphContainerKinds: ReadonlySet<string> = new Set(GRAPH_CONTAINER_KINDS);

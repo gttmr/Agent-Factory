@@ -1,4 +1,12 @@
 import type { CatalogEntry } from "../catalog/types";
+import {
+  GRAPH_CALL_CONTROLS,
+  GRAPH_DECISION_OWNERS,
+  GRAPH_FLOW_KINDS,
+  GRAPH_INVOKE_BINDINGS,
+  GRAPH_POLICIES,
+  GRAPH_SIDE_EFFECTS
+} from "./types";
 import type {
   AgentExecutionMode,
   CatalogBinding,
@@ -239,89 +247,40 @@ function normalizeRuntimeBinding(value: unknown): ScaffoldPlanModule["runtime_bi
   return null;
 }
 
-const GRAPH_INVOKE_BINDINGS = new Set([
-  "unresolved",
-  "local_python",
-  "direct_api",
-  "mcp_tool",
-  "mcp_toolset",
-  "local_function",
-  "internal_workflow",
-  "ui_input",
-  "remote_a2a",
-  "callback_wait",
-  "unknown"
-]);
-
-const GRAPH_DECISION_OWNERS = new Set(["workflow_code", "llm", "human", "remote_agent", "system", "unknown"]);
-
-const GRAPH_CALL_CONTROLS = new Set([
-  "none",
-  "fixed_by_workflow",
-  "selected_by_llm",
-  "selected_by_human",
-  "event_callback",
-  "resume",
-  "unknown"
-]);
-
-const GRAPH_SIDE_EFFECTS = new Set(["none", "read", "write", "external_message", "transaction", "unknown"]);
-
-const GRAPH_POLICIES = new Set([
-  "none",
-  "auth_required",
-  "approval_required",
-  "audit_required",
-  "idempotency_required",
-  "timeout_retry_required",
-  "data_policy_required",
-  "manual_fallback_required",
-  "callback_resume_required",
-  "compensation_required",
-  "unknown"
-]);
-
-const GRAPH_FLOW_KINDS = new Set([
-  "sequence",
-  "route",
-  "fan_out",
-  "fan_in",
-  "loop_back",
-  "loop_exit",
-  "fallback",
-  "error",
-  "resume",
-  "callback",
-  "unknown"
-]);
+const GRAPH_INVOKE_BINDING_SET: ReadonlySet<string> = new Set(GRAPH_INVOKE_BINDINGS);
+const GRAPH_DECISION_OWNER_SET: ReadonlySet<string> = new Set(GRAPH_DECISION_OWNERS);
+const GRAPH_CALL_CONTROL_SET: ReadonlySet<string> = new Set(GRAPH_CALL_CONTROLS);
+const GRAPH_SIDE_EFFECT_SET: ReadonlySet<string> = new Set(GRAPH_SIDE_EFFECTS);
+const GRAPH_POLICY_SET: ReadonlySet<string> = new Set(GRAPH_POLICIES);
+const GRAPH_FLOW_KIND_SET: ReadonlySet<string> = new Set(GRAPH_FLOW_KINDS);
 
 function normalizeInvokeBinding(
   value: unknown,
   nodeKind: ProcessFlow["nodes"][number]["node_kind"] | null
 ): GraphInvokeBinding | null {
-  if (typeof value === "string" && GRAPH_INVOKE_BINDINGS.has(value)) return value as GraphInvokeBinding;
+  if (typeof value === "string" && GRAPH_INVOKE_BINDING_SET.has(value)) return value as GraphInvokeBinding;
   if (nodeKind === "workflow_call") return "internal_workflow";
   return null;
 }
 
 function normalizeDecisionOwner(value: unknown): GraphDecisionOwner | null {
-  return typeof value === "string" && GRAPH_DECISION_OWNERS.has(value) ? (value as GraphDecisionOwner) : null;
+  return typeof value === "string" && GRAPH_DECISION_OWNER_SET.has(value) ? (value as GraphDecisionOwner) : null;
 }
 
 function normalizeCallControl(value: unknown): GraphCallControl | null {
-  return typeof value === "string" && GRAPH_CALL_CONTROLS.has(value) ? (value as GraphCallControl) : null;
+  return typeof value === "string" && GRAPH_CALL_CONTROL_SET.has(value) ? (value as GraphCallControl) : null;
 }
 
 function normalizeGraphSideEffect(value: unknown): GraphSideEffect | null {
-  return typeof value === "string" && GRAPH_SIDE_EFFECTS.has(value) ? (value as GraphSideEffect) : null;
+  return typeof value === "string" && GRAPH_SIDE_EFFECT_SET.has(value) ? (value as GraphSideEffect) : null;
 }
 
 function normalizeGraphPolicy(value: unknown): GraphPolicy | null {
-  return typeof value === "string" && GRAPH_POLICIES.has(value) ? (value as GraphPolicy) : null;
+  return typeof value === "string" && GRAPH_POLICY_SET.has(value) ? (value as GraphPolicy) : null;
 }
 
 function normalizeFlowKind(value: unknown): GraphFlowKind | null {
-  return typeof value === "string" && GRAPH_FLOW_KINDS.has(value) ? (value as GraphFlowKind) : null;
+  return typeof value === "string" && GRAPH_FLOW_KIND_SET.has(value) ? (value as GraphFlowKind) : null;
 }
 
 function normalizeMockBinding(candidate: ModuleCandidate, graphNode: NonNullable<ProcessFlow["nodes"]>[number] | null): ScaffoldPlanModule["mock_binding"] {
@@ -559,22 +518,34 @@ function collectRunnableDynamicBlockers(
   const blockers: string[] = [];
   const nodes = processFlow?.nodes ?? [];
   const edges = processFlow?.edges ?? [];
+  const outgoingByFrom = new Map<string, ProcessFlow["edges"]>();
+  for (const edge of edges) {
+    const outgoing = outgoingByFrom.get(edge.from);
+    if (outgoing) {
+      outgoing.push(edge);
+    } else {
+      outgoingByFrom.set(edge.from, [edge]);
+    }
+  }
   const loopControls = nodes.filter((node) => node?.node_kind === "loop_control");
   for (const node of loopControls) {
-    const outgoing = edges.filter((edge) => edge?.from === node.id);
-    const backEdges = outgoing.filter((edge) => edge.execution_semantics === "loop_back");
-    const exitEdges = outgoing.filter((edge) => edge.execution_semantics === "loop_exit");
-    if (!backEdges.length || !exitEdges.length) {
-      blockers.push(`${node.id}: loop_control 은 loop_back 과 loop_exit edge가 모두 필요합니다.`);
-      continue;
-    }
-    const missingDecision = [...backEdges, ...exitEdges].filter((edge) => {
+    let hasBackEdge = false;
+    let hasExitEdge = false;
+    let missingDecision = false;
+    for (const edge of outgoingByFrom.get(node.id) ?? []) {
+      if (edge.execution_semantics !== "loop_back" && edge.execution_semantics !== "loop_exit") continue;
+      if (edge.execution_semantics === "loop_back") hasBackEdge = true;
+      if (edge.execution_semantics === "loop_exit") hasExitEdge = true;
       const hasCondition = typeof edge.route_condition === "string" && edge.route_condition.trim();
       const hasAliases = Array.isArray(edge.route_aliases) && edge.route_aliases.some((alias) => alias.trim());
       const defaultExit = edge.execution_semantics === "loop_exit" && edge.is_default_route === true;
-      return !hasCondition && !hasAliases && !defaultExit;
-    });
-    if (missingDecision.length > 0) {
+      if (!hasCondition && !hasAliases && !defaultExit) missingDecision = true;
+    }
+    if (!hasBackEdge || !hasExitEdge) {
+      blockers.push(`${node.id}: loop_control 은 loop_back 과 loop_exit edge가 모두 필요합니다.`);
+      continue;
+    }
+    if (missingDecision) {
       blockers.push(
         `${node.id}: dynamic loop runnable 생성을 위해 loop_back/loop_exit route_condition 또는 route_aliases를 검토하세요.`
       );

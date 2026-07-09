@@ -454,7 +454,7 @@ function canonicalizeGraphIRIds(graphIR: GraphIR): GraphIR {
  * `null` rather than fabricated values. A `migrated_from_legacy_stage_shape`
  * warning is appended to `validation.warnings` so the UI can banner it.
  */
-export function legacyStageToGraphIR(input: unknown, requirementId: string): GraphIR {
+function legacyStageToGraphIR(input: unknown, requirementId: string): GraphIR {
   if (!isRecord(input)) {
     return {
       requirement_id: requirementId,

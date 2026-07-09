@@ -106,7 +106,7 @@ export function buildRuntimeContracts({
  * the override is observable; if every category-gated heuristic says skip, an
  * ADK Callback baseline is emitted as the editable starting point.
  */
-export function buildRuntimeContractsForCandidate(
+function buildRuntimeContractsForCandidate(
   candidate: ModuleCandidate,
   requirement: NormalizedRequirement
 ): RuntimeContract[] {
@@ -548,6 +548,8 @@ function buildCallbackBrokerContract(candidate: ModuleCandidate, _requirement: N
 }
 
 function buildAdkCallbackContract(candidate: ModuleCandidate, _requirement: NormalizedRequirement): RuntimeContract {
+  const requiresAsyncRuntimeSupport = needsAsyncRuntimeSupport(candidate, _requirement);
+  const hasWriteSideEffect = isWriteLike(candidate, _requirement);
   return {
     contract_id: runtimeContractId(candidate.id, "adk-callback"),
     contract_kind: "adk_callback",
@@ -558,18 +560,18 @@ function buildAdkCallbackContract(candidate: ModuleCandidate, _requirement: Norm
     required_review_fields: ["policies.masking_policy", "policies.data_policy"],
     reviewer_notes: "",
     runtime_support: {
-      context_manager_required: needsAsyncRuntimeSupport(candidate, _requirement),
+      context_manager_required: requiresAsyncRuntimeSupport,
       callback_broker_required: false,
-      human_approval_required: isWriteLike(candidate, _requirement),
-      idempotency_required: isWriteLike(candidate, _requirement),
+      human_approval_required: hasWriteSideEffect,
+      idempotency_required: hasWriteSideEffect,
       audit_required: true,
-      compensation_required: isWriteLike(candidate, _requirement)
+      compensation_required: hasWriteSideEffect
     },
     operation: {
-      operation_type: isWriteLike(candidate, _requirement) ? "approval" : "read",
+      operation_type: hasWriteSideEffect ? "approval" : "read",
       side_effect_level: "none",
       callback_expected: false,
-      async_resume_required: needsAsyncRuntimeSupport(candidate, _requirement)
+      async_resume_required: requiresAsyncRuntimeSupport
     },
     identifiers: ["work_item_id", "correlation_id", "idempotency_key"],
     policies: defaultPolicies(),

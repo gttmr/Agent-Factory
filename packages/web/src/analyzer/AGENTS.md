@@ -16,7 +16,7 @@ and tests for those contracts.
 | Graph IR migrations and soft validation | `graphMigration.ts` |
 | Module review status and Graph IR sync | `moduleReview.ts`, `moduleReviewGraph.ts` |
 | Runtime support contracts | `runtimeContracts.ts` |
-| Import/export normalization | `analysisArtifactImport.ts`, `analysisArtifactExport.ts` |
+| Import normalization | `analysisArtifactImport.ts` |
 
 ## Local Rules
 

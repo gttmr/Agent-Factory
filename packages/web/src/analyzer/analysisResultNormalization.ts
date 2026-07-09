@@ -15,7 +15,7 @@ export function normalizeAnalysisResultForWorkbench(result: AnalysisResult): Ana
   };
 }
 
-export function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCandidate[] {
+function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCandidate[] {
   return candidates.map((candidate) => ({
     ...candidate,
     missing_information_resolution:
