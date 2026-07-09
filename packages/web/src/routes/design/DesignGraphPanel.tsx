@@ -2,27 +2,17 @@ import { lazy, Suspense } from "react";
 import type { GraphEditState, Selection } from "../../components/GraphCanvas";
 import { GraphElementEditor } from "../../components/GraphElementEditor";
 import { GraphInspector } from "../../components/GraphInspector";
-import type { AnalysisResult, GraphEdge, GraphIR, GraphNode, ModuleCandidate, RuntimeContract } from "../../analyzer/types";
-import { A2AContractInspector } from "../../design/A2AContractPanel";
-import type { buildA2AReviewRows } from "../../design/A2AContractPanel";
-import { CommentThread } from "../../design/CommentThread";
-import { RuntimeContractInspector } from "../../design/RuntimeContractPanel";
-import type { CommentAnchor, CommentRecord, CommentStage, HighlightRecord } from "../../state/useCollaboration";
-import type { AuthorRole } from "../../state/useAuthor";
+import type { AnalysisResult, GraphEdge, GraphIR, GraphNode, ModuleCandidate } from "../../analyzer/types";
+import type { CommentRecord, HighlightRecord } from "../../state/useCollaboration";
 import { Button, EmptyState } from "../../ui/primitives";
-import { INSPECTOR_ENABLED, type SidebarTab } from "./designStageModel";
-import { SelectionHeader } from "./DesignSelectionHeader";
+import type { SidebarTab } from "./designStageModel";
 
 const GraphCanvas = lazy(async () => {
   const module = await import("../../components/GraphCanvas");
   return { default: module.GraphCanvas };
 });
 
-type A2AReviewRow = ReturnType<typeof buildA2AReviewRows>[number];
-
 interface DesignGraphPanelProps {
-  reqId: string;
-  activeTab: SidebarTab;
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
   errorCount: number;
@@ -31,16 +21,10 @@ interface DesignGraphPanelProps {
   selectedNode: GraphNode | null;
   selectedEdge: GraphEdge | null;
   selectedCandidate: ModuleCandidate | null;
-  selectedContract: RuntimeContract | null;
-  selectedA2ARow: A2AReviewRow | null;
   a2aContracts: AnalysisResult["a2aContracts"];
   catalogContracts: Record<string, unknown>;
   comments: CommentRecord[];
   highlights: HighlightRecord[];
-  anchor: CommentAnchor | null;
-  authorName: string;
-  authorRole: AuthorRole;
-  commentPending: boolean;
   saving: boolean;
   nodeLabel: (id: string) => string;
   onSelectionChange: (selection: Selection) => void;
@@ -48,19 +32,9 @@ interface DesignGraphPanelProps {
   onSaveGraphIR: (graphIR: GraphIR) => void;
   onOpenCatalogWorkflowPicker: () => void;
   onSetActiveTab: (tab: SidebarTab) => void;
-  onSetActionMessage: (message: string | null) => void;
-  onSaveRuntimeContract: (contract: RuntimeContract) => void;
-  onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
-  onAuthorNameChange: (value: string) => void;
-  onAuthorRoleChange: (value: AuthorRole) => void;
-  onCreateComment: (input: { stage: CommentStage; anchor: CommentAnchor; body_md: string }) => void;
-  onUpdateComment: (id: string, body: Partial<Pick<CommentRecord, "body_md" | "status">>) => void;
-  onDeleteComment: (id: string) => void;
 }
 
 export function DesignGraphPanel({
-  reqId,
-  activeTab,
   analysis,
   graphIR,
   errorCount,
@@ -69,31 +43,17 @@ export function DesignGraphPanel({
   selectedNode,
   selectedEdge,
   selectedCandidate,
-  selectedContract,
-  selectedA2ARow,
   a2aContracts,
   catalogContracts,
   comments,
   highlights,
-  anchor,
-  authorName,
-  authorRole,
-  commentPending,
   saving,
   nodeLabel,
   onSelectionChange,
   onEditStateChange,
   onSaveGraphIR,
   onOpenCatalogWorkflowPicker,
-  onSetActiveTab,
-  onSetActionMessage,
-  onSaveRuntimeContract,
-  onSaveA2AContract,
-  onAuthorNameChange,
-  onAuthorRoleChange,
-  onCreateComment,
-  onUpdateComment,
-  onDeleteComment
+  onSetActiveTab
 }: DesignGraphPanelProps) {
   return (
     <>
@@ -109,7 +69,7 @@ export function DesignGraphPanel({
           <span>errors <strong>{errorCount}</strong></span>
         </div>
       </div>
-      <div className={`af-design-grid${INSPECTOR_ENABLED ? "" : " af-design-grid--no-inspector"}`}>
+      <div className="af-design-grid">
         <aside className="af-design-sidebar" aria-label="선택 노드/엣지 정보">
           <div className="af-design-context-head">
             <span>선택 컨텍스트</span>
@@ -173,38 +133,6 @@ export function DesignGraphPanel({
           )}
         </section>
 
-        {INSPECTOR_ENABLED ? (
-          <aside className="af-design-inspector" aria-label="선택 검토 패널">
-            {activeTab === "runtime" ? (
-              <RuntimeContractInspector contract={selectedContract} saving={saving} onSave={onSaveRuntimeContract} onCancel={() => onSetActionMessage(null)} />
-            ) : activeTab === "a2a" ? (
-              <A2AContractInspector
-                candidate={selectedA2ARow?.candidate ?? null}
-                contract={selectedA2ARow?.contract ?? null}
-                saving={saving}
-                onSave={onSaveA2AContract}
-                onCancel={() => onSetActionMessage(null)}
-              />
-            ) : (
-              <>
-                <SelectionHeader selection={selection} graphIR={graphIR} />
-                <CommentThread
-                  reqId={reqId}
-                  comments={comments}
-                  anchor={anchor}
-                  authorName={authorName}
-                  authorRole={authorRole}
-                  isMutating={commentPending}
-                  onAuthorNameChange={onAuthorNameChange}
-                  onAuthorRoleChange={onAuthorRoleChange}
-                  onCreate={onCreateComment}
-                  onUpdate={onUpdateComment}
-                  onDelete={onDeleteComment}
-                />
-              </>
-            )}
-          </aside>
-        ) : null}
       </div>
     </>
   );

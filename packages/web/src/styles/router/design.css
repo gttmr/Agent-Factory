@@ -73,16 +73,9 @@
 
 .af-design-grid {
   display: grid;
-  grid-template-columns: minmax(18rem, 0.28fr) minmax(0, 1fr) minmax(18rem, 0.25fr);
+  grid-template-columns: minmax(18rem, 0.26fr) minmax(0, 1fr);
   gap: var(--space-lg);
   min-height: clamp(24rem, 42vh, 28rem);
-}
-
-/* Inspector 비활성 시(DesignWorkbench INSPECTOR_ENABLED=false): 우측 320px Inspector
-   열을 없애고 캔버스(1fr)가 그 영역까지 차지한다. 아래 1100px collapse 규칙이
-   소스 순서상 뒤에 있어 좁은 화면에서는 동일하게 1열로 접힌다. */
-.af-design-grid--no-inspector {
-  grid-template-columns: minmax(18rem, 0.26fr) minmax(0, 1fr);
 }
 
 @media (max-width: 1100px) {
@@ -92,7 +85,6 @@
 }
 
 .af-design-sidebar,
-.af-design-inspector,
 .af-design-canvas-pane {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -423,6 +415,23 @@
   gap: var(--space-lg);
 }
 
+.af-design-bottom > .af-design-sidebar-body > .af-runtime-tab-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: var(--space-lg);
+  min-height: 100%;
+}
+
+.af-runtime-tab-list,
+.af-runtime-tab-editor {
+  min-width: 0;
+}
+
+.af-runtime-tab-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .af-design-bottom > .af-design-sidebar-body > .af-a2a-tab-panel > .af-a2a-tab-actions {
   display: flex;
   justify-content: flex-end;
@@ -433,9 +442,10 @@
   color: var(--text-muted);
 }
 
-.af-design-inspector {
-  padding: 12px;
-  overflow-y: auto;
+@media (max-width: 900px) {
+  .af-design-bottom > .af-design-sidebar-body > .af-runtime-tab-panel {
+    grid-template-columns: 1fr;
+  }
 }
 
 .af-module-list {
