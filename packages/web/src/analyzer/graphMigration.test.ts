@@ -2,6 +2,36 @@ import assert from "node:assert/strict";
 import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "./graphMigration.ts";
 import type { GraphEdge, GraphIR, GraphNode } from "./types.ts";
 
+const unsupportedLegacyGraphMessage = /구버전 그래프 형식은 더 이상 지원되지 않습니다/;
+
+assert.throws(
+  () => normalizeGraphIRForRuntime(null, "req-legacy-reject"),
+  unsupportedLegacyGraphMessage
+);
+
+assert.throws(
+  () =>
+    normalizeGraphIRForRuntime(
+      {
+        requirement_id: "req-legacy-reject",
+        graph_id: "graph-001",
+        nodes: [{ id: "node-agent", label: "Agent", type: "agent" }],
+        edges: [
+          {
+            id: "edge-001",
+            from: "node-agent",
+            to: "node-output",
+            edge_type: "event",
+            data_channel: "event_output",
+            data: "payload"
+          }
+        ]
+      },
+      "req-legacy-reject"
+    ),
+  unsupportedLegacyGraphMessage
+);
+
 const graph: GraphIR = {
   requirement_id: "req-position",
   graph_id: "graph-001",

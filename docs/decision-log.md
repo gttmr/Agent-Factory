@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-09 · PR TBD — legacy stage-flow import dropped
+
+- **결정**: Workbench `analysis-result.json` import와 Graph IR normalization은 native Graph IR만 허용한다. `processFlow`가 non-record이거나 구버전 stage-flow/browser export 키(`nodes[].type`, `nodes[].subtype`, `edges[].edge_type`, `edges[].data_channel`, `edges[].data`)를 포함하면 변환하지 않고 "구버전 그래프 형식은 더 이상 지원되지 않습니다 — native Graph IR(analysis-result.json 최신 스키마)로 다시 내보내세요." 오류를 기존 import error surface에 표시한다.
+- **배경**: in-repo artifacts/templates는 native Graph IR이고 root validator는 이미 legacy node/edge keys를 거부한다. 오래된 out-of-repo browser import 호환성은 명시적으로 포기해 변환기가 잘못된 Graph IR을 조용히 보정하는 경로를 없앤다.
+- **영향**: `packages/web/src/analyzer/graphMigration.ts` native-only guard/normalization, `analysisResultNormalization.ts` import 오류 전파, `graphMigration.test.ts` rejection regression, Workbench import documentation. Early native Graph IR normalization(빈 containers/lanes, route aliases, human input contracts, positions, remote-agent calls)은 유지한다.
+
 ## 2026-07-09 · PR TBD — Design 계약 편집 UX와 stepper 계약 정렬
 
 - **결정**: Runtime 계약 편집기를 우측 Inspector 파킹 경로에서 Design 검토 하단 `Runtime 계약` 탭으로 옮긴다. Reviewer는 `RuntimeContractSidebar`에서 계약을 선택하고 같은 탭에서 status, policies, reviewer notes를 draft/save/revert로 편집하며, 저장은 기존 `analysis-result.json` 저장 경로를 그대로 사용한다.

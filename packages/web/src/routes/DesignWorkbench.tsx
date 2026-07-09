@@ -71,7 +71,7 @@ export default function DesignWorkbench() {
 
   const manifest = manifestData?.manifest;
   const analysis = analysisData?.data ?? null;
-  const { graphIR, errorCount, warningCount } = useGraphIR(analysis);
+  const { graphIR, errorCount, warningCount, normalizationError } = useGraphIR(analysis);
   const comments = commentsFile?.comments ?? [];
   const highlights = highlightsFile?.highlights ?? [];
   const runtimeContracts = analysis?.runtimeContracts ?? [];
@@ -93,7 +93,7 @@ export default function DesignWorkbench() {
   const unapprovedCandidateCount = analysis ? analysis.moduleCandidates.length - approvedCandidateCount : 0;
   const boundariesGateEnabled = Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
   const runtimeGateEnabled = Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady && a2aContractsReady;
-  const hasGraph = Boolean(graphIR);
+  const hasGraph = Boolean(graphIR) || Boolean(normalizationError);
   const reviewReady = allCandidatesApproved && errorCount === 0 && runtimeContractsReady && a2aContractsReady;
   const boundariesApproved = Boolean(manifest?.approvals.boundaries_approved);
   const runtimeApproved = Boolean(manifest?.approvals.runtime_contracts_approved);
@@ -198,6 +198,7 @@ export default function DesignWorkbench() {
             setActiveTab={setActiveTab}
             analysis={analysis}
             graphIR={graphIR}
+            normalizationError={normalizationError}
             errorCount={errorCount}
             selection={selection}
             graphEditState={graphEditState}

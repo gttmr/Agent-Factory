@@ -31,6 +31,7 @@ Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검�
 Workbench의 분석 단계는 두 경로를 지원한다. `/af/:reqId/analyze`에서 raw requirement 텍스트를 입력해 `af-analyze-requirement` Stage Runner를 실행할 수 있고, skill-led 운영에서 외부 producer가 만든 `artifacts/af/<req-id>/analysis-result.json`과 `af-run-manifest.json`을 browser file import로 올릴 수도 있다.
 Import 연결 방식은 browser file import다. Workbench가 로컬 `artifacts/af` 디렉터리를 자동 감시하거나 manifest의 `artifact_root`와 `outputs[]` 경로를 따라 host filesystem을 직접 읽지는 않는다.
 Import된 artifact는 live analyzer 응답과 같은 client-side normalization을 거쳐 `AnalysisResult`, `ModuleCandidate[]`, Runtime 계약, A2A 계약, Graph IR 상태로 hydrate된다.
+Import되는 `processFlow`는 native Graph IR(`node_kind`, `edge_kind`, `data_label`)이어야 한다. 구버전 stage-flow/browser export의 `nodes[].type`, `edges[].edge_type`, `edges[].data_channel`, `edges[].data` 형식은 더 이상 변환하지 않으며, Workbench는 최신 `analysis-result.json` 스키마로 다시 내보내라는 import 오류를 표시한다.
 Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마지막 검증 결과를 상태 요약으로 보여준다. `requirement_id`가 현재 분석 artifact와 다르면 연결하지 않는다.
 누락 정보나 모순이 남아 있으면 `분석 결과` 단계로, 그렇지 않으면 `모듈 검토` 단계로 이동해 reviewer가 검토를 계속한다.
 검토 후 canonical artifact는 `artifacts/af/<req-id>/`에 그대로 남는다. Stage Runner 결과는 `runs/<stage>/<run-id>/`에 보존되고, 적용된 artifact와 manifest는 같은 root에서 파일로 확인한다.
