@@ -37,23 +37,18 @@ function backfillCandidateReviewFields(candidates: ModuleCandidate[]): ModuleCan
 }
 
 function normalizeProcessFlowForWorkbench(result: AnalysisResult): AnalysisResult {
-  try {
-    const requirementId =
-      result.normalizedRequirement && typeof result.normalizedRequirement.id === "string"
-        ? result.normalizedRequirement.id
-        : "req-001";
-    const migrated = normalizeGraphIRForRuntime(result.processFlow, requirementId);
-    const soft = validateGraphIRSoft(migrated);
-    const validated = {
-      ...migrated,
-      validation: mergeGraphIRValidation(migrated.validation, soft)
-    };
-    const processFlow = hasModuleCoverageErrors(validated)
-      ? repairGraphIRModuleCoverage(validated, result.moduleCandidates)
-      : validated;
-    return { ...result, processFlow };
-  } catch (error) {
-    console.warn("[analyzer] graph-ir client migration failed (non-fatal):", error);
-    return result;
-  }
+  const requirementId =
+    result.normalizedRequirement && typeof result.normalizedRequirement.id === "string"
+      ? result.normalizedRequirement.id
+      : "req-001";
+  const migrated = normalizeGraphIRForRuntime(result.processFlow, requirementId);
+  const soft = validateGraphIRSoft(migrated);
+  const validated = {
+    ...migrated,
+    validation: mergeGraphIRValidation(migrated.validation, soft)
+  };
+  const processFlow = hasModuleCoverageErrors(validated)
+    ? repairGraphIRModuleCoverage(validated, result.moduleCandidates)
+    : validated;
+  return { ...result, processFlow };
 }

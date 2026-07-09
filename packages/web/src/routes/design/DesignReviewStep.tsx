@@ -79,6 +79,7 @@ interface DesignReviewStepProps {
   setActiveTab: Dispatch<SetStateAction<SidebarTab>>;
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
+  normalizationError?: string;
   errorCount: number;
   selection: Selection;
   graphEditState: GraphEditState | null;
@@ -96,6 +97,7 @@ export function DesignReviewStep({
   setActiveTab,
   analysis,
   graphIR,
+  normalizationError,
   errorCount,
   selection,
   graphEditState,
@@ -114,6 +116,7 @@ export function DesignReviewStep({
       <DesignGraphPanel
         analysis={analysis}
         graphIR={graphIR}
+        normalizationError={normalizationError}
         errorCount={errorCount}
         selection={selection}
         graphEditState={graphEditState}

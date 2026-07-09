@@ -15,6 +15,7 @@ const GraphCanvas = lazy(async () => {
 interface DesignGraphPanelProps {
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
+  normalizationError?: string;
   errorCount: number;
   selection: Selection;
   graphEditState: GraphEditState | null;
@@ -37,6 +38,7 @@ interface DesignGraphPanelProps {
 export function DesignGraphPanel({
   analysis,
   graphIR,
+  normalizationError,
   errorCount,
   selection,
   graphEditState,
@@ -104,13 +106,26 @@ export function DesignGraphPanel({
           <div className="af-design-canvas-toolbar">
             <div className="af-design-canvas-title">
               <span>Graph IR Canvas</span>
-              <strong>{graphIR ? `${graphIR.nodes?.length ?? 0} nodes · ${graphIR.edges?.length ?? 0} edges` : "processFlow 없음"}</strong>
+              <strong>
+                {normalizationError
+                  ? "processFlow 형식 오류"
+                  : graphIR
+                    ? `${graphIR.nodes?.length ?? 0} nodes · ${graphIR.edges?.length ?? 0} edges`
+                    : "processFlow 없음"}
+              </strong>
             </div>
-            <Button type="button" variant="secondary" onClick={onOpenCatalogWorkflowPicker} disabled={saving || graphEditState?.editModeActive === true}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onOpenCatalogWorkflowPicker}
+              disabled={saving || graphEditState?.editModeActive === true || Boolean(normalizationError)}
+            >
               카탈로그 워크플로우 삽입
             </Button>
           </div>
-          {graphIR ? (
+          {normalizationError ? (
+            <EmptyState title="Graph IR 형식 오류" description={normalizationError} />
+          ) : graphIR ? (
             <Suspense fallback={<div className="af-design-canvas-loading">Graph IR 불러오는 중...</div>}>
               <GraphCanvas
                 graphIR={graphIR}

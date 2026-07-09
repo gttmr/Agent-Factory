@@ -1,6 +1,6 @@
-// Pure, dependency-free helpers for migrating legacy stage-flow process flows
-// into ADK Graph IR, plus a soft structural validator that mirrors the
-// validate-artifacts.mjs structural checks without throwing.
+// Pure, dependency-free helpers for normalizing native ADK Graph IR process
+// flows, plus a soft structural validator that mirrors the validate-artifacts.mjs
+// structural checks without throwing.
 //
 // Both Vite (browser) and Node consume this module. Do NOT add `node:` imports.
 
@@ -23,7 +23,6 @@ import type {
   GraphContainer,
   GraphEdge,
   GraphIR,
-  GraphLane,
   GraphNode,
   GraphCallControl,
   GraphDecisionOwner,
@@ -34,8 +33,7 @@ import type {
   GraphValidation,
   GraphValidationIssue,
   LaneId,
-  NodeKind,
-  OwnerScope
+  NodeKind
 } from "./types";
 
 const NODE_KIND_SET = new Set<string>(GRAPH_NODE_KINDS);
@@ -70,20 +68,18 @@ const MODULE_FORBIDDEN_NODE_KIND_SET = new Set<string>([
   "callback_wait"
 ]);
 const REMOTE_AGENT_NODE_KIND_SET = new Set<string>(["remote_a2a", "remote_agent_call"]);
+const UNSUPPORTED_LEGACY_GRAPH_IR_MESSAGE =
+  "구버전 그래프 형식은 더 이상 지원되지 않습니다 — native Graph IR(analysis-result.json 최신 스키마)로 다시 내보내세요.";
+
+class UnsupportedGraphIRFormatError extends Error {
+  constructor() {
+    super(UNSUPPORTED_LEGACY_GRAPH_IR_MESSAGE);
+    this.name = "UnsupportedGraphIRFormatError";
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isGraphIRShaped(value: Record<string, unknown>): boolean {
-  // Graph IR has containers + lanes arrays AND its nodes use `node_kind`
-  // rather than the legacy `type` field.
-  const hasContainers = Array.isArray(value.containers);
-  const hasLanes = Array.isArray(value.lanes);
-  if (!hasContainers || !hasLanes) return false;
-  const nodes = Array.isArray(value.nodes) ? value.nodes : [];
-  if (nodes.length === 0) return true;
-  return nodes.every((node) => isRecord(node) && typeof node.node_kind === "string");
 }
 
 function asString(value: unknown, fallback: string): string {
@@ -262,21 +258,13 @@ function normalizeNodePosition(value: unknown): GraphNode["position"] | undefine
     : undefined;
 }
 
-function laneForLegacyType(legacyType: string | undefined, nodeKind: NodeKind): LaneId {
-  if (legacyType === "input" || nodeKind === "input") return "input";
-  if (legacyType === "output" || nodeKind === "output") return "output";
-  if (legacyType === "remote_a2a" || nodeKind === "remote_a2a") return "remote_boundary";
-  if (legacyType === "adapter" || nodeKind === "adapter" || nodeKind === "adapter_call") return "adapter";
+function laneForNodeKind(nodeKind: NodeKind): LaneId {
+  if (nodeKind === "input") return "input";
+  if (nodeKind === "output") return "output";
+  if (nodeKind === "remote_a2a" || nodeKind === "remote_agent_call") return "remote_boundary";
+  if (nodeKind === "adapter" || nodeKind === "adapter_call") return "adapter";
   if (nodeKind === "human_input") return "human_input";
   return "local_graph";
-}
-
-function legacyChannelToEdgeKind(channel: unknown, edgeType: unknown): EdgeKind {
-  if (typeof channel === "string" && EDGE_KIND_SET.has(channel)) {
-    return channel as EdgeKind;
-  }
-  if (edgeType === "remote_a2a") return "remote_a2a";
-  return "event_output";
 }
 
 function executionSemanticsForEdge(kind: EdgeKind): ExecutionSemantics {
@@ -445,230 +433,38 @@ function canonicalizeGraphIRIds(graphIR: GraphIR): GraphIR {
   };
 }
 
-/**
- * Detect a legacy stage-flow shape and convert it to Graph IR. If the input
- * is already Graph-IR-shaped (or not a record), it is returned unchanged.
- *
- * Conversion is conservative: synthetic node ids/lanes/containers are
- * derived from the old fields; everything not directly mappable becomes
- * `null` rather than fabricated values. A `migrated_from_legacy_stage_shape`
- * warning is appended to `validation.warnings` so the UI can banner it.
- */
-function legacyStageToGraphIR(input: unknown, requirementId: string): GraphIR {
+function hasLegacyGraphIRKeys(input: Record<string, unknown>): boolean {
+  const nodes = Array.isArray(input.nodes) ? input.nodes : [];
+  const edges = Array.isArray(input.edges) ? input.edges : [];
+  return (
+    nodes.some((node) => isRecord(node) && ("type" in node || "subtype" in node)) ||
+    edges.some((edge) => isRecord(edge) && ("edge_type" in edge || "data_channel" in edge || "data" in edge))
+  );
+}
+
+function requireNativeGraphIR(input: unknown): GraphIR {
   if (!isRecord(input)) {
-    return {
-      requirement_id: requirementId,
-      graph_id: "graph-001",
-      root_workflow_module_id: null,
-      nodes: [],
-      edges: [],
-      containers: [],
-      lanes: [],
-      validation: {
-        ok: true,
-        errors: [],
-        warnings: [
-          {
-            code: "migrated_from_legacy_stage_shape",
-            message: "Legacy stage-flow shape was migrated to Graph IR.",
-            target_kind: "graph",
-            target_id: null
-          }
-        ]
-      }
-    };
+    throw new UnsupportedGraphIRFormatError();
   }
-
-  if (isGraphIRShaped(input)) {
-    return input as unknown as GraphIR;
+  if (hasLegacyGraphIRKeys(input)) {
+    throw new UnsupportedGraphIRFormatError();
   }
-
-  const legacyNodes = Array.isArray(input.nodes) ? input.nodes : [];
-  const legacyEdges = Array.isArray(input.edges) ? input.edges : [];
-
-  const nodes: GraphNode[] = [];
-  const usedLanes = new Set<LaneId>();
-  let firstModuleBoundId: string | null = null;
-  let hasRemote = false;
-
-  for (const raw of legacyNodes) {
-    if (!isRecord(raw)) continue;
-    const id = typeof raw.id === "string" ? raw.id : "";
-    if (!id) continue;
-
-    const legacyType = typeof raw.type === "string" ? raw.type : undefined;
-    const candidateKind: NodeKind = (() => {
-      if (typeof raw.node_kind === "string" && NODE_KIND_SET.has(raw.node_kind)) {
-        return raw.node_kind as NodeKind;
-      }
-      if (legacyType && NODE_KIND_SET.has(legacyType)) {
-        return legacyType as NodeKind;
-      }
-      // Old type values: input/output/agent/workflow/adapter/remote_a2a all
-      // overlap NODE_KIND_SET. Anything else falls back to "agent".
-      return "agent";
-    })();
-
-    const moduleBound =
-      candidateKind === "agent" ||
-      candidateKind === "workflow" ||
-      candidateKind === "adapter" ||
-      candidateKind === "remote_a2a";
-    const moduleId = (() => {
-      if (typeof raw.module_id === "string") return raw.module_id;
-      if (moduleBound && /^mod-/.test(id)) return id;
-      return null;
-    })();
-
-    if (moduleBound && firstModuleBoundId === null && moduleId) {
-      firstModuleBoundId = moduleId;
-    }
-    if (candidateKind === "remote_a2a") hasRemote = true;
-
-    const lane = laneForLegacyType(legacyType, candidateKind);
-    usedLanes.add(lane);
-
-    const ownerScope: OwnerScope = candidateKind === "remote_a2a" ? "remote" : "local";
-    const containerId = candidateKind === "remote_a2a" ? "container-remote" : "container-root";
-
-    const adkRole: GraphNode["adk_node_role"] =
-      candidateKind === "remote_a2a"
-        ? "boundary"
-        : candidateKind === "input" || candidateKind === "output"
-        ? "synthetic"
-        : moduleBound
-        ? "workflow_node"
-        : "synthetic";
-
-    const reviewStatus: GraphNode["review_status"] =
-      typeof raw.review_status === "string" ? (raw.review_status as GraphNode["review_status"]) : "needs_info";
-
-    const label = typeof raw.label === "string" && raw.label.trim() ? raw.label : id;
-    const subtype = typeof raw.subtype === "string" ? raw.subtype : undefined;
-
-    nodes.push({
-      id,
-      label,
-      module_id: moduleBound ? moduleId : null,
-      node_kind: candidateKind,
-      execution_kind: null,
-      agent_execution_mode: asAgentExecutionMode(raw.agent_execution_mode, candidateKind),
-      adk_node_role: adkRole,
-      owner_scope: ownerScope,
-      container_id: containerId,
-      lane_id: lane,
-      input_ports: [],
-      output_ports: [],
-      schema_refs: [],
-      review_status: reviewStatus,
-      ...graphNodeControlMetadata(raw)
-    });
+  if (!Array.isArray(input.nodes) || !input.nodes.every((node) => isRecord(node) && typeof node.node_kind === "string")) {
+    throw new UnsupportedGraphIRFormatError();
   }
-
-  const edges: GraphEdge[] = [];
-  for (let i = 0; i < legacyEdges.length; i += 1) {
-    const raw = legacyEdges[i];
-    if (!isRecord(raw)) continue;
-    const from = typeof raw.from === "string" ? raw.from : "";
-    const to = typeof raw.to === "string" ? raw.to : "";
-    if (!from || !to) continue;
-
-    const channel = (raw as Record<string, unknown>).data_channel;
-    const edgeType = (raw as Record<string, unknown>).edge_type;
-    const edgeKind = legacyChannelToEdgeKind(channel, edgeType);
-    const isRemote = edgeKind === "remote_a2a" || edgeType === "remote_a2a";
-    const dataLabel = typeof raw.data === "string" ? raw.data : "";
-
-    edges.push({
-      id: typeof raw.id === "string" && raw.id ? raw.id : padEdgeId(i),
-      from,
-      to,
-      from_port: null,
-      to_port: null,
-      edge_kind: edgeKind,
-      execution_semantics: executionSemanticsForEdge(edgeKind),
-      data_label: dataLabel,
-      schema_ref: typeof raw.schema_ref === "string" ? (raw.schema_ref as string) : null,
-      route_condition: typeof raw.route_condition === "string" ? (raw.route_condition as string) : null,
-      state_key: typeof raw.state_key === "string" ? (raw.state_key as string) : null,
-      artifact_key: typeof raw.artifact_key === "string" ? (raw.artifact_key as string) : null,
-      a2a_contract_id:
-        typeof (raw as Record<string, unknown>).a2a_contract_id === "string"
-          ? ((raw as Record<string, unknown>).a2a_contract_id as string)
-          : null,
-      is_remote_boundary_crossing: isRemote,
-      ...graphEdgeControlMetadata(raw)
-    });
+  if (!Array.isArray(input.edges) || !input.edges.every((edge) => isRecord(edge) && typeof edge.edge_kind === "string")) {
+    throw new UnsupportedGraphIRFormatError();
   }
-
-  const containers: GraphContainer[] = [];
-  const localNodeIds = nodes.filter((n) => n.owner_scope !== "remote").map((n) => n.id);
-  const remoteNodeIds = nodes.filter((n) => n.owner_scope === "remote").map((n) => n.id);
-  containers.push({
-    id: "container-root",
-    module_id: null,
-    label: "Root graph workflow",
-    container_kind: "graph_workflow",
-    adk_mapping: null,
-    contains_node_ids: localNodeIds,
-    entry_node_ids: nodes.filter((n) => n.node_kind === "input").map((n) => n.id),
-    exit_node_ids: nodes.filter((n) => n.node_kind === "output").map((n) => n.id),
-    layout_policy: "dag_with_routes",
-    parent_container_id: null
-  });
-  if (hasRemote) {
-    containers.push({
-      id: "container-remote",
-      module_id: null,
-      label: "Remote A2A boundary",
-      container_kind: "remote_boundary",
-      adk_mapping: null,
-      contains_node_ids: remoteNodeIds,
-      entry_node_ids: remoteNodeIds,
-      exit_node_ids: remoteNodeIds,
-      layout_policy: "free",
-      parent_container_id: null
-    });
-  }
-
-  // Always include input/output local_graph at minimum, plus any actually used.
-  const laneOrder: LaneId[] = ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"];
-  const lanes: GraphLane[] = laneOrder
-    .filter((id) => usedLanes.has(id) || id === "input" || id === "local_graph" || id === "output")
-    .map((id) => ({ id, label: id }));
-
-  const validation: GraphValidation = {
-    ok: true,
-    errors: [],
-    warnings: [
-      {
-        code: "migrated_from_legacy_stage_shape",
-        message: "Legacy stage-flow shape was migrated to Graph IR.",
-        target_kind: "graph",
-        target_id: null
-      }
-    ]
-  };
-
-  return {
-    requirement_id: requirementId,
-    graph_id: "graph-001",
-    root_workflow_module_id: firstModuleBoundId,
-    nodes,
-    edges,
-    containers,
-    lanes,
-    validation
-  };
+  return input as unknown as GraphIR;
 }
 
 /**
- * Return a native Graph IR object with legacy mirror fields removed. This is
- * intentionally tolerant because it runs on saved browser records and older
- * analyzer output before the strict validator gets a chance to reject them.
+ * Return a normalized native Graph IR object. Old stage-flow browser imports
+ * are intentionally rejected before normalization so the import UI can surface
+ * a clear unsupported-format error.
  */
 export function normalizeGraphIRForRuntime(input: unknown, requirementId: string): GraphIR {
-  const graphIR = legacyStageToGraphIR(input, requirementId);
+  const graphIR = requireNativeGraphIR(input);
   const containers = graphIR.containers ?? [];
   const lanes = graphIR.lanes ?? [];
   const validation = graphIR.validation ?? { ok: true, errors: [], warnings: [] };
@@ -679,13 +475,10 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
     root_workflow_module_id: graphIR.root_workflow_module_id ?? null,
     nodes: (graphIR.nodes ?? []).map((node) => {
       const nodeRecord = node as GraphNode & Record<string, unknown>;
-      const legacyType = typeof nodeRecord.type === "string" ? nodeRecord.type : undefined;
       const nodeKind =
         node.node_kind && NODE_KIND_SET.has(node.node_kind)
           ? node.node_kind
-          : legacyType && NODE_KIND_SET.has(legacyType)
-            ? (legacyType as NodeKind)
-            : "function";
+          : "function";
       const position = normalizeNodePosition(nodeRecord.position);
       const label = asString(node.label, asString(node.id, "node"));
       return {
@@ -698,7 +491,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         adk_node_role: node.adk_node_role ?? null,
         owner_scope: node.owner_scope ?? (nodeKind === "remote_a2a" ? "remote" : "local"),
         container_id: asNullableString(node.container_id),
-        lane_id: LANE_ID_SET.has(String(node.lane_id)) ? (node.lane_id as LaneId) : laneForLegacyType(legacyType, nodeKind),
+        lane_id: LANE_ID_SET.has(String(node.lane_id)) ? (node.lane_id as LaneId) : laneForNodeKind(nodeKind),
         input_ports: Array.isArray(node.input_ports) ? node.input_ports : [],
         output_ports: Array.isArray(node.output_ports) ? node.output_ports : [],
         schema_refs: Array.isArray(node.schema_refs) ? node.schema_refs : [],
@@ -720,12 +513,10 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
     }),
     edges: (graphIR.edges ?? []).map((edge, index) => {
       const edgeRecord = edge as GraphEdge & Record<string, unknown>;
-      const legacyChannel = edgeRecord.data_channel;
-      const legacyEdgeType = edgeRecord.edge_type;
       const edgeKind =
         edge.edge_kind && EDGE_KIND_SET.has(edge.edge_kind)
           ? edge.edge_kind
-          : legacyChannelToEdgeKind(legacyChannel, legacyEdgeType);
+          : "event_output";
       return {
         id: asString(edge.id, padEdgeId(index)),
         from: asString(edge.from, ""),
@@ -734,7 +525,7 @@ export function normalizeGraphIRForRuntime(input: unknown, requirementId: string
         to_port: asNullableString(edge.to_port),
         edge_kind: edgeKind,
         execution_semantics: edge.execution_semantics ?? executionSemanticsForEdge(edgeKind),
-        data_label: typeof edge.data_label === "string" ? edge.data_label : typeof edgeRecord.data === "string" ? edgeRecord.data : "",
+        data_label: typeof edge.data_label === "string" ? edge.data_label : "",
         schema_ref: asNullableString(edge.schema_ref),
         route_condition: asNullableString(edge.route_condition),
         route_aliases: asStringArray(edgeRecord.route_aliases),
