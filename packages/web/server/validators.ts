@@ -1,1 +1,1 @@
-export { validateAnalysisResult } from "./codexAnalyzer";
+export { validateAnalysisResult } from "./analysisResultValidation";

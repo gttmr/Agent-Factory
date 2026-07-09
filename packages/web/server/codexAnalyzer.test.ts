@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fixture from "../../../templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json" with { type: "json" };
 import graphWorkflowFixture from "../../../templates/regression-scenarios/scenario-d-graph-workflow/analysis-result.json" with { type: "json" };
-import { runCodexAnalyzer, validateAnalysisResult, type CodexAnalyzerRunner } from "./codexAnalyzer.ts";
+import { validateAnalysisResult } from "./analysisResultValidation.ts";
+import { runCodexAnalyzer, type CodexAnalyzerRunner } from "./codexAnalyzer.ts";
 
 const repoRoot = await mkdtemp(join(tmpdir(), "af-codex-analyzer-"));
 
