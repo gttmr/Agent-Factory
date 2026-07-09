@@ -130,7 +130,7 @@ Agent Factory policy:
 | Desired behavior | Graph IR/runtime representation |
 |---|---|
 | 현재 입력만 처리 | `agent` node lowered as `single_turn` |
-| 이전 대화 흐름 반영 | `agent` node lowered as `chat`, stateful warning required |
+| 이전 대화 흐름 반영 | `agent` node lowered as `chat`; UI/review must expose session-history context |
 | 작업 위임 후 자동 parent return | coordinator `LlmAgent` + task sub-agent topology |
 | runtime 값에 따라 task dispatch | `dynamic_workflow` + function node using `ctx.run_node` |
 
@@ -162,7 +162,7 @@ Runnable source generator는 다음 규칙을 따른다.
 Design/Build UI는 mode별 차이를 숨기면 안 된다.
 
 - `single_turn`: "single turn", "현재 입력만 사용" 같은 짧은 표시.
-- `chat`: "stateful", "session history 사용" 표시와 warning.
+- `chat`: `agent_execution_mode`/`agent mode`로 명시하고 "session history 사용" helper copy 또는 review note를 보여준다.
 - `task`: 일반 node mode 선택지로 제공하지 않는다. 별도 coordinator/sub-agent 설계 화면이나 dynamic dispatch 설계로 유도한다.
 
 검토자는 다음 질문을 확인한다.

@@ -11,14 +11,14 @@ runtime controls, collaboration files, and integrated Mock Lab endpoints.
 | Task | Files |
 | --- | --- |
 | Artifact root reads/writes and whitelist | `artifactRootStore.ts`, `afArtifactsApi.ts` |
-| Analyze/Design Stage Runner | `stageRunner.ts`, `codexAnalyzer.ts` |
+| Stage Runner and direct analyzer | `stageRunner.ts`, `codexAnalyzer.ts` |
 | Catalog index and approval publish | `afCatalogApi.ts` |
 | Runtime env and ADK server controls | `runtimeEnv.ts`, `runtimeChat.ts` |
 | Collaboration comments/highlights | `afCollaborationApi.ts` |
 
 ## Local Rules
 
-- Preserve proposed-artifact-before-canonical behavior for Stage Runner runs.
+- Preserve proposed-artifact-before-canonical behavior for Analyze/Design Stage Runner runs. Build records canonical `runtime-stub/` side effects, and Verify proposes report/delta artifacts.
 - Do not add new artifact write paths without updating the whitelist and active docs.
 - Approval patches must mirror matching `stages.<stage>.status` for external tools.
 - Stage Runner invokes Codex with constrained repository behavior; do not make network or approval policy changes casually.

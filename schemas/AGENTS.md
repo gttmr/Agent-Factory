@@ -18,7 +18,7 @@ source-of-truth contracts for validator, analyzer, templates, and workbench UI.
 
 ## Local Rules
 
-- Keep schema enums aligned with `packages/web/src/analyzer/types.ts`, `classificationRules.ts`, UI badges, templates, validator constants, and source generator assumptions.
+- Keep schema enums aligned with `packages/web/src/analyzer/types.ts`, `classificationRules.ts`, UI badges, templates, validator constants, and source generator assumptions. `scripts/validate-artifacts.test.mjs` machine-enforces analyzer/schema/validator enum alignment.
 - Tighten contracts only with matching migration/normalization and regression fixture updates.
 - `analysis-draft` can differ from final `analysis-result`, but server hydration must bridge them explicitly.
 - Preserve `raw_requirement_to_code=false` and approved-artifact posture in scaffold-plan contracts.
@@ -33,6 +33,7 @@ source-of-truth contracts for validator, analyzer, templates, and workbench UI.
 
 ```bash
 node scripts/validate-artifacts.mjs
+cd packages/web && npm run test:analyzer
 cd packages/web && npm run build
 ```
 

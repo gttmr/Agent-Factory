@@ -3,7 +3,7 @@
 ## Scope
 
 This directory owns client-side artifact semantics: taxonomy, graph migration,
-review gates, scaffold-plan derivation, runtime-contract modeling, import/export,
+review gates, scaffold-plan derivation, runtime-contract modeling, import normalization,
 and tests for those contracts.
 
 ## Where To Look
@@ -24,7 +24,7 @@ and tests for those contracts.
 - Keep Graph IR execution details out of taxonomy values; sequence, route, join, loop, human input, and fan-out live in Graph IR.
 - `legacy_recommended_type` is migration metadata only.
 - Candidate-level missing information is a hard scaffold blocker; requirement-level missing information is reviewer-attested.
-- Analyzer enums must stay aligned with `schemas/*.schema.json`, `scripts/validate-artifacts.mjs`, `scripts/generate-adk-source.mjs`, and badges.
+- Analyzer enums must stay aligned with `schemas/*.schema.json`, `scripts/artifact-validation/constants.mjs`, `scripts/generate-adk-source.mjs`, and badges; `scripts/validate-artifacts.test.mjs` machine-enforces analyzer/schema/validator enum alignment through `npm run test:analyzer`.
 
 ## Anti-Patterns
 

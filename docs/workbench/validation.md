@@ -4,9 +4,9 @@ Agent Factory review artifact는 구현 계획이나 후속 작업에 쓰기 전
 검증 목표는 raw requirement가 바로 코드, scaffold export, 실행 logic으로 건너뛰지 않게 하는 것이다.
 Skill-led DLC 실행은 `artifacts/af/<req-id>/`를 기본 artifact root로 쓰고 `af-run-manifest.json`으로 단계를 연결한다.
 Workbench는 Vite 미들웨어(`/api/af/*`, `/api/af-collab/*`, `/api/catalog`, `/api/mock-lab/*`)를 통해 artifact root 디렉터리와 Mock Lab runtime lab을 다루며, `manifest.approvals.*`를 게이트 UI의 단일 진실로 사용한다.
-초기 분석 결과는 Analyze Stage Runner 또는 Landing/단계 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. Stage Runner 결과는 먼저 `runs/<stage>/<run-id>/proposed-artifacts/`에 저장되고, 사용자가 diff/preview 후 적용할 때 canonical artifact가 갱신된다.
+초기 분석 결과는 Analyze Stage Runner 또는 Landing/단계 import 버튼으로 `analysis-result.json`을 artifact root에 적재한다. Analyze/Design Stage Runner 결과는 먼저 `runs/<stage>/<run-id>/proposed-artifacts/`에 저장되고, 사용자가 diff/preview 후 적용할 때 canonical artifact가 갱신된다. Build Stage Runner는 같은 run ledger에 실행 evidence를 남기지만 canonical `runtime-stub/` 출력을 직접 기록하고, Verify Stage Runner는 `validation-report.md`와 `catalog-delta.yaml` proposal을 남긴다.
 현재 manifest는 lightweight contract이며 formal JSON Schema는 없다. Workbench parser는 core fields(`requirement_id`, `artifact_root`, `current_stage`, `stages`, `approvals`, `validation`)와 optional `stage_runs`를 tolerant하게 읽는다.
-`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path를 검증한다. `stage_runs.*.latest_run_id`는 `YYYYMMDDTHHMMSSZ-(analyze|design|build|verify)-<6 hex>` 형식으로, 서버 Stage Runner가 기록하는 네 단계 run id를 모두 허용한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다.
+`scripts/validate-artifacts.mjs`는 `af-run-manifest.json`이 있을 때 core fields, stage/status enum, approval boolean, validation command/result, POSIX-style output path, optional `stage_runs` run id/status/output path를 검증한다. `stage_runs.*.latest_run_id`는 `YYYYMMDDTHHMMSSZ-(analyze|design|build|verify)-<6 hex>` 형식으로, 서버 Stage Runner가 기록하는 네 단계 run id를 모두 허용한다. 더 깊은 artifact 존재 추적은 하지 않으며, 최종 artifact 검증은 여전히 `analysis-result.json`, split artifacts, `scaffold-plan.json` schema와 validator 명령을 기준으로 한다. Analyzer/schema/validator enum alignment는 `scripts/validate-artifacts.test.mjs`가 검사하며 `cd packages/web && npm run test:analyzer`에 포함된다.
 
 ## module-candidates.json
 
@@ -169,7 +169,7 @@ cd packages/web && npm run build
 ```
 
 문서만 변경한 경우에는 build 대신 구조와 링크 검증을 우선한다.
-TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run test:analyzer`와 `cd packages/web && npm run build`를 실행한다.
+TypeScript, React, analyzer, schema, validator logic을 변경한 경우에는 `cd packages/web && npm run test:analyzer`와 `cd packages/web && npm run build`를 실행한다. `npm run test:analyzer`는 web analyzer/server tests뿐 아니라 root `scripts/validate-artifacts.test.mjs` enum-alignment test와 `scripts/generate-adk-source.test.mjs` regression도 실행한다.
 scaffold-plan 또는 ADK source generator를 직접 변경한 경우에는 `node scripts/generate-adk-source.mjs ...`, `python3 -m compileall ...`, generated stub `pytest` smoke를 추가한다. Runtime chat bridge를 검증할 때는 generated stub directory에서 `adk api_server --host 127.0.0.1 --port 8765 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .`를 실행한 뒤 `runtime-chat-smoke.json`을 `/run`에 전송한다.
 
 ## ADK 공식 문서 확인

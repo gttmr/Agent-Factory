@@ -18,7 +18,7 @@ discovery.
 | Manifest approval gates | `useApprovalGate.ts` |
 | Stage Runner | `useStageRunner.ts`, `useStreamingProcess.ts` |
 | Catalog and publish | `useCatalog.ts`, `useCatalogDelta.ts`, `useCatalogPublish.ts` |
-| Runtime and Mock Lab | `useRuntimeChat.ts`, `useMockLabDiscovery.ts` |
+| Runtime and Mock Lab | `useRuntimeChat.ts`, `useRuntimeA2a.ts`, `useMockLabDiscovery.ts` |
 
 ## Local Rules
 

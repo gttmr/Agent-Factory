@@ -78,7 +78,7 @@ State sits on top of `@tanstack/react-query`. Manifest, analysis-result, catalog
 
 ### Analyzer pipeline
 
-`packages/web/server/stageRunner.ts` is the four-stage Stage Runner execution contract for `analyze`, `design`, `build`, and `verify`. It creates sortable run ids, writes `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, `proposed-artifacts/*`, and optional `diagnostics.md`, then updates optional `manifest.stage_runs`. Analyze/Design run DLC skills and preserve diff-before-canonical apply. Build/Verify wrap server-side primitives: Build records `runtime-stub/build` run history with canonical runtime-stub side effects, and Verify records allow-list command evidence plus proposed report/delta artifacts. The legacy `/api/analyze-requirement` analyzer endpoint remains available as an internal/direct analysis primitive.
+`packages/web/server/stageRunner.ts` is the four-stage Stage Runner execution contract for `analyze`, `design`, `build`, and `verify`. It creates sortable run ids, writes `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, optional `diagnostics.md`, and updates optional `manifest.stage_runs`. Analyze/Design run DLC skills and preserve diff-before-canonical apply through `proposed-artifacts/*`. Build/Verify wrap server-side primitives: Build records `runtime-stub/build` run history and reports canonical `runtime-stub/` side effects without a diff/apply proposal, while Verify records allow-list command evidence plus proposed `validation-report.md` and `catalog-delta.yaml`. The legacy `/api/analyze-requirement` analyzer endpoint remains available as an internal/direct analysis primitive.
 
 ### Taxonomy contract (load-bearing)
 
@@ -96,7 +96,7 @@ Rules baked into the schemas, validator, and analyzer:
 - Remote A2A is high-friction. It requires `risk_level: high` and full contract fields (`owner`, `agent_card`, `auth`, `task_lifecycle`, `timeout`, `retry`, `fallback`, `audit`). Multi-step local workflow alone is **not** enough to propose it.
 - Each `module_category` must carry its matching subtype (`agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind`).
 
-The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the validator constants in `scripts/validate-artifacts.mjs` must stay aligned. Changing one without the others will break exports.
+The enums in `src/analyzer/types.ts`, the JSON Schemas in `schemas/`, and the validator constants in `scripts/artifact-validation/constants.mjs` must stay aligned. `scripts/validate-artifacts.test.mjs` machine-checks this alignment and is included in `cd packages/web && npm run test:analyzer`; changing one enum surface without the others will break the test/export contract.
 
 ### Schemas, catalog, templates
 
@@ -121,8 +121,8 @@ Key contracts:
 
 - **Single source of truth for category visuals** — `packages/web/src/components/CategoryBadge.tsx` exports `CategoryBadge`, `SubtypeBadge`, `getSubtypeValue`, `categoryClass`. Never write category labels as raw `<span>` in a new view; import these instead so Module Review, Graph IR, Catalog, and A2A Contract Review stay in sync.
 - **Design tokens** — `:root` in `packages/web/src/styles/tokens.css` is the single source for color (`--cat-{agent,workflow,adapter,remote}-{base,soft,line}` plus `input` / `output`, chrome palette), the type scale (`--fs-*`), spacing (`--space-*`), weight (`--fw-*`), radius, and `--z-overlay`. New categories must add all three color variants together. Stylesheets are split under `styles/` and composed through CSS cascade layers in `styles/index.css` (`@layer tokens, base, primitives, components, features, router, utilities`) — see `docs/visualization/design-system.md`.
-- **Subtype glyphs** — `subtypeGlyph` map in `CategoryBadge.tsx` covers every value in `agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind`. Any new enum value added in `analyzer/types.ts` must be mirrored here or it falls back to `·`.
-- **Graph Workflow markers** — `GraphCanvas.tsx` renders Graph IR through `src/components/graph/*` (the rendering layer: `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, `containerOverlay.tsx`, `validationBanner.tsx`); `src/graph/` keeps only the pure graph-IR engine helper (`containerMembership.ts`). Fan-out/fan-in, loop, human input, route, and Remote A2A are detected from `container_kind`, `node_kind`, `edge_kind`, and `execution_semantics`; update `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, and `containerOverlay.tsx` together when adding a marker.
+- **Subtype glyphs** — `subtypeGlyph` map in `CategoryBadge.tsx` covers every value in `agent_kind`, `workflow_kind`, `adapter_kind`, `remote_contract_kind`, and `runtime_contract_kind` through a typed exhaustive map. Any new known enum value added in `analyzer/types.ts` must be mirrored here before build can pass; only unknown runtime strings fall back to `·`.
+- **Graph Workflow markers** — `GraphCanvas.tsx` renders Graph IR through `src/components/graph/*` (the rendering layer: `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, `containerOverlay.tsx`, `validationBanner.tsx`, shared `GraphElementTabs.tsx`); `src/graph/` keeps the pure graph-IR helpers (`containerMembership.ts`, plus `graphDisplay.ts` for node-kind→category mapping, canonical edge ids, and candidate subtype lookup). Fan-out/fan-in, loop, human input, route, and Remote A2A are detected from `container_kind`, `node_kind`, `edge_kind`, and `execution_semantics`; update `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, and `containerOverlay.tsx` together when adding a marker.
 
 ### CSS pitfall to remember
 

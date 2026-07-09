@@ -12,7 +12,7 @@ badges, Stage Runner controls, and graph element editing.
 - `graph/*`: render-layer layout, nodes, edges, containers, and validation banner.
 - `GraphInspector.tsx`: read-only node/edge detail.
 - `GraphElementEditor.tsx` and model test: field-level Graph IR edits.
-- `StageRunnerPanel.tsx`: Analyze/Design run surface.
+- `StageRunnerPanel.tsx`: shared Analyze/Design/Build/Verify run surface.
 
 ## Local Rules
 
