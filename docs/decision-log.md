@@ -10,6 +10,16 @@
 
 ---
 
+## 2026-07-09 · PR TBD — Design 계약 편집 UX와 stepper 계약 정렬
+
+- **결정**: Runtime 계약 편집기를 우측 Inspector 파킹 경로에서 Design 검토 하단 `Runtime 계약` 탭으로 옮긴다. Reviewer는 `RuntimeContractSidebar`에서 계약을 선택하고 같은 탭에서 status, policies, reviewer notes를 draft/save/revert로 편집하며, 저장은 기존 `analysis-result.json` 저장 경로를 그대로 사용한다.
+- **결정**: Design 검토의 우측 Inspector/flag 경로를 제거한다. `INSPECTOR_ENABLED`와 right-pane 전용 CSS/prop plumbing은 삭제하고, Graph review top split은 `[선택 노드/엣지 정보 패널 | Graph IR Canvas]` 2열로 고정한다. Remote A2A 편집은 하단 `Remote A2A` 탭, comment/highlight 편집은 하단 `검토 메모` 탭이 계속 소유한다.
+- **결정**: Design StageShell step status는 `manifest.approvals.*`와 artifact presence만 사용한다. `1. 실행`은 canonical `processFlow` 존재, `2. 검토`는 `boundaries_approved`, `3. 승인`은 `boundaries_approved && runtime_contracts_approved`에서 완료 상태를 읽는다. Candidate status 기반 `reviewReady`는 approval button enablement, next-action guidance, metric display에만 남긴다.
+- **배경**: Runtime 계약 readiness를 Stage Runner 재실행이나 외부 편집 없이 해소할 수 있어야 했고, 비활성 right-pane flag는 실제 사용자 경로와 문서/테스트 계약을 갈라놓았다. Stepper는 gate source-of-truth와 같은 manifest approval model을 보여야 한다.
+- **영향**: `DesignWorkbench`/Design review bottom tab UX, Runtime 계약 readiness review flow, Design StageShell status model and tests, `CLAUDE.md`, `docs/workbench/agent-factory-harness.md`. Schema, server API, Stage Runner execution, catalog publish, Runtime Handoff generator는 변경하지 않는다.
+
+---
+
 ## 2026-07-08 · PR TBD — DLC 스킬 세트를 ADK 2.3 기준 단계형 계약으로 재작성
 
 - **결정**: `.agents/skills`의 4개 스테이지 스킬과 `_shared`를 전면 재작성했다. (a) SKILL.md는 "단계마다 참조 파일 1개만 읽기 → 행동 → 검증 커맨드 → gate/stop" 라우터 구조로 전환하고 선독(Required Reading) 패턴을 제거했다(짧은 컨텍스트 소비 모델 제약). (b) `_shared/adk-2.md`(ADK 2.0 기준)를 삭제하고 ADK 2.3 토픽별 참조(`adk-2.3-{baseline,routes,data-handling,human-input,dynamic,remote-a2a}.md`)로 대체했다. (c) Stage Runner proposed-first를 1차 모드로, 단독 canonical 편집을 표기된 2차 모드로 규정하고, 스킬의 manifest 승인/상태 직접 토글을 금지했다. (d) build는 artifact-sync를 1차 경로로, 직접 `generate-adk-source.mjs` 호출을 수동/고급 경로로 강등했다. (e) `a2a-contracts.json`을 표준 아티팩트 목록에서 제거했다(임베디드 `analysisResult.a2aContracts`가 정본).

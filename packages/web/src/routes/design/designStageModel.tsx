@@ -1,7 +1,6 @@
 export {
   DESIGN_STEP_IDS,
   GRAPH_IR_SAVE_SUCCESS_MESSAGE,
-  INSPECTOR_ENABLED,
   buildDesignNextAction,
   buildDesignSteps,
   statusLabel,

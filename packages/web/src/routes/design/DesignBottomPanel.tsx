@@ -5,7 +5,7 @@ import { approveCandidate, resolveMissingItem, setCandidateStatus } from "../../
 import type { AnalysisResult, GraphIR, ModuleCandidate, ModuleStatus, RuntimeContract } from "../../analyzer/types";
 import { DESIGN_BOTTOM_TABS, nextDesignBottomTabAfterModuleSelect } from "../../design/designWorkbenchTabs";
 import { ReviewNotesPanel } from "../../design/ReviewNotesPanel";
-import { RuntimeContractSidebar } from "../../design/RuntimeContractPanel";
+import { RuntimeContractInspector, RuntimeContractSidebar } from "../../design/RuntimeContractPanel";
 import { reviewNotesBadgeCount } from "../../design/reviewNotesModel";
 import type { CommentAnchor, CommentRecord, CommentStage, HighlightRecord, CreateHighlightInput } from "../../state/useCollaboration";
 import type { AuthorRole } from "../../state/useAuthor";
@@ -20,6 +20,7 @@ interface DesignBottomPanelProps {
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
   selectedReviewCandidate: ModuleCandidate | null;
+  selectedContract: RuntimeContract | null;
   selectedContractId: string | null;
   selectedA2ARow: DesignA2AReviewRow | null;
   runtimeContracts: RuntimeContract[];
@@ -36,6 +37,7 @@ interface DesignBottomPanelProps {
   onSelectionChange: (selection: Selection) => void;
   onSaveCandidate: (candidateId: string, candidate: ModuleCandidate, syncStatus?: ModuleStatus) => void;
   onSelectContract: (contractId: string) => void;
+  onSaveRuntimeContract: (contract: RuntimeContract) => void;
   onSelectA2AModule: (moduleId: string) => void;
   onCreateA2AContract: (candidate: ModuleCandidate) => void;
   onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
@@ -68,6 +70,7 @@ export function DesignBottomPanel({
   analysis,
   graphIR,
   selectedReviewCandidate,
+  selectedContract,
   selectedContractId,
   selectedA2ARow,
   runtimeContracts,
@@ -84,6 +87,7 @@ export function DesignBottomPanel({
   onSelectionChange,
   onSaveCandidate,
   onSelectContract,
+  onSaveRuntimeContract,
   onSelectA2AModule,
   onCreateA2AContract,
   onImportLocalA2AProvider,
@@ -129,7 +133,20 @@ export function DesignBottomPanel({
           />
         ) : null}
         {activeTab === "runtime" ? (
-          <RuntimeContractSidebar contracts={runtimeContracts} selectedContractId={selectedContractId} onSelect={onSelectContract} />
+          <div className="af-runtime-tab-panel">
+            <div className="af-runtime-tab-list">
+              <RuntimeContractSidebar contracts={runtimeContracts} selectedContractId={selectedContractId} onSelect={onSelectContract} />
+            </div>
+            <div className="af-runtime-tab-editor">
+              <RuntimeContractInspector
+                key={selectedContract?.contract_id ?? "none"}
+                contract={selectedContract}
+                saving={saving}
+                onSave={onSaveRuntimeContract}
+                onCancel={() => undefined}
+              />
+            </div>
+          </div>
         ) : null}
         {activeTab === "a2a" ? (
           <DesignA2ATab

@@ -5,43 +5,41 @@ export type SidebarTab = DesignBottomTab;
 export type DesignStepId = "run" | "review" | "approve";
 
 export const DESIGN_STEP_IDS: DesignStepId[] = ["run", "review", "approve"];
-export const INSPECTOR_ENABLED = false;
 export const GRAPH_IR_SAVE_SUCCESS_MESSAGE =
   "Graph IR 저장 완료 — Build 에서 계약 동기화 + runtime-stub 재생성이 필요합니다.";
 
 export function buildDesignSteps({
   hasGraph,
-  designRunComplete,
-  reviewReady,
-  bothApproved,
+  boundariesApproved,
+  runtimeContractsApproved,
   activeStep
 }: {
   hasGraph: boolean;
-  designRunComplete: boolean;
-  reviewReady: boolean;
-  bothApproved: boolean;
+  boundariesApproved: boolean;
+  runtimeContractsApproved: boolean;
   activeStep: DesignStepId;
 }): StageStep[] {
+  const bothApproved = boundariesApproved && runtimeContractsApproved;
   return [
     {
       id: "run",
       label: "1. 실행",
       hint: "경계·Graph IR 생성",
-      status: designRunComplete ? "done" : activeStep === "run" ? "current" : "todo"
+      status: hasGraph ? "done" : activeStep === "run" ? "current" : "todo"
     },
     {
       id: "review",
       label: "2. 검토",
       hint: "모듈·그래프·계약",
       available: hasGraph,
-      status: !hasGraph ? "todo" : reviewReady ? "done" : activeStep === "review" ? "current" : "blocked"
+      status: !hasGraph ? "todo" : boundariesApproved ? "done" : activeStep === "review" ? "current" : "blocked"
     },
     {
       id: "approve",
       label: "3. 승인",
       hint: "경계·계약 게이트",
       available: hasGraph,
-      status: bothApproved ? "done" : activeStep === "approve" ? "current" : !reviewReady ? (hasGraph ? "blocked" : "todo") : "todo"
+      status: !hasGraph ? "todo" : bothApproved ? "done" : activeStep === "approve" ? "current" : !boundariesApproved ? "blocked" : "todo"
     }
   ];
 }

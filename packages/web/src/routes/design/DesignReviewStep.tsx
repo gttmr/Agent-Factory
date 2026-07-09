@@ -56,7 +56,6 @@ export interface DesignReviewHandlers {
   onEditStateChange: (state: GraphEditState | null) => void;
   onSaveGraphIR: (graphIR: GraphIR) => void;
   onOpenCatalogWorkflowPicker: () => void;
-  onSetActionMessage: (message: string | null) => void;
   onSaveRuntimeContract: (contract: RuntimeContract) => void;
   onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
   onSelectReviewModule: (moduleId: string) => void;
@@ -113,8 +112,6 @@ export function DesignReviewStep({
   return (
     <div className="af-design-split">
       <DesignGraphPanel
-        reqId={reqId}
-        activeTab={activeTab}
         analysis={analysis}
         graphIR={graphIR}
         errorCount={errorCount}
@@ -123,16 +120,10 @@ export function DesignReviewStep({
         selectedNode={selected.node}
         selectedEdge={selected.edge}
         selectedCandidate={selected.candidate}
-        selectedContract={contracts.selectedContract}
-        selectedA2ARow={contracts.selectedA2ARow}
         a2aContracts={contracts.a2aContracts}
         catalogContracts={catalogContracts}
         comments={collaboration.comments}
         highlights={collaboration.highlights}
-        anchor={collaboration.anchor}
-        authorName={collaboration.authorName}
-        authorRole={collaboration.authorRole}
-        commentPending={collaboration.commentPending}
         saving={saving}
         nodeLabel={nodeLabel}
         onSelectionChange={handlers.onSelectionChange}
@@ -140,14 +131,6 @@ export function DesignReviewStep({
         onSaveGraphIR={handlers.onSaveGraphIR}
         onOpenCatalogWorkflowPicker={handlers.onOpenCatalogWorkflowPicker}
         onSetActiveTab={setActiveTab}
-        onSetActionMessage={handlers.onSetActionMessage}
-        onSaveRuntimeContract={handlers.onSaveRuntimeContract}
-        onSaveA2AContract={handlers.onSaveA2AContract}
-        onAuthorNameChange={handlers.onAuthorNameChange}
-        onAuthorRoleChange={handlers.onAuthorRoleChange}
-        onCreateComment={handlers.onCreateComment}
-        onUpdateComment={handlers.onUpdateComment}
-        onDeleteComment={handlers.onDeleteComment}
       />
       <DesignBottomPanel
         reqId={reqId}
@@ -156,6 +139,7 @@ export function DesignReviewStep({
         analysis={analysis}
         graphIR={graphIR}
         selectedReviewCandidate={selected.reviewCandidate}
+        selectedContract={contracts.selectedContract}
         selectedContractId={contracts.selectedContractId}
         selectedA2ARow={contracts.selectedA2ARow}
         runtimeContracts={contracts.runtimeContracts}
@@ -172,6 +156,7 @@ export function DesignReviewStep({
         onSelectionChange={handlers.onSelectionChange}
         onSaveCandidate={handlers.onSaveCandidate}
         onSelectContract={handlers.onSelectContract}
+        onSaveRuntimeContract={handlers.onSaveRuntimeContract}
         onSelectA2AModule={handlers.onSelectA2AModule}
         onCreateA2AContract={handlers.onCreateA2AContract}
         onImportLocalA2AProvider={handlers.onImportLocalA2AProvider}
