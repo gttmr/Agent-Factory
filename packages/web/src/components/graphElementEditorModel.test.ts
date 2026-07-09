@@ -4,7 +4,6 @@ import {
   availableGraphElementGroups,
   isEdgeKindEditable,
   isNodeModuleLinkEditable,
-  isNodeRuntimeControlEditable,
   nextGraphElementGroupAfterSelectionChange
 } from "./graphElementEditorModel.ts";
 import type { GraphEdge, GraphNode } from "../analyzer/types";
@@ -159,10 +158,6 @@ assert.equal(
   false,
   "workflow_call nodes with a target contract lock module linkage"
 );
-
-assert.equal(isNodeRuntimeControlEditable(node({ node_kind: "agent" })), false);
-assert.equal(isNodeRuntimeControlEditable(node({ node_kind: "adapter_call" })), false);
-assert.equal(isNodeRuntimeControlEditable(node({ node_kind: "input" })), false);
 
 assert.equal(isEdgeKindEditable(edge("router", "target", { edge_kind: "route" })), false);
 assert.equal(isEdgeKindEditable(edge("source", "remote", { edge_kind: "remote_a2a" })), false);

@@ -1,17 +1,7 @@
 import { Handle, Position, type NodeProps } from "reactflow";
 import { CategoryBadge, SubtypeBadge } from "../CategoryBadge";
 import type { GraphNodeData } from "./layout";
-import type { ModuleCategory } from "../../analyzer/types";
-
-function moduleCategoryFromKind(kind: string | undefined): ModuleCategory | null {
-  if (kind === "workflow_call") return "workflow";
-  if (kind === "adapter_call") return "adapter";
-  if (kind === "remote_agent_call") return "remote_a2a";
-  if (kind === "agent" || kind === "workflow" || kind === "adapter" || kind === "remote_a2a") {
-    return kind;
-  }
-  return null;
-}
+import { graphNodeKindToModuleCategory } from "../../graph/graphDisplay";
 
 function reviewChip(status: string | undefined) {
   if (!status || status === "n/a") return null;
@@ -49,8 +39,8 @@ function HandleStrip() {
 
 function ModuleCard({ data, kind }: NodeProps<GraphNodeData> & { kind: "agent" | "workflow" | "adapter" | "remote_a2a" }) {
   const { graphNode, selected, onSelect } = data;
-  const cat = moduleCategoryFromKind(kind);
-  const sub = graphNode.execution_kind && graphNode.execution_kind !== kind ? graphNode.execution_kind : null;
+  const cat = graphNodeKindToModuleCategory(kind);
+  const sub = data.moduleSubtype ?? null;
   return (
     <div
       className={`graph-node graph-node-card cat-${cat ?? "agent"} ${selected ? "is-selected" : ""} ${

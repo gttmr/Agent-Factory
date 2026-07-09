@@ -49,7 +49,7 @@
 }
 
 .af-a2a-row-button small,
-.af-a2a-table td small {
+.af-a2a-table td > small {
   display: block;
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -210,7 +210,7 @@
 
 .af-a2a-warning {
   font-size: var(--fs-sm);
-  color: var(--cat-remote, #b42318);
+  color: var(--cat-remote);
   background: var(--cat-remote-soft, var(--cat-remote-soft));
   padding: 8px 10px;
   border-radius: 6px;

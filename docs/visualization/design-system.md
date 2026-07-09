@@ -95,16 +95,16 @@ src/styles/
 
 모든 토큰은 `packages/web/src/styles/tokens.css` 의 `:root` 에 있다. 색·폰트·타이포·간격·radius·z·motion 을 여기서만 편집한다. base/primitives/components/features/router 는 리터럴을 직접 쓰지 않고 이 토큰을 참조한다.
 
-**색 — 카테고리.** 새 카테고리를 추가하려면 항상 base/soft/line 3종을 함께 추가하고, `category.css` 에 glyph + `.category-badge.cat-<name>` + `.row-stripe.cat-<name>` 규칙을 더한다.
+**색 — 카테고리와 Graph lane.** 새 module category를 추가하려면 항상 base/soft/line 3종을 함께 추가하고, `category.css` 에 glyph + `.category-badge.cat-<name>` + `.row-stripe.cat-<name>` 규칙을 더한다. `input`/`output`은 `ModuleCategory`가 아니라 Graph lane 색 토큰이다(`packages/web/src/analyzer/types.ts:1`, `packages/web/src/styles/tokens.css:71-76`).
 
-| 카테고리 | 메인 | soft | line | 의미 |
+| 토큰 | 메인 | soft | line | 의미 |
 | --- | --- | --- | --- | --- |
 | `agent` | `--cat-agent` (#a21caf 자홍) | `--cat-agent-soft` | `--cat-agent-line` | reasoning 책임 |
 | `workflow` | `--cat-workflow` (#b35900 주황) | `--cat-workflow-soft` | `--cat-workflow-line` | control flow / orchestration |
 | `adapter` | `--cat-adapter` (#0c6b58 청록) | `--cat-adapter-soft` | `--cat-adapter-line` | callable capability |
 | `remote_a2a` | `--cat-remote` (#b42318 빨강) | `--cat-remote-soft` | `--cat-remote-line` | 원격 protocol boundary |
-| `input` | `--cat-input` (#2858a5 파랑) | `--cat-input-soft` | `--cat-input-line` | 흐름 입력 |
-| `output` | `--cat-output` (#0e7c5f 녹색) | `--cat-output-soft` | `--cat-output-line` | 흐름 출력 |
+| `input` lane | `--cat-input` (#2858a5 파랑) | `--cat-input-soft` | `--cat-input-line` | 흐름 입력 lane |
+| `output` lane | `--cat-output` (#0e7c5f 녹색) | `--cat-output-soft` | `--cat-output-line` | 흐름 출력 lane |
 
 빨강(`--cat-remote`)은 Remote A2A 외에는 쓰지 않는다. 에러/위험 빨강이 필요하면 `--red` 를 쓴다.
 
@@ -126,17 +126,18 @@ src/styles/
 
 화면에 텍스트만 있을 때보다 한 글자 글리프를 함께 보여주면 인지 비용이 크게 줄어든다. 컨트랙트는 `packages/web/src/components/CategoryBadge.tsx` 에 있다.
 
-**카테고리:**
+**카테고리 (`ModuleCategory`; `packages/web/src/components/CategoryBadge.tsx:23-28`):**
 - agent → `◆`
 - workflow → `▶`
 - adapter → `⚙`
 - remote_a2a → `⇨`
-- input → `⇥`
-- output → `⇤`
 
-**서브타입 (workflow_kind / adapter_kind / agent_kind / remote_contract_kind):**
+`input`/`output`은 CategoryBadge glyph 대상이 아니다. 입력/출력 구분은 Graph lane 위치와 `--cat-input`/`--cat-output` 색 토큰으로 표시한다.
+
+**서브타입 (workflow_kind / adapter_kind / agent_kind / remote_contract_kind / runtime_contract_kind; `packages/web/src/components/CategoryBadge.tsx:21,30-51`, `packages/web/src/analyzer/types.ts:101-108`):**
 - orchestration → `⋈`, graph → `⬢`, dynamic → `λ`
 - retrieval → `🔎`, rule_registry → `§`, legacy_api → `API`, data_query → `?`, template → `T`, computation → `Σ`, external_service → `↗`
+- mcp_legacy_adapter → `MCP`, eai_legacy_adapter → `EAI`, context_manager → `CTX`, callback_broker → `CB`, adk_callback → `ADK`, async_resume → `↻`
 - specialist → `S`, shared → `★`, a2a → `A2A`, unknown → `·`
 
 새 서브타입을 enum 에 추가할 때는 반드시 `subtypeGlyph` 매핑도 함께 갱신한다. 누락되면 `·` 로 fallback 된다.

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { freezeGraphLayout, layoutGraphIR } from "./layout.ts";
 import type { GraphIR, GraphNode } from "../../analyzer/types.ts";
+import { graphEdgeId, graphNodeKindToModuleCategory } from "../../graph/graphDisplay.ts";
 
 const graph: GraphIR = {
   requirement_id: "req-layout-position",
@@ -87,6 +88,15 @@ const rootRect = layout.containerRects.find((rect) => rect.container.id === "con
 assert.ok(rootRect, "container rect should be derived from final node positions");
 assert.ok(rootRect.x <= 480, "container should include persisted x coordinate");
 assert.ok(rootRect.y <= 320, "container should include persisted y coordinate");
+
+// --- shared graph display helpers ---
+assert.equal(graphNodeKindToModuleCategory("workflow_call"), "workflow");
+assert.equal(graphNodeKindToModuleCategory("adapter_call"), "adapter");
+assert.equal(graphNodeKindToModuleCategory("remote_agent_call"), "remote_a2a");
+assert.equal(graphNodeKindToModuleCategory("agent"), "agent");
+assert.equal(graphNodeKindToModuleCategory("human_input"), null);
+assert.equal(graphEdgeId({ id: "reviewed-edge" }, 3), "reviewed-edge");
+assert.equal(graphEdgeId({}, 3), "edge-3");
 
 // --- freezeGraphLayout: dragging one node must not move the others ---
 // Regression for the edit-mode bug where moving a node re-ran dagre on the rest
