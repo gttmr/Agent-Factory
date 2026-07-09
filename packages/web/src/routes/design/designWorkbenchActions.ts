@@ -8,9 +8,7 @@ import { insertCatalogWorkflowNode, pruneDetachedCatalogWorkflowCandidates } fro
 import type { AnalysisResult, GraphIR, ModuleCandidate, ModuleStatus, RuntimeContract } from "../../analyzer/types";
 import type { DesignBottomTab } from "../../design/designWorkbenchTabs";
 import type { RuntimeA2aAgentCardResult } from "../../state/useRuntimeA2a";
-
-const GRAPH_IR_SAVE_SUCCESS_MESSAGE =
-  "Graph IR 저장 완료 — Build 에서 계약 동기화 + runtime-stub 재생성이 필요합니다.";
+import { GRAPH_IR_SAVE_SUCCESS_MESSAGE } from "./designStageModelCore";
 
 type MutationOptions = {
   onSuccess?: () => void;

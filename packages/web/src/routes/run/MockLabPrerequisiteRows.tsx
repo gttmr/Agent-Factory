@@ -1,16 +1,7 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { Button } from "../../ui/primitives";
 import { AfApiError } from "../../state/apiClient";
-
-export interface MockLabPrerequisiteEntry {
-  readonly mock_server_id: string;
-  readonly status: "missing" | "stopped" | "running";
-  readonly running: boolean;
-  readonly start_action: {
-    readonly method: "POST";
-    readonly url: string;
-  };
-}
+import type { MockLabPrerequisiteEntry } from "../../state/useRuntimeChat";
 
 interface MockLabPrerequisiteRowsProps {
   readonly prerequisites: readonly MockLabPrerequisiteEntry[] | null | undefined;

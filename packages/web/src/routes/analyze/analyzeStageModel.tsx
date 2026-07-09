@@ -1,10 +1,17 @@
 import type { CatalogHubEntry } from "../../catalog/catalogIndex";
 import type { StageNextAction, StageStep } from "../../layout/StageShell";
-import type { AnalyzeCatalogEntry } from "../../state/useAnalyze";
 
 export type AnalyzeStepId = "run" | "review" | "approve";
 
 export const ANALYZE_STEP_IDS: AnalyzeStepId[] = ["run", "review", "approve"];
+
+export interface AnalyzeCatalogEntry {
+  readonly id?: string;
+  readonly name: string;
+  readonly module_category: "agent" | "workflow" | "adapter" | "remote_a2a";
+  readonly subtype?: string | null;
+  readonly [key: string]: unknown;
+}
 
 export function buildAnalyzeSteps({
   hasAnalysis,
