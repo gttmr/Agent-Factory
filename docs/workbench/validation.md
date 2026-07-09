@@ -127,7 +127,7 @@ PR6 마이그레이션 이후 워크벤치는 in-browser save record(`SavedAnaly
 
 - `af-run-manifest.json` — stage status, approval gate, 마지막 validation 결과.
 - `runs/<stage>/<run-id>/` — Stage Runner request, event stream, result summary, diff summary, proposed artifacts, diagnostics.
-- `analysis-result.json` 및 분할 산출물(`commonization-notes.json`, `boundary-design.md`, `a2a-contracts.json`).
+- `analysis-result.json` 및 분할 산출물(`commonization-notes.json`, `boundary-design.md`). Remote A2A 계약은 `analysis-result.json.a2aContracts`가 정본이다 — 구 아티팩트 루트의 분리 `a2a-contracts.json`은 레거시 잔재로, artifact-sync가 파생하지 않고 검증기/생성기도 읽지 않는다.
 - `scaffold-plan.json`, `runtime-stub/`, `implementation-handoff.md`.
 - `validation-report.md`, `catalog-delta.yaml`.
 - `collaboration/{comments,highlights}.json`.

@@ -1,34 +1,20 @@
 ---
 name: af-build-runtime-stub
-description: Build Agent Factory ADK Runtime Handoff bundles from approved scaffold-plan artifacts. Use when Codex must generate smoke TODO stubs or reviewed runnable ADK Workflow bundles from approved modules, runtime contracts, Graph IR, and catalog bindings while preserving raw_requirement_to_code=false and no production business logic.
+description: Use when approved Agent Factory scaffold-plan artifacts need a smoke TODO or runnable ADK Runtime Handoff bundle, including artifact-sync, runtime-stub generation, generated-output checks, and handoff non-goal review.
 ---
 
 # AF Build Runtime Stub
 
-## Overview
+Use this third DLC stage only after Analyze and Design artifacts are reviewed. The primary path is Workbench artifact-sync from canonical artifacts; standalone direct generation is secondary and manual. Never build from raw requirements, unreviewed analyzer output, unresolved candidate missing information, or unapproved runtime/A2A contracts.
 
-Use this skill for the third DLC stage: approved artifacts -> ADK Runtime Handoff bundle.
-Smoke mode emits TODO/runtime-wiring stubs for structural review. A reviewed `scaffold-plan.json` with `output_mode: runnable` emits a synthetic runnable ADK Workflow for local smoke review. Both modes are generated only from approved artifacts and remain non-production handoff surfaces.
-
-## Required Reading
-
-- Read `../_shared/agent-factory-dlc.md`.
-- Read `../_shared/artifact-contracts.md`.
-- Read `../_shared/adk-2.md`.
-- Read `references/runtime-stub.md`.
-- Read repo-root `<repo>/schemas/scaffold-plan.schema.json` and `<repo>/scripts/generate-adk-source.mjs` before generating source.
-
-## Workflow
-
-1. Load the approved `artifacts/af/<req-id>/af-run-manifest.json`, `analysis-result.json`, and `scaffold-plan.json`.
-2. Refuse to build from raw requirements, unapproved candidates, unresolved Graph IR errors, unapproved required runtime contracts, or `a2aContracts` that are required for Remote A2A but not `approved`.
-3. Generate source under `artifacts/af/<req-id>/runtime-stub/`.
-4. Keep `raw_requirement_to_code=false`. In smoke mode, keep TODO runtime wiring and TODO business logic explicit. In runnable mode, emit only reviewed synthetic ADK Workflow wiring and keep real integration/business logic out of generated source.
-5. Include synthetic `runtime_mock` only as deterministic local smoke output when already present in reviewed catalog contracts.
-6. Write `implementation-handoff.md` with exact TODOs and non-goals.
-7. Update `af-run-manifest.json` with generated paths and verification commands.
-
-## Gate
-
-Do not write real endpoints, credentials, private deployment scripts, customer data, or production business logic.
-Do not mark the bundle production-ready. Smoke and runnable outputs are reviewed handoff surfaces; production integration remains a separate implementation task.
+1. Read `../_shared/artifact-root-stage-runner.md` -> choose Stage Runner/Workbench artifact-sync mode or standalone canonical mode -> verify with `test -f <artifact-root>/analysis-result.json` -> stop if canonical analysis is absent.
+2. Read `../_shared/runtime-contracts.md` -> check manifest approvals, `runtimeContracts`, embedded `a2aContracts`, and approved module source -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop if approvals or required contracts are missing.
+3. Read `references/artifact-sync-build.md` -> run artifact sync before generation, using `POST /api/af/:reqId/artifact-sync/run` in Workbench or the documented manual equivalent -> verify with `test -f <artifact-root>/scaffold-plan.json` -> stop if sync reports drift errors.
+4. If route or join features are present, read `../_shared/adk-2.3-routes.md` -> inspect route/join Graph IR and scaffold plan fields -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on route or reachability errors.
+5. If state or artifact channels are present, read `../_shared/adk-2.3-data-handling.md` -> inspect `state_key` and `artifact_key` channels -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on unsupported data-channel lowering.
+6. If `human_input` nodes are present, read `../_shared/adk-2.3-human-input.md` -> inspect prompt, resume, choice, and response schema fields -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on unsupported `response_schema_ref`.
+7. If dynamic or loop shapes are present, read `../_shared/adk-2.3-dynamic.md` -> inspect loop containers, `loop_control`, `loop_back`, and `loop_exit` metadata -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on unsupported dynamic lowering.
+8. If Remote A2A is present, read `../_shared/adk-2.3-remote-a2a.md` -> inspect embedded A2A contracts and runtime policy fields -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on missing approved contract, Agent Card URL, or invalid auth env var.
+9. Read `references/runtime-generation.md` -> generate or inspect `runtime-stub/` from synced artifacts -> verify with `test -d <artifact-root>/runtime-stub` -> stop on generation failure.
+10. Read `references/runtime-output-checks.md` -> compile generated Python and run generated tests only when dependencies exist -> verify with `python3 -m compileall <artifact-root>/runtime-stub` -> stop on compile/test failure.
+11. Read `references/handoff-non-goals.md` -> update or inspect `implementation-handoff.md` for smoke/runnable status and TODOs -> verify with `test -f <artifact-root>/runtime-stub/implementation-handoff.md` -> stop if `raw_requirement_to_code=false`, no-private-data, no-deploy, or no-production-business-logic invariants are violated.

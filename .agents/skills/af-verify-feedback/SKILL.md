@@ -1,33 +1,16 @@
 ---
 name: af-verify-feedback
-description: Verify Agent Factory artifacts, runtime stubs, schema conformance, and feedback loops. Use when Codex must run validation commands, summarize evidence, produce catalog-delta proposals, record failures, and close the DLC cycle without directly editing catalog runtime contracts.
+description: Use when Agent Factory artifacts, Stage Runner output, generated runtime stubs, validation evidence, or catalog-delta proposals need verification and feedback closure without direct catalog edits.
 ---
 
 # AF Verify Feedback
 
-## Overview
+Use this fourth DLC stage to prove artifact and handoff claims with observable evidence. Verify may propose reports and catalog deltas; it does not silently edit catalog seed files or claim completion without fresh command output.
 
-Use this skill for the fourth DLC stage: artifact/stub verification -> review evidence and feedback.
-It closes the loop by proving claims with commands and proposing catalog feedback as a delta, not by silently editing runtime catalogs.
-
-## Required Reading
-
-- Read `../_shared/agent-factory-dlc.md`.
-- Read `../_shared/artifact-contracts.md`.
-- Read `references/verification-feedback.md`.
-- Read repo-root `<repo>/docs/workbench/validation.md` for current verification commands.
-
-## Workflow
-
-1. Load `artifacts/af/<req-id>/af-run-manifest.json` and identify the latest completed stage.
-2. Run schema/artifact validation commands that match the changed artifacts. If the user supplies a single fixture file, validate its containing scenario directory; if the user supplies an artifact root, validate that root; if schema/templates changed, validate the relevant parent fixture collections.
-3. Run build/typecheck only when TypeScript, React, analyzer, schema, validator, or source-generator logic changed.
-4. Verify generated runtime stubs structurally when present.
-5. Write `validation-report.md` with exact commands, pass/fail results, and remaining risk.
-6. Write `catalog-delta.yaml` only as a proposed change set for reuse, runtime mocks, or contract gaps.
-7. Update `af-run-manifest.json` with verification evidence and feedback artifact paths.
-
-## Gate
-
-Do not call work complete without observable verification.
-Do not edit `catalog/*.yaml` directly from this skill; catalog changes require a separate approval task.
+1. Read `../_shared/artifact-root-stage-runner.md` -> identify the latest relevant canonical root or Stage Runner run -> verify with `test -f <artifact-root>/af-run-manifest.json` -> stop if no artifact root or completed run exists.
+2. Read `references/stage-runner-verify-output.md` -> distinguish Stage Runner proposed files from manual verify command evidence -> verify with `test -f <run-dir>/result-summary.json` -> stop if the chosen run is absent or incomplete.
+3. Read `references/validation-allowlist.md` -> choose `validate_artifact_root`, `build_web`, or `test_analyzer`, or the exact manual equivalent -> verify with `node scripts/validate-artifacts.mjs <artifact-root>` -> stop on non-zero exit or if a heavier claim needs an unrun allow-list command.
+4. Read `references/runtime-stub-checks.md` -> compile/test generated runtime only when `runtime-stub/` and dependencies exist -> verify with `python3 -m compileall <artifact-root>/runtime-stub` -> mark unverified explicitly if dependencies are missing.
+5. Read `../_shared/catalog-feedback.md` -> keep catalog feedback proposal-only and outside `catalog/*.yaml` -> verify with `git diff --name-only -- catalog` -> stop if any catalog seed file changed directly.
+6. Read `references/catalog-delta-proposal.md` -> write or inspect only `catalog-delta.yaml` proposals -> verify with `test -f <artifact-root>/catalog-delta.yaml` -> stop if proposals include private endpoints, credentials, or production business logic.
+7. Read `references/evidence-report.md` -> record exact commands, outputs, failures, and residual uncertainty in `validation-report.md` -> verify with `test -f <artifact-root>/validation-report.md` -> gate: no complete/fixed/passing claim without observable verification.

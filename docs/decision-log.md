@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-08 · PR TBD — DLC 스킬 세트를 ADK 2.3 기준 단계형 계약으로 재작성
+
+- **결정**: `.agents/skills`의 4개 스테이지 스킬과 `_shared`를 전면 재작성했다. (a) SKILL.md는 "단계마다 참조 파일 1개만 읽기 → 행동 → 검증 커맨드 → gate/stop" 라우터 구조로 전환하고 선독(Required Reading) 패턴을 제거했다(짧은 컨텍스트 소비 모델 제약). (b) `_shared/adk-2.md`(ADK 2.0 기준)를 삭제하고 ADK 2.3 토픽별 참조(`adk-2.3-{baseline,routes,data-handling,human-input,dynamic,remote-a2a}.md`)로 대체했다. (c) Stage Runner proposed-first를 1차 모드로, 단독 canonical 편집을 표기된 2차 모드로 규정하고, 스킬의 manifest 승인/상태 직접 토글을 금지했다. (d) build는 artifact-sync를 1차 경로로, 직접 `generate-adk-source.mjs` 호출을 수동/고급 경로로 강등했다. (e) `a2a-contracts.json`을 표준 아티팩트 목록에서 제거했다(임베디드 `analysisResult.a2aContracts`가 정본).
+- **배경**: 6/28 이후 60커밋 동안 스킬이 미갱신되어 Stage Runner 계약·모듈형 생성기(`scripts/adk-source/`)·artifact-sync 흐름과 어긋났다. 출처 간 모순 12건은 진실 위계(실런타임 > adk.dev > 코드 > 리포 문서, 리포 범위 규칙 최우선)로 판정했고, 판정 원장은 `docs/workbench/skill-refresh-evidence-2026-07.md`에 있다. Python API 서명 주장은 설치된 `google-adk 2.3.0` venv 소스로 검증된 것만 남겼다.
+- **영향**: `.agents/skills/**` 전체(스킬 디렉터리명·SKILL.md 경로는 `stageRunner.ts:38,42` 하드 참조 때문에 불변 유지), `docs/workbench/skill-refresh-evidence-2026-07.md` 신설. 스키마·검증기·워크벤치 코드는 무변경(스킬이 코드 현실을 따라간 것이며 계약 자체는 그대로).
+
 ## 2026-07-08 · PR TBD — Route decision prompts expose reviewed route aliases
 
 - **결정**: Agent node가 downstream router를 선택하는 Graph IR에서 generated instruction은 reviewed route edge의 canonical lower-case `route_decision.route_type` 값과 accepted alias를 노출한다. Runtime route matching은 계속 structured fields(`route_decision`, `route_type`, `action`, `route`, `decision`, `choice`, `value`, `response`)에서 추출한 값과 reviewed `route_aliases`만 비교하며, 업무별 route 문자열은 generator에 하드코딩하지 않는다.
