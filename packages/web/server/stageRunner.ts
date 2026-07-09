@@ -32,24 +32,82 @@ export type SkillRunnerStage = (typeof skillRunnerStages)[number];
 const RUN_ID_PATTERN = /^\d{8}T\d{6}Z-(analyze|design|build|verify)-[a-f0-9]{6}$/;
 const ALLOWED_MODELS = new Set(["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.3-codex-spark"]);
 const DEFAULT_MODEL = "gpt-5.5";
-const SKILL_BY_STAGE: Record<SkillRunnerStage, { skillName: string; skillPath: string }> = {
+
+type StageRunnerKind = "codex" | "runtime_stub" | "verify";
+type StageCodexMetadataBehavior = "execution_mode_backend" | "none";
+type StageApplyAvailability = "diff_artifacts" | "no_artifacts";
+
+interface StageDefinition {
+  readonly skillName: string;
+  readonly skillPath: string;
+  readonly runnerKind: StageRunnerKind;
+  readonly proposedArtifactFiles: readonly string[];
+  readonly diffAvailable: boolean;
+  readonly applyAvailability: StageApplyAvailability;
+  readonly requiresDesignReady: boolean;
+  readonly commandLabel: (body: StageRunRequestBody) => string;
+  readonly codexMetadata: StageCodexMetadataBehavior;
+  readonly proposedMessage: string;
+  readonly codexOutputInstruction: string;
+}
+
+const SERVER_PRIMITIVE_CODEX_INSTRUCTION = "This stage is handled by server-side primitives; do not edit canonical artifacts.";
+
+const STAGE_DEFINITIONS = {
   analyze: {
     skillName: "af-analyze-requirement",
-    skillPath: ".agents/skills/af-analyze-requirement/SKILL.md"
+    skillPath: ".agents/skills/af-analyze-requirement/SKILL.md",
+    runnerKind: "codex",
+    proposedArtifactFiles: ["analysis-result.json"],
+    diffAvailable: true,
+    applyAvailability: "diff_artifacts",
+    requiresDesignReady: false,
+    commandLabel: (body) => (body.execution_mode === "fake" ? "fake-runner" : "codex sdk"),
+    codexMetadata: "execution_mode_backend",
+    proposedMessage: "proposed artifact 생성이 완료되었습니다.",
+    codexOutputInstruction: "Write the proposed analysis artifact to proposed-artifacts/analysis-result.json only. Do not edit canonical artifacts."
   },
   design: {
     skillName: "af-design-boundaries",
-    skillPath: ".agents/skills/af-design-boundaries/SKILL.md"
+    skillPath: ".agents/skills/af-design-boundaries/SKILL.md",
+    runnerKind: "codex",
+    proposedArtifactFiles: ["analysis-result.json", "boundary-design.md"],
+    diffAvailable: true,
+    applyAvailability: "diff_artifacts",
+    requiresDesignReady: true,
+    commandLabel: (body) => (body.execution_mode === "fake" ? "fake-runner" : "codex sdk"),
+    codexMetadata: "execution_mode_backend",
+    proposedMessage: "proposed artifact 생성이 완료되었습니다.",
+    codexOutputInstruction:
+      "Write proposed-artifacts/analysis-result.json and proposed-artifacts/boundary-design.md only. Do not edit canonical artifacts or approval gates."
   },
   build: {
     skillName: "runtime-stub/build",
-    skillPath: "scripts/generate-adk-source.mjs"
+    skillPath: "scripts/generate-adk-source.mjs",
+    runnerKind: "runtime_stub",
+    proposedArtifactFiles: [],
+    diffAvailable: false,
+    applyAvailability: "no_artifacts",
+    requiresDesignReady: false,
+    commandLabel: () => "node scripts/generate-adk-source.mjs",
+    codexMetadata: "none",
+    proposedMessage: "runtime-stub 생성이 완료되었습니다.",
+    codexOutputInstruction: SERVER_PRIMITIVE_CODEX_INSTRUCTION
   },
   verify: {
     skillName: "verify/run",
-    skillPath: "packages/web/server/afVerifyRunApi.ts"
+    skillPath: "packages/web/server/afVerifyRunApi.ts",
+    runnerKind: "verify",
+    proposedArtifactFiles: ["validation-report.md", "catalog-delta.yaml"],
+    diffAvailable: true,
+    applyAvailability: "diff_artifacts",
+    requiresDesignReady: false,
+    commandLabel: (body) => `verify ${body.verifyCommand ?? "validate_artifact_root"}`,
+    codexMetadata: "none",
+    proposedMessage: "proposed artifact 생성이 완료되었습니다.",
+    codexOutputInstruction: SERVER_PRIMITIVE_CODEX_INSTRUCTION
   }
-};
+} satisfies Record<SkillRunnerStage, StageDefinition>;
 
 export interface StageRunRequestBody {
   execution_mode?: "codex" | "fake";
@@ -236,7 +294,7 @@ const defaultPrimitiveRunner: StagePrimitiveRunner = {
 export async function runStageSkill(input: RunStageSkillInput): Promise<StageRunSummary> {
   const stage = assertSkillRunnerStage(input.stage);
   const model = normalizeModel(input.body.model);
-  const skill = SKILL_BY_STAGE[stage];
+  const definition = STAGE_DEFINITIONS[stage];
   const runId = createRunId(stage);
   const rootDir = input.store.resolveRootDir(input.reqId);
   const runDir = resolveRunDir(input.store, input.reqId, stage, runId);
@@ -249,7 +307,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     stage,
     runId,
     model,
-    skillName: skill.skillName,
+    skillName: definition.skillName,
     body,
     catalogContext: catalogSnapshot.context
   });
@@ -269,68 +327,77 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
   await writeJsonFile(join(runDir, "request.json"), request);
   await emit({
     phase: "started",
-    message: `${skill.skillName} 실행을 시작했습니다.`,
+    message: `${definition.skillName} 실행을 시작했습니다.`,
     title: "stage run started"
   });
 
   let status: AfStageRunStatus = "completed";
   let lastError: string | null = null;
   let diagnostics: string | null = null;
-  let codexMetadata: StageRunCodexMetadata | undefined =
-    stage === "analyze" || stage === "design" ? createCodexMetadata(body.execution_mode === "fake" ? "fake" : "sdk") : undefined;
+  let codexMetadata = createInitialCodexMetadata(definition, body);
   let outputArtifacts: string[] = [];
   let validationErrors: string[] = [];
   try {
     assertNotCanceled(input.signal);
-    if (stage === "design") {
+    if (definition.requiresDesignReady) {
       await assertDesignReady(input.store, input.reqId);
     }
 
-    if (stage === "build") {
-      const result = await runBuildPrimitiveStage({
-        input,
-        body,
-        stage,
-        model,
-        rootDir,
-        runDir,
-        proposedDir,
-        emit
-      });
-      outputArtifacts = result.files.map((file) => `runtime-stub/${file.path}`);
-    } else if (stage === "verify") {
-      const result = await runVerifyPrimitiveStage({
-        input,
-        body,
-        stage,
-        model,
-        rootDir,
-        runDir,
-        proposedDir,
-        emit
-      });
-      validationErrors = result.ok ? [] : [`verify command failed with exit code ${result.exit_code}`];
-      await writeVerifyProposedArtifacts({ proposedDir, reqId: input.reqId, runId, result });
-    } else if (body.execution_mode === "fake") {
-      await runFakeStage({ store: input.store, reqId: input.reqId, stage, body, proposedDir, emit });
-    } else {
-      const runner = input.codexRunner ?? new SdkCodexStageRunner();
-      codexMetadata = await runner.run({
-        repoRoot: input.repoRoot,
-        rootDir,
-        runDir,
-        proposedDir,
-        stage,
-        skillPath: skill.skillPath,
-        model,
-        signal: input.signal,
-        emit
-      });
+    switch (definition.runnerKind) {
+      case "runtime_stub": {
+        const result = await runBuildPrimitiveStage({
+          input,
+          body,
+          stage,
+          model,
+          rootDir,
+          runDir,
+          proposedDir,
+          emit
+        });
+        outputArtifacts = result.files.map((file) => `runtime-stub/${file.path}`);
+        break;
+      }
+      case "verify": {
+        const result = await runVerifyPrimitiveStage({
+          input,
+          body,
+          stage,
+          model,
+          rootDir,
+          runDir,
+          proposedDir,
+          emit
+        });
+        validationErrors = result.ok ? [] : [`verify command failed with exit code ${result.exit_code}`];
+        await writeVerifyProposedArtifacts({ proposedDir, reqId: input.reqId, runId, result });
+        break;
+      }
+      case "codex":
+        if (body.execution_mode === "fake") {
+          await runFakeStage({ store: input.store, reqId: input.reqId, stage, body, proposedDir, emit });
+        } else {
+          const runner = input.codexRunner ?? new SdkCodexStageRunner();
+          codexMetadata = await runner.run({
+            repoRoot: input.repoRoot,
+            rootDir,
+            runDir,
+            proposedDir,
+            stage,
+            skillPath: definition.skillPath,
+            model,
+            signal: input.signal,
+            emit
+          });
+        }
+        break;
+      default:
+        assertNever(definition);
     }
     assertNotCanceled(input.signal);
     await emit({
       phase: "proposed",
-      message: stage === "build" ? "runtime-stub 생성이 완료되었습니다." : "proposed artifact 생성이 완료되었습니다.",
+      message: definition.proposedMessage,
       title: "proposed artifacts"
     });
   } catch (error) {
@@ -341,7 +408,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
       reqId: input.reqId,
       stage,
       model,
-      skillName: skill.skillName,
+      skillName: definition.skillName,
       command: commandNameForStage(stage, body),
       startedAt,
       finishedAt: new Date(),
@@ -356,7 +423,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
   }
 
   let diffSummary: StageRunDiffSummary = { files: [] };
-  if (status === "completed" && stage !== "build") {
+  if (status === "completed" && definition.diffAvailable) {
     diffSummary = await buildDiffSummary(input.store, input.reqId, stage, runId);
   }
   if (status === "completed") {
@@ -369,7 +436,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
         reqId: input.reqId,
         stage,
         model,
-        skillName: skill.skillName,
+        skillName: definition.skillName,
         command: commandNameForStage(stage, body),
         startedAt,
         finishedAt: new Date(),
@@ -403,7 +470,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     run_id: runId,
     stage,
     status,
-    skill_name: skill.skillName,
+    skill_name: definition.skillName,
     model,
     started_at: startedAt.toISOString(),
     finished_at: finishedAt.toISOString(),
@@ -620,10 +687,20 @@ function normalizeModel(value: unknown): CodexAnalyzerModel {
   return typeof value === "string" && ALLOWED_MODELS.has(value) ? (value as CodexAnalyzerModel) : DEFAULT_MODEL;
 }
 
+function createInitialCodexMetadata(
+  definition: StageDefinition,
+  body: StageRunRequestBody
+): StageRunCodexMetadata | undefined {
+  if (definition.codexMetadata === "none") return undefined;
+  return createCodexMetadata(body.execution_mode === "fake" ? "fake" : "sdk");
+}
+
 function commandNameForStage(stage: SkillRunnerStage, body: StageRunRequestBody): string {
-  if (stage === "build") return "node scripts/generate-adk-source.mjs";
-  if (stage === "verify") return `verify ${body.verifyCommand ?? "validate_artifact_root"}`;
-  return body.execution_mode === "fake" ? "fake-runner" : "codex sdk";
+  return STAGE_DEFINITIONS[stage].commandLabel(body);
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled stage runner variant: ${String(value)}`);
 }
 
 function createRunId(stage: SkillRunnerStage): string {
@@ -823,12 +900,7 @@ async function runFakeStage(input: {
 }
 
 function buildCodexStagePrompt(input: Pick<CodexStageRunnerInput, "rootDir" | "runDir" | "stage" | "skillPath">): string {
-  const outputInstruction =
-    input.stage === "analyze"
-      ? "Write the proposed analysis artifact to proposed-artifacts/analysis-result.json only. Do not edit canonical artifacts."
-      : input.stage === "design"
-        ? "Write proposed-artifacts/analysis-result.json and proposed-artifacts/boundary-design.md only. Do not edit canonical artifacts or approval gates."
-        : "This stage is handled by server-side primitives; do not edit canonical artifacts.";
+  const outputInstruction = STAGE_DEFINITIONS[input.stage].codexOutputInstruction;
   return [
     `Read ${input.skillPath} and execute the ${input.stage} stage for this artifact root.`,
     `Artifact root: ${input.rootDir}`,
@@ -1198,16 +1270,9 @@ async function buildDiffSummary(
 ): Promise<StageRunDiffSummary> {
   const runDir = resolveRunDir(store, reqId, stage, runId);
   const proposedDir = join(runDir, "proposed-artifacts");
-  const allowed =
-    stage === "analyze"
-      ? ["analysis-result.json"]
-      : stage === "design"
-        ? ["analysis-result.json", "boundary-design.md"]
-        : stage === "verify"
-          ? ["validation-report.md", "catalog-delta.yaml"]
-          : [];
+  const definition = STAGE_DEFINITIONS[stage];
   const files: StageRunArtifactDiff[] = [];
-  for (const file of allowed) {
+  for (const file of definition.proposedArtifactFiles) {
     const proposedPath = join(proposedDir, file);
     const proposedStat = await stat(proposedPath).catch(() => null);
     if (!proposedStat?.isFile()) continue;
@@ -1231,7 +1296,7 @@ async function buildDiffSummary(
       bytes: Buffer.byteLength(content, "utf8")
     });
   }
-  if (!files.length && stage !== "build") {
+  if (!files.length && definition.diffAvailable) {
     throw new ArtifactValidationError(422, "proposed artifact 가 생성되지 않았습니다.");
   }
   return { files };
