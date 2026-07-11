@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import type { AfRunManifest } from "../../analyzer/afRunManifest.ts";
+import { buildBuildStageRunnerConfig, buildVerifyStageRunnerConfig, summarizeVerifyRunState } from "../stageRunnerScreenConfig.ts";
 import { buildDesignSteps } from "./designStageModelCore.ts";
 
 {
@@ -67,4 +69,87 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
   // Then: the Approve step is complete only from manifest approval state.
   assert.ok(approveStep);
   assert.equal(approveStep.status, "done");
+}
+
+{
+  // Given: Verify has Stage Runner history even before a validation result is written.
+  const manifest: AfRunManifest = {
+    requirement_id: "req-verify",
+    artifact_root: "artifacts/af/req-verify",
+    current_stage: "verify",
+    stages: {
+      analyze: { status: "complete", outputs: ["analysis-result.json"] },
+      design: { status: "complete", outputs: ["boundary-design.md"] },
+      build: { status: "complete", outputs: ["runtime-stub"] },
+      verify: { status: "pending", outputs: [] }
+    },
+    approvals: {
+      analysis_reviewed: true,
+      boundaries_approved: true,
+      runtime_contracts_approved: true,
+      stub_ready_for_followup: true
+    },
+    validation: { commands: [], last_result: "not_run" },
+    stage_runs: {
+      verify: {
+        latest_run_id: "20260709T120000Z-verify-a1b2c3",
+        status: "running",
+        started_at: "2026-07-09T12:00:00.000Z",
+        finished_at: null,
+        skill_name: "verify/run",
+        model: "gpt-5.5",
+        output_artifacts: [],
+        last_error: null
+      }
+    }
+  };
+
+  // When: the Verify screen state is summarized for the route stepper and metrics.
+  const state = summarizeVerifyRunState(manifest);
+
+  // Then: run presence comes from Stage Runner history, while validation status remains manifest-owned.
+  assert.equal(state.hasRun, true);
+  assert.equal(state.latestRunStatusLabel, "실행 중");
+  assert.equal(state.validationLabel, "미실행");
+}
+
+{
+  // Given: the Verify config owns the Stage Runner command body.
+  const runState = summarizeVerifyRunState(undefined);
+
+  // When: a command is selected in the Verify Stage Runner controls slot.
+  const config = buildVerifyStageRunnerConfig({
+    commandKey: "test_analyzer",
+    runState,
+    reportExists: false,
+    deltaExists: true
+  });
+  const body = config.buildRunBody("gpt-5.5");
+
+  // Then: the canonical Stage Runner request carries the selected allow-list command.
+  assert.equal(config.stage, "verify");
+  assert.equal(body.model, "gpt-5.5");
+  assert.equal(body.verifyCommand, "test_analyzer");
+}
+
+{
+  // Given: Build keeps its primitive runner config shared but apply mode outside the helper.
+  const config = buildBuildStageRunnerConfig({
+    analysisExists: true,
+    boundariesApproved: true,
+    runtimeApproved: true,
+    modeDirty: false,
+    planReady: false,
+    stubReady: false,
+    runtimeStubFileCount: 0,
+    selectedOutputMode: "smoke"
+  });
+
+  // When: the Build Stage Runner config is read by the route.
+  const body = config.buildRunBody("gpt-5.4");
+
+  // Then: shared config covers the primitive request without hiding Build's call-site applyMode.
+  assert.equal(config.stage, "build");
+  assert.equal(config.disabledReason, "scaffold-plan.json 이 생성 가능 상태여야 build stage를 실행할 수 있습니다.");
+  assert.equal(body.model, "gpt-5.4");
 }

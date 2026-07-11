@@ -1,5 +1,6 @@
 export interface StageRunnerNarrativeEvent {
   readonly phase?: string;
+  readonly title?: string;
   readonly message?: string;
   readonly itemType?: string;
   readonly snippet?: string;
@@ -28,6 +29,39 @@ export function selectStageRunnerNarrative(events: readonly StageRunnerNarrative
     agentMessage,
     todoProgress: todoSnippet ? parseTodoProgress(todoSnippet) : null
   };
+}
+
+export function selectProcessLog(events: readonly StageRunnerNarrativeEvent[]): string | null {
+  const processEvents: Array<{ readonly stream: string; readonly snippet: string }> = [];
+  for (const event of events) {
+    if (event.phase !== "process_event" || typeof event.snippet !== "string" || event.snippet === "") continue;
+    processEvents.push({ stream: event.title ?? "stdout", snippet: event.snippet });
+  }
+
+  const keptEvents = processEvents.slice(-200);
+  const firstEvent = keptEvents[0];
+  if (!firstEvent) return null;
+  let processLog = "";
+  if (keptEvents.every((event) => event.stream === firstEvent.stream)) {
+    processLog = keptEvents.map((event) => event.snippet).join("");
+  } else {
+    let previousStream: string | null = null;
+    for (const event of keptEvents) {
+      if (event.stream !== previousStream) {
+        if (processLog !== "" && !processLog.endsWith("\n")) processLog += "\n";
+        processLog += `[${event.stream}]\n`;
+        previousStream = event.stream;
+      }
+      processLog += event.snippet;
+    }
+  }
+
+  let truncated = keptEvents.length < processEvents.length;
+  if (processLog.length > 100000) {
+    processLog = processLog.slice(-100000);
+    truncated = true;
+  }
+  return truncated ? `[이전 출력 생략]\n${processLog}` : processLog;
 }
 
 function latestSnippet(events: readonly StageRunnerNarrativeEvent[], itemType: string): string | null {

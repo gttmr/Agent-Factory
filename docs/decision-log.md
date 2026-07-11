@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-09 · PR TBD — Verify execution is Stage Runner only
+
+- **결정**: `/af/:reqId/verify`의 실행 스텝에서 legacy direct command 카드/로그 lane을 제거하고, allow-list command 선택과 실행은 Verify Stage Runner panel의 controls slot이 단독으로 소유한다. Route UI의 "run happened" 상태는 `manifest.stage_runs.verify`와 `manifest.validation`을 한 번에 요약한 read-only state에서만 읽는다.
+- **배경**: Verify 화면이 같은 `afVerifyRunApi` primitive에 대해 Stage Runner run history/proposed artifacts 경로와 direct `runVerify.mutate` 경로를 동시에 노출해, 사용자가 어떤 실행 기록과 validation 상태를 기준으로 삼아야 하는지 혼동할 수 있었다.
+- **영향**: Verify run-step UX, shared stage-screen config, active Verify documentation. Server primitive route and `manifest.validation` writes stay unchanged.
+
 ## 2026-07-09 · PR TBD — legacy stage-flow import dropped
 
 - **결정**: Workbench `analysis-result.json` import와 Graph IR normalization은 native Graph IR만 허용한다. `processFlow`가 non-record이거나 구버전 stage-flow/browser export 키(`nodes[].type`, `nodes[].subtype`, `edges[].edge_type`, `edges[].data_channel`, `edges[].data`)를 포함하면 변환하지 않고 "구버전 그래프 형식은 더 이상 지원되지 않습니다 — native Graph IR(analysis-result.json 최신 스키마)로 다시 내보내세요." 오류를 기존 import error surface에 표시한다.

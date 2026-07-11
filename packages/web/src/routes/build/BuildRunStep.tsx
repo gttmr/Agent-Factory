@@ -11,6 +11,7 @@ import { useArtifactSync } from "../../state/useArtifactSync";
 import { useCatalog } from "../../state/useCatalog";
 import { useMockLabDiscovery } from "../../state/useMockLabDiscovery";
 import { useBuildRuntimeStub, useRuntimeStub, useSaveScaffoldPlan, useScaffoldPlan } from "../../state/useScaffoldPlan";
+import { buildBuildCompoundDisabledReason, buildBuildStageRunnerConfig } from "../stageRunnerScreenConfig";
 import { ArtifactSyncRunPanel } from "./ArtifactSyncRunPanel";
 import { buildArtifactSyncRunOptions } from "./artifactSyncRunOptions";
 import { buildAdkGraphReadiness } from "./buildReadiness";
@@ -102,14 +103,17 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
   const stubReady = (runtimeStub?.files ?? []).length > 0;
   const blockers = scaffoldPlan?.validation?.blockers ?? effectivePlan?.validation.blockers ?? [];
   const warnings = scaffoldPlan?.validation?.warnings ?? effectivePlan?.validation.warnings ?? [];
-  const compoundDisabledReason = buildCompoundDisabledReason({ analysisExists: Boolean(analysis), boundariesApproved, runtimeApproved });
-  const buildStageDisabledReason =
-    compoundDisabledReason ??
-    (modeDirty
-      ? "저장된 scaffold-plan 과 선택한 output mode가 다릅니다. 먼저 scaffold-plan 을 재생성하세요."
-      : !planReady
-        ? "scaffold-plan.json 이 생성 가능 상태여야 build stage를 실행할 수 있습니다."
-        : null);
+  const compoundDisabledReason = buildBuildCompoundDisabledReason({ analysisExists: Boolean(analysis), boundariesApproved, runtimeApproved });
+  const stageRunnerConfig = buildBuildStageRunnerConfig({
+    analysisExists: Boolean(analysis),
+    boundariesApproved,
+    runtimeApproved,
+    modeDirty,
+    planReady,
+    stubReady,
+    runtimeStubFileCount: runtimeStub?.files.length ?? 0,
+    selectedOutputMode
+  });
 
   function handleSavePlan() {
     if (!effectivePlan) return;
@@ -198,19 +202,8 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
       ) : null}
       <StageRunnerPanel
         reqId={reqId}
-        stage="build"
-        skillName="runtime-stub/build"
-        title="Build Stage Runner"
-        description="기존 runtime-stub 생성 primitive를 실행하고 run 이력에 기록합니다. canonical runtime-stub side effect는 기존 Build API와 동일합니다."
-        metrics={[
-          { label: "scaffold", value: planReady ? "ready" : "blocked", tone: planReady ? "ok" : "warn" },
-          { label: "runtime-stub", value: stubReady ? `${runtimeStub?.files.length ?? 0} files` : "empty", tone: stubReady ? "ok" : "warn" },
-          { label: "mode", value: selectedOutputMode }
-        ]}
-        disabledReason={buildStageDisabledReason}
+        {...stageRunnerConfig}
         applyMode="none"
-        runButtonLabel="runtime-stub build 기록 실행"
-        buildRunBody={(model) => ({ model })}
       />
       <ArtifactSyncRunPanel
         compoundDisabledReason={compoundDisabledReason}
@@ -264,21 +257,4 @@ function BuildRunNotice({ message }: { readonly message: string }) {
       <span>{message}</span>
     </div>
   );
-}
-
-function buildCompoundDisabledReason({
-  analysisExists,
-  boundariesApproved,
-  runtimeApproved
-}: {
-  readonly analysisExists: boolean;
-  readonly boundariesApproved: boolean;
-  readonly runtimeApproved: boolean;
-}): string | null {
-  if (!boundariesApproved || !runtimeApproved) {
-    return `게이트 미충족: boundaries_approved=${boundariesApproved ? "예" : "아니오"}, runtime_contracts_approved=${
-      runtimeApproved ? "예" : "아니오"
-    }`;
-  }
-  return analysisExists ? null : "analysis-result.json 이 없어 계약 동기화를 실행할 수 없습니다.";
 }

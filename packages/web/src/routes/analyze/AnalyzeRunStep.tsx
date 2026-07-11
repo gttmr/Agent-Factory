@@ -1,5 +1,6 @@
 import { StageRunnerPanel } from "../../components/StageRunnerPanel";
 import { Button, Field, TextareaField } from "../../ui/primitives";
+import { buildAnalyzeStageRunnerConfig } from "../stageRunnerScreenConfig";
 import type { AnalyzeCatalogEntry } from "./analyzeStageModel";
 
 interface AnalyzeRunStepProps {
@@ -37,17 +38,20 @@ export function AnalyzeRunStep({
   onDomainDraftChange,
   onImport
 }: AnalyzeRunStepProps) {
+  const stageRunnerConfig = buildAnalyzeStageRunnerConfig({
+    hasAnalysis,
+    analysisEtag,
+    analyzeRawText,
+    analyzeDomain,
+    catalog,
+    catalogCounts,
+    currentCandidateCount
+  });
+
   return (
     <StageRunnerPanel
       reqId={reqId}
-      stage="analyze"
-      skillName="af-analyze-requirement"
-      title="Analyze Skill Runner"
-      description={
-        hasAnalysis
-          ? "분석 결과가 있을 때 이 단계는 입력 보강, 재분석, JSON import 를 위한 refresh path 입니다. 검토 근거와 approval path 는 ‘2. 검토’ 이후에서 확인합니다."
-          : "요구사항 텍스트와 seed catalog 를 서버 Stage Runner 로 보내고, 결과는 run 폴더의 proposed artifact 로 먼저 저장합니다. canonical analysis-result.json 은 제안 적용 후에만 바뀝니다."
-      }
+      {...stageRunnerConfig}
       headerAction={
         <div className="af-action-row">
           <label className="ui-button ui-button-secondary af-import-button">
@@ -94,27 +98,6 @@ export function AnalyzeRunStep({
           </div>
         </div>
       }
-      metrics={[
-        { label: "입력 글자", value: `${analyzeRawText.length}자`, tone: analyzeRawText ? "ok" : "danger" },
-        { label: "현재 후보", value: currentCandidateCount === null ? "없음" : `${currentCandidateCount}개` },
-        { label: "catalog", value: `${catalog.length}개` },
-        {
-          label: "catalog 구성",
-          value: `A ${catalogCounts.agent} · W ${catalogCounts.workflow} · D ${catalogCounts.adapter} · R ${catalogCounts.remote_a2a}`
-        }
-      ]}
-      disabledReason={
-        analyzeRawText
-          ? null
-          : "요구사항 텍스트가 비어 있습니다. 원문을 입력하거나 raw_text 가 포함된 analysis-result.json 을 import 하세요."
-      }
-      currentArtifactEtag={analysisEtag}
-      runButtonLabel={hasAnalysis ? "Analyze 재실행" : "Analyze 실행"}
-      buildRunBody={(model) => ({
-        model,
-        input: { rawText: analyzeRawText, domain: analyzeDomain },
-        catalog
-      })}
     />
   );
 }
