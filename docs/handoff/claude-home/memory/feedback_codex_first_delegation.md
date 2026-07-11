@@ -1,15 +1,15 @@
 ---
 name: feedback-codex-first-delegation
-description: Delegate exploration and implementation to Codex gpt-5.5 (high/xhigh); Claude subagents only for MCP-bound work
+description: Delegate exploration and implementation to Codex gpt-5.6 (codex id gpt-5.6-sol, high/xhigh); Claude subagents only for MCP-bound work
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 0704deb0-6f93-4873-a8d5-dcb5f581eac7
 ---
 
-For Agent Factory work, delegate most exploration, investigation, and implementation to Codex (subagent_type `codex:codex-rescue` or the codex skill) running gpt-5.5 with reasoning effort high — xhigh for hard/multi-artifact tasks. Do NOT default to Opus subagents (supersedes the old opus-xhigh rule from 2026-05-26; user corrected this on 2026-07-02).
+For Agent Factory work, delegate most exploration, investigation, and implementation to Codex (subagent_type `codex:codex-rescue` or the codex skill) running **gpt-5.6** with reasoning effort high — xhigh for hard/multi-artifact tasks. Do NOT default to Opus subagents (supersedes the old opus-xhigh rule from 2026-05-26; user corrected this on 2026-07-02). **Model update (2026-07-10): user directed default = gpt-5.6, superseding gpt-5.5, for ALL sessions.** The codex model id is `gpt-5.6-sol` and it is already the global default in `~/.codex/config.toml` (`model = "gpt-5.6-sol"`, effort xhigh) — so either omit `--model` (config default applies) or pass `--model gpt-5.6-sol` explicitly. Never pass `--model gpt-5.5` anymore. `review` has no `--model` flag and always uses the config default.
 
-**Why:** User explicitly redirected: don't explore with Opus subagents — use codex gpt-5.5 high, or xhigh by difficulty, for most cases. The main Claude session is orchestrator/judge only on large efforts: it plans, verifies, integrates, and must not generate code itself.
+**Why:** User explicitly redirected: don't explore with Opus subagents — use codex (now gpt-5.6) high, or xhigh by difficulty, for most cases. The main Claude session is orchestrator/judge only on large efforts: it plans, verifies, integrates, and must not generate code itself.
 
 **How to apply:**
 - Main-session model: the user keeps the orchestrator session on **Fable 5** and asked (2026-07-03) that important judgments run on Fable 5 — don't downgrade the main session; codex still does implementation/exploration.

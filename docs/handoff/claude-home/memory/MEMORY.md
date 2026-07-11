@@ -1,6 +1,6 @@
 - [Use Codex actively](feedback_codex_usage.md) — delegate non-trivial drafts to codex skill, Claude verifies and integrates
 - [Codex "limit" = Claude's own session](feedback_codex_retry_loop.md) — "hit your session limit · resets HH:mm" from a Codex call is CLAUDE's session cap, not Codex; after resume, re-run Codex freely
-- [Codex-first delegation](feedback_codex_first_delegation.md) — exploration/implementation via codex gpt-5.5 high (xhigh by difficulty); Claude subagents only for MCP-bound work; supersedes old opus default
+- [Codex-first delegation](feedback_codex_first_delegation.md) — exploration/implementation via codex **gpt-5.6** (id `gpt-5.6-sol`, config default; never pass gpt-5.5) high/xhigh; Claude subagents only for MCP-bound work
 - [Commit per PR boundary](feedback_commit_per_pr.md) — Agent Factory workbench refactor: one commit per PR (PR1–PR6), no batching, no push without ask
 - [Worktree merge + final audit](feedback_worktree_merge_and_final_audit.md) — verify clean merge-back before done; end big tasks with subagent+Codex whole-repo doc/contract audit
 - [Codex incremental review](feedback_codex_incremental_review.md) — on big tasks, Codex-review every commit boundary / large source change as it lands, not just at the end; docs in lockstep
