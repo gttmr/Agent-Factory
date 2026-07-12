@@ -77,7 +77,6 @@ const entries = [
   { token: "node_id", source: "Graph IR and generated runtime configuration field" },
   { token: "node_input", source: "ADK workflow function-node input parameter" },
   { token: "node_kind", source: "Graph IR node discriminator field" },
-  { token: "not_run", source: "generator-internal validation result status" },
   { token: "objective_text", source: "generator-neutral semantic text input name" },
   { token: "output_mode", source: "scaffold-plan schema field" },
   { token: "output_schema", source: "Mock binding schema field" },

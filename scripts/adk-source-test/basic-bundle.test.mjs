@@ -3,10 +3,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import {
   assertConnectedMcpRuntimeLabels,
-  assertManifestStageUpdated,
   assertRunnableBundle,
   assertSmokeBundle
 } from "./assertions.mjs";
@@ -29,8 +29,25 @@ test("smoke mode emits the synthetic runtime smoke agent", () => {
   const { artifactRoot, outputRoot } = generate({ runnable: false });
   try {
     assertSmokeBundle(outputRoot);
-    assertManifestStageUpdated(artifactRoot);
   } finally {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test("generator CLI leaves af-run-manifest.json byte-identical", async () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-manifest-pure-"));
+  const originalArgv = process.argv;
+  try {
+    writeFixture(artifactRoot, { runnable: false });
+    const manifestPath = join(artifactRoot, "af-run-manifest.json");
+    const manifestBefore = readFileSync(manifestPath);
+
+    process.argv = [process.execPath, generator, artifactRoot, join(artifactRoot, "runtime-stub")];
+    await import(`${pathToFileURL(generator).href}?manifest-purity=${Date.now()}`);
+
+    assert.deepEqual(readFileSync(manifestPath), manifestBefore);
+  } finally {
+    process.argv = originalArgv;
     rmSync(artifactRoot, { recursive: true, force: true });
   }
 });
@@ -39,7 +56,6 @@ test("runnable mode emits an ADK Workflow graph and the editable bundle config",
   const { artifactRoot, outputRoot } = generate({ runnable: true });
   try {
     assertRunnableBundle(outputRoot);
-    assertManifestStageUpdated(artifactRoot);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -51,7 +67,6 @@ test("runnable mode lowers chat agent execution mode", () => {
     const { agentSource } = readBundle(outputRoot);
     assert.match(agentSource, /mode="chat"/);
     assert.doesNotMatch(agentSource, /mode="single_turn"/);
-    assertManifestStageUpdated(artifactRoot);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
@@ -61,7 +76,6 @@ test("runnable connected MCP adapters carry an explicit runtime MCP label", () =
   const { artifactRoot, outputRoot } = generate({ runnable: true, connectedAdapter: true });
   try {
     assertConnectedMcpRuntimeLabels(outputRoot);
-    assertManifestStageUpdated(artifactRoot);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

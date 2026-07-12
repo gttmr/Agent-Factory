@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { writeBundleFiles } from "../adk-source/bundle-writer.mjs";
 import { loadArtifactContext } from "../adk-source/context.mjs";
 import { buildFiles } from "../adk-source/file-builder.mjs";
-import { updateRunManifest } from "../adk-source/run-manifest.mjs";
 
 export const scriptsRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const repoRoot = join(scriptsRoot, "..");
@@ -161,10 +160,8 @@ export function generate({ runnable, connectedAdapter = false, agentExecutionMod
 
 export function generateBundle(artifactRoot, outputRoot) {
   const artifactContext = loadArtifactContext(artifactRoot);
-  const { runManifest, packageName } = artifactContext;
   const files = buildFiles({ artifactRoot, outputRoot, ...artifactContext });
   writeBundleFiles(outputRoot, files);
-  updateRunManifest({ artifactRoot, outputRoot, packageName, runManifest });
 }
 
 export function discoverGeneratedPackage(root) {

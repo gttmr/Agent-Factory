@@ -4,16 +4,14 @@ import { join, resolve } from "node:path";
 import { writeBundleFiles } from "./adk-source/bundle-writer.mjs";
 import { loadArtifactContext } from "./adk-source/context.mjs";
 import { buildFiles } from "./adk-source/file-builder.mjs";
-import { updateRunManifest } from "./adk-source/run-manifest.mjs";
 
 const artifactRoot = resolve(process.argv[2] ?? "templates");
 const outputRoot = resolve(process.argv[3] ?? "generated/adk-source");
 const artifactContext = loadArtifactContext(artifactRoot);
-const { runManifest, outputMode, packageName } = artifactContext;
+const { outputMode, packageName } = artifactContext;
 const files = buildFiles({ artifactRoot, outputRoot, ...artifactContext });
 
 writeBundleFiles(outputRoot, files);
-updateRunManifest({ artifactRoot, outputRoot, packageName, runManifest });
 
 console.log(`ADK source generated from scaffold-plan.json (output_mode=${outputMode}): ${join(outputRoot, packageName)}`);
 console.log("Prepare the shared ADK runtime from the repository root:");

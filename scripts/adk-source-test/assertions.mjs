@@ -171,15 +171,6 @@ export function assertConnectedMcpRuntimeLabels(outputRoot) {
   assert.match(mockConfig, /tool_name: "?lookup_test_data"?/);
 }
 
-export function assertManifestStageUpdated(artifactRoot) {
-  const runManifest = JSON.parse(readFileSync(join(artifactRoot, "af-run-manifest.json"), "utf8"));
-  assert.equal(runManifest.current_stage, "build");
-  assert.equal(runManifest.stages.build.status, "complete");
-  assert.equal(runManifest.approvals.stub_ready_for_followup, true);
-  assert.ok(runManifest.stages.build.outputs.includes("runtime-stub/"));
-  assert.ok(runManifest.validation.commands.some((command) => command.includes("python3 -m compileall")));
-}
-
 function assertCommonBundle(outputRoot, manifest) {
   const readme = readFileSync(join(outputRoot, "README.md"), "utf8");
   assert.equal(manifest.guardrails.raw_requirement_to_code, false);
