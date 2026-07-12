@@ -53,6 +53,8 @@ import { collectTargets, findJsonFiles, readJson } from "./artifact-validation/f
 import { isMcpContract, validateContractRegistry } from "./artifact-validation/contract-registry.mjs";
 import { validateModuleCandidates } from "./artifact-validation/module-candidates.mjs";
 import { validateSavedAnalysisFixtures } from "./artifact-validation/saved-analysis.mjs";
+import { registryProjectionCompatibilityIssues } from "./artifact-validation/registry-projection-compatibility.mjs";
+import { registryProjectionTemplateAgreementIssues } from "./artifact-validation/implementation-template-agreement.mjs";
 
 const rawArg = process.argv[2] ?? "templates";
 const root = resolve(rawArg);
@@ -74,6 +76,7 @@ for (const target of targets) {
   validateAnalysisResult(target);
   validateAfRunManifest({ dir: target, errors });
   validateScaffoldPlan(target);
+  validateRegistryProjectionTemplateAgreement(target);
   validateSavedAnalysisFixtures({
     dir: target,
     root,
@@ -132,7 +135,16 @@ function validateProcessFlow(dir = root) {
     return;
   }
   const flow = readJson(path, errors);
-  validateGraphIR(flow, "process-flow.json", new Map(), new Map());
+  // Split roots may omit module-candidates.json; fall back to the embedded
+  // analysis-result candidates so validation and loadArtifactContext agree.
+  // Parse problems in analysis-result.json are reported by its own validator,
+  // so a throwaway error sink avoids double-reporting here.
+  const analysisPath = join(dir, "analysis-result.json");
+  const embeddedCandidates = existsSync(analysisPath)
+    ? (readJson(analysisPath, [])?.moduleCandidates ?? [])
+    : [];
+  const candidatesById = candidateIndex(loadModuleCandidates(dir, embeddedCandidates));
+  validateGraphIR(flow, "process-flow.json", candidatesById, new Map());
 }
 
 function validateOptionalEnumValue(value, allowed, label) {
@@ -185,6 +197,59 @@ function llmToolsetEdgeIssue(edge) {
   if (!edge || typeof edge !== "object") return null;
   if (edge.call_control !== "selected_by_llm") return null;
   return `has call_control selected_by_llm; LLM-selected toolset selection is agent node metadata (node_kind: agent), not edge metadata.`;
+}
+
+function validateRegistryProjectionCompatibility(module, label, outputMode = null) {
+  for (const issue of registryProjectionCompatibilityIssues(module, { outputMode })) {
+    errors.push(`${label} ${issue}.`);
+  }
+}
+
+function loadModuleCandidates(dir, embeddedCandidates = []) {
+  const candidatesPath = join(dir, "module-candidates.json");
+  if (existsSync(candidatesPath)) {
+    const loaded = readJson(candidatesPath, errors);
+    return Array.isArray(loaded) ? loaded : [];
+  }
+  return Array.isArray(embeddedCandidates) ? embeddedCandidates : [];
+}
+
+function candidateIndex(candidates) {
+  return new Map(
+    candidates
+      .filter((candidate) => candidate && typeof candidate.id === "string")
+      .map((candidate) => [candidate.id, candidate])
+  );
+}
+
+function validateRegistryProjectionTemplateAgreement(dir) {
+  const scaffoldPath = existsSync(join(dir, "scaffold-plan.json"))
+    ? join(dir, "scaffold-plan.json")
+    : existsSync(join(dir, "scaffold-plan.template.json"))
+      ? join(dir, "scaffold-plan.template.json")
+      : null;
+  if (!scaffoldPath) return;
+
+  const splitFlowPath = join(dir, "process-flow.json");
+  let processFlow = null;
+  if (existsSync(splitFlowPath)) {
+    processFlow = readJson(splitFlowPath, errors);
+  } else {
+    const analysisPath = join(dir, "analysis-result.json");
+    if (existsSync(analysisPath)) {
+      processFlow = readJson(analysisPath, errors)?.processFlow ?? null;
+    }
+  }
+  if (!processFlow || !Array.isArray(processFlow.nodes)) return;
+
+  const scaffoldPlan = readJson(scaffoldPath, errors);
+  if (!Array.isArray(scaffoldPlan.modules)) return;
+  errors.push(
+    ...registryProjectionTemplateAgreementIssues({
+      nodes: processFlow.nodes,
+      modules: scaffoldPlan.modules
+    })
+  );
 }
 
 /**
@@ -370,6 +435,12 @@ function validateGraphIR(graph, label, candidatesById, contractsById) {
         ) {
           errors.push(
             `${label}.nodes[${index}] (${node.id}) node_kind ${node.node_kind} does not match candidate ${candidate.id} module_category ${candidate.module_category}.`
+          );
+        }
+        if (candidate) {
+          validateRegistryProjectionCompatibility(
+            { ...candidate, ...node, module_category: candidate.module_category },
+            `${label}.nodes[${index}] (${node.id})`
           );
         }
       }
@@ -743,6 +814,7 @@ function validateScaffoldPlan(dir = root) {
       }
     }
     validateScaffoldMcpBinding(module, label);
+    validateRegistryProjectionCompatibility(module, label, outputMode);
   });
 }
 
@@ -973,16 +1045,7 @@ function validateAnalysisResult(dir = root) {
   // Build the candidate index from the same dir, if present, so we can
   // cross-check remote_module_id and 1:1 pairing. Falls back to the
   // analysis-result's embedded moduleCandidates when no sibling file exists.
-  const candidatesPath = join(dir, "module-candidates.json");
-  let candidates = [];
-  if (existsSync(candidatesPath)) {
-    const loaded = readJson(candidatesPath, errors);
-    if (Array.isArray(loaded)) {
-      candidates = loaded;
-    }
-  } else if (Array.isArray(result.moduleCandidates)) {
-    candidates = result.moduleCandidates;
-  }
+  const candidates = loadModuleCandidates(dir, result.moduleCandidates);
   const remoteCandidateById = new Map();
   for (const candidate of candidates) {
     if (candidate && candidate.module_category === "remote_a2a" && typeof candidate.id === "string") {
@@ -1027,12 +1090,7 @@ function validateAnalysisResult(dir = root) {
   // GraphIR structural validation. Build full candidate index (not just
   // remote) and contract index so node module bindings and remote-edge
   // contract refs can be cross-checked.
-  const candidatesById = new Map();
-  for (const candidate of candidates) {
-    if (candidate && typeof candidate.id === "string") {
-      candidatesById.set(candidate.id, candidate);
-    }
-  }
+  const candidatesById = candidateIndex(candidates);
   const contractsById = new Map();
   for (const contract of result.a2aContracts) {
     if (contract && typeof contract.contract_id === "string") {

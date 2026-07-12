@@ -1,5 +1,5 @@
 import { adapterConnection } from "../adapters.mjs";
-import { emitOutgoingArtifactChannelWrites, emitOutgoingStateChannelWrites, outgoingStateChannelKeys } from "../channels.mjs";
+import { emitOutgoingArtifactChannelWrites, emitOutgoingStateChannelWrites } from "../channels.mjs";
 import { funcName, nodeSymbol, pyNodeName, stateKey } from "../naming.mjs";
 import { escapePythonString, toPyStr, toPythonLiteral } from "../python-literals.mjs";
 import { remoteA2aRegistrySnapshotRows } from "../remote-a2a.mjs";
@@ -16,7 +16,7 @@ export function emitStubFunc(target, context) {
     module.module_category === "workflow"
       ? "검토된 결정적 워크플로우 조정자 자리표시자"
       : adapterConnection(module) === "unconnected"
-        ? "Mock Lab MCP 서버가 아직 연결되지 않은 adapter"
+        ? "synthetic MCP 서버가 아직 연결되지 않은 adapter"
         : "검토된 TODO boundary";
   const connectionStatus = module.module_category === "adapter" ? "unconnected" : "coordinator";
   return `async def ${funcName(target)}(ctx: Context, node_input=None) -> dict:
@@ -61,16 +61,6 @@ ${emitOutgoingStateChannelWrites(context.graphContext, module.id)}${emitOutgoing
 }
 
 function registrySnapshotRowsForStub(module, context) {
-  if (!emitsRegistrySnapshot(module, context)) return [];
+  if (module.adk_skeleton_contract?.implementation_template !== "remote_a2a_registry_projection_stub") return [];
   return remoteA2aRegistrySnapshotRows({ analysisResult: context.analysisResult, modules: context.modules });
-}
-
-function emitsRegistrySnapshot(module, context) {
-  const outputNames = (Array.isArray(module.outputs) ? module.outputs : [])
-    .map((output) => (typeof output?.name === "string" ? output.name.trim() : ""))
-    .filter(Boolean);
-  return (
-    outputNames.includes("agent_registry_snapshot") ||
-    outgoingStateChannelKeys(context.graphContext, module.id).includes("agent_registry_snapshot")
-  );
 }

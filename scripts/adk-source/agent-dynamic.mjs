@@ -36,7 +36,7 @@ export function buildDynamicRunnableAgentPy(context) {
   });
   const loopControlBlocks = loopPlan.loopControls.map(emitLoopControlNode);
 
-  const description = `검토된 Agent Factory artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
+  const description = `검토된 workbench artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
   const usesArtifacts = usesArtifactChannels(graphContext);
@@ -71,7 +71,7 @@ ${remoteImport}${mcpToolsetImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, START, Workflow, node
 ${artifactGenaiImport}
 
-${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)) })}
+${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)), modules })}
 
 ${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}${dynamicHelpers()}
 

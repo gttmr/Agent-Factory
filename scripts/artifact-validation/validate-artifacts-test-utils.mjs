@@ -111,3 +111,42 @@ export function runValidatorExpectingFailure(artifactRoot) {
   rmSync(artifactRoot, { recursive: true, force: true });
   assert.fail("validate-artifacts unexpectedly succeeded");
 }
+
+export function registrySelectorArtifacts() {
+  const analysis = readScenarioAnalysis();
+  const plan = readJson(join(scenarioRoot, "scaffold-plan.json"));
+  const contract = {
+    scaffold_level: "mock_testable_skeleton",
+    target_runtime: "adk_python_2_x",
+    generation_mode: "deterministic_template",
+    implementation_template: "remote_a2a_registry_projection_stub",
+    manual_completion_required: true,
+    developer_todos: ["review Remote A2A provider projection"]
+  };
+  const candidate = analysis.moduleCandidates.find((item) => item.id === "mod-customer-profile");
+  const node = analysis.processFlow.nodes.find((item) => item.module_id === candidate.id);
+  const module = plan.modules.find((item) => item.id === candidate.id);
+  assert.ok(candidate && node && module);
+  Object.assign(node, {
+    runtime_binding: "local_function",
+    invoke_binding: "local_function",
+    call_control: "fixed_by_workflow",
+    adk_skeleton_contract: structuredClone(contract)
+  });
+  delete node.mock_binding;
+  Object.assign(module, {
+    access_protocol: "local",
+    mcp_server: null,
+    mcp_tool_name: null,
+    runtime_binding: "local_function",
+    invoke_binding: "local_function",
+    mock_binding: null,
+    adk_skeleton_contract: structuredClone(contract)
+  });
+  return { analysis, plan, candidate, node, module };
+}
+
+export function writeRegistrySelectorArtifacts(artifactRoot, artifacts) {
+  writeJson(join(artifactRoot, "analysis-result.json"), artifacts.analysis);
+  writeJson(join(artifactRoot, "scaffold-plan.json"), artifacts.plan);
+}

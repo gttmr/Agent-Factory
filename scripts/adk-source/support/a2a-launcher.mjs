@@ -41,7 +41,7 @@ def _patch_adk_a2a_resume_executor_version() -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Agent Factory ADK A2A launcher")
+    parser = argparse.ArgumentParser(description="Reviewed workbench ADK A2A launcher")
     parser.add_argument("agents_dir", nargs="?", default=".")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8001)

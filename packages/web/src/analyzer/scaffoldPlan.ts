@@ -31,6 +31,7 @@ import type {
 import { runtimeContractReadinessIssues } from "./runtimeContracts";
 
 const DEFAULT_RUNNABLE_MODEL = "hosted_vllm/local-model";
+const REGISTRY_PROJECTION_TEMPLATE = "remote_a2a_registry_projection_stub";
 
 export interface BuildScaffoldPlanInput {
   normalizedRequirement: NormalizedRequirement;
@@ -90,6 +91,8 @@ export function buildScaffoldPlan({
       }))
   ];
   const blockers = collectBlockers(modules, deployableCandidates);
+  blockers.push(...collectImplementationTemplateConflicts(processFlow));
+  blockers.push(...collectRegistryProjectionCompatibilityBlockers(outputMode, deployableCandidates, processFlow));
   blockers.push(...collectRunnableDynamicBlockers(outputMode, modules, processFlow));
   const runtimeContractPlans = runtimeContracts.map(toScaffoldRuntimeContract);
   blockers.push(...collectRuntimeContractBlockers(runtimeContracts));
@@ -341,7 +344,15 @@ function adkSkeletonContractFor(
   const nodeKind = graphNode?.node_kind;
   const isWorkflowCall = nodeKind === "workflow_call";
   const isMockAdapter = isFixedMcpAdapterCall(candidate, graphNode);
-  if (graphNode?.adk_skeleton_contract && (candidate.module_category !== "adapter" || isMockAdapter)) {
+  const hasRegistryProjectionSelector =
+    graphNode?.adk_skeleton_contract?.implementation_template === REGISTRY_PROJECTION_TEMPLATE;
+  const isRegistryProjectionAdapter =
+    hasRegistryProjectionSelector &&
+    registryProjectionCompatibilityFailures(candidate, graphNode, runnable ? "runnable" : "smoke", isMockAdapter).length === 0;
+  if (
+    graphNode?.adk_skeleton_contract &&
+    (candidate.module_category !== "adapter" || isMockAdapter || isRegistryProjectionAdapter)
+  ) {
     return graphNode.adk_skeleton_contract;
   }
   return {
@@ -361,6 +372,31 @@ function adkSkeletonContractFor(
         ? ["Mock Lab MCP tool binding 확인", "실제 EAI/API client로 교체할 TODO 유지"]
         : ["검토된 scaffold boundary 안에서 개발자가 수동 보강"]
   };
+}
+
+function registryProjectionCompatibilityFailures(
+  candidate: ModuleCandidate,
+  graphNode: NonNullable<ProcessFlow["nodes"]>[number],
+  outputMode: ScaffoldOutputMode,
+  isMockAdapter = isFixedMcpAdapterCall(candidate, graphNode)
+): string[] {
+  if (graphNode.adk_skeleton_contract?.implementation_template !== REGISTRY_PROJECTION_TEMPLATE) return [];
+
+  const failures: string[] = [];
+  if (outputMode !== "runnable") failures.push("output_mode runnable 필요");
+  if (candidate.module_category !== "adapter") failures.push("module_category adapter 필요");
+  if (graphNode.runtime_binding !== "local_function") failures.push("runtime_binding local_function 필요");
+  if (graphNode.invoke_binding !== "local_function" && graphNode.invoke_binding !== "local_python") {
+    failures.push("invoke_binding local_function 또는 local_python 필요");
+  }
+  if (
+    graphNode.adk_skeleton_contract.generation_mode !== undefined &&
+    graphNode.adk_skeleton_contract.generation_mode !== "deterministic_template"
+  ) {
+    failures.push("generation_mode deterministic_template 필요");
+  }
+  if (isMockAdapter) failures.push("connected MCP adapter가 아닌 stub-function lowering 필요");
+  return failures;
 }
 
 function scaffoldGraphFor(processFlow: ProcessFlow) {
@@ -507,6 +543,54 @@ function collectBlockers(modules: ScaffoldPlanModule[], candidates: ModuleCandid
       return moduleBlockers;
     })
   ];
+}
+
+function collectImplementationTemplateConflicts(processFlow: ProcessFlow): string[] {
+  const selectorsByModuleId = new Map<string, Map<string | null, string[]>>();
+  for (const node of processFlow?.nodes ?? []) {
+    if (typeof node.module_id !== "string") continue;
+    const selector = node.adk_skeleton_contract?.implementation_template ?? null;
+    const selectors = selectorsByModuleId.get(node.module_id) ?? new Map<string | null, string[]>();
+    const nodeIds = selectors.get(selector) ?? [];
+    nodeIds.push(node.id);
+    selectors.set(selector, nodeIds);
+    selectorsByModuleId.set(node.module_id, selectors);
+  }
+
+  const blockers: string[] = [];
+  for (const [moduleId, selectors] of selectorsByModuleId) {
+    if (selectors.size < 2) continue;
+    const details = [...selectors.entries()]
+      .map(([selector, nodeIds]) => `${nodeIds.join(", ")}=${JSON.stringify(selector)}`)
+      .join("; ");
+    blockers.push(
+      `${moduleId}: 재사용 Graph IR node의 adk_skeleton_contract.implementation_template presence/value가 일치하지 않습니다 (${details}).`
+    );
+  }
+  return blockers;
+}
+
+function collectRegistryProjectionCompatibilityBlockers(
+  outputMode: ScaffoldOutputMode,
+  candidates: ModuleCandidate[],
+  processFlow: ProcessFlow
+): string[] {
+  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  return (processFlow?.nodes ?? []).flatMap((node) => {
+    if (
+      typeof node.module_id !== "string" ||
+      node.adk_skeleton_contract?.implementation_template !== REGISTRY_PROJECTION_TEMPLATE
+    ) {
+      return [];
+    }
+    const candidate = candidateById.get(node.module_id);
+    if (!candidate || candidate.status !== "approved") return [];
+    const failures = registryProjectionCompatibilityFailures(candidate, node, outputMode);
+    if (failures.length === 0) return [];
+    return [
+      `${candidate.name} (${candidate.id}, node ${node.id}): 검토된 ${REGISTRY_PROJECTION_TEMPLATE} selector를 scaffold-plan에 보존할 수 없습니다 (${failures.join(", ")}).`
+    ];
+  });
 }
 
 function collectRunnableDynamicBlockers(

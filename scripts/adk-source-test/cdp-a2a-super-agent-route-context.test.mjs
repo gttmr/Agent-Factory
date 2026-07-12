@@ -62,3 +62,10 @@ test("Given reviewed Super Agent route contract When runtime is generated Then r
     previous: { user_message: "fallback" }
   });
 });
+
+test("Given an alternate reviewed route-agent name When runtime is generated Then route authority guidance uses that name", () => {
+  const { agentSource } = generateSuperAgentRouteBundle({ agentName: "Delegation Router Agent" });
+
+  assert.match(agentSource, /Route JSON은 Delegation Router Agent 에이전트가 직접 결정한 구조화 출력이어야 하며/);
+  assert.doesNotMatch(agentSource, /Route JSON은 Super Agent가 직접 결정한 구조화 출력이어야 하며/);
+});

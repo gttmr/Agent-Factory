@@ -20,7 +20,7 @@ export function buildSampleInputsYaml({ modules, normalizedRequirement, packageN
     lines.push("  - module_id: workflow");
     lines.push(`    module_name: ${yamlScalar(normalizedRequirement.title || packageName)}`);
     lines.push("    input:");
-    lines.push(`      user_request: ${yamlScalar(firstSmokeSample({ modules }) || "ADK Web smoke test sample")}`);
+    lines.push(`      user_request: ${yamlScalar(firstSmokeSample({ modules }) || "ADK development UI smoke test sample")}`);
   }
   return `${lines.join("\n")}\n`;
 }

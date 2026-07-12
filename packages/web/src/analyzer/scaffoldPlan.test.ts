@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { buildScaffoldPlan } from "./scaffoldPlan.ts";
 import { buildRuntimeContracts, runtimeContractReadinessIssues } from "./runtimeContracts.ts";
 import type { CatalogEntry } from "../catalog/types.ts";
-import type { ModuleCandidate, NormalizedRequirement, ProcessFlow, RuntimeContract } from "./types.ts";
+import type { AdkSkeletonContract, ModuleCandidate, NormalizedRequirement, ProcessFlow, RuntimeContract } from "./types.ts";
 
 const normalizedRequirement: NormalizedRequirement = {
   id: "req-ko-defaults",
@@ -474,6 +474,184 @@ const selectedToolsetModule = selectedToolsetPlan.modules[0];
 assert.equal(selectedToolsetModule.mock_binding?.status, "missing");
 assert.equal(selectedToolsetModule.adk_skeleton_contract?.scaffold_level, "handoff");
 assert.equal(selectedToolsetModule.adk_skeleton_contract?.implementation_template, "adapter_placeholder_stub");
+
+const registryProjectionContract: AdkSkeletonContract = {
+  scaffold_level: "mock_testable_skeleton",
+  target_runtime: "adk_python_2_x",
+  generation_mode: "deterministic_template",
+  implementation_template: "remote_a2a_registry_projection_stub",
+  manual_completion_required: true,
+  developer_todos: ["review Remote A2A provider projection"]
+};
+const registryProjectionPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({
+      id: "mod-registry-projection",
+      name: "Registry Projection Adapter",
+      module_category: "adapter",
+      agent_kind: null,
+      adapter_kind: "data_query",
+      access_protocol: "local",
+      inputs: [],
+      outputs: [{ name: "registry_payload", type: "object", required: true }]
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        id: "node-registry-projection",
+        label: "Registry Projection Adapter",
+        module_id: "mod-registry-projection",
+        node_kind: "adapter_call",
+        execution_kind: "adapter_call",
+        adk_node_role: "workflow_node",
+        owner_scope: "local",
+        container_id: null,
+        lane_id: "adapter",
+        input_ports: [],
+        output_ports: [],
+        schema_refs: [],
+        runtime_binding: "local_function",
+        invoke_binding: "local_function",
+        call_control: "fixed_by_workflow",
+        adk_skeleton_contract: registryProjectionContract,
+        review_status: "approved"
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.deepEqual(registryProjectionPlan.modules[0].adk_skeleton_contract, registryProjectionContract);
+assert.ok(
+  registryProjectionPlan.validation.blockers.every((blocker) => !blocker.includes("remote_a2a_registry_projection_stub")),
+  "compatible runnable registry selector must remain blocker-free"
+);
+
+const smokeRegistryProjectionPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [
+    candidate({
+      id: "mod-smoke-registry-projection",
+      name: "Smoke Registry Projection Adapter",
+      module_category: "adapter",
+      agent_kind: null,
+      adapter_kind: "data_query",
+      access_protocol: "local"
+    })
+  ],
+  processFlow: {
+    ...flow,
+    nodes: [
+      {
+        ...flow.nodes[0],
+        id: "node-smoke-registry-projection",
+        label: "Smoke Registry Projection Adapter",
+        module_id: "mod-smoke-registry-projection",
+        node_kind: "adapter_call",
+        execution_kind: "adapter_call",
+        lane_id: "adapter",
+        runtime_binding: "local_function",
+        invoke_binding: "local_function",
+        call_control: "fixed_by_workflow",
+        adk_skeleton_contract: registryProjectionContract
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "smoke"
+});
+assert.equal(smokeRegistryProjectionPlan.modules[0].adk_skeleton_contract?.implementation_template, "adapter_placeholder_stub");
+assert.equal(smokeRegistryProjectionPlan.validation.can_generate_source, false);
+assert.ok(
+  smokeRegistryProjectionPlan.validation.blockers.some(
+    (blocker) =>
+      blocker.includes("Smoke Registry Projection Adapter") &&
+      blocker.includes("remote_a2a_registry_projection_stub") &&
+      blocker.includes("output_mode runnable 필요")
+  ),
+  "smoke derivation must explain why the reviewed registry selector cannot be preserved"
+);
+
+const reusedRegistryCandidate = candidate({
+  id: "mod-reused-registry-projection",
+  name: "Reused Registry Projection Adapter",
+  module_category: "adapter",
+  agent_kind: null,
+  adapter_kind: "data_query",
+  access_protocol: "local",
+  outputs: [{ name: "registry_payload", type: "object", required: true }]
+});
+const reusedRegistryNode: NonNullable<ProcessFlow["nodes"]>[number] = {
+  id: "node-reused-registry-projection-a",
+  label: "Reused Registry Projection Adapter A",
+  module_id: reusedRegistryCandidate.id,
+  node_kind: "adapter_call" as const,
+  execution_kind: "adapter_call",
+  adk_node_role: "workflow_node",
+  owner_scope: "local" as const,
+  container_id: null,
+  lane_id: "adapter" as const,
+  input_ports: [],
+  output_ports: [],
+  schema_refs: [],
+  runtime_binding: "local_function" as const,
+  invoke_binding: "local_function" as const,
+  call_control: "fixed_by_workflow" as const,
+  review_status: "approved" as const
+};
+const conflictingReusedRegistryPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [reusedRegistryCandidate],
+  processFlow: {
+    ...flow,
+    nodes: [
+      reusedRegistryNode,
+      {
+        ...reusedRegistryNode,
+        id: "node-reused-registry-projection-b",
+        label: "Reused Registry Projection Adapter B",
+        adk_skeleton_contract: registryProjectionContract
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.equal(conflictingReusedRegistryPlan.validation.can_generate_source, false);
+assert.ok(
+  conflictingReusedRegistryPlan.validation.blockers.some(
+    (blocker) => blocker.includes(reusedRegistryCandidate.id) && blocker.includes("implementation_template")
+  ),
+  "reused modules with different selector presence must block scaffold-plan derivation"
+);
+
+const identicalReusedRegistryPlan = buildScaffoldPlan({
+  normalizedRequirement,
+  moduleCandidates: [reusedRegistryCandidate],
+  processFlow: {
+    ...flow,
+    nodes: [
+      { ...reusedRegistryNode, adk_skeleton_contract: registryProjectionContract },
+      {
+        ...reusedRegistryNode,
+        id: "node-reused-registry-projection-b",
+        label: "Reused Registry Projection Adapter B",
+        adk_skeleton_contract: structuredClone(registryProjectionContract)
+      }
+    ]
+  },
+  catalogEntries: [],
+  outputMode: "runnable"
+});
+assert.equal(identicalReusedRegistryPlan.validation.can_generate_source, true);
+assert.deepEqual(identicalReusedRegistryPlan.modules[0].adk_skeleton_contract, registryProjectionContract);
+assert.ok(
+  identicalReusedRegistryPlan.validation.blockers.every((blocker) => !blocker.includes("implementation_template")),
+  "identical selectors on reused nodes must remain derivable"
+);
 
 const catalogPlan = buildScaffoldPlan({
   normalizedRequirement,
