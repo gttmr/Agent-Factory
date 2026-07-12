@@ -13,6 +13,7 @@ import "./adk-source-test/workflow-call.test.mjs";
 import "./adk-source-test/dynamic-loop-lowering.test.mjs";
 import "./adk-source-test/dynamic-loop-decisions.test.mjs";
 import "./adk-source-test/dynamic-loop-guards.test.mjs";
+import "./adk-source-test/dynamic-edge-ordering.test.mjs";
 import "./adk-source-test/graph-ir-rejections.test.mjs";
 import "./adk-source-test/state-channels-lowering.test.mjs";
 import "./adk-source-test/state-channel-guards.test.mjs";

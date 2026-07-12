@@ -4,7 +4,7 @@ import { assertNoSymbolCollisions } from "./graph/guards.mjs";
 import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import {
   assertDynamicRunnableGraphSupported,
-  buildDynamicRunnablePlan
+  dynamicRunIdComponent
 } from "./graph/dynamic.mjs";
 import { pyGraphNodeName, syntheticNodeSymbol } from "./naming.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
@@ -17,7 +17,7 @@ const MAX_DYNAMIC_LOOP_ITERATIONS = 3;
 
 export function buildDynamicRunnableAgentPy(context) {
   const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName } = context;
-  assertDynamicRunnableGraphSupported(graphContext);
+  const dynamicPlan = assertDynamicRunnableGraphSupported(graphContext);
   assertDataChannelsSupported(graphContext);
   assertRemoteA2aSupported({ analysisResult, modules });
 
@@ -26,15 +26,14 @@ export function buildDynamicRunnableAgentPy(context) {
   const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
   const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
   const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
-  const loopPlan = buildDynamicRunnablePlan(graphContext);
-  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...terminalOutputNodes, ...loopPlan.loopControls]);
+  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...terminalOutputNodes, ...dynamicPlan.loopControls]);
   const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
     orderedNodeSpecs,
     humanInputNodes,
     routerNodes: [],
     terminalOutputNodes
   });
-  const loopControlBlocks = loopPlan.loopControls.map(emitLoopControlNode);
+  const loopControlBlocks = dynamicPlan.loopControls.map(emitLoopControlNode);
 
   const description = `검토된 workbench artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
     normalizedRequirement.title || packageName
@@ -54,7 +53,7 @@ export function buildDynamicRunnableAgentPy(context) {
     ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
     : "";
   const eventImport = usesRemoteAuth || usesTerminalOutputs ? "Event, RequestInput" : "RequestInput";
-  const dynamicWorkflow = emitDynamicWorkflow(loopPlan.steps);
+  const dynamicWorkflow = emitDynamicWorkflow(dynamicPlan);
 
   return `from __future__ import annotations
 
@@ -93,12 +92,15 @@ def ${syntheticNodeSymbol(node)}(node_input=None):
     return node_input`;
 }
 
-function emitDynamicWorkflow(steps) {
+function emitDynamicWorkflow(plan) {
+  const seeds = plan.seeds.map((seed) => `    results[${toPyStr(seed.nodeId)}] = node_input`);
   return `@node(name="dynamic_workflow", rerun_on_resume=True)
 async def dynamic_workflow(ctx: Context, node_input=None):
-    payload = node_input
-${renderSteps(steps, "    ")}
-    return payload`;
+    results = {}
+    barriers = {}
+${seeds.join("\n")}
+${renderSteps(plan.steps, "    ")}
+    return results[${toPyStr(plan.resultNodeId)}]`;
 }
 
 function renderSteps(steps, indent) {
@@ -106,29 +108,95 @@ function renderSteps(steps, indent) {
 }
 
 function renderStep(step, indent) {
-  if (step.kind === "run") {
-    return `${indent}payload = await ctx.run_node(${step.symbol}, payload)`;
+  if (step.kind === "run" || step.kind === "terminal") {
+    return renderRunStep(step, indent, null);
   }
-  const body = step.body.map((entry) => `${indent}    payload = await ctx.run_node(${entry.symbol}, payload)`);
+  if (step.kind === "join") return renderJoinStep(step, indent, null);
+  const body = step.bodySteps.map((bodyStep) => {
+    if (bodyStep.kind === "join") return renderJoinStep(bodyStep, `${indent}    `, "iterationResults");
+    return renderRunStep(bodyStep, `${indent}    `, step);
+  });
+  const controlInput = renderInputExpression(step.controlInputRefs, "iterationResults");
+  const controlRunId = loopRunId(step, step.controlNodeId);
   return [
     `${indent}_loop_iteration = 0`,
+    `${indent}_loop_feedback = None`,
     `${indent}while True:`,
+    `${indent}    iterationResults = {}`,
+    `${indent}    iterationBarriers = {}`,
     ...body,
-    `${indent}    _loop_decision = await ctx.run_node(${step.controlSymbol}, payload)`,
+    `${indent}    iterationResults[${toPyStr(step.controlNodeId)}] = await ctx.run_node(`,
+    `${indent}        ${step.controlSymbol},`,
+    `${indent}        ${controlInput},`,
+    `${indent}        run_id=${controlRunId},`,
+    `${indent}    )`,
+    `${indent}    _loop_decision = iterationResults[${toPyStr(step.controlNodeId)}]`,
     `${indent}    ctx.state[${toPyStr(`af_dynamic_loop:${step.controlNodeId}`)}] = {`,
     `${indent}        "iteration": _loop_iteration,`,
     `${indent}        "decision": _loop_decision,`,
     `${indent}    }`,
     `${indent}    if not _dynamic_should_continue(_loop_decision, ${inlineList(step.backAliases)}, ${inlineList(step.exitAliases)}, ${toPyStr(step.defaultAction)}):`,
-    `${indent}        payload = _loop_decision`,
+    `${indent}        results[${toPyStr(step.controlNodeId)}] = _loop_decision`,
     `${indent}        break`,
     `${indent}    _loop_iteration += 1`,
     `${indent}    if _loop_iteration >= _MAX_DYNAMIC_LOOP_ITERATIONS:`,
     `${indent}        ctx.state[${toPyStr(`af_dynamic_loop:${step.controlNodeId}:max_iterations_reached`)}] = True`,
-    `${indent}        payload = _loop_decision`,
+    `${indent}        results[${toPyStr(step.controlNodeId)}] = _loop_decision`,
     `${indent}        break`,
-    `${indent}    payload = _loop_decision`
+    `${indent}    _loop_feedback = _loop_decision`
   ].join("\n");
+}
+
+function renderRunStep(step, indent, loopStep) {
+  let input = renderInputExpression(step.inputRefs, loopStep ? "iterationResults" : null);
+  if (loopStep && step.usesLoopFeedback) input = `(_loop_feedback if _loop_iteration > 0 else ${input})`;
+  const target = loopStep ? "iterationResults" : "results";
+  const runId = loopStep ? loopRunId(loopStep, step.nodeId) : toPyStr(step.runId);
+  return [
+    `${indent}${target}[${toPyStr(step.nodeId)}] = await ctx.run_node(`,
+    `${indent}    ${step.symbol},`,
+    `${indent}    ${input},`,
+    `${indent}    run_id=${runId},`,
+    `${indent})`
+  ].join("\n");
+}
+
+function renderJoinStep(step, indent, loopResultsName) {
+  const target = step.explicit
+    ? loopResultsName ?? "results"
+    : loopResultsName
+      ? "iterationBarriers"
+      : "barriers";
+  const rows = step.predecessors.map(
+    (predecessor) =>
+      `${indent}    ${toPyStr(predecessor.runtimeName)}: ${renderResultRef(predecessor, loopResultsName)},`
+  );
+  return [
+    `${indent}${target}[${toPyStr(step.nodeId)}] = {`,
+    ...rows,
+    `${indent}}`
+  ].join("\n");
+}
+
+function renderInputExpression(refs, loopResultsName) {
+  if (!refs.length) return "node_input";
+  if (refs.length !== 1) throw new Error(`dynamic runnable emitter expected one input reference, found ${refs.length}.`);
+  return renderResultRef(refs[0], loopResultsName);
+}
+
+function renderResultRef(ref, loopResultsName) {
+  if (ref.storage === "barrier") {
+    return `${ref.scope === "iteration" ? "iterationBarriers" : "barriers"}[${toPyStr(ref.nodeId)}]`;
+  }
+  if (ref.scope === "iteration") {
+    if (!loopResultsName) throw new Error(`dynamic runnable emitter cannot read iteration result ${ref.nodeId} outside a loop.`);
+    return `${loopResultsName}[${toPyStr(ref.nodeId)}]`;
+  }
+  return `results[${toPyStr(ref.nodeId)}]`;
+}
+
+function loopRunId(loopStep, nodeId) {
+  return `f${toPyStr(`run-loop-${dynamicRunIdComponent(loopStep.regionId)}-iteration-{_loop_iteration}-${dynamicRunIdComponent(nodeId)}`)}`;
 }
 
 function dynamicHelpers() {

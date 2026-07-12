@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-12 · PR TBD — dynamic execution is edge-driven and fan-in is explicit
+
+- **결정**: Dynamic runnable execution order is derived from reviewed Graph IR edges; the original node index is only the stable tie-break for simultaneously ready nodes. A reviewed `loop_region` anchors an edge-path closure from each `loop_back` target to its `loop_control`; nested/overlapping closures, residual cycles, illegal boundaries, and unreachable active nodes reject before bundle write. Dynamic fan-in aggregates only an explicit join or reviewed `fan_in`, using ADK runtime node names as result-map keys; ambiguous normal convergence rejects. Sibling children are sequential direct awaits with deterministic node/region/iteration run IDs.
+- **배경**: The previous dynamic builder walked `processFlow.nodes`, omitted accepted `join` nodes, and used container membership as loop execution membership. That could misorder a shuffled graph, chain one fan-out branch into the next, move scenario D's human-review path outside the loop, and provide no truthful cycle/reachability guarantee.
+- **영향**: Dynamic generated `agent.py` intentionally changes to per-node/iteration result maps, explicit barriers, edge-topological calls, and deterministic run IDs. Smoke and static runnable bundles remain byte-identical under relative-path SHA-256 manifests. A real ADK 2.3 `InMemoryRunner` RED/GREEN gate proves loop-body `RequestInput` resume replays completed children under parent rerun. No schema, catalog, template artifact, public output mode, or static lowering changes.
+
 ## 2026-07-12 · PR TBD — caller-owned run-manifest orchestration
 
 - **결정**: `scripts/generate-adk-source.mjs`는 generated bundle file만 쓰는 pure generator로 유지한다. 성공한 server Build caller만 `af-run-manifest.json`의 `current_stage: "build"`와 생성된 `stages.build.outputs`를 기록하며, `manifest.approvals.*`와 `stages.*.status`는 `PATCH /api/af/:id/manifest/approvals`의 reviewer decision projection으로만 바꾼다.
