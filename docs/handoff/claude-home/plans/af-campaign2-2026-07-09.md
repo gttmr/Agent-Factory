@@ -40,15 +40,17 @@
 
 증거: `.evidence-reviews/c5-generator.md` §Neutrality. 원칙(AGENTS.md): 도메인 리터럴은 생성기가 아니라 reviewed 아티팩트/카탈로그가 소유.
 
-- [ ] 4a. **계약 설계 (메인 세션 판정, codex 초안)**: 
+- [x] 4a. **계약 설계 (메인 세션 판정, codex 초안)**: 
   - `analysis_input_bundle`: PAYLOAD_WRAPPER_KEYS에서 제거. 대체 — scaffold-plan 모듈의 reviewed `input_mapping`/출력명 기반 일반 래퍼 키 해석 (스키마에 필드 추가가 필요한지 기존 필드로 표현 가능한지 먼저 판정)
   - `agent_registry_snapshot`: 특수분기 제거. 대체 — runtime contract 또는 module capability의 일반 필드(예: `emits_registry_snapshot` 성격의 reviewed 플래그) 설계
   - "Super Agent" 지시문: `${module.name}` 치환 (즉시 가능, 설계 불요)
-- [ ] 4b. 구현: schema/types/validator/생성기 관통 + 회귀 시나리오 아티팩트 갱신 (wf-page-recommendation-required, cdp-a2a-* 픽스처)
-- [ ] 4c. 중립성 테스트 강화: 고정 토큰 목록 → 아티팩트-유래 검증(생성기 소스에 등장하는 스네이크케이스 리터럴을 알려진 계약 어휘 화이트리스트와 대조하는 방식) — 이번 3건을 못 잡은 구조적 원인 해소
-- [ ] 4d. **실 adk 런타임 검증 (필수 게이트)**: 갱신된 회귀 시나리오를 InMemoryRunner 또는 `adk api_server`로 실행 — 유닛테스트만으로 완료 선언 금지 (LlmAgent 노드 JSON-직렬화 제약 메모리 준수)
-- [ ] 4e. brittle 테스트 완화 동시 진행: 라우터/dynamic/terminal의 exact-string 단정을 행동 검증(AST/py_compile/evaluateGeneratedRoute)으로 전환 — 중립성 수정이 어차피 exact-string 테스트를 깨므로 같은 변경 세트가 효율적
-- [ ] 4f. decision-log + harness/스키마 문서 갱신
+- [x] 4b. 구현: schema/types/validator/생성기 관통 + 회귀 시나리오 아티팩트 갱신 (wf-page-recommendation-required, cdp-a2a-* 픽스처)
+- [x] 4c. 중립성 테스트 강화: 고정 토큰 목록 → 아티팩트-유래 검증(생성기 소스에 등장하는 스네이크케이스 리터럴을 알려진 계약 어휘 화이트리스트와 대조하는 방식) — 이번 3건을 못 잡은 구조적 원인 해소
+- [x] 4d. **실 adk 런타임 검증 (필수 게이트)**: 갱신된 회귀 시나리오를 InMemoryRunner 또는 `adk api_server`로 실행 — 유닛테스트만으로 완료 선언 금지 (LlmAgent 노드 JSON-직렬화 제약 메모리 준수)
+- [x] 4e. brittle 테스트 완화 동시 진행: 라우터/dynamic/terminal의 exact-string 단정을 행동 검증(AST/py_compile/evaluateGeneratedRoute)으로 전환 — 중립성 수정이 어차피 exact-string 테스트를 깨므로 같은 변경 세트가 효율적
+- [x] 4f. decision-log + harness/스키마 문서 갱신
+
+> Phase 4 완료 (2026-07-12): PR #69 (649eb7b). 설계 승인→구현→실 ADK 런타임 게이트(InMemoryRunner+Gemini+Mock Lab MCP, 4턴/23이벤트) PASS→codex 리뷰 4라운드(5→2→2→1건, 전부 수정; 생존성 의미론 교정에서 가드 조작 13파일 되돌림). agreement 게이트는 registry projection 선택자 한정. 4e는 계획 취지대로 이번 변경이 깨는 테스트만 전환(라우터/dynamic 계열은 이미 evaluateGeneratedRoute 행동 검증).
 
 ## 명시적 보류 (이번 캠페인 제외)
 
