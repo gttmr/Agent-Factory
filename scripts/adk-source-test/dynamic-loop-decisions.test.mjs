@@ -1,9 +1,15 @@
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { channelModules, generator, writeChannelFixture } from "./fixtures.mjs";
+import { dynamicRunIdComponent } from "../adk-source/graph/dynamic.mjs";
+import { channelModules, generateBundle, writeChannelFixture } from "./fixtures.mjs";
+import {
+  executeGeneratedDynamicTrace,
+  generatedPythonExecutable
+} from "./generated-python-runtime.mjs";
 
 function assertDynamicDecisionHelpers(agentSource, cases) {
   const python = `
@@ -35,7 +41,7 @@ for case in json.loads(${JSON.stringify(JSON.stringify(cases))}):
     if actual != expected:
         raise AssertionError(f"{case['name']}: expected {expected}, got {actual}")
 `;
-  execFileSync("python3", ["-c", python], { input: agentSource, stdio: "pipe" });
+  execFileSync(generatedPythonExecutable(), ["-c", python], { input: agentSource, stdio: "pipe" });
 }
 
 test("dynamic loop decisions exact-match aliases and fall back to reviewed human continue default", () => {
@@ -107,8 +113,9 @@ test("dynamic loop decisions exact-match aliases and fall back to reviewed human
       ]
     });
     const outputRoot = join(artifactRoot, "out");
-    execFileSync(process.execPath, [generator, artifactRoot, outputRoot], { stdio: "pipe" });
-    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    generateBundle(artifactRoot, outputRoot);
+    const sourcePath = join(outputRoot, "req_ch_adk", "agent.py");
+    const source = readFileSync(sourcePath, "utf8");
 
     assertDynamicDecisionHelpers(source, [
       {
@@ -127,6 +134,56 @@ test("dynamic loop decisions exact-match aliases and fall back to reviewed human
         shouldContinue: false
       }
     ]);
+    const trace = executeGeneratedDynamicTrace({
+      sourcePath,
+      initialInput: { request: "check" },
+      nodeOutputs: {
+        agent_mod_param_check: [{ check: 1 }, { check: 2 }],
+        node_operator_input: [
+          { response: "provide_missing_parameters" },
+          { response: "complete" }
+        ],
+        node_loop_control: [
+          { response: "provide_missing_parameters" },
+          { response: "complete" }
+        ],
+        node_mod_fixed_adapter: { fixed: true },
+        node_out1: { terminal: true }
+      }
+    });
+    assert.deepEqual(trace.trace.map((row) => row.symbol), [
+      "agent_mod_param_check",
+      "node_operator_input",
+      "node_loop_control",
+      "agent_mod_param_check",
+      "node_operator_input",
+      "node_loop_control",
+      "node_mod_fixed_adapter",
+      "node_out1"
+    ]);
+    assert.deepEqual(trace.trace[4].input, { check: 2 }, "iteration two must not reuse iteration-one results");
+    assert.deepEqual(trace.trace.slice(0, 6).map((row) => row.run_id), [
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-0-${dynamicRunIdComponent("param-check")}`,
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-0-${dynamicRunIdComponent("operator-input")}`,
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-0-${dynamicRunIdComponent("loop-control")}`,
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-1-${dynamicRunIdComponent("param-check")}`,
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-1-${dynamicRunIdComponent("operator-input")}`,
+      `run-loop-${dynamicRunIdComponent("container-loop")}-iteration-1-${dynamicRunIdComponent("loop-control")}`
+    ]);
+    const bounded = executeGeneratedDynamicTrace({
+      sourcePath,
+      initialInput: { request: "bounded" },
+      nodeOutputs: {
+        agent_mod_param_check: [{ check: 1 }, { check: 2 }, { check: 3 }],
+        node_operator_input: { response: "provide_missing_parameters" },
+        node_loop_control: { response: "provide_missing_parameters" },
+        node_mod_fixed_adapter: { fixed: true },
+        node_out1: { terminal: true }
+      }
+    });
+    assert.equal(bounded.trace.filter((row) => row.symbol === "node_loop_control").length, 3);
+    assert.equal(bounded.state["af_dynamic_loop:loop-control:max_iterations_reached"], true);
+    assert.deepEqual(bounded.trace.at(-1).input, { fixed: true });
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
