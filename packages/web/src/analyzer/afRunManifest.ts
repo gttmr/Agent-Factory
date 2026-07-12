@@ -9,6 +9,7 @@ export type AfRunValidationResult = (typeof afRunValidationResults)[number];
 export type AfStageRunStatus = (typeof afStageRunStatuses)[number];
 
 export interface AfRunStage {
+  readonly [key: string]: unknown;
   status: AfRunStageStatus;
   outputs: string[];
 }
@@ -138,6 +139,7 @@ function normalizeStages(value: unknown): Record<AfRunStageId, AfRunStage> {
 function normalizeStage(value: unknown): AfRunStage {
   const record = isRecord(value) ? value : {};
   return {
+    ...record,
     status: normalizeStageStatus(record.status),
     outputs: Array.isArray(record.outputs) ? record.outputs.filter((item): item is string => typeof item === "string") : []
   };

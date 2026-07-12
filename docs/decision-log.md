@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-12 · PR TBD — caller-owned run-manifest orchestration
+
+- **결정**: `scripts/generate-adk-source.mjs`는 generated bundle file만 쓰는 pure generator로 유지한다. 성공한 server Build caller만 `af-run-manifest.json`의 `current_stage: "build"`와 생성된 `stages.build.outputs`를 기록하며, `manifest.approvals.*`와 `stages.*.status`는 `PATCH /api/af/:id/manifest/approvals`의 reviewer decision projection으로만 바꾼다.
+- **배경**: generator가 manual CLI regeneration에서도 `stages.build.status: "complete"`와 `stub_ready_for_followup: true`를 설정해, reviewer gate를 생성 부작용으로 우회할 수 있었다.
+- **영향**: manual CLI regeneration은 gate/stage를 더 이상 바꾸지 않는다. Direct Build primitive와 `artifact-sync/run`은 성공 시에만 generated output orchestration metadata를 기록하고, 생성 실패 시 manifest를 그대로 둔다. Existing/future per-stage metadata is preserved during caller projection.
+
 ## 2026-07-12 · PR #69 — Reviewed template selectors and structural generator neutrality
 
 - **결정**: 생성기는 scenario-owned output/state 이름으로 동작을 추론하지 않는다. Remote A2A provider registry projection은 canonical Graph IR node와 derived scaffold module의 reviewed `adk_skeleton_contract.implementation_template: remote_a2a_registry_projection_stub`만 dispatch selector로 사용하고, runnable local-function adapter/stub-function compatibility를 validator가 양쪽 artifact surface에서 강제한다. Payload wrapper는 scaffold module의 reviewed `object`/`array` output 이름에서 결정적으로 파생한다.

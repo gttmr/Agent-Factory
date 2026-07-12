@@ -13,6 +13,7 @@ import {
 } from "./artifactSyncProcessSteps";
 import { isRecord, readJsonBody, sendJson } from "./httpApi";
 import { beginSse, shouldStreamProcess, writeSseEvent } from "./processStreaming";
+import { recordRuntimeStubBuild } from "./runManifestBuild";
 
 interface ArtifactSyncRunBody {
   readonly outputMode?: ScaffoldOutputMode;
@@ -52,6 +53,7 @@ export async function handleArtifactSyncRun(
       sendJson(res, 422, composeArtifactSyncResponse(sync, false, generation));
       return;
     }
+    await recordRuntimeStubBuild(store, reqId, generation.files ?? []);
   }
 
   let validation: ArtifactSyncValidationSummary | undefined;
@@ -103,6 +105,7 @@ async function handleArtifactSyncRunSse(
         });
         return;
       }
+      await recordRuntimeStubBuild(store, reqId, generation.files ?? []);
     }
 
     let validation: ArtifactSyncValidationSummary | undefined;

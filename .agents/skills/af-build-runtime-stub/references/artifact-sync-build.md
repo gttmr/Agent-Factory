@@ -27,7 +27,7 @@ The endpoint order is:
 4. optionally run `node scripts/generate-adk-source.mjs <artifact-root> <artifact-root>/runtime-stub`
 5. optionally run `node scripts/validate-artifacts.mjs <artifact-root>`
 
-This path does not accept or save a Graph IR payload. Known side effect: when the generator runs (`rebuildRuntimeStub: true`) and `af-run-manifest.json` exists, `scripts/adk-source/run-manifest.mjs` sets `current_stage: "build"`, marks the build stage complete, and sets `approvals.stub_ready_for_followup: true`. That is generator-owned build-completion recording. The skill itself must never hand-edit `manifest.approvals.*` or stage statuses.
+This path does not accept or save a Graph IR payload. The generator CLI is pure file generation and never touches `af-run-manifest.json`. After a successful server-side generation (`rebuildRuntimeStub: true` or the Build primitive), the calling server layer records orchestration metadata only — `current_stage: "build"` and the generated file list in `stages.build.outputs`. Stage statuses and `manifest.approvals.*` (including `stub_ready_for_followup`) change only through the reviewer-driven approvals PATCH; neither generation nor this skill may set them.
 
 ## Manual Equivalent
 
@@ -52,7 +52,7 @@ node scripts/validate-artifacts.mjs <artifact-root>
 
 - `packages/web/server/artifactSyncRunApi.ts`
 - `packages/web/server/artifactSync.ts`
-- `scripts/adk-source/run-manifest.mjs`
+- `packages/web/server/runManifestBuild.ts`
 - `packages/web/server/artifactSyncProcessSteps.ts`
 - `packages/web/server/afArtifactsApi.ts`
 - `docs/workbench/agent-factory-harness.md`

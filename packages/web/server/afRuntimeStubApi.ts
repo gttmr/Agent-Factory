@@ -4,6 +4,7 @@ import { join, resolve, sep } from "node:path";
 import type { ArtifactRootStore } from "./artifactRootStore";
 import { readJsonBody, sendJson } from "./httpApi";
 import { beginSse, flushBufferedProcessOutput, runProcess, shouldStreamProcess, writeSseEvent } from "./processStreaming";
+import { recordRuntimeStubBuild } from "./runManifestBuild";
 import { collectRuntimeStubFiles, isIgnoredRuntimeStubPath, type RuntimeStubFile } from "./runtimeStubFiles";
 
 export interface RuntimeStubBuildInput {
@@ -135,6 +136,7 @@ export async function runRuntimeStubBuild(input: RuntimeStubBuildInput): Promise
     };
   }
   const files = await collectRuntimeStubFiles(stubDir, stubDir);
+  await recordRuntimeStubBuild(input.store, input.reqId, files);
   return {
     ok: true,
     files,

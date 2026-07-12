@@ -79,6 +79,11 @@ async function assertArtifactSyncJsonComposesSyncGenerationAndValidation(request
   assert.equal(result.validation?.command_key, "validate_artifact_root");
   assert.equal(result.validation?.stdout, "verify stdout line\n");
   assert.equal(result.validation?.stderr, "verify stderr line\n");
+  const manifest = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` }));
+  assert.equal(manifest.current_stage, "build");
+  assert.deepEqual(manifest.stages.build.outputs, ["runtime-stub/agent.py"]);
+  assert.equal(manifest.stages.build.status, "pending");
+  assert.equal(manifest.approvals.stub_ready_for_followup, false);
 }
 
 async function assertArtifactSyncSseStreamsSyncAndProcesses(request: ArtifactTestRequest, root: string): Promise<void> {
@@ -160,7 +165,7 @@ async function assertGenerationFailureStopsBeforeValidation(request: ArtifactTes
   await writeSyncReadyRoot(request, root, reqId);
   const rootDir = join(root, `artifacts/af/${reqId}`);
   await writeFile(join(rootDir, "fail-generate"), "", "utf8");
-  const validationBefore = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` })).validation;
+  const manifestBefore = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` }));
 
   const result = parseJsonBody<ArtifactSyncResponse>(
     await postArtifactSync(request, reqId, { outputMode: "smoke", rebuildRuntimeStub: true, runValidation: true })
@@ -169,7 +174,7 @@ async function assertGenerationFailureStopsBeforeValidation(request: ArtifactTes
   assert.equal(result.ok, false);
   assert.equal(result.generation?.exit_code, 6);
   assert.equal(result.validation, undefined);
-  assert.deepEqual(responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` })).validation, validationBefore);
+  assert.deepEqual(responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` })), manifestBefore);
   assert.equal((await readCommandLog(root)).includes(`node scripts/validate-artifacts.mjs ${rootDir}`), false);
 }
 
