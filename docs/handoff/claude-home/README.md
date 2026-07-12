@@ -1,6 +1,6 @@
 # Claude 세션 환경 핸드오프 스냅샷
 
-새 머신에서 이 리포지토리를 클론했을 때, 기존 머신의 `~/`(Claude Code 홈)에만 있던 프로젝트 관련 컨텍스트를 복원하기 위한 스냅샷이다. **살아있는 원본은 각 머신의 `~/.claude/**`이며, 이 디렉터리는 수동으로 동기화하는 사본이다** (마지막 동기화: 2026-07-05).
+새 머신에서 이 리포지토리를 클론했을 때, 기존 머신의 `~/`(Claude Code 홈)에만 있던 프로젝트 관련 컨텍스트를 복원하기 위한 스냅샷이다. **살아있는 원본은 각 머신의 `~/.claude/**`이며, 이 디렉터리는 수동으로 동기화하는 사본이다** (마지막 동기화: 2026-07-12).
 
 ## 구성
 
@@ -11,6 +11,8 @@
 | `global/CLAUDE.md` | `~/.claude/CLAUDE.md` | 사용자 전역 개발 헌장 (모든 프로젝트 공통 작업 규칙) |
 | `settings/project-settings.local.json` | `<repo>/.claude/settings.local.json` | 프로젝트 로컬 권한 허용 목록 (gitignore 대상) |
 | `settings/mcp-servers.md` | `~/.claude.json` 발췌 | adk-docs·chrome-devtools MCP 정의 + 플러그인 전제 |
+| `evidence/` | 각 워크트리 미추적 노트 | 캠페인 설계·구현 증거 (dynamic 재작성 승인 설계 `d0-dynamic-design.md` 등 — `STATUS-*.md` 참조) |
+| `STATUS-2026-07-12.md` | (세션 산출) | 크로스호스트 인계 브리프: 완료/진행 중/다음 작업/운영 노트 |
 
 ## 새 머신 복원 절차
 

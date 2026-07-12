@@ -13,3 +13,4 @@
 - [ADK node JSON-serializable constraint](reference_adk_node_json_serializable.md) — node outputs feeding an LlmAgent must be JSON-safe (no genai Content/node_input echo); emit chat text via yield Event(content=...); verify generator changes at real adk runtime, not just unit tests
 - [codex .agents/ 쓰기 차단](project_codex_agents_dir_sandbox.md) — codex 샌드박스가 리포 .agents/ 수정 거부; 스킬 편집은 skills-staging/ 우회 + 메인 세션이 이동/커밋
 - [codex 장기 실행 패턴](feedback_codex_companion_long_runs.md) — rescue 포워더는 10분 컷; 장기 작업은 메인 세션 백그라운드 Bash로 companion 직접 실행 + 증분 저장, head 파이프 금지
+- [Campaign 3 state](project_campaign3_2026_07.md) — Phase M merged PR #70; dynamic PR-A merged PR #71 (edge-topological+join, D8 real-ADK proof); next PR-B dispatch + Phase S UI splits + terminal-output f-string security fix; cross-host handoff docs/handoff/claude-home/STATUS-2026-07-12.md
