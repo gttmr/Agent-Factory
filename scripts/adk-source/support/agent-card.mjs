@@ -6,7 +6,7 @@ export function buildAgentCard({ packageName, normalizedRequirement, baseUrl = D
   const title = normalizedRequirement?.title || packageName;
   return {
     name: packageName,
-    description: `ADK Workflow generated from the approved Agent Factory artifact: ${title}.`,
+    description: `ADK Workflow generated from the approved workbench artifact: ${title}.`,
     url: rpcUrl,
     version: "0.1.0",
     preferredTransport: "JSONRPC",
@@ -30,7 +30,7 @@ export function buildAgentCard({ packageName, normalizedRequirement, baseUrl = D
       {
         id: `${packageName}_workflow`,
         name: title,
-        description: "Runs the reviewed Agent Factory ADK Workflow over synthetic local runtime inputs.",
+        description: "Runs the reviewed workbench ADK Workflow over synthetic local runtime inputs.",
         tags: ["agent-factory", "adk-workflow"]
       }
     ]

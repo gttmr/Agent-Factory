@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-12 · PR #69 — Reviewed template selectors and structural generator neutrality
+
+- **결정**: 생성기는 scenario-owned output/state 이름으로 동작을 추론하지 않는다. Remote A2A provider registry projection은 canonical Graph IR node와 derived scaffold module의 reviewed `adk_skeleton_contract.implementation_template: remote_a2a_registry_projection_stub`만 dispatch selector로 사용하고, runnable local-function adapter/stub-function compatibility를 validator가 양쪽 artifact surface에서 강제한다. Payload wrapper는 scaffold module의 reviewed `object`/`array` output 이름에서 결정적으로 파생한다.
+- **배경**: `analysis_input_bundle`, `agent_registry_snapshot`, `Super Agent` 같은 campaign vocabulary가 generator source의 wrapper/dispatch/prompt literal로 남아 artifact 계약 대신 특정 fixture 이름이 런타임 동작을 결정하고 있었다. 고정 토큰 deny-list는 새 scenario vocabulary와 Python template 내부 literal을 구조적으로 막지 못했다.
+- **영향**: runnable·dynamic ADK lowering, scaffold-plan derivation, artifact validator, CDP A2A fixtures, generated-Python behavioral tests, generator-neutrality source scan/allowlist policy. Provider가 없는 selector는 기존 safe unconnected placeholder를 유지하며, `implementation_template` 전체 enum closure와 real-ADK runtime smoke는 이 campaign의 source 변경 범위 밖이다.
+
 ## 2026-07-09 · PR TBD — Verify execution is Stage Runner only
 
 - **결정**: `/af/:reqId/verify`의 실행 스텝에서 legacy direct command 카드/로그 lane을 제거하고, allow-list command 선택과 실행은 Verify Stage Runner panel의 controls slot이 단독으로 소유한다. Route UI의 "run happened" 상태는 `manifest.stage_runs.verify`와 `manifest.validation`을 한 번에 요약한 read-only state에서만 읽는다.

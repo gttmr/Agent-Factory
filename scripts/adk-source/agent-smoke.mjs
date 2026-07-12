@@ -116,7 +116,7 @@ class SyntheticRuntimeSmokeAgent(BaseAgent):
 
 root_agent = SyntheticRuntimeSmokeAgent(
     name="${packageName}",
-    description="검토된 Agent Factory 인계 artifact를 확인하는 합성 ADK 런타임 smoke bridge입니다.",
+    description="검토된 workbench 인계 artifact를 확인하는 합성 ADK 런타임 smoke bridge입니다.",
 )
 `;
 }

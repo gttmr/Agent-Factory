@@ -1,8 +1,17 @@
 import "./artifact-validation/validate-artifacts-saved-analysis.test.mjs";
 import "./artifact-validation/validate-artifacts-graph.test.mjs";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
 import test from "node:test";
+import {
+  registrySelectorArtifacts,
+  runValidatorExpectingFailure,
+  tempArtifactRoot,
+  validator,
+  writeJson,
+  writeRegistrySelectorArtifacts
+} from "./artifact-validation/validate-artifacts-test-utils.mjs";
 import {
   a2aContractStatuses,
   a2aHttpPaths,
@@ -45,6 +54,134 @@ test("validate-artifacts keeps analyzer, validator, and schema enums aligned", (
     }
   }
 });
+
+test("validate-artifacts accepts compatible registry projection selectors on Graph IR and scaffold modules", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-ok-");
+  writeRegistrySelectorArtifacts(artifactRoot, registrySelectorArtifacts());
+  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  rmSync(artifactRoot, { recursive: true, force: true });
+  assert.match(output, /Artifact validation OK/);
+});
+
+test("validate-artifacts rejects a Graph IR selector missing from the matching scaffold module", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-graph-only-");
+  const artifacts = registrySelectorArtifacts();
+  delete artifacts.module.adk_skeleton_contract;
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /Graph IR selector .* is not preserved in scaffold module/);
+});
+
+test("validate-artifacts rejects a scaffold selector without matching Graph IR approval", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-scaffold-only-");
+  const artifacts = registrySelectorArtifacts();
+  delete artifacts.node.adk_skeleton_contract;
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /scaffold selector .* has no matching Graph IR approval/);
+});
+
+test("validate-artifacts rejects a registry-selector Graph IR node without a scaffold module", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-missing-scaffold-module-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.plan.modules = artifacts.plan.modules.filter((item) => item.id !== artifacts.module.id);
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /Graph IR selector .* for module .* has no matching scaffold module/);
+});
+
+test("validate-artifacts rejects a registry-selector scaffold module without a Graph IR node", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-missing-graph-node-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.analysis.processFlow.nodes = artifacts.analysis.processFlow.nodes.filter(
+    (item) => item.module_id !== artifacts.module.id
+  );
+  const incomingEdge = artifacts.analysis.processFlow.edges.find((item) => item.to === artifacts.node.id);
+  const outgoingEdge = artifacts.analysis.processFlow.edges.find((item) => item.from === artifacts.node.id);
+  assert.ok(incomingEdge && outgoingEdge);
+  incomingEdge.to = outgoingEdge.to;
+  artifacts.analysis.processFlow.edges = artifacts.analysis.processFlow.edges.filter(
+    (item) => item.from !== artifacts.node.id
+  );
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /scaffold selector .* for module .* has no matching Graph IR node/);
+});
+
+test("validate-artifacts rejects different selector values across Graph IR and scaffold surfaces", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-value-drift-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.module.adk_skeleton_contract.implementation_template = "adapter_placeholder_stub";
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /Graph IR selector .* is not preserved in scaffold module .*adapter_placeholder_stub/);
+});
+
+test("validate-artifacts accepts a non-registry Graph IR template without a scaffold counterpart", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-derived-graph-template-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.node.adk_skeleton_contract.implementation_template = "function_stub";
+  delete artifacts.module.adk_skeleton_contract;
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  rmSync(artifactRoot, { recursive: true, force: true });
+  assert.match(output, /Artifact validation OK/);
+});
+
+test("validate-artifacts accepts a derived scaffold template without a Graph IR counterpart", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-derived-scaffold-template-");
+  const artifacts = registrySelectorArtifacts();
+  delete artifacts.node.adk_skeleton_contract;
+  artifacts.module.adk_skeleton_contract.implementation_template = "llm_agent_selection_stub";
+  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
+  rmSync(artifactRoot, { recursive: true, force: true });
+  assert.match(output, /Artifact validation OK/);
+});
+
+test("validate-artifacts loads split module candidates when validating selector compatibility", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-split-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.candidate.module_category = "agent";
+  artifacts.candidate.agent_kind = "specialist";
+  artifacts.candidate.adapter_kind = null;
+  writeJson(`${artifactRoot}/process-flow.json`, artifacts.analysis.processFlow);
+  writeJson(`${artifactRoot}/module-candidates.json`, artifacts.analysis.moduleCandidates);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /remote_a2a_registry_projection_stub module category must be adapter/);
+});
+
+test("validate-artifacts falls back to embedded candidates for split flows without module-candidates.json", () => {
+  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-embedded-");
+  const artifacts = registrySelectorArtifacts();
+  artifacts.candidate.module_category = "agent";
+  artifacts.candidate.agent_kind = "specialist";
+  artifacts.candidate.adapter_kind = null;
+  writeJson(`${artifactRoot}/process-flow.json`, artifacts.analysis.processFlow);
+  writeJson(`${artifactRoot}/analysis-result.json`, artifacts.analysis);
+  const result = runValidatorExpectingFailure(artifactRoot);
+  assert.match(result.stderr, /process-flow\.json[^\n]*remote_a2a_registry_projection_stub module category must be adapter/);
+});
+
+for (const { name, surface, mutate, expected } of [
+  { name: "wrong category", surface: "graph", mutate: ({ candidate }) => { candidate.module_category = "agent"; candidate.agent_kind = "specialist"; candidate.adapter_kind = null; }, expected: /module category must be adapter/ },
+  { name: "wrong runtime binding", surface: "scaffold", mutate: ({ module }) => { module.runtime_binding = "direct_api"; }, expected: /runtime_binding must be local_function/ },
+  { name: "wrong invoke binding", surface: "graph", mutate: ({ node }) => { node.invoke_binding = "direct_api"; }, expected: /invoke_binding must be local_function or local_python/ },
+  { name: "connected MCP adapter", surface: "scaffold", mutate: ({ module }) => { Object.assign(module, { access_protocol: "mcp", mcp_server: "mock-registry", mcp_tool_name: "lookup_registry", invoke_binding: "mcp_tool", call_control: "fixed_by_workflow" }); }, expected: /must lower through the stub-function path/ },
+  { name: "non-deterministic generation mode", surface: "graph", mutate: ({ node }) => { node.adk_skeleton_contract.generation_mode = "manual"; }, expected: /generation_mode must be deterministic_template/ },
+  { name: "smoke output mode", surface: "scaffold", mutate: ({ plan }) => { plan.output_mode = "smoke"; }, expected: /requires runnable output_mode/ }
+]) {
+  test(`validate-artifacts rejects registry projection selector with ${name} on ${surface}`, () => {
+    const artifactRoot = tempArtifactRoot("af-validator-registry-selector-bad-");
+    const artifacts = registrySelectorArtifacts();
+    if (surface === "graph") delete artifacts.module.adk_skeleton_contract;
+    else delete artifacts.node.adk_skeleton_contract;
+    mutate(artifacts);
+    writeRegistrySelectorArtifacts(artifactRoot, artifacts);
+    const result = runValidatorExpectingFailure(artifactRoot);
+    assert.match(result.stderr, expected);
+  });
+}
 
 const analyzerTypesUrl = new URL("../packages/web/src/analyzer/types.ts", import.meta.url);
 const schemaCache = new Map();

@@ -78,7 +78,7 @@ test("runnable preserves workflow_call stubs and handoff files", () => {
     assert.ok(existsSync(join(outputRoot, "README.md")));
     assert.match(workflowCalls, /workflow_call_placeholder/);
     assert.match(workflowCalls, /wf-risk-check/);
-    assert.match(adapters, /Adapter stubs call Mock Lab/);
+    assert.match(adapters, /Adapter stubs call the synthetic MCP provider/);
     assert.match(handoff, /confirm_workflow_call_contract/);
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });

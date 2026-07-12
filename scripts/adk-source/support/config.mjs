@@ -83,7 +83,7 @@ function agentConfigEntries({ modules, agentNodeTargets }) {
 export function buildWorkflowPy() {
   return `"""ADK Workflow entrypoint shim.
 
-The executable root_agent lives in agent.py so ADK Web can import the package.
+The executable root_agent lives in agent.py so the ADK development UI can import the package.
 This file gives developers a stable place to inspect workflow-level handoff
 metadata without adding production business logic.
 """
@@ -121,9 +121,9 @@ MODULE_SCHEMAS = ${toPythonLiteral(
 export function buildNodeHelperPy(kind) {
   const note = {
     agents: "Agent node instructions are emitted in agent.py as LlmAgent declarations.",
-    adapters: "Adapter stubs call Mock Lab only when mock_binding is linked; replace with real EAI/API clients manually.",
+    adapters: "Adapter stubs call the synthetic MCP provider only when mock_binding is linked; replace with real EAI/API clients manually.",
     gates: "User confirmation gates are modeled with RequestInput nodes and reviewed router route edges.",
-    human_inputs: "Human input nodes are RequestInput placeholders for ADK Web smoke tests.",
+    human_inputs: "Human input nodes are RequestInput placeholders for ADK development UI smoke tests.",
     routers: "Reviewed router nodes lower route edges into ADK Workflow route functions.",
   }[kind];
   return `"""${note}"""
@@ -189,7 +189,7 @@ export function buildMockConfigYaml({ modules, adapterConnection }) {
 
 export function buildEnvExample({ analysisResult, modules }) {
   const remoteEnvLines = remoteA2aEnvVars({ analysisResult, modules }).map((envVar) => `# ${envVar}=...`);
-  return `# Agent Factory 공유 runtime env template입니다.
+  return `# Workbench 공유 runtime env template입니다.
 # 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
 # AF_LLM_PROVIDER=auto 는 AF_VLLM_*가 있으면 vLLM, 없으면 Gemini fallback을 사용합니다.
 #

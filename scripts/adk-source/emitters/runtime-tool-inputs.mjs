@@ -1,4 +1,37 @@
-export function buildRuntimeToolInputsSection() {
+import { toPyStr } from "../python-literals.mjs";
+
+const GENERIC_PAYLOAD_WRAPPER_KEYS = [
+  "previous",
+  "arguments",
+  "structured_content",
+  "structuredContent",
+  "result",
+  "output",
+  "input",
+  "payload",
+  "data",
+  "response",
+  "runtime_mock"
+];
+
+export function reviewedPayloadWrapperKeys(modules) {
+  const genericKeys = new Set(GENERIC_PAYLOAD_WRAPPER_KEYS);
+  const reviewedKeys = new Set();
+  for (const module of Array.isArray(modules) ? modules : []) {
+    for (const output of Array.isArray(module?.outputs) ? module.outputs : []) {
+      const outputType = typeof output?.type === "string" ? output.type.trim().toLowerCase() : "";
+      if (outputType !== "object" && outputType !== "array") continue;
+      const outputName = typeof output?.name === "string" ? output.name.trim() : "";
+      if (outputName && !genericKeys.has(outputName)) reviewedKeys.add(outputName);
+    }
+  }
+  return [...GENERIC_PAYLOAD_WRAPPER_KEYS, ...[...reviewedKeys].sort()];
+}
+
+export function buildRuntimeToolInputsSection({ modules }) {
+  const payloadWrapperKeys = reviewedPayloadWrapperKeys(modules)
+    .map((key) => `    ${toPyStr(key)},`)
+    .join("\n");
   return `
 
 def _user_text_from_context(ctx: Context) -> str:
@@ -23,18 +56,7 @@ USER_TEXT_INPUT_NAMES = {
 }
 
 PAYLOAD_WRAPPER_KEYS = (
-    "previous",
-    "arguments",
-    "structured_content",
-    "structuredContent",
-    "result",
-    "output",
-    "input",
-    "payload",
-    "data",
-    "response",
-    "runtime_mock",
-    "analysis_input_bundle",
+${payloadWrapperKeys}
 )
 
 

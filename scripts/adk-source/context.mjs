@@ -1,11 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { toPythonIdentifier } from "./naming.mjs";
+import {
+  REGISTRY_PROJECTION_TEMPLATE,
+  registryProjectionCompatibilityIssues
+} from "../artifact-validation/registry-projection-compatibility.mjs";
+import { registryProjectionTemplateAgreementIssues } from "../artifact-validation/implementation-template-agreement.mjs";
 
 export const DEFAULT_MODEL = "hosted_vllm/local-model";
 export const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 export const RUNTIME_MCP_LABEL = "런타임 MCP";
-export const RUNTIME_MCP_NOTE = "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다.";
+export const RUNTIME_MCP_NOTE = "실행 시점에 synthetic MCP 서버를 통해 모델이 파악한 데이터입니다.";
 
 export function loadArtifactContext(artifactRoot) {
   const readJson = (name, fallbackName) => {
@@ -51,6 +56,49 @@ export function loadArtifactContext(artifactRoot) {
 
   const modules = scaffoldPlan.modules;
   const outputMode = scaffoldPlan.output_mode === "runnable" ? "runnable" : "smoke";
+  const registryProjectionIssues = modules.flatMap((module) =>
+    registryProjectionCompatibilityIssues(module, { outputMode }).map(
+      (issue) => `${module.id ?? module.name ?? "unknown module"}: ${issue}`
+    )
+  );
+  if (registryProjectionIssues.length > 0) {
+    throw new Error(
+      `scaffold-plan.json has incompatible registry projection selectors: ${registryProjectionIssues.join("; ")}`
+    );
+  }
+  const registryProjectionAgreementIssues = registryProjectionTemplateAgreementIssues({
+    nodes: processFlow.nodes,
+    modules
+  });
+  if (registryProjectionAgreementIssues.length > 0) {
+    throw new Error(
+      `registry projection implementation_template agreement failed: ${registryProjectionAgreementIssues.join("; ")}`
+    );
+  }
+  const moduleById = new Map(modules.map((module) => [module.id, module]));
+  const graphRegistryProjectionIssues = (Array.isArray(processFlow.nodes) ? processFlow.nodes : []).flatMap((node) => {
+    if (node?.adk_skeleton_contract?.implementation_template !== REGISTRY_PROJECTION_TEMPLATE) return [];
+    const module = moduleById.get(node.module_id);
+    if (!module) return [];
+    const mergedContract = {
+      ...(module.adk_skeleton_contract ?? {}),
+      ...node.adk_skeleton_contract
+    };
+    return registryProjectionCompatibilityIssues(
+      {
+        ...module,
+        ...node,
+        module_category: module.module_category,
+        adk_skeleton_contract: mergedContract
+      },
+      { outputMode }
+    ).map((issue) => `${node.id ?? node.module_id ?? "unknown Graph node"}: ${issue}`);
+  });
+  if (graphRegistryProjectionIssues.length > 0) {
+    throw new Error(
+      `process-flow.json has incompatible registry projection selectors: ${graphRegistryProjectionIssues.join("; ")}`
+    );
+  }
   validateRunInputs({
     analysisResult,
     normalizedRequirement,

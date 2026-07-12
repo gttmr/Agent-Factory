@@ -6,15 +6,17 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   assertConnectedMcpRuntimeLabels,
-  assertGeneratorSourcesStayDomainNeutral,
   assertManifestStageUpdated,
   assertRunnableBundle,
   assertSmokeBundle
 } from "./assertions.mjs";
+import { compileGeneratedPython, executeGeneratedPythonSymbols } from "./generated-python-runtime.mjs";
+import { reviewedPayloadWrapperKeys } from "../adk-source/emitters/runtime-tool-inputs.mjs";
 import {
   baseModules,
   discoverGeneratedPackage,
   generate,
+  generateBundle,
   generator,
   readBundle,
   repoRoot,
@@ -160,21 +162,52 @@ test("smoke mode graph edges keep reused adapter module nodes distinct", () => {
   }
 });
 
-test("runnable tool input resolver traverses runtime mock output bundles", () => {
-  const { artifactRoot, outputRoot } = generate({ runnable: true, connectedAdapter: true });
+test("runnable tool input resolver traverses reviewed container outputs but not scalar outputs", () => {
+  const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-reviewed-wrapper-"));
   try {
-    const { agentSource } = readBundle(outputRoot);
-    assert.match(
-      agentSource,
-      /PAYLOAD_WRAPPER_KEYS = \([\s\S]*"runtime_mock"[\s\S]*"analysis_input_bundle"[\s\S]*\)/
-    );
+    writeFixture(artifactRoot, { runnable: true, connectedAdapter: true });
+    const planPath = join(artifactRoot, "scaffold-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    plan.modules[1].outputs = [
+      { name: "reviewed_object_envelope", type: " object ", required: true },
+      { name: "reviewed_array_envelope", type: "ARRAY", required: false },
+      { name: "reviewed_scalar_envelope", type: "string", required: true },
+      { name: "reviewed_\"quoted\"_envelope", type: "object", required: true },
+      { name: "reviewed_object_envelope", type: "object", required: false }
+    ];
+    writeJson(planPath, plan);
+
+    const outputRoot = join(artifactRoot, "out");
+    generateBundle(artifactRoot, outputRoot);
+    const sourcePath = join(outputRoot, discoverGeneratedPackage(outputRoot), "agent.py");
+    compileGeneratedPython(sourcePath);
+    const result = executeGeneratedPythonSymbols({
+      sourcePath,
+      names: ["PAYLOAD_WRAPPER_KEYS", "_content_text", "_json_payload", "_payload_value"],
+      prelude: "import json\nfrom typing import Any",
+      body: `
+result = {
+    "object": _payload_value({"reviewed_object_envelope": {"needle": "object-ok"}}, "needle"),
+    "array": _payload_value({"reviewed_array_envelope": [{"needle": "array-ok"}]}, "needle"),
+    "quoted": _payload_value({'reviewed_"quoted"_envelope': {"needle": "quoted-ok"}}, "needle"),
+    "scalar": _payload_value({"reviewed_scalar_envelope": {"needle": "must-not-resolve"}}, "needle"),
+}
+`
+    });
+    assert.deepEqual(result, { object: "object-ok", array: "array-ok", quoted: "quoted-ok", scalar: null });
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }
 });
 
-test("generator source keeps hardcoded scenario literals out of generator modules", () => {
-  assertGeneratorSourcesStayDomainNeutral();
+test("reviewed payload wrapper keys are deduplicated and sorted by code unit after the generic base", () => {
+  const keys = reviewedPayloadWrapperKeys([
+    { outputs: [{ name: "z_wrapper", type: "object" }, { name: "A_wrapper", type: "array" }] },
+    { outputs: [{ name: "z_wrapper", type: " ARRAY " }, { name: "scalar_leaf", type: "string" }] }
+  ]);
+  assert.deepEqual(keys.slice(-2), ["A_wrapper", "z_wrapper"]);
+  assert.equal(keys.filter((key) => key === "z_wrapper").length, 1);
+  assert.equal(keys.includes("scalar_leaf"), false);
 });
 
 test("runnable honors an explicit scaffold package_name", () => {

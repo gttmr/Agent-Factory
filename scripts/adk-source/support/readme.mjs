@@ -35,7 +35,7 @@ Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-f
   vLLM(OpenAI-compatible, \`LiteLlm\`) 또는 Gemini fallback을 쓰는 \`LlmAgent\`이고, adapter node는 deterministic
   \`FunctionNode\`입니다.
 - graph는 **synthetic input만** 사용합니다. private endpoint, credential, 실제 고객 데이터는 포함하지 않습니다.
-- reviewed Agent Factory artifact에서만 생성되었습니다(\`raw_requirement_to_code=false\`).
+- reviewed workbench artifact에서만 생성되었습니다(\`raw_requirement_to_code=false\`).
 
 ## 설정 변경
 
@@ -53,15 +53,15 @@ ${buildRemoteA2aRuntimePolicyMarkdown(context)}
 
 ${buildSampleDialogueMarkdown(context)}
 
-## Adapter와 Mock Lab
+## Adapter와 synthetic MCP provider
 
-연결된 adapter는 streamable-HTTP로 실행 중인 Mock Lab MCP tool을 호출합니다
+연결된 adapter는 streamable-HTTP로 실행 중인 synthetic MCP tool을 호출합니다
 (\`AF_MOCK_LAB_MCP_URL\` base, 기본값 \`http://127.0.0.1:5173/api/mock-lab/mcp\`).
 이 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload와 \`workflow_manifest.json\`에 기록됩니다.
-Mock Lab server가 binding/running 상태가 아닌 adapter는 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
+synthetic MCP server가 binding/running 상태가 아닌 adapter는 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
 \`workflow_manifest.json\`의 \`runtime.unconnected_adapters\`에 표시됩니다.
 
-## ADK Web
+## ADK development UI
 
 \`\`\`bash
 AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
@@ -121,7 +121,7 @@ export function buildImplementationHandoff(context) {
     (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
   );
   if (outputMode === "runnable") {
-    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: Mock Lab MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
+    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: synthetic MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
     const chatProjection = buildChatProjectionHandoffMarkdown(context);
     return `# 구현 Handoff (runnable mode)
 
@@ -129,7 +129,7 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 
 ## 현재 실행되는 것
 
-- Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Adapter node는 실제 실행 시점에 Mock Lab MCP tool을 호출합니다.
+- Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Adapter node는 실제 실행 시점에 synthetic MCP tool을 호출합니다.
 - 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
 - 모든 실행은 합성 input만 사용합니다.
 
@@ -138,7 +138,7 @@ ${chatProjection}
 ## 반드시 유지할 경계
 
 - 비공개 endpoint, credential, 고객 데이터, 배포 script를 추가하지 마세요.
-- Adapter 호출은 실제 운영 system이 아니라 합성 Mock Lab 서버를 향해야 합니다.
+- Adapter 호출은 실제 운영 system이 아니라 local synthetic MCP 서버를 향해야 합니다.
 - 동작은 \`agents.config.yaml\`에서 조정하고 공유 secret은 \`.agent-factory/runtime.env\`에 둡니다. secret을 코드에 hard-code하지 마세요.
 
 ## 미연결 adapter
@@ -215,7 +215,7 @@ function mockSpecRelativePath({ outputRoot, artifactRoot }) {
 }
 
 function buildSampleDialogueMarkdown(context) {
-  return ["## Sample ADK Web messages", "", "```text", sampleConversationTranscript(context), "```"].join("\n");
+  return ["## Sample ADK development UI messages", "", "```text", sampleConversationTranscript(context), "```"].join("\n");
 }
 
 function buildRemoteA2aRuntimePolicyMarkdown(context) {
@@ -251,9 +251,9 @@ ${envVars.length ? `- Required env vars: ${envVars.join(", ")}` : "- Required en
 
 function buildMockLabRunMarkdown(context) {
   const mockId = context.mockLabSpec?.mock_id || "<mock-id>";
-  return `## Mock Lab MCP server
+  return `## Synthetic MCP server
 
-From the repo root, start the existing Mock Lab package on its fixed standalone port and run the saved spec:
+From the repo root, start the existing synthetic MCP package on its fixed standalone port and run the saved spec:
 
 \`\`\`bash
 npm run dev --prefix packages/mock-lab -- --host 0.0.0.0 --port 5176 --strictPort
@@ -261,7 +261,7 @@ curl -X POST http://127.0.0.1:5176/api/mock-lab/${mockId}/server/start
 curl 'http://127.0.0.1:5176/api/mock-lab/mcp-discovery?server=${mockId}'
 \`\`\`
 
-Then run ADK Web from this generated output root with the standalone Mock Lab URL explicit, so it wins over any central runtime default:
+Then run the ADK development UI from this generated output root with the standalone synthetic MCP URL explicit, so it wins over any central runtime default:
 
 \`\`\`bash
 AF_RUNTIME_ENV_FILE=${runtimeEnvRelativePath(context)} \\

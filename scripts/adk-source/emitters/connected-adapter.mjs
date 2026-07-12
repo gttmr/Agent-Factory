@@ -20,7 +20,7 @@ export function emitConnectedAdapterFunc(target, context) {
     ? ",\n        extra_payloads=_artifact_payloads"
     : "";
   return `async def ${funcName(target)}(ctx: Context, node_input=None) -> dict:
-    """실행 시점에 Mock Lab MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. synthetic Mock Lab 전용입니다.
+    """실행 시점에 synthetic MCP tool ${toPyStr(module.mcp_tool_name)}을 호출합니다. local synthetic runtime 전용입니다.
 
     결정적 Adapter입니다. 모델이 tool을 고르게 하지 않고 MCP session을 열어
     지정된 tool을 직접 호출하므로 audit에서 실제 tools/call을 확인할 수 있습니다.

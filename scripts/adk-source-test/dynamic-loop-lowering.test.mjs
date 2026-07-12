@@ -4,12 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { channelModules, generateBundle, writeChannelFixture } from "./fixtures.mjs";
+import { compileGeneratedPython, executeGeneratedPythonSymbols } from "./generated-python-runtime.mjs";
 
 test("runnable lowers reviewed loop control through an ADK dynamic workflow node", () => {
   const { agentBase, unconnectedAdapter } = channelModules();
   const modules = [
     { ...agentBase, id: "mod-draft", name: "Draft Agent" },
-    { ...unconnectedAdapter, id: "mod-review", name: "Review Adapter" }
+    {
+      ...unconnectedAdapter,
+      id: "mod-review",
+      name: "Review Adapter",
+      outputs: [{ name: "dynamic_review_envelope", type: "object", required: true }]
+    }
   ];
   const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-dynamic-loop-"));
   try {
@@ -56,7 +62,8 @@ test("runnable lowers reviewed loop control through an ADK dynamic workflow node
     });
     const outputRoot = join(artifactRoot, "out");
     generateBundle(artifactRoot, outputRoot);
-    const source = readFileSync(join(outputRoot, "req_ch_adk", "agent.py"), "utf8");
+    const sourcePath = join(outputRoot, "req_ch_adk", "agent.py");
+    const source = readFileSync(sourcePath, "utf8");
     assert.match(source, /from google\.adk\.workflow import FunctionNode, START, Workflow, node/);
     assert.match(source, /from google\.genai import types/);
     assert.match(source, /from google\.adk\.events import Event, RequestInput/);
@@ -75,6 +82,16 @@ test("runnable lowers reviewed loop control through an ADK dynamic workflow node
     assert.match(source, /payload = await ctx\.run_node\(node_out1, payload\)\s*return payload/s);
     assert.match(source, /root_agent = Workflow\(\s*name="req_ch_adk",\s*description=.*,\s*edges=\[\(START, dynamic_workflow\)\],\s*\)/s);
     assert.doesNotMatch(source, /loop Graph IR yet|wait for loop lowering/);
+    compileGeneratedPython(sourcePath);
+    assert.equal(
+      executeGeneratedPythonSymbols({
+        sourcePath,
+        names: ["PAYLOAD_WRAPPER_KEYS", "_content_text", "_json_payload", "_payload_value"],
+        prelude: "import json\nfrom typing import Any",
+        body: "result = _payload_value({'dynamic_review_envelope': {'needle': 'dynamic-ok'}}, 'needle')"
+      }),
+      "dynamic-ok"
+    );
   } finally {
     rmSync(artifactRoot, { recursive: true, force: true });
   }

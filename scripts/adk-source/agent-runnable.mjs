@@ -47,7 +47,7 @@ export function buildRunnableAgentPy(context) {
   const projectionNotes = runtimeProjectionNotes(processFlow);
   const joinDecls = joins.map((join) => `${join.sym} = JoinNode(name=${toPyStr(join.name)})`);
   const edgeLiteral = workflowEdgeLiteral(edges);
-  const description = `검토된 Agent Factory artifact에서 생성한 실행 가능한 ADK 2.3 워크플로우입니다: ${truncate(
+  const description = `검토된 workbench artifact에서 생성한 실행 가능한 ADK 2.3 워크플로우입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
 
@@ -86,7 +86,7 @@ ${remoteImport}${mcpToolsetImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, JoinNode, START, Workflow
 ${artifactGenaiImport}
 
-${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)) })}
+${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)), modules })}
 
 ${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}# ---------------------------------------------------------------------------
 # Graph nodes

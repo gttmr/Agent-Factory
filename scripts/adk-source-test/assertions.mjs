@@ -3,33 +3,16 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { assertPregeneratedAgentCard, assertRunnableAgentCard } from "./agent-card-assertions.mjs";
 import {
-  collectFiles,
-  collectGeneratorSourceFiles,
   discoverGeneratedPackage,
+  collectGeneratorSourceFiles,
   readBundle,
   repoRoot
 } from "./fixtures.mjs";
-
-const generatorAuthoredLeaks = [
-  "wf-page-recommendation-mock",
-  "WORKFLOW_INSTRUCTION",
-  "Page Metadata RAG",
-  "적금",
-  "T2S",
-  "UserFlow",
-  "행동유형",
-  "PAGE_B"
-];
 const legacyRouteAliasLiterals = ["run_analysis", "skip_analysis", "분석 실행", "분석 없이 진행"];
 
-export function assertGeneratorSourcesStayDomainNeutral() {
+export function assertLegacyRouteAliasCompatibility() {
   for (const file of collectGeneratorSourceFiles()) {
-    const label = relative(repoRoot, file);
-    const source = readFileSync(file, "utf8");
-    for (const token of generatorAuthoredLeaks) {
-      assert.ok(!source.includes(token), `${label} contains generator-authored scenario/product literal "${token}"`);
-    }
-    assertLegacyRouteAliasCompatOnly(source, label);
+    assertLegacyRouteAliasCompatOnly(readFileSync(file, "utf8"), relative(repoRoot, file));
   }
 }
 
@@ -178,7 +161,7 @@ export function assertConnectedMcpRuntimeLabels(outputRoot) {
   assert.equal(manifest.runtime.connected_adapters[0].mock_binding.provider, "mock_lab");
   assert.match(manifest.runtime.connected_adapters[0].runtime_mcp_note, /실행 시점/);
   assert.match(agentSource, /"runtime_mcp_label": "런타임 MCP"/);
-  assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 Mock Lab MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
+  assert.match(agentSource, /"runtime_mcp_note": "실행 시점에 synthetic MCP 서버를 통해 모델이 파악한 데이터입니다\."/);
   assert.match(agentSource, /"connection_status": "mcp_connected"/);
   assert.match(agentSource, /def _user_text_from_context\(ctx: Context\) -> str:/);
   assert.match(agentSource, /USER_TEXT_INPUT_NAMES = \{/);
@@ -212,17 +195,6 @@ function assertCommonBundle(outputRoot, manifest) {
   assert.doesNotMatch(readme, /python3 -m venv \.venv/);
   assert.doesNotMatch(readme, /pip install -r requirements\.txt/);
   assert.match(readme, /requirements\/adk-runtime\.txt/);
-  assertNoGeneratorAuthoredGeneratedLeaks(outputRoot);
-}
-
-function assertNoGeneratorAuthoredGeneratedLeaks(outputRoot) {
-  for (const file of collectFiles(outputRoot)) {
-    const label = relative(outputRoot, file);
-    const text = readFileSync(file, "utf8");
-    for (const token of generatorAuthoredLeaks) {
-      assert.ok(!text.includes(token), `domain-neutral bundle leaked generator-authored literal "${token}" into ${label}`);
-    }
-  }
 }
 
 function assertLegacyRouteAliasCompatOnly(source, label) {

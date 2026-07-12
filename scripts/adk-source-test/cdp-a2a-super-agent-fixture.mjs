@@ -8,11 +8,11 @@ function channelModulesForSuperAgent() {
   return { agentBase, unconnectedAdapter };
 }
 
-function superAgentModule(agentBase) {
+function superAgentModule(agentBase, agentName) {
   return {
     ...agentBase,
     id: "mod-super-agent",
-    name: "Super Agent",
+    name: agentName,
     agent_execution_mode: "chat",
     inputs: [
       { name: "user_message", type: "text", required: true },
@@ -61,9 +61,9 @@ function superAgentRouteEdges() {
   ];
 }
 
-export function superAgentRouteFixtureContract() {
+export function superAgentRouteFixtureContract({ agentName = "Super Agent" } = {}) {
   const { agentBase, unconnectedAdapter } = channelModulesForSuperAgent();
-  const superAgent = superAgentModule(agentBase);
+  const superAgent = superAgentModule(agentBase, agentName);
   const registry = adapterModule(unconnectedAdapter, "mod-registry", "Registry Discovery Adapter");
   const activeTask = adapterModule(unconnectedAdapter, "mod-active-task", "Active A2A Task Adapter");
   const remoteSink = adapterModule(unconnectedAdapter, "mod-remote-sink", "Remote Delegation Adapter");
@@ -75,10 +75,10 @@ export function superAgentRouteFixtureContract() {
   };
 }
 
-export function generateSuperAgentRouteBundle() {
+export function generateSuperAgentRouteBundle({ agentName = "Super Agent" } = {}) {
   const artifactRoot = mkdtempSync(join(tmpdir(), "af-gen-super-agent-route-"));
   try {
-    const fixture = superAgentRouteFixtureContract();
+    const fixture = superAgentRouteFixtureContract({ agentName });
     writeChannelFixture(artifactRoot, fixture);
     const outputRoot = join(artifactRoot, "out");
     generateBundle(artifactRoot, outputRoot);

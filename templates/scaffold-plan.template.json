@@ -47,35 +47,39 @@
     },
     {
       "id": "mod-002",
-      "name": "requirement_review_specialist",
-      "module_category": "agent",
-      "agent_kind": "specialist",
+      "name": "response_guidance_retrieval",
+      "module_category": "adapter",
+      "agent_kind": null,
       "workflow_kind": null,
-      "adapter_kind": null,
+      "adapter_kind": "retrieval",
       "remote_contract_kind": null,
-      "scaffold_output": "agent_shell_only",
+      "scaffold_output": "contract_or_stub_only",
       "no_runnable_business_logic": true,
       "catalog_binding": null,
       "developer_todos": [
-        "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
-        "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
+        "Review the retrieval source and access policy before replacing the TODO boundary.",
+        "Preserve reviewed citation and grounding requirements when wiring runtime behavior."
       ],
       "inputs": [
         {
-          "name": "review_context",
-          "type": "object",
+          "name": "complaint_text",
+          "type": "text",
           "required": true
         }
       ],
       "outputs": [
         {
-          "name": "recommendation",
-          "type": "object"
+          "name": "guidance_summary",
+          "type": "text"
+        },
+        {
+          "name": "citations",
+          "type": "array"
         }
       ],
-      "risk_signals": [],
+      "risk_signals": ["audit_required"],
       "runtime_mock": null,
-      "required_review_fields": ["input_contract", "output_contract", "eval_placeholders"]
+      "required_review_fields": ["citation_required", "grounding_required", "source_acl_required"]
     }
   ],
   "runtime_contracts": [
@@ -153,11 +157,11 @@
       },
       {
         "module_id": "mod-002",
-        "module_name": "requirement_review_specialist",
+        "module_name": "response_guidance_retrieval",
         "reason": "no catalog binding was selected for this approved module",
         "developer_todos": [
-          "Implement this module in TODO_IMPLEMENT_HERE after the design is approved.",
-          "Map reviewed inputs, validate outputs, and keep business credentials out of generated code."
+          "Review the retrieval source and access policy before replacing the TODO boundary.",
+          "Preserve reviewed citation and grounding requirements when wiring runtime behavior."
         ]
       }
     ]
@@ -167,7 +171,7 @@
     "blockers": [],
     "warnings": [
       "customer_profile_lookup: catalog binding is emitted as TODO/stub until runtime binding policy is approved",
-      "requirement_review_specialist: generated as new-code TODO boundary because no catalog binding is selected"
+      "response_guidance_retrieval: generated as new-code TODO boundary because no catalog binding is selected"
     ]
   }
 }
