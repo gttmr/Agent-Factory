@@ -1,12 +1,11 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
-import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
+import { hasAgentOwnedToolsets } from "./adapters.mjs";
+import { collectGenerationNodes } from "./graph/collector.mjs";
 import { assertNoSymbolCollisions } from "./graph/guards.mjs";
-import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import {
   assertDynamicRunnableGraphSupported,
   dynamicRunIdComponent
 } from "./graph/dynamic.mjs";
-import { pyGraphNodeName, syntheticNodeSymbol } from "./naming.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
 import { assertRemoteA2aSupported, usesRemoteA2a, usesRemoteA2aAuthInterceptor } from "./remote-a2a.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
@@ -17,29 +16,34 @@ const MAX_DYNAMIC_LOOP_ITERATIONS = 3;
 
 export function buildDynamicRunnableAgentPy(context) {
   const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName } = context;
-  const dynamicPlan = assertDynamicRunnableGraphSupported(graphContext);
+  const collection = collectGenerationNodes(graphContext, { mode: "dynamic" });
+  const dynamicPlan = assertDynamicRunnableGraphSupported(graphContext, { collection });
   assertDataChannelsSupported(graphContext);
   assertRemoteA2aSupported({ analysisResult, modules });
 
-  const graph = graphIndexes(graphContext);
-  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
-  const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
-  const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
-  assertNoSymbolCollisions(orderedNodeSpecs, [...humanInputNodes, ...terminalOutputNodes, ...dynamicPlan.loopControls]);
-  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
+  const {
+    collisionTargets,
+    humanInputNodes,
+    loopControlNodes,
+    moduleSpecsInDeclarationOrder: orderedNodeSpecs,
+    routerNodes,
+    terminalOutputNodes
+  } = collection;
+  assertNoSymbolCollisions(collisionTargets);
+  const { nodeBlocks, funcBlocks, loopControlBlocks } = emitRunnableNodeBlocks(context, {
+    mode: "dynamic",
     orderedNodeSpecs,
     humanInputNodes,
-    routerNodes: [],
-    terminalOutputNodes
+    routerNodes,
+    terminalOutputNodes,
+    loopControlNodes
   });
-  const loopControlBlocks = dynamicPlan.loopControls.map(emitLoopControlNode);
 
   const description = `검토된 workbench artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
     normalizedRequirement.title || packageName
   )}.`;
   const usesArtifacts = usesArtifactChannels(graphContext);
-  const usesTerminalOutputs = terminalOutputNodes.length > 0;
+  const usesTerminalOutputs = collection.featureFlags.has("terminal_outputs");
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
   const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
@@ -84,12 +88,6 @@ root_agent = Workflow(
     edges=[(START, dynamic_workflow)],
 )
 `;
-}
-
-function emitLoopControlNode(node) {
-  return `@node(name=${toPyStr(pyGraphNodeName(node))})
-def ${syntheticNodeSymbol(node)}(node_input=None):
-    return node_input`;
 }
 
 function emitDynamicWorkflow(plan) {

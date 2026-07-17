@@ -6,6 +6,9 @@ import { readBundle } from "./adk-source-test/fixtures.mjs";
 
 import "./adk-source-test/basic-bundle.test.mjs";
 import "./adk-source-test/generator-neutrality.test.mjs";
+import "./adk-source-test/graph-dispatch.test.mjs";
+import "./adk-source-test/node-collector.test.mjs";
+import "./adk-source-test/output-byte-identity.test.mjs";
 import "./adk-source-test/reused-chat-projection.test.mjs";
 import "./adk-source-test/route-choices.test.mjs";
 import "./adk-source-test/toolsets.test.mjs";

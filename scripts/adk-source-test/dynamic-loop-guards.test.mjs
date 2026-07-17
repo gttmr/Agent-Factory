@@ -26,6 +26,14 @@ function linearContext({ nodeKind = "agent", module = null, edge = {} } = {}) {
   };
 }
 
+function requiredMetadataForEdgeKind(edgeKind) {
+  if (["session_state", "temp_state", "user_state", "app_state"].includes(edgeKind)) {
+    return { state_key: "support_value" };
+  }
+  if (edgeKind === "artifact") return { artifact_key: "support.json" };
+  return {};
+}
+
 test("runnable rejects loop control edges without reviewed loop decisions", () => {
   const { agentBase } = channelModules();
   const modules = [{ ...agentBase, id: "mod-draft", name: "Draft Agent" }];
@@ -415,7 +423,9 @@ test("dynamic support matrix records every accepted module node kind and ordinar
     "app_state",
     "artifact"
   ]) {
-    const plan = buildDynamicRunnablePlan(linearContext({ edge: { edge_kind: edgeKind } }));
+    const plan = buildDynamicRunnablePlan(
+      linearContext({ edge: { edge_kind: edgeKind, ...requiredMetadataForEdgeKind(edgeKind) } })
+    );
     assert.deepEqual(new Set(plan.consumedEdgeIds), new Set(["e1", "e2"]), edgeKind);
   }
   for (const executionSemantics of ["normal_transition", "fan_out", "fan_in"]) {
@@ -430,7 +440,8 @@ test("dynamic support matrix records every accepted module node kind and ordinar
       edge: {
         edge_kind: "remote_a2a",
         execution_semantics: "boundary_crossing",
-        is_remote_boundary_crossing: true
+        is_remote_boundary_crossing: true,
+        a2a_contract_id: "a2a-001"
       }
     })
   );
