@@ -10,7 +10,7 @@ search, review notes, bottom tabs, runtime contracts, and Remote A2A editing.
 | Task | Files |
 | --- | --- |
 | Runtime contract readiness UI | `RuntimeContractPanel.tsx` |
-| Remote A2A contract UI/validation | `A2AContractPanel.tsx`, `a2aContractValidator.ts` |
+| Remote A2A contract UI/validation | `A2AContractPanel.tsx` (re-export façade — keep importing from it), `A2AContractSidebar.tsx`, `A2AContractInspector.tsx`, `A2AContractEditor.tsx` (+ `A2AContractEditorFields.tsx`, `A2AContractCoreSections.tsx`, `A2AContractCapabilitySections.tsx`), `A2AContractPanelModel.ts`, `a2aContractValidator.ts` |
 | Review notes/comments model | `ReviewNotesPanel.tsx`, `reviewNotesModel.ts` |
 | Path highlighting/search | `PathTracePanel.tsx`, `pathSearch.ts` |
 | Bottom tab rules | `designWorkbenchTabs.ts` |
