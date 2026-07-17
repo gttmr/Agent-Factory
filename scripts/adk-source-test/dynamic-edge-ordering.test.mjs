@@ -20,7 +20,10 @@ import {
 const SMOKE_BASELINE = [
   ["af_adk_a2a_server.py", "7b99703b21959b971c1a7365bd884698e7e8e3043605757bdd3907450d3428c0"],
   ["implementation-handoff.md", "8c36f45b67e145be9641b8582a72e1d52848e43658c5836da0babe68d8f7da4f"],
-  ["README.md", "28a261a854d24e88a753d136fee78da0a9871643c50c9b8b6864159abefa7401"],
+  // README.md and req_gen_test_adk/README.md are excluded: they embed the
+  // environment-dependent relative path back to the checkout's
+  // .agent-factory/runtime.env, so their bytes vary by checkout/tmp location.
+  // README stability is covered by the behavioral README tests instead.
   ["req_gen_test_adk/__init__.py", "5ab8550f1e4ff205f461d035caad57bd7d4535bdd19f9c804d747f29f20953f1"],
   ["req_gen_test_adk/agent.json", "f4b8a28fc20cda7d7132dd26fbea75ade12a405fdf9e626c1eb29fac5488ecff"],
   ["req_gen_test_adk/agent.py", "26e21298b7d209dff08633ebba3e7f35546ed51bff55e56a9fd262a9fb3fe5b8"],
@@ -32,7 +35,6 @@ const SMOKE_BASELINE = [
   ["req_gen_test_adk/nodes/human_inputs.py", "85b80e0cc7f0aa36be8e7b2407459126d17d281f6df6baafc380229fb7de2677"],
   ["req_gen_test_adk/nodes/routers.py", "16c6bf552636e110b48b6f89e0a54d48a80d8ac5ecd9a5632ebd156e1b1d1dbe"],
   ["req_gen_test_adk/nodes/workflow_calls.py", "8395fab4e022dd7cce56c6e699f0f6b29a1e059d2eb9dc88a14bd91be0e2fad8"],
-  ["req_gen_test_adk/README.md", "28a261a854d24e88a753d136fee78da0a9871643c50c9b8b6864159abefa7401"],
   ["req_gen_test_adk/sample_inputs.yaml", "af8bc165f14a5bab73642d48ae637d24dfa1c7d85b1b210f50a4ca9b8e9ff60a"],
   ["req_gen_test_adk/schemas.py", "28cda704fddf55339abf9df31f520647a4448ec3ef0a36b79123b613d897308e"],
   ["req_gen_test_adk/tests/__init__.py", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
@@ -49,10 +51,16 @@ const STATIC_RUNNABLE_BASELINE = [
   ["af_adk_a2a_server.py", "7b99703b21959b971c1a7365bd884698e7e8e3043605757bdd3907450d3428c0"],
   ["agents.config.yaml", "0b6894d00eb13baeda3b30c19fc01fa0b3f43fa25e0c347839530952b6d7696c"],
   ["implementation-handoff.md", "638273a607f57d6a5a02e0462e97628e7dfdab8c0bfbee289d1d8c9d7b2bae2b"],
-  ["README.md", "cd504fc3ffe1592b8244da59d6933ee3edeab32ae2c3a4adb068ff6ba6b5c7b4"],
+  // README.md and req_gen_test_adk/README.md are excluded: they embed the
+  // environment-dependent relative path back to the checkout's
+  // .agent-factory/runtime.env, so their bytes vary by checkout/tmp location.
+  // README stability is covered by the behavioral README tests instead.
   ["req_gen_test_adk/__init__.py", "5ab8550f1e4ff205f461d035caad57bd7d4535bdd19f9c804d747f29f20953f1"],
   ["req_gen_test_adk/agent.json", "f4b8a28fc20cda7d7132dd26fbea75ade12a405fdf9e626c1eb29fac5488ecff"],
-  ["req_gen_test_adk/agent.py", "912d8ae95b25f82de6b9e9b501f1ab4bdfad882e4b40f8114ab37ad8138d0911"],
+  // agent.py hash updated 2026-07-12: terminal-output emitter now binds the
+  // node id via a python literal (_node_id) instead of raw f-string
+  // interpolation (injection fix); smoke agent.py is unaffected.
+  ["req_gen_test_adk/agent.py", "f3ed9bf59989a9fd698d49b31a6b059f02e9996e8739533fc80caacfcae8609e"],
   ["req_gen_test_adk/mock_config.yaml", "9a56f996e0b3795b1e495051cf0406f5eac9077e26959fe48bff2a917cad4902"],
   ["req_gen_test_adk/nodes/__init__.py", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
   ["req_gen_test_adk/nodes/adapters.py", "3bdbe9a01560955a25562fcd4556cb64bf02126d4947ceb593ae61d060af08e1"],
@@ -61,7 +69,6 @@ const STATIC_RUNNABLE_BASELINE = [
   ["req_gen_test_adk/nodes/human_inputs.py", "85b80e0cc7f0aa36be8e7b2407459126d17d281f6df6baafc380229fb7de2677"],
   ["req_gen_test_adk/nodes/routers.py", "16c6bf552636e110b48b6f89e0a54d48a80d8ac5ecd9a5632ebd156e1b1d1dbe"],
   ["req_gen_test_adk/nodes/workflow_calls.py", "8395fab4e022dd7cce56c6e699f0f6b29a1e059d2eb9dc88a14bd91be0e2fad8"],
-  ["req_gen_test_adk/README.md", "cd504fc3ffe1592b8244da59d6933ee3edeab32ae2c3a4adb068ff6ba6b5c7b4"],
   ["req_gen_test_adk/sample_inputs.yaml", "af8bc165f14a5bab73642d48ae637d24dfa1c7d85b1b210f50a4ca9b8e9ff60a"],
   ["req_gen_test_adk/schemas.py", "28cda704fddf55339abf9df31f520647a4448ec3ef0a36b79123b613d897308e"],
   ["req_gen_test_adk/tests/__init__.py", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],

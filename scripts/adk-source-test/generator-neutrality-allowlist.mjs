@@ -124,6 +124,7 @@ const entries = [
   { token: "target_workflow", source: "generated workflow-call configuration field" },
   { token: "task_state", source: "A2A task lifecycle field" },
   { token: "terminal_output", source: "generator-internal node lowering role" },
+  { token: "terminal_output_node_id", source: "generator-internal terminal structured-output field" },
   { token: "terminal_outputs", source: "generated runtime manifest capability field" },
   { token: "timeout_seconds", source: "A2A runtime policy field" },
   { token: "to_dict", source: "ADK State serialization API" },

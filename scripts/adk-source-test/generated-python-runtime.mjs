@@ -111,8 +111,14 @@ export function bundleSha256Manifest(root) {
   }));
 }
 
+// README files embed the environment-dependent relative path back to the
+// checkout's .agent-factory/runtime.env, so their bytes vary by checkout/tmp
+// location and cannot be hash-pinned; README stability is covered by the
+// behavioral README tests instead.
+const SHA256_MANIFEST_ENV_DEPENDENT = new Set(["README.md", "req_gen_test_adk/README.md"]);
+
 export function assertBundleSha256Manifest(root, expectedRows) {
-  const actualRows = bundleSha256Manifest(root);
+  const actualRows = bundleSha256Manifest(root).filter((row) => !SHA256_MANIFEST_ENV_DEPENDENT.has(row.path));
   const expected = new Map(expectedRows.map((row) => [row.path, row.sha256]));
   const actual = new Map(actualRows.map((row) => [row.path, row.sha256]));
   const paths = [...new Set([...expected.keys(), ...actual.keys()])].sort();
