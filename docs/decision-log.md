@@ -10,6 +10,12 @@
 
 ---
 
+## 2026-07-17 · PR TBD — node/edge kind dispatch and generation collection have single owners
+
+- **결정**: ADK source generation의 17개 `node_kind`와 10개 `edge_kind`를 각각 한 registry row가 소유한다. Node handler는 mode별 capability, collection role, runtime endpoint/name, collision target, emission을 제공하고, edge handler는 mode별 capability, required metadata, endpoint legality, lowering, consumption ID를 제공한다. Smoke/static/dynamic assembler는 kind-agnostic mode 정책만 소유하며 공통 collector가 declaration-order bucket, toolset exclusion, feature flags, collision target, coverage를 한 번 계산한다.
+- **배경**: 기존 smoke/static/dynamic 경로가 node collection, 지원 판정, endpoint resolution, edge lowering을 독립적으로 반복해 새 kind 추가 시 여러 switch/set/조건을 함께 수정해야 했고, dynamic builder의 router 누락처럼 경로별 drift가 생길 수 있었다.
+- **영향**: `scripts/adk-source/dispatch/**`, 공통 graph collector, 기존 graph guard/lowering/dynamic plan 및 세 mode assembler의 내부 ownership만 바뀐다. Graph-wide invariant와 PR-A edge ordering/loop/reachability/D9 consumption ledger는 유지한다. Shared relative-path SHA-256 manifest로 smoke/static/dynamic generated bundle byte identity를 고정하며, schema·validator constants·catalog·template artifact·CLI·web UI와 public output mode에는 변경이 없다.
+
 ## 2026-07-12 · PR TBD — dynamic execution is edge-driven and fan-in is explicit
 
 - **결정**: Dynamic runnable execution order is derived from reviewed Graph IR edges; the original node index is only the stable tie-break for simultaneously ready nodes. A reviewed `loop_region` anchors an edge-path closure from each `loop_back` target to its `loop_control`; nested/overlapping closures, residual cycles, illegal boundaries, and unreachable active nodes reject before bundle write. Dynamic fan-in aggregates only an explicit join or reviewed `fan_in`, using ADK runtime node names as result-map keys; ambiguous normal convergence rejects. Sibling children are sequential direct awaits with deterministic node/region/iteration run IDs.

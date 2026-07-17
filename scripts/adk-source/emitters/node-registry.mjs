@@ -1,50 +1,31 @@
-import { emitRemoteA2aNode } from "../remote-a2a.mjs";
-import { emitAgentNode, moduleLoweringRole } from "./agent-node.mjs";
-import { emitConnectedAdapterFunc } from "./connected-adapter.mjs";
-import { emitFunctionNodeDecl, emitStubFunc } from "./function-node.mjs";
-import { emitHumanInputFunc, emitHumanInputNodeDecl } from "./hitl.mjs";
-import { emitRouteFunc, emitRouterNodeDecl } from "./router.mjs";
-import { emitTerminalOutputFunc, emitTerminalOutputNodeDecl } from "./terminal-output.mjs";
+import { emissionForNode } from "../dispatch/index.mjs";
 
-export function emitRunnableNodeBlocks(context, { orderedNodeSpecs, humanInputNodes, routerNodes, terminalOutputNodes = [] }) {
+export function emitRunnableNodeBlocks(
+  context,
+  {
+    mode,
+    orderedNodeSpecs,
+    humanInputNodes,
+    routerNodes,
+    terminalOutputNodes = [],
+    loopControlNodes = []
+  }
+) {
   const nodeBlocks = [];
   const funcBlocks = [];
-
-  // Node lowering registry: maps a node's lowering role to its function/
-  // declaration emitters, replacing the per-role if/elif chain. Adding a node
-  // kind (e.g. a future remote_a2a or dynamic node) adds a registry entry here —
-  // though it may also need import, guard (assertRunnableGraphSupported), and
-  // graph-resolution support, so this is the emission seam, not the whole story.
-  // emitFunc returns null when the node needs no standalone function (LlmAgent
-  // agents are declared inline). Emission order — module nodes in graph order,
-  // then human-input nodes — is preserved.
-  const NODE_LOWERING = {
-    agent: { emitFunc: () => null, emitDecl: (target) => emitAgentNode(target, context) },
-    connected_adapter: {
-      emitFunc: (target) => emitConnectedAdapterFunc(target, context),
-      emitDecl: emitFunctionNodeDecl
-    },
-    stub_function: { emitFunc: (target) => emitStubFunc(target, context), emitDecl: emitFunctionNodeDecl },
-    human_input: { emitFunc: (node) => emitHumanInputFunc(node, context), emitDecl: emitHumanInputNodeDecl },
-    router: { emitFunc: (node) => emitRouteFunc(node, context), emitDecl: emitRouterNodeDecl },
-    terminal_output: { emitFunc: emitTerminalOutputFunc, emitDecl: emitTerminalOutputNodeDecl },
-    remote_a2a: {
-      emitFunc: () => null,
-      emitDecl: (target) => emitRemoteA2aNode({ analysisResult: context.analysisResult, target })
-    }
-  };
-  const emitNode = (role, target) => {
-    const handler = NODE_LOWERING[role];
-    if (!handler) throw new Error(`runnable codegen: no node-lowering handler for role "${role}".`);
-    const func = handler.emitFunc(target);
-    if (func) funcBlocks.push(func);
-    nodeBlocks.push(handler.emitDecl(target));
+  const loopControlBlocks = [];
+  const sections = { nodeBlocks, loopControlBlocks };
+  const emitNode = (target) => {
+    const emission = emissionForNode(target, { mode, context });
+    if (emission.func) funcBlocks.push(emission.func);
+    sections[emission.section].push(emission.decl);
   };
 
-  for (const spec of orderedNodeSpecs) emitNode(moduleLoweringRole(spec.module), spec);
-  for (const node of humanInputNodes) emitNode("human_input", node);
-  for (const node of routerNodes) emitNode("router", node);
-  for (const node of terminalOutputNodes) emitNode("terminal_output", node);
+  for (const spec of orderedNodeSpecs) emitNode(spec);
+  for (const node of humanInputNodes) emitNode(node);
+  for (const node of routerNodes) emitNode(node);
+  for (const node of terminalOutputNodes) emitNode(node);
+  for (const node of loopControlNodes) emitNode(node);
 
-  return { nodeBlocks, funcBlocks };
+  return { nodeBlocks, funcBlocks, loopControlBlocks };
 }

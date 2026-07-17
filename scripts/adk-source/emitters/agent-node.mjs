@@ -135,7 +135,8 @@ function defaultAgentInstruction(module) {
   ].join("\n");
 }
 
-export function moduleLoweringRole(module) {
+export function moduleLoweringRole(target) {
+  const module = target.module ?? target;
   if (module.module_category === "remote_a2a") return "remote_a2a";
   if (module.module_category === "agent") return "agent";
   if (adapterConnection(module) === "mcp_connected") return "connected_adapter";

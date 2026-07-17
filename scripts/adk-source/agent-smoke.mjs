@@ -1,13 +1,17 @@
-import { buildGraphWorkflowEdges, orderedGraphNodeSpecs, terminalOutputIds } from "./graph/indexes.mjs";
+import { buildSmokeGraphWorkflowEdges } from "./dispatch/index.mjs";
+import { collectGenerationNodes } from "./graph/collector.mjs";
 import { nodeFunctionName, todoFunctionName } from "./naming.mjs";
 import { escapePythonString, toPythonEdgeTupleLiteral, toPythonLiteral } from "./python-literals.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
 
 export function buildSmokeAgentPy(context) {
   const { graphContext, modules, packageName } = context;
-  const nodeSpecs = orderedGraphNodeSpecs(graphContext);
-  const functions = [...modules.map(buildTodoFunction), ...nodeSpecs.map(buildNodeFunction)].join("\n\n");
-  const graphEdges = buildGraphWorkflowEdges(graphContext);
+  const collection = collectGenerationNodes(graphContext, { mode: "smoke" });
+  const functions = [
+    ...modules.map(buildTodoFunction),
+    ...collection.moduleSpecsInDeclarationOrder.map(buildNodeFunction)
+  ].join("\n\n");
+  const graphEdges = buildSmokeGraphWorkflowEdges(graphContext, collection);
 
   return `from __future__ import annotations
 
@@ -22,7 +26,7 @@ from google.genai import types
 
 COMPONENT_CONTRACTS = ${toPythonLiteral(componentContracts(context))}
 GRAPH_EDGES = ${toPythonEdgeTupleLiteral(graphEdges)}
-TERMINAL_OUTPUTS = ${toPythonLiteral(terminalOutputIds(graphContext))}
+TERMINAL_OUTPUTS = ${toPythonLiteral(collection.terminalOutputNodes.map((node) => node.id))}
 
 
 def _event_output(module_id: str, module_name: str, node_input: Any = None):

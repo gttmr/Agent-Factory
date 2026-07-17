@@ -1,10 +1,10 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
-import { agentOwnedToolsetAdapterIds, hasAgentOwnedToolsets } from "./adapters.mjs";
+import { hasAgentOwnedToolsets } from "./adapters.mjs";
+import { collisionTargetForSyntheticJoin } from "./dispatch/index.mjs";
+import { collectGenerationNodes } from "./graph/collector.mjs";
 import { assertNoSymbolCollisions, assertRunnableGraphSupported } from "./graph/guards.mjs";
 import { hasDynamicRunnableShape } from "./graph/dynamic.mjs";
-import { graphIndexes, orderedGraphNodeSpecs } from "./graph/indexes.mjs";
 import { buildRunnableGraph, workflowEdgeLiteral } from "./graph/lowering.mjs";
-import { usesRoutes } from "./graph/routes.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
 import { assertRemoteA2aSupported, usesRemoteA2a, usesRemoteA2aAuthInterceptor } from "./remote-a2a.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
@@ -18,26 +18,22 @@ export function buildRunnableAgentPy(context) {
   if (hasDynamicRunnableShape(graphContext)) {
     return buildDynamicRunnableAgentPy(context);
   }
-  assertRunnableGraphSupported(graphContext);
+  const collection = collectGenerationNodes(graphContext, { mode: "static" });
+  assertRunnableGraphSupported(graphContext, { collection });
   assertDataChannelsSupported(graphContext);
   assertRemoteA2aSupported({ analysisResult, modules });
-  const { edges, joins } = buildRunnableGraph(graphContext);
-  const graph = graphIndexes(graphContext);
-  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(graphContext);
-  const orderedNodeSpecs = orderedGraphNodeSpecs(graphContext, { excludeModuleIds: toolsetAdapterIds });
-  const humanInputNodes = graph.nodes.filter((node) => node.node_kind === "human_input");
-  const routerNodes = graph.nodes.filter((node) => node.node_kind === "router");
-  const terminalOutputNodes = graph.nodes.filter((node) => node.node_kind === "output");
-  const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
+  const { edges, joins } = buildRunnableGraph(graphContext, { collection });
+  const {
+    collisionTargets,
+    humanInputNodes,
+    moduleSpecsInDeclarationOrder: orderedNodeSpecs,
+    routerNodes,
+    terminalOutputNodes
+  } = collection;
   const autoJoins = joins.filter((join) => join.explicit === false);
-  assertNoSymbolCollisions(orderedNodeSpecs, [
-    ...humanInputNodes,
-    ...routerNodes,
-    ...terminalOutputNodes,
-    ...explicitJoinNodes,
-    ...autoJoins
-  ]);
+  assertNoSymbolCollisions([...collisionTargets, ...autoJoins.map(collisionTargetForSyntheticJoin)]);
   const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
+    mode: "static",
     orderedNodeSpecs,
     humanInputNodes,
     routerNodes,
@@ -55,7 +51,7 @@ export function buildRunnableAgentPy(context) {
   // (wrap as a Part); Remote A2A nodes need RemoteA2aAgent. Gated so bundles
   // without those features keep an unchanged import block.
   const usesArtifacts = usesArtifactChannels(graphContext);
-  const usesRouteNodes = usesRoutes(processFlow);
+  const usesRouteNodes = collection.featureFlags.has("routes");
   const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
   const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 || usesRouteNodes ? "import json\n" : "";
   const usesTerminalOutputs = terminalOutputNodes.length > 0;

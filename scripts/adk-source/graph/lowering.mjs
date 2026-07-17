@@ -1,38 +1,19 @@
-import { agentOwnedToolsetAdapterIds } from "../adapters.mjs";
+import { validateAndLowerEdge } from "../dispatch/index.mjs";
 import { nodeSymbol, pyGraphNodeName, syntheticNodeSymbol } from "../naming.mjs";
 import { toPyStr } from "../python-literals.mjs";
-import { graphIndexes, moduleNodeCounts, moduleNodeSpec, orderedGraphNodeSpecs } from "./indexes.mjs";
-import { routeValue } from "./routes.mjs";
+import { collectGenerationNodes } from "./collector.mjs";
 
-export function buildRunnableGraph(context) {
-  const graph = graphIndexes(context);
-  const counts = moduleNodeCounts(graph);
-  const toolsetAdapterIds = agentOwnedToolsetAdapterIds(context);
-  const explicitJoinNodes = graph.nodes.filter((node) => node.node_kind === "join");
+export function buildRunnableGraph(context, options = {}) {
+  const collection = options.collection ?? collectGenerationNodes(context, { mode: "static" });
+  const { counts, graph, toolsetAdapterIds } = collection;
+  const explicitJoinNodes = collection.explicitJoinNodes;
   const explicitJoinSymbols = new Set(explicitJoinNodes.map((node) => syntheticNodeSymbol(node)));
-  const resolve = (nodeId, side) => {
-    const node = graph.nodesById.get(nodeId);
-    if (!node) return null;
-    if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
-      if (toolsetAdapterIds.has(node.module_id)) return null;
-      return nodeSymbol(moduleNodeSpec(node, graph, counts));
-    }
-    if (side === "from" && node.node_kind === "input") return "START";
-    if (
-      node.node_kind === "human_input" ||
-      node.node_kind === "join" ||
-      node.node_kind === "router" ||
-      (side === "to" && node.node_kind === "output")
-    ) {
-      return syntheticNodeSymbol(node);
-    }
-    return null; // unknown synthetic nodes are not runnable workflow nodes
-  };
 
   const baseEdges = [];
   const routeEdgesBySource = new Map();
+  const consumedEdgeIds = [];
   const seen = new Set();
-  const add = (from, to, edge = {}) => {
+  const add = (from, to, record = {}) => {
     if (!from || !to || from === to) return;
     const key = `${from}->${to}`;
     if (seen.has(key)) return;
@@ -40,34 +21,40 @@ export function buildRunnableGraph(context) {
     baseEdges.push({
       from,
       to,
-      fanIn: edge.execution_semantics === "fan_in" || edge.flow_kind === "fan_in",
-      route: edge.edge_kind === "route"
+      fanIn: record.fanIn === true,
+      route: record.kind === "route"
     });
   };
 
-  if (Array.isArray(context.processFlow.edges)) {
-    for (const edge of context.processFlow.edges) {
-      const from = resolve(edge.from, "from");
-      const to = resolve(edge.to, "to");
-      if (from && to && from === to && from !== "START") {
-        throw new Error(
-          `runnable mode does not support self-loop/loop Graph IR yet (node ${from}). Use smoke mode or wait for loop lowering.`
-        );
-      }
-      if (edge.edge_kind === "route") {
-        if (from && to) {
-          if (!routeEdgesBySource.has(from)) routeEdgesBySource.set(from, []);
-          routeEdgesBySource.get(from).push({ value: routeValue(edge), target: to });
-        }
-        add(from, to, edge);
-        continue;
-      }
-      add(from, to, edge);
+  const graphEdges = Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [];
+  for (const [index, edge] of graphEdges.entries()) {
+    const record = validateAndLowerEdge(edge, {
+      mode: "static",
+      graph,
+      counts,
+      exclusions: toolsetAdapterIds,
+      index
+    });
+    consumedEdgeIds.push(record.consumedEdgeId);
+    const { from, to } = record;
+    if (from && to && from === to && from !== "START") {
+      throw new Error(
+        `runnable mode does not support self-loop/loop Graph IR yet (node ${from}). Use smoke mode or wait for loop lowering.`
+      );
     }
+    if (record.kind === "route") {
+      if (from && to) {
+        if (!routeEdgesBySource.has(from)) routeEdgesBySource.set(from, []);
+        routeEdgesBySource.get(from).push({ value: record.value, target: to });
+      }
+      add(from, to, record);
+      continue;
+    }
+    add(from, to, record);
   }
 
   const incoming = new Set(baseEdges.map((edge) => edge.to));
-  for (const spec of orderedGraphNodeSpecs(context, { excludeModuleIds: toolsetAdapterIds })) {
+  for (const spec of collection.moduleSpecsInDeclarationOrder) {
     const sym = nodeSymbol(spec);
     if (!incoming.has(sym)) add("START", sym);
   }
@@ -135,7 +122,7 @@ export function buildRunnableGraph(context) {
     );
   }
   assertAcyclic(runtimePairs(finalEdges));
-  return { edges: finalEdges, joins };
+  return { edges: finalEdges, joins, consumedEdgeIds };
 }
 
 function runtimePairs(edgeSpecs) {

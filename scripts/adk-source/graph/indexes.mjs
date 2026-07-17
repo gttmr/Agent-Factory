@@ -1,5 +1,3 @@
-import { nodeFunctionName } from "../naming.mjs";
-
 export function graphIndexes({ modules, processFlow }) {
   const moduleById = new Map(modules.map((module) => [module.id, module]));
   const nodes = Array.isArray(processFlow.nodes) ? processFlow.nodes : [];
@@ -35,50 +33,6 @@ export function validateGraphCoverage(context) {
   if (missing.length > 0) {
     throw new Error(`processFlow is missing Graph IR nodes for scaffold-plan modules: ${missing.join(", ")}`);
   }
-}
-
-export function buildGraphWorkflowEdges(context) {
-  const graph = graphIndexes(context);
-  const counts = moduleNodeCounts(graph);
-  const rows = [];
-  const seen = new Set();
-  const push = (from, to) => {
-    if (!from || !to || from === to) return;
-    const key = `${from}->${to}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    rows.push([from, to]);
-  };
-
-  if (Array.isArray(context.processFlow.edges)) {
-    for (const edge of context.processFlow.edges) {
-      push(graphEndpoint(edge.from, "from", graph, counts), graphEndpoint(edge.to, "to", graph, counts));
-    }
-  }
-
-  const incoming = new Set(rows.map(([, to]) => to));
-  const outgoing = new Set(rows.map(([from]) => from));
-  for (const node of graph.moduleNodes) {
-    const fn = nodeFunctionName(moduleNodeSpec(node, graph, counts));
-    if (!incoming.has(fn)) push("START", fn);
-    if (!outgoing.has(fn)) push(fn, "emit_workflow_result");
-  }
-
-  if (rows.length === 0) {
-    throw new Error("processFlow does not provide any usable Graph IR edges for runtime stub generation.");
-  }
-  return rows;
-}
-
-function graphEndpoint(nodeId, side, graph, counts) {
-  const node = graph.nodesById.get(nodeId);
-  if (!node) return null;
-  if (typeof node.module_id === "string" && graph.moduleById.has(node.module_id)) {
-    return nodeFunctionName(moduleNodeSpec(node, graph, counts));
-  }
-  if (side === "from" && node.node_kind === "input") return "START";
-  if (side === "to" && node.node_kind === "output") return "emit_workflow_result";
-  return null;
 }
 
 export function moduleNodeCounts(context) {
