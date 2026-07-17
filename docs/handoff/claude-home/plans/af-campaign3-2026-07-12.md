@@ -24,11 +24,13 @@
 - [ ] D2. **PR-B (구조)**: 엔드포인트/런타임 심볼 리졸버 3중 중복 → edge/node-kind 디스패치 단일화 (메모리: 추가 = 핸들러 1개 원칙). 산출물 동일성/행동 검증 + 실 ADK 런타임 게이트.
 - [ ] D3. 문서·decision-log 각 PR 동일 변경 세트.
 
-> Phase D PR-A 완료 (2026-07-12): PR #71 (2d1154e→521a764). 리뷰 3라운드(P1 2건 포함) — 전부 정직한 plan-시점 거부로 수정. D8 실 ADK RED/GREEN resume 증명 통과, smoke/static SHA-256 불변. 승인 설계·증거는 docs/handoff/claude-home/evidence/. PR-B(D2)와 D3의 PR-B분·보안 후속(terminal-output f-string)은 다음 세션.
+> Phase D PR-A 완료 (2026-07-12): PR #71 (2d1154e→521a764). 리뷰 3라운드(P1 2건 포함) — 전부 정직한 plan-시점 거부로 수정. D8 실 ADK RED/GREEN resume 증명 통과, smoke/static SHA-256 불변. 승인 설계·증거는 docs/handoff/claude-home/evidence/. PR-B(D2)와 D3의 PR-B분은 다음 세션.
+>
+> 보안 후속 완료 (2026-07-17): **PR #72** (d9c9bb5→4e4cd04) — terminal-output 노드 ID를 `toPyStr` 경유 `_node_id` 로컬 바인딩으로 f-string 주입 차단, 적대적 ID py_compile 회귀 추가, 중립성 allowlist `terminal_output_node_id` 등재. 부수 발견: PR-A SHA-256 baseline이 환경 의존 README 2개를 핀(클린 main에서도 실패) → `assertBundleSha256Manifest`에서 제외. 리뷰 클린(0건).
 
 ## Phase S — ① 대형 파일 분할 (UI 3종, PR 1개, 기계적)
 
-- [ ] S1. GraphCanvas.tsx(1220) / GraphElementEditor.tsx(940) / A2AContractPanel.tsx(810) 분할 — 기존 `components/graph/*` 레이어 관례를 따름, 동작 보존(빌드 산출물 비교), design-system 준수.
+- [ ] S1. GraphCanvas.tsx(1220) / GraphElementEditor.tsx(940) 분할 — 기존 `components/graph/*` 레이어 관례를 따름, 동작 보존(빌드 산출물 비교), design-system 준수. ~~A2AContractPanel.tsx(810)~~ → **PR #73 완료 (2026-07-17)**: façade 유지 + Model + 뷰 6종(최대 308줄), analyzer 132/132, 브라우저 스모크(Remote A2A 탭) 통과, 리뷰 클린. 방법 노트: docs/handoff/claude-home/evidence/s1-a2a-split-notes.md.
 - [ ] S2. 검증: build/test:analyzer + 스크린샷 스모크(Design 검토 화면). 문서 영향 없으면 decision-log 불필요.
 
 ## 보류 유지
