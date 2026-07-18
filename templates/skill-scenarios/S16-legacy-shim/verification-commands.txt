@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S16-legacy-shim/expected-skill.json","utf8"))'
+rg -n 'af-discover-assets/SKILL[.]md' .agents/skills/af-analyze-requirement/SKILL.md
+test ! -e .agents/skills/af-analyze-requirement/references

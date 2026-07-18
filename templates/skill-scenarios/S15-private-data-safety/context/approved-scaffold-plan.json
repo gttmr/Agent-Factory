@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_root": "${SCENARIO_OUTPUT_ROOT}/runtime",
+  "output_mode": "smoke",
+  "approval": "approved",
+  "connection_contract": {
+    "endpoint_env": "AF_SYNTHETIC_SERVICE_URL",
+    "credential_env": "AF_SYNTHETIC_SERVICE_CREDENTIAL",
+    "auth_required": true,
+    "fixture_policy": "local synthetic response only",
+    "network_access": "disabled"
+  }
+}

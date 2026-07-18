@@ -1,0 +1,6 @@
+- approved ambient contract와 package surface를 generation gate로 확인한다.
+- event normalization과 one-session-per-delivery를 구현한다.
+- duplicate 처리와 idempotent output을 검증한다.
+- retry exhaustion, DLQ, concurrency, timeout과 sink failure를 분리한다.
+- 합성 fixture와 local-only output을 사용한다.
+- deployment, credential, production resource를 생성하지 않는다.

@@ -1,0 +1,6 @@
+- approved callback contract와 output boundary를 확인한다.
+- before-tool Continue와 Override를 정확히 구현·시험한다.
+- Runner-wide guardrail에 Plugin 우선 판단을 적용한다.
+- 차단 case에서 Tool side effect가 발생하지 않음을 검증한다.
+- state와 audit evidence를 최소·redacted 형태로 남긴다.
+- 코드가 승인 범위와 synthetic-only 경계를 벗어나지 않는다.

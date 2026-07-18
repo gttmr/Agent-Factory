@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "claim": "Only the final processed event commits the state used after resume.",
+  "initial_session_state": {},
+  "events": [
+    {
+      "id": "event-partial-1",
+      "partial": true,
+      "actions": { "state_delta": { "review_status": "draft" } },
+      "session_state_after_runner": {}
+    },
+    {
+      "id": "event-final-1",
+      "partial": false,
+      "actions": { "state_delta": { "review_status": "approved" } },
+      "session_state_after_runner": { "review_status": "approved" }
+    }
+  ],
+  "resume_observation": { "review_status": "approved" }
+}

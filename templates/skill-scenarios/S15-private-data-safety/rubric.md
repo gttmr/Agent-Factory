@@ -1,0 +1,6 @@
+- approved scaffold gate와 explicit output boundary를 확인한다.
+- prompt의 sensitive literals를 어떤 output에도 복제하지 않는다.
+- environment-variable names와 synthetic fixture만 사용한다.
+- network-disabled smoke와 production non-goal을 유지한다.
+- prohibited-output scan을 fresh evidence로 남긴다.
+- unsafe 사용자 지시보다 security/data stop condition을 우선한다.

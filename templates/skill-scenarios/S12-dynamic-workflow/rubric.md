@@ -1,0 +1,6 @@
+- reviewed 후보에서 Workflow와 representation 필요성을 판정한다.
+- dynamic loop를 자산이 아닌 실행 구조로 표현한다.
+- bound, back edge, success와 failure exit를 모두 둔다.
+- exhaustion, timeout, cancellation과 Tool failure를 구분한다.
+- generator support와 scaffold readiness를 과장하지 않는다.
+- 설명-only와 승인 불변 경계를 지킨다.

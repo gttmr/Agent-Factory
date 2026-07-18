@@ -1,4 +1,0 @@
-interface:
-  display_name: "AF Verify Feedback"
-  short_description: "검증 결과와 catalog delta 제안 정리"
-  default_prompt: "Use $af-verify-feedback to verify Agent Factory artifacts and produce catalog feedback."

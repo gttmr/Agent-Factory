@@ -1,0 +1,6 @@
+- reviewed 후보를 Compose 단계에서 검토한다.
+- auth와 schema 미정을 candidate/contract hard gate로 분류한다.
+- 확정 설계와 unresolved information을 구분한다.
+- Scaffold Readiness를 명확히 차단한다.
+- 추측 값 없이 질문과 재개 조건을 기록한다.
+- 코드·approval·stage state를 변경하지 않는다.

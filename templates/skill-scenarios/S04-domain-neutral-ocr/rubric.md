@@ -1,0 +1,6 @@
+- OCR Tool과 consuming Workflow의 책임을 분리한다.
+- Tool Owner를 제공된 팀으로 정확히 보존한다.
+- business domain, owner, reuse 판단을 독립적으로 설명한다.
+- 포괄적인 `공통` Domain 값을 사용하지 않는다.
+- cross-domain 가능성을 근거와 review 상태로 남긴다.
+- 파일·credential·private endpoint를 만들거나 추측하지 않는다.

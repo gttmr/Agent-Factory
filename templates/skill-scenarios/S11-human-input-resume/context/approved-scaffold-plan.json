@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_root": "${SCENARIO_OUTPUT_ROOT}/runtime",
+  "output_mode": "runnable",
+  "approval": "approved",
+  "human_input_contract": {
+    "interrupt_id": "synthetic-approval-001",
+    "message": "합성 변경을 적용할까요?",
+    "allowed_responses": ["approve", "reject"],
+    "response_mapping": { "approve": "apply", "reject": "cancel" },
+    "resume_scope": "same invocation and session",
+    "side_effect_idempotency_key": "synthetic-change-001",
+    "timeout_seconds": 60
+  }
+}

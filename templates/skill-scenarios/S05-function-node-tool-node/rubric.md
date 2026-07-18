@@ -1,0 +1,6 @@
+- reviewed 입력을 Compose 단계에서 사용한다.
+- OCR 실행을 독립 Tool Node로 유지한다.
+- 정규화를 Workflow-private Function Node로 구분한다.
+- 각 단계의 책임·I/O·오류와 ownership을 설명한다.
+- 불필요한 Agent나 Catalog Tool을 추가하지 않는다.
+- 코드 생성과 approval 변경 없이 설계 경계를 지킨다.

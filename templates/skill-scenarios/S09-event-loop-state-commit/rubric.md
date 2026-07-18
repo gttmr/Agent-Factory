@@ -1,0 +1,6 @@
+- 검증 대상과 claim을 식별하고 Verify skill을 사용한다.
+- partial action과 final commit semantics를 정확히 구분한다.
+- yield, Runner commit, resume 순서를 evidence에 연결한다.
+- 제공 trace와 실제 runtime proof의 한계를 명시한다.
+- negative scenario와 residual uncertainty를 남긴다.
+- prior-stage artifact나 runtime source를 수정하지 않는다.

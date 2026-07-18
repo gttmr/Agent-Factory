@@ -1,0 +1,6 @@
+- reviewed candidate를 다시 발견 단계로 돌리지 않고 Compose를 수행한다.
+- 계산 기능을 독립 Tool 계약과 function Binding으로 유지한다.
+- 고정 호출 단계를 Tool Node로 표현한다.
+- 호출 판단 주체를 Workflow로 일관되게 둔다.
+- 입력·출력·오류와 검증 가능한 deterministic 조건을 남긴다.
+- 설명-only 요청과 approval 불변 경계를 지킨다.

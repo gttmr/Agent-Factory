@@ -1,4 +1,0 @@
-interface:
-  display_name: "AF Build Runtime Stub"
-  short_description: "승인 artifact에서 Runtime Handoff bundle 생성"
-  default_prompt: "Use $af-build-runtime-stub to create an Agent Factory Runtime Handoff bundle from approved artifacts."

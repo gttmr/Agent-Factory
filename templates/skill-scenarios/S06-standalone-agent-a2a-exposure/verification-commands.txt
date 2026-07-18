@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const value=JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S06-standalone-agent-a2a-exposure/context/agent-and-card.json","utf8"));if(value.agent_card_example.url!=="http://127.0.0.1:18080")process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S06-standalone-agent-a2a-exposure/expected-skill.json","utf8"))'
+! rg -n 'https?://(?!127[.]0[.]0[.]1)' templates/skill-scenarios/S06-standalone-agent-a2a-exposure/context --pcre2

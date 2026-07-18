@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Scaffold Runtime"
+  short_description: "승인 계약에서 검증 가능한 ADK 런타임을 생성"
+  default_prompt: "Use $af-scaffold-runtime to generate a reviewable ADK Runtime Handoff from approved Agent Factory artifacts."

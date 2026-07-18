@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "review_state": "reviewed",
+  "candidates": [
+    {
+      "id": "agent-document-review",
+      "asset_type": "Agent",
+      "responsibility": "문서 내용을 검토하고 텍스트 추출 필요 여부를 판단한다."
+    },
+    {
+      "id": "tool-ocr-extract",
+      "asset_type": "Tool",
+      "responsibility": "이미지 또는 PDF에서 텍스트를 추출한다.",
+      "binding_evidence": "외부 MCP server",
+      "side_effect": false
+    }
+  ]
+}

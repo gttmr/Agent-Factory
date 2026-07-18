@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Discover Assets"
+  short_description: "요구 증거에서 Agent·Workflow·Tool 후보를 도출"
+  default_prompt: "Use $af-discover-assets to identify evidence-backed Agent Factory asset candidates and unresolved information."

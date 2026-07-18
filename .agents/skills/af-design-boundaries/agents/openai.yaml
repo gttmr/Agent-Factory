@@ -1,4 +1,0 @@
-interface:
-  display_name: "AF Design Boundaries"
-  short_description: "Agent/Workflow/Adapter/Remote A2A 경계를 설계"
-  default_prompt: "Use $af-design-boundaries to review Agent Factory module boundaries and runtime contracts."

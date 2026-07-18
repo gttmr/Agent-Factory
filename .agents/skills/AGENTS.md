@@ -1,76 +1,64 @@
-# Agent Factory DLC Skills
+# Agent Factory Coding-Agent Skills
 
 ## Scope
 
-This tree contains Agent Factory DLC stage skills and shared references. Edit it
-only for explicit skill, DLC workflow, or skill-sync work.
+This tree contains the Agent Factory coding-agent skills and shared references.
+Edit it only for explicit skill, DLC workflow, or skill-sync work.
 
 ## Structure
 
-- `af-analyze-requirement`: raw/imported requirement to schema-first analysis proposals.
-- `af-design-boundaries`: module, Graph IR, runtime contract, Remote A2A, and reuse review.
-- `af-build-runtime-stub`: approved scaffold-plan artifacts to Runtime Handoff bundle.
-- `af-verify-feedback`: validation evidence, runtime-stub checks, and catalog-delta feedback.
-- `_shared`: stage-neutral topic references; not a triggerable skill.
+Entrypoint + four work skills (canonical):
 
-Shared references:
+- `af-workflow`: entrypoint — checks repository/artifact state, routes to the right work skill, prevents stage skipping. Produces no artifacts itself.
+- `af-discover-assets`: requirement → evidence-backed Agent/Workflow/Tool candidates, resources, dependencies, missing information.
+- `af-compose-solution`: reviewed candidates → execution structure (standalone-or-Workflow decision, Graph IR, Invocation Control, Binding, runtime pattern contracts, scaffold readiness).
+- `af-scaffold-runtime`: approved compose output → ADK project / Runtime Handoff bundle. Never consumes raw requirements.
+- `af-verify-runtime`: five-level verification (skill structure, artifact contract, code correctness, runtime smoke, behavior evaluation) with evidence.
 
-- `_shared/workflow-invariants.md`
-- `_shared/artifact-root-stage-runner.md`
-- `_shared/taxonomy-boundaries.md`
-- `_shared/missing-information-gates.md`
-- `_shared/runtime-contracts.md`
-- `_shared/catalog-feedback.md`
-- `_shared/adk-2.3-baseline.md`
-- `_shared/adk-2.3-routes.md`
-- `_shared/adk-2.3-data-handling.md`
-- `_shared/adk-2.3-human-input.md`
-- `_shared/adk-2.3-dynamic.md`
-- `_shared/adk-2.3-remote-a2a.md`
+Legacy compatibility shims (do not extend; removal criteria in `docs/migration/skill-vnext-status.md`):
+
+- `af-analyze-requirement` → `af-discover-assets`
+- `af-design-boundaries` → `af-compose-solution`
+- `af-build-runtime-stub` → `af-scaffold-runtime`
+- `af-verify-feedback` → `af-verify-runtime`
+
+The Workbench Stage Runner now reads the canonical `skillPath`s directly (migrated 2026-07-18); the shims remain only for direct/manual legacy invocations and must still hand off immediately with the stage output contracts intact.
+
+`_shared` is reference material only, never a triggerable skill. Pattern cards live under `_shared/adk/` and are read conditionally via `_shared/runtime-pattern-selection.md`, not all at once.
 
 ## Where To Look
 
 | Task | Location |
 | --- | --- |
-| Stage trigger and step gates | Each stage `SKILL.md` |
-| Stage order and non-goals | `_shared/workflow-invariants.md` |
-| Artifact root, run ledger, proposed files | `_shared/artifact-root-stage-runner.md` |
-| Taxonomy and Remote A2A boundary rules | `_shared/taxonomy-boundaries.md` |
-| Missing-information hard and soft gates | `_shared/missing-information-gates.md` |
-| Runtime contract posture | `_shared/runtime-contracts.md` |
-| Catalog proposal boundary | `_shared/catalog-feedback.md` |
-| ADK baseline and truth order | `_shared/adk-2.3-baseline.md` |
-| Route/join lowering review | `_shared/adk-2.3-routes.md` |
-| State/artifact channel lowering review | `_shared/adk-2.3-data-handling.md` |
-| Human input lowering review | `_shared/adk-2.3-human-input.md` |
-| Dynamic workflow lowering review | `_shared/adk-2.3-dynamic.md` |
-| Remote A2A lowering review | `_shared/adk-2.3-remote-a2a.md` |
-| Analyze-specific output and shapes | `af-analyze-requirement/references/` |
-| Design-specific review rubrics | `af-design-boundaries/references/` |
-| Build-specific sync and runtime checks | `af-build-runtime-stub/references/` |
-| Verify-specific allow-list and reports | `af-verify-feedback/references/` |
+| Which skill to run next | `af-workflow/SKILL.md` |
+| Truth hierarchy and Target/Current/Compatibility/Blocker labels | `_shared/source-of-truth.md` |
+| Stage order, raw→code prohibition, approval invariants | `_shared/lifecycle-invariants.md` |
+| Artifact root, run ledger, proposed-first apply (Current Implementation) | `_shared/artifact-root-and-stage-runner.md` |
+| Asset taxonomy summary (canonical: docs/workbench/taxonomy.md) | `_shared/taxonomy.md` |
+| Graph IR summary (canonical: docs/workbench/graph-ir.md) | `_shared/graph-ir.md` |
+| Target 판단 → current `legacy` serialization | `_shared/compatibility-current-schema.md` |
+| Missing-information hard/soft gates | `_shared/missing-information.md` |
+| Security and synthetic-data rules | `_shared/security-and-data.md` |
+| Catalog proposal and reuse boundary | `_shared/catalog-and-reuse.md` |
+| Evidence → runtime pattern card routing | `_shared/runtime-pattern-selection.md` |
+| Deterministic test vs behavior eval contract | `_shared/testing-contract.md` |
+| ADK pattern cards (MCP, A2A, callbacks, event loop, ambient, human input, state, graph/dynamic) | `_shared/adk/*.md` |
 
 ## Local Rules
 
-- Keep stage order intact: analyze -> design -> build -> verify.
-- Do not let `af-build-runtime-stub` consume raw requirements or unapproved analyzer output.
-- Keep `_shared` references generic and stage-neutral; stage-specific procedure belongs in that stage's `SKILL.md` or `references/`.
-- Stage Runner proposed-first mode is primary; standalone canonical mode is secondary.
-- Stage skills do not toggle `manifest.approvals.*` or stage statuses directly.
-- Remote A2A contracts are canonical in `analysis-result.json.a2aContracts[]`; do not treat split `a2a-contracts.json` as a standard artifact.
-- When a skill changes artifact shape, update schemas, workbench surfaces, validator/generator checks, and active docs in the same change set.
+- Keep stage order intact: discover → compose → scaffold → verify; `af-workflow` routes but never skips gates.
+- `af-scaffold-runtime` must not consume raw requirements or unapproved compose output.
+- Tool Invocation Control uses only Workflow | Agent; `selected_by_llm` and `decision_owner: llm` appear only inside the Compatibility Layer as `legacy` serialization.
+- Writing current canonical/proposed artifacts requires `_shared/compatibility-current-schema.md`; unmappable Target judgments become Blockers in `docs/migration/skill-vnext-status.md`, never invented enums.
+- Skills do not toggle `manifest.approvals.*` or stage statuses, and never write `catalog/*.yaml` directly.
+- Keep `_shared` references generic; skill-specific procedure belongs in that skill's `SKILL.md` or `references/`.
+- Reference files stay version-neutral in name; record Checked date, official source, and installed package version inside the file.
+- Canonical skills never reference the legacy shims; shims contain no independent procedure.
 - Skill output under `artifacts/af/*` is ignored runtime data, not source to commit.
-
-## Anti-Patterns
-
-- Do not treat `_shared` as a fifth user-facing skill.
-- Do not approve Remote A2A without owner, protocol, auth, lifecycle, timeout, retry, fallback, and audit detail.
-- Do not add private endpoints, credentials, customer data, deployment scripts, or production runtime code to examples.
-- Do not teach freehand ADK coding from raw requirements; ADK details here are for generated-output review and Graph IR mapping.
-- Do not write `catalog/*.yaml` from DLC skills; use `catalog-delta.yaml` proposals and the approval-gated publish path.
 
 ## Verification
 
-- For documentation-only skill edits, run `git diff --check`.
-- For contract-affecting skill edits, also run `node scripts/validate-artifacts.mjs`.
-- For workbench-facing behavior changes, run `cd packages/web && npm run build`.
+- Structural validation: `node scripts/validate-skills.mjs`
+- Documentation-only skill edits: `git diff --check`
+- Contract-affecting artifacts: `node scripts/validate-artifacts.mjs`
+- Scenario/trigger testing: see `tests/skills/README.md` (light models, fresh sessions, no answer leakage)

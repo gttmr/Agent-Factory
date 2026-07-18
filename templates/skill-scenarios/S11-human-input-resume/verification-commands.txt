@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const value=JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S11-human-input-resume/context/approved-scaffold-plan.json","utf8"));if(value.raw_requirement_to_code!==false||!value.human_input_contract.interrupt_id)process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S11-human-input-resume/expected-skill.json","utf8"))'
+rg -n 'side_effect_idempotency_key|response_mapping|resume_scope' templates/skill-scenarios/S11-human-input-resume/context/approved-scaffold-plan.json

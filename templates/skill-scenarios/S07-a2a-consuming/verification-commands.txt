@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const fs=require("node:fs");for(const p of ["templates/skill-scenarios/S07-a2a-consuming/context/approved-scaffold-plan.json","templates/skill-scenarios/S07-a2a-consuming/context/remote-agent-card.json","templates/skill-scenarios/S07-a2a-consuming/expected-skill.json"])JSON.parse(fs.readFileSync(p,"utf8"))'
+rg -n '"raw_requirement_to_code": false|"direction": "consuming"' templates/skill-scenarios/S07-a2a-consuming/context/approved-scaffold-plan.json
+rg -n 'http://127[.]0[.]0[.]1:18081' templates/skill-scenarios/S07-a2a-consuming/context/remote-agent-card.json

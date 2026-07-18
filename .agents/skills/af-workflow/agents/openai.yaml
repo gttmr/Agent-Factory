@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Workflow"
+  short_description: "현재 상태를 판단해 올바른 Agent Factory 단계로 연결"
+  default_prompt: "Use $af-workflow to inspect the current Agent Factory state and route the request to the correct work skill."

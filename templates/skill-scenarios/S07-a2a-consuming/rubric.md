@@ -1,0 +1,6 @@
+- approved scaffold plan과 explicit output root를 gate로 확인한다.
+- A2A consuming seam과 local mock server를 분리해 생성한다.
+- Agent Card, task lifecycle, auth와 timeout을 계약에 맞춘다.
+- local sub-agent 대안을 비교하되 조용히 대체하지 않는다.
+- compile과 pattern-specific negative test를 fresh evidence로 남긴다.
+- private/production 값과 범위 밖 파일을 생성하지 않는다.

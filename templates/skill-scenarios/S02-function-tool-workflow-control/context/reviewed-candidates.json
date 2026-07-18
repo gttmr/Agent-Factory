@@ -1,0 +1,16 @@
+{
+  "synthetic": true,
+  "review_state": "reviewed",
+  "candidates": [
+    {
+      "id": "tool-business-day-offset",
+      "asset_type": "Tool",
+      "responsibility": "입력 날짜와 휴일 달력에서 영업일 오프셋을 계산한다.",
+      "input": { "date": "YYYY-MM-DD", "offset": 3 },
+      "output": { "date": "YYYY-MM-DD" },
+      "side_effect": false,
+      "implementation_evidence": "동일 입력에 동일 결과를 내는 in-process 함수"
+    }
+  ],
+  "flow_evidence": "요청 수신, 계산 호출, 결과 반환 순서를 하나의 실행 흐름이 소유한다."
+}

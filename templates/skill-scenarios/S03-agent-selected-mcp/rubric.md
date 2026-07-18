@@ -1,0 +1,6 @@
+- reviewed Agent와 Tool을 Compose 입력으로 사용한다.
+- OCR의 외부 callable boundary와 MCP Binding을 구분한다.
+- 선택적 호출의 판단 주체를 Agent로 둔다.
+- OCR Tool을 main Graph의 필수 고정 단계로 만들지 않는다.
+- 미확정 connection 정보를 질문과 gate로 남긴다.
+- 파일 생성, 코드 생성, approval 변경을 하지 않는다.

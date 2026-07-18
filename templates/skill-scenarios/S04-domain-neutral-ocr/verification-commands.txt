@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S04-domain-neutral-ocr/expected-skill.json","utf8"))'
+rg -n 'Owner: AI공통플랫폼팀' templates/skill-scenarios/S04-domain-neutral-ocr/context/requirements.md
+! rg -n '^[- ]*Domain: 공통$' templates/skill-scenarios/S04-domain-neutral-ocr/context/requirements.md

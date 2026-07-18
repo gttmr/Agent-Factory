@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_root": "${SCENARIO_OUTPUT_ROOT}/runtime",
+  "output_mode": "runnable",
+  "approval": "approved",
+  "ambient_contract": {
+    "source": "pubsub",
+    "entry_mode": "trigger endpoint",
+    "event_id_field": "message.messageId",
+    "session_policy": "one session per delivery",
+    "idempotency_store": "local synthetic ledger",
+    "retry_max": 3,
+    "dead_letter_queue": "external synthetic boundary",
+    "timeout_seconds": 30,
+    "output_sink": "local structured log"
+  }
+}

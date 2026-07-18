@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_root": "${SCENARIO_OUTPUT_ROOT}/runtime",
+  "output_mode": "runnable",
+  "approval": "approved",
+  "callback_contract": {
+    "hook": "before_tool",
+    "scope": "runner-wide guardrail",
+    "continue_case": "approved synthetic operation",
+    "override_case": "blocked synthetic operation",
+    "state_write": "audit:last_guardrail_decision",
+    "side_effect": false,
+    "error_policy": "fail closed"
+  }
+}

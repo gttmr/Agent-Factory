@@ -1,0 +1,6 @@
+- approved Human Input contract와 output boundary를 확인한다.
+- pause, response mapping과 resume correlation을 정확히 연결한다.
+- duplicate response와 at-least-once Tool side effect를 보호한다.
+- invalid, reject, timeout과 abandoned paths를 시험한다.
+- supported API resume와 unsupported UI/CLI를 구분한다.
+- 합성 데이터만 사용하고 approval을 skill이 변경하지 않는다.

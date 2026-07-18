@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const value=JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S09-event-loop-state-commit/context/event-trace.json","utf8"));if(value.events[0].partial!==true||Object.keys(value.events[0].session_state_after_runner).length!==0||value.events[1].partial!==false)process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S09-event-loop-state-commit/expected-skill.json","utf8"))'
+rg -n 'state_delta|session_state_after_runner|resume_observation' templates/skill-scenarios/S09-event-loop-state-commit/context/event-trace.json

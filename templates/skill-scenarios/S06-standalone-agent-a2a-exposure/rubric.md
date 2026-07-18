@@ -1,0 +1,6 @@
+- standalone Agent와 A2A Exposure를 올바르게 구분한다.
+- 독립 owner·deployment lifecycle을 boundary 근거로 사용한다.
+- Agent Card와 task/auth/failure 계약을 검토 가능하게 만든다.
+- Remote A2A라는 별도 자산을 만들지 않는다.
+- 합성 localhost 자료를 production 근거로 과장하지 않는다.
+- 코드·deploy·credential 없이 Compose 범위를 지킨다.

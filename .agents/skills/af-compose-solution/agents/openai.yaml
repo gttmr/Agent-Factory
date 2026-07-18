@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Compose Solution"
+  short_description: "승인 후보를 Graph IR과 실행 계약으로 조합"
+  default_prompt: "Use $af-compose-solution to turn reviewed Agent Factory candidates into a scaffold-ready execution design."

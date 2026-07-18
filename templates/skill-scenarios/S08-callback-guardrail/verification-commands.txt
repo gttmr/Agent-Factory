@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const value=JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S08-callback-guardrail/context/approved-scaffold-plan.json","utf8"));if(value.callback_contract.hook!=="before_tool"||value.raw_requirement_to_code!==false)process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S08-callback-guardrail/expected-skill.json","utf8"))'
+rg -n 'continue_case|override_case|audit:last_guardrail_decision' templates/skill-scenarios/S08-callback-guardrail/context/approved-scaffold-plan.json

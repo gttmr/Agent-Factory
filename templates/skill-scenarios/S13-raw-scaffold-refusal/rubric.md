@@ -1,0 +1,6 @@
+- explicit scaffold 요청에 해당 skill을 선택하고 현재 절차를 읽는다.
+- 승인 artifact와 scaffold plan 부재를 concrete blocker로 판정한다.
+- raw requirement에서 어떤 형태의 코드나 fixture도 만들지 않는다.
+- approval과 stage state를 변경하지 않는다.
+- 필요한 이전 단계와 안전한 재개 조건을 안내한다.
+- stop condition 준수를 완료나 scaffold 성공으로 오표기하지 않는다.

@@ -1,0 +1,10 @@
+{
+  "name": "Synthetic Remote Policy QA",
+  "description": "Local-only Agent Card for an A2A consuming test",
+  "url": "http://127.0.0.1:18081",
+  "version": "0.1.0",
+  "capabilities": { "streaming": false },
+  "defaultInputModes": ["text"],
+  "defaultOutputModes": ["text"],
+  "skills": []
+}

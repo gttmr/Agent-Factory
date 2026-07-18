@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const fs=require("node:fs");const p="templates/skill-scenarios/S01-single-agent/prompt.md";const expected="여신 상담 메모를 읽고 상담 유형(신규/연장/조건변경/기타)을 분류하는 기능이 필요해. Agent Factory 방식으로 어떤 구성요소를 만들어야 하는지 정리해줘. 파일은 만들지 말고 무엇을 만들지 설명만 해줘.";if(fs.readFileSync(p,"utf8").trimEnd()!==expected)process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S01-single-agent/expected-skill.json","utf8"))'
+test -d templates/skill-scenarios/S01-single-agent/context

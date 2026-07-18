@@ -1,0 +1,4 @@
+interface:
+  display_name: "AF Verify Runtime"
+  short_description: "Artifact와 런타임 동작을 계층별 증거로 검증"
+  default_prompt: "Use $af-verify-runtime to verify Agent Factory artifacts and runtime behavior with fresh, layered evidence."

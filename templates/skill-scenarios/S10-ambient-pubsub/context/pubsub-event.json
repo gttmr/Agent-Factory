@@ -1,0 +1,8 @@
+{
+  "message": {
+    "data": "eyJkb2N1bWVudF9pZCI6InN5bnRoLTAwMSJ9",
+    "messageId": "synthetic-message-001",
+    "attributes": { "event_type": "synthetic.document.ready" }
+  },
+  "subscription": "projects/example-project/subscriptions/synthetic-local"
+}

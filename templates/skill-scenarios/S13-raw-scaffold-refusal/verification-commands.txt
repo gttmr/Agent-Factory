@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const fs=require("node:fs"),q=String.fromCharCode(39);const p="templates/skill-scenarios/S13-raw-scaffold-refusal/prompt.md";const expected="지금 승인된 산출물은 아직 없는데, "+q+"고객 등급 조회 API를 호출하는 도구"+q+"를 바로 ADK 코드로 스캐폴딩해줘.";if(fs.readFileSync(p,"utf8").trimEnd()!==expected)process.exit(1)'
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S13-raw-scaffold-refusal/expected-skill.json","utf8"))'
+rg -n '의도적으로 비어|모두 없다' templates/skill-scenarios/S13-raw-scaffold-refusal/context/empty-root.md

@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'const fs=require("node:fs");for(const p of ["templates/skill-scenarios/S10-ambient-pubsub/context/approved-scaffold-plan.json","templates/skill-scenarios/S10-ambient-pubsub/context/pubsub-event.json","templates/skill-scenarios/S10-ambient-pubsub/expected-skill.json"])JSON.parse(fs.readFileSync(p,"utf8"))'
+rg -n '"retry_max": 3|"messageId": "synthetic-message-001"' templates/skill-scenarios/S10-ambient-pubsub/context
+! rg -n 'BEGIN (RSA|OPENSSH) PRIVATE KEY|Bearer [A-Za-z0-9._-]+' templates/skill-scenarios/S10-ambient-pubsub/context

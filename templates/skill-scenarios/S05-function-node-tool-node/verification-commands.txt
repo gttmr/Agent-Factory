@@ -1,0 +1,4 @@
+node scripts/validate-skills.mjs
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S05-function-node-tool-node/expected-skill.json","utf8"))'
+rg -n 'reviewed Tool|deterministic transform' templates/skill-scenarios/S05-function-node-tool-node/context/reviewed-candidates.md
+test -d templates/skill-scenarios/S05-function-node-tool-node/context

@@ -1,0 +1,21 @@
+{
+  "synthetic": true,
+  "candidate": {
+    "id": "agent-policy-qa",
+    "asset_type": "Agent",
+    "review_state": "approved-for-compose",
+    "owner": "Policy Automation Team",
+    "responsibility": "합성 규정 문서에서 질문에 답한다.",
+    "deployment_boundary": "독립 배포와 버전 수명주기"
+  },
+  "agent_card_example": {
+    "name": "Synthetic Policy QA",
+    "description": "Synthetic card for local contract review",
+    "url": "http://127.0.0.1:18080",
+    "version": "0.1.0",
+    "capabilities": { "streaming": false },
+    "defaultInputModes": ["text"],
+    "defaultOutputModes": ["text"],
+    "skills": []
+  }
+}
