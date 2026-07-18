@@ -11,6 +11,7 @@ import "./adk-source-test/node-collector.test.mjs";
 import "./adk-source-test/output-byte-identity.test.mjs";
 import "./adk-source-test/reused-chat-projection.test.mjs";
 import "./adk-source-test/route-choices.test.mjs";
+import "./adk-source-test/route-convergence.test.mjs";
 import "./adk-source-test/toolsets.test.mjs";
 import "./adk-source-test/workflow-call.test.mjs";
 import "./adk-source-test/dynamic-loop-lowering.test.mjs";

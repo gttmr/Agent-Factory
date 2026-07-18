@@ -1,32 +1,35 @@
-import { routeCasesFor } from "../graph/routes.mjs";
+import { mergedRouteCasesFor } from "../graph/routes.mjs";
 import { graphIndexes } from "../graph/indexes.mjs";
 import { pyGraphNodeName, routeFuncName, syntheticNodeSymbol } from "../naming.mjs";
 import { toPyStr } from "../python-literals.mjs";
 
 export function emitRouteFunc(node, context) {
-  const routeCases = routeCasesFor(context.processFlow, node.id);
-  if (routeCases.length === 0) {
+  const routeGroups = mergedRouteCasesFor(context.processFlow, node.id);
+  if (routeGroups.length === 0) {
     throw new Error(`router node ${node.id} has no route edges.`);
   }
   const graph = graphIndexes(context.graphContext ?? context);
-  const checks = routeCases
-    .map(({ value, aliases, stateKey, to }) => {
-      const aliasLiteral = `[${aliases.map((alias) => toPyStr(alias)).join(", ")}]`;
-      const outputValue = routeOutputValue({ graph, nodeInput: "node_input", stateKey, to });
-      const remoteA2aGuard = !stateKey && isRemoteA2aRouteCase({ graph, to });
-      const textMatch = remoteA2aGuard
-        ? `_route_text_matches(text, ${aliasLiteral}) and not _route_control_syntax_in_current_user_text(ctx)`
-        : `_route_text_matches(text, ${aliasLiteral})`;
-      if (stateKey) {
-        return `    ${stateTextVar(value)} = _route_state_text(ctx, ${toPyStr(stateKey)})
+  const checks = routeGroups
+    .flatMap((routeGroup) =>
+      routeGroup.cases.map(({ value, aliases, stateKey, to }) => {
+        const aliasLiteral = `[${aliases.map((alias) => toPyStr(alias)).join(", ")}]`;
+        const outputValue = routeOutputValue({ graph, nodeInput: "node_input", stateKey, to });
+        const remoteA2aGuard = !stateKey && isRemoteA2aRouteCase({ graph, to });
+        const textMatch = remoteA2aGuard
+          ? `_route_text_matches(text, ${aliasLiteral}) and not _route_control_syntax_in_current_user_text(ctx)`
+          : `_route_text_matches(text, ${aliasLiteral})`;
+        if (stateKey) {
+          return `    ${stateTextVar(value)} = _route_state_text(ctx, ${toPyStr(stateKey)})
     if _route_state_matches(${stateTextVar(value)}, ${aliasLiteral}):
-        return Event(route=${toPyStr(value)}, output=_json_safe_node_value(${outputValue}))`;
-      }
-      return `    if ${textMatch}:
-        return Event(route=${toPyStr(value)}, output=_json_safe_node_value(${outputValue}))`;
-    })
+        return Event(route=${toPyStr(routeGroup.value)}, output=_json_safe_node_value(${outputValue}))`;
+        }
+        return `    if ${textMatch}:
+        return Event(route=${toPyStr(routeGroup.value)}, output=_json_safe_node_value(${outputValue}))`;
+      })
+    )
     .join("\n");
-  const fallback = routeCases.find((route) => route.isDefault) ?? routeCases[0];
+  const fallbackGroup = routeGroups.find((routeGroup) => routeGroup.isDefault) ?? routeGroups[0];
+  const fallback = fallbackGroup.cases.find((routeCase) => routeCase.isDefault) ?? fallbackGroup.cases[0];
   const fallbackOutput = routeOutputValue({ graph, nodeInput: "node_input", stateKey: fallback.stateKey, to: fallback.to });
   return `def _route_decision_text(node_input):
     for key in ("route_decision", "route_type", "action", "route", "decision", "choice", "value", "response"):
@@ -155,7 +158,7 @@ def _route_control_syntax_in_current_user_text(ctx: Context) -> bool:
 def ${routeFuncName(node)}(ctx: Context, node_input=None):
     text = _route_decision_text(node_input)
 ${checks}
-    return Event(route=${toPyStr(fallback.value)}, output=_json_safe_node_value(${fallbackOutput}))`;
+    return Event(route=${toPyStr(fallbackGroup.value)}, output=_json_safe_node_value(${fallbackOutput}))`;
 }
 
 export function emitRouterNodeDecl(node) {

@@ -23,6 +23,43 @@ export function routeCasesFor(processFlow, nodeId) {
   return routes;
 }
 
+export function mergedRouteCasesFor(processFlow, nodeId) {
+  return mergeRouteCasesByTarget(routeCasesFor(processFlow, nodeId), (routeCase) => routeCase.to);
+}
+
+export function mergeRouteCasesByTarget(routeCases, targetFor = (routeCase) => routeCase.target) {
+  const groups = [];
+  const groupsByTarget = new Map();
+  for (const routeCase of Array.isArray(routeCases) ? routeCases : []) {
+    const target = targetFor(routeCase);
+    let group = groupsByTarget.get(target);
+    if (!group) {
+      group = { target, cases: [] };
+      groupsByTarget.set(target, group);
+      groups.push(group);
+    }
+    group.cases.push(routeCase);
+  }
+  return groups.map(({ target, cases }) => {
+    const first = cases[0];
+    const values = [...new Set(cases.map((routeCase) => routeCase.value))].sort();
+    return {
+      ...first,
+      value: canonicalMergedRouteKey(values),
+      aliases: [...new Set(cases.flatMap((routeCase) => routeCase.aliases ?? []))],
+      isDefault: cases.some((routeCase) => routeCase.isDefault === true),
+      target,
+      cases
+    };
+  });
+}
+
+function canonicalMergedRouteKey(values) {
+  // routeValue excludes "|", so sorted joining is deterministic and cannot
+  // collide with a single reviewed route value.
+  return values.join("|");
+}
+
 export function routeValue(edge) {
   const condition = typeof edge?.route_condition === "string" ? edge.route_condition.trim() : "";
   const match = /(?:choice|route|decision)\s*==\s*["']?([A-Za-z0-9_-]+)["']?/i.exec(condition);

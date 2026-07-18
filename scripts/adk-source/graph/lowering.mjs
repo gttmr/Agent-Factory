@@ -2,6 +2,7 @@ import { validateAndLowerEdge } from "../dispatch/index.mjs";
 import { nodeSymbol, pyGraphNodeName, syntheticNodeSymbol } from "../naming.mjs";
 import { toPyStr } from "../python-literals.mjs";
 import { collectGenerationNodes } from "./collector.mjs";
+import { mergeRouteCasesByTarget } from "./routes.mjs";
 
 export function buildRunnableGraph(context, options = {}) {
   const collection = options.collection ?? collectGenerationNodes(context, { mode: "static" });
@@ -45,7 +46,7 @@ export function buildRunnableGraph(context, options = {}) {
     if (record.kind === "route") {
       if (from && to) {
         if (!routeEdgesBySource.has(from)) routeEdgesBySource.set(from, []);
-        routeEdgesBySource.get(from).push({ value: record.value, target: to });
+        routeEdgesBySource.get(from).push({ value: record.value, target: to, isDefault: record.isDefault });
       }
       add(from, to, record);
       continue;
@@ -93,7 +94,11 @@ export function buildRunnableGraph(context, options = {}) {
       seenRouteValues.add(route.value);
       uniqueRoutes.push(route);
     }
-    finalEdges.push({ kind: "route", from, routes: uniqueRoutes });
+    finalEdges.push({
+      kind: "route",
+      from,
+      routes: mergeRouteCasesByTarget(uniqueRoutes, (route) => route.target)
+    });
   }
 
   if (finalEdges.length === 0) {
@@ -143,7 +148,8 @@ export function workflowEdgeLiteral(edgeSpecs) {
   if (!Array.isArray(edgeSpecs) || edgeSpecs.length === 0) return "[]";
   const rows = edgeSpecs.map((spec) => {
     if (spec.kind === "route") {
-      const routeRows = spec.routes.map((route) => `            ${toPyStr(route.value)}: ${route.target},`).join("\n");
+      const routes = mergeRouteCasesByTarget(spec.routes, (route) => route.target);
+      const routeRows = routes.map((route) => `            ${toPyStr(route.value)}: ${route.target},`).join("\n");
       return `        (${spec.from}, {\n${routeRows}\n        }),`;
     }
     return `        (${spec.from}, ${spec.to}),`;

@@ -55,8 +55,8 @@ const SERVER_PRIMITIVE_CODEX_INSTRUCTION = "This stage is handled by server-side
 
 const STAGE_DEFINITIONS = {
   analyze: {
-    skillName: "af-analyze-requirement",
-    skillPath: ".agents/skills/af-analyze-requirement/SKILL.md",
+    skillName: "af-discover-assets",
+    skillPath: ".agents/skills/af-discover-assets/SKILL.md",
     runnerKind: "codex",
     proposedArtifactFiles: ["analysis-result.json"],
     diffAvailable: true,
@@ -68,8 +68,8 @@ const STAGE_DEFINITIONS = {
     codexOutputInstruction: "Write the proposed analysis artifact to proposed-artifacts/analysis-result.json only. Do not edit canonical artifacts."
   },
   design: {
-    skillName: "af-design-boundaries",
-    skillPath: ".agents/skills/af-design-boundaries/SKILL.md",
+    skillName: "af-compose-solution",
+    skillPath: ".agents/skills/af-compose-solution/SKILL.md",
     runnerKind: "codex",
     proposedArtifactFiles: ["analysis-result.json", "boundary-design.md"],
     diffAvailable: true,
@@ -82,8 +82,8 @@ const STAGE_DEFINITIONS = {
       "Write proposed-artifacts/analysis-result.json and proposed-artifacts/boundary-design.md only. Do not edit canonical artifacts or approval gates."
   },
   build: {
-    skillName: "runtime-stub/build",
-    skillPath: "scripts/generate-adk-source.mjs",
+    skillName: "af-scaffold-runtime",
+    skillPath: ".agents/skills/af-scaffold-runtime/SKILL.md",
     runnerKind: "runtime_stub",
     proposedArtifactFiles: [],
     diffAvailable: false,
@@ -95,8 +95,8 @@ const STAGE_DEFINITIONS = {
     codexOutputInstruction: SERVER_PRIMITIVE_CODEX_INSTRUCTION
   },
   verify: {
-    skillName: "verify/run",
-    skillPath: "packages/web/server/afVerifyRunApi.ts",
+    skillName: "af-verify-runtime",
+    skillPath: ".agents/skills/af-verify-runtime/SKILL.md",
     runnerKind: "verify",
     proposedArtifactFiles: ["validation-report.md", "catalog-delta.yaml"],
     diffAvailable: true,
@@ -339,6 +339,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
   let codexMetadata = createInitialCodexMetadata(definition, body);
   let outputArtifacts: string[] = [];
   let validationErrors: string[] = [];
+  let diffSummary: StageRunDiffSummary = { files: [] };
   try {
     assertNotCanceled(input.signal);
     if (definition.requiresDesignReady) {
@@ -397,6 +398,9 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
         assertNever(definition);
     }
     assertNotCanceled(input.signal);
+    if (definition.diffAvailable) {
+      diffSummary = await buildDiffSummary(input.store, input.reqId, stage, runId);
+    }
     await emit({
       phase: "proposed",
       message: definition.proposedMessage,
@@ -424,10 +428,6 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     });
   }
 
-  let diffSummary: StageRunDiffSummary = { files: [] };
-  if (status === "completed" && definition.diffAvailable) {
-    diffSummary = await buildDiffSummary(input.store, input.reqId, stage, runId);
-  }
   if (status === "completed") {
     const artifactValidationErrors = diffSummary.files.flatMap((file) => file.validation_errors);
     validationErrors = [...validationErrors, ...artifactValidationErrors];
@@ -882,7 +882,7 @@ async function runFakeStage(input: {
     [
       `# ${input.reqId} boundary design proposal`,
       "",
-      "`af-design-boundaries` fake runner output.",
+      "`af-compose-solution` fake runner output.",
       "",
       "- Module candidates with candidate-level missing_information are proposed as resolved.",
       "- approval gate values are intentionally unchanged.",
@@ -1274,10 +1274,17 @@ async function buildDiffSummary(
   const proposedDir = join(runDir, "proposed-artifacts");
   const definition = STAGE_DEFINITIONS[stage];
   const files: StageRunArtifactDiff[] = [];
+  const missingFiles: string[] = [];
   for (const file of definition.proposedArtifactFiles) {
     const proposedPath = join(proposedDir, file);
     const proposedStat = await stat(proposedPath).catch(() => null);
-    if (!proposedStat?.isFile()) continue;
+    if (!proposedStat?.isFile()) missingFiles.push(file);
+  }
+  if (missingFiles.length) {
+    throw new ArtifactValidationError(422, `필수 proposed artifact가 누락되었습니다: ${missingFiles.join(", ")}`);
+  }
+  for (const file of definition.proposedArtifactFiles) {
+    const proposedPath = join(proposedDir, file);
     const content = await readFile(proposedPath, "utf8");
     const base = await store.readArtifact(reqId, file).catch((error) => {
       if (error instanceof ArtifactValidationError && error.statusCode === 404) return null;
@@ -1297,9 +1304,6 @@ async function buildDiffSummary(
       after_summary: summarizeArtifact(file, content),
       bytes: Buffer.byteLength(content, "utf8")
     });
-  }
-  if (!files.length && definition.diffAvailable) {
-    throw new ArtifactValidationError(422, "proposed artifact 가 생성되지 않았습니다.");
   }
   return { files };
 }

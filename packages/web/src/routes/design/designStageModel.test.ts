@@ -96,7 +96,7 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
         status: "running",
         started_at: "2026-07-09T12:00:00.000Z",
         finished_at: null,
-        skill_name: "verify/run",
+        skill_name: "af-verify-runtime",
         model: "gpt-5.5",
         output_artifacts: [],
         last_error: null
@@ -128,6 +128,7 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
 
   // Then: the canonical Stage Runner request carries the selected allow-list command.
   assert.equal(config.stage, "verify");
+  assert.equal(config.skillName, "af-verify-runtime");
   assert.equal(body.model, "gpt-5.5");
   assert.equal(body.verifyCommand, "test_analyzer");
 }
@@ -150,6 +151,7 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
 
   // Then: shared config covers the primitive request without hiding Build's call-site applyMode.
   assert.equal(config.stage, "build");
+  assert.equal(config.skillName, "af-scaffold-runtime");
   assert.equal(config.disabledReason, "scaffold-plan.json 이 생성 가능 상태여야 build stage를 실행할 수 있습니다.");
   assert.equal(body.model, "gpt-5.4");
 }

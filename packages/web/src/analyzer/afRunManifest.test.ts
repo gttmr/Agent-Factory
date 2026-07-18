@@ -28,7 +28,7 @@ const manifest = parseAfRunManifest(
         status: "completed",
         started_at: "2026-05-27T13:00:00.000Z",
         finished_at: "2026-05-27T13:02:00.000Z",
-        skill_name: "af-analyze-requirement",
+        skill_name: "af-discover-assets",
         model: "gpt-5.5",
         output_artifacts: [
           "runs/analyze/20260527T130000Z-analyze-a1b2c3/proposed-artifacts/analysis-result.json"
@@ -75,8 +75,14 @@ assert.equal(summary.validationStatusLabel, "실패");
 const serialized = serializeAfRunManifest(manifest);
 assert.ok(serialized.endsWith("\n"));
 assert.equal(JSON.parse(serialized).requirement_id, "req-001");
-assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-analyze-requirement");
+assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-discover-assets");
 assert.equal(JSON.parse(serialized).stage_runs.analyze.codex.usage, undefined);
+
+const historicalManifestValue = JSON.parse(serialized);
+historicalManifestValue.stage_runs.analyze.skill_name = "historical-custom-skill";
+const historicalManifest = parseAfRunManifest(JSON.stringify(historicalManifestValue), "historical-af-run-manifest.json");
+assert.equal(historicalManifest.stage_runs?.analyze?.skill_name, "historical-custom-skill");
+assert.equal(JSON.parse(serializeAfRunManifest(historicalManifest)).stage_runs.analyze.skill_name, "historical-custom-skill");
 
 assert.throws(() => parseAfRunManifest("[]", "bad.json"), /object/);
 assert.throws(() => parseAfRunManifest(JSON.stringify({ requirement_id: "" }), "bad.json"), /requirement_id/);

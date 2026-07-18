@@ -51,6 +51,7 @@ const analyzeRun = await runStageSkill({
 
 assert.equal(analyzeRun.stage, "analyze");
 assert.equal(analyzeRun.status, "completed");
+assert.equal(analyzeRun.skill_name, "af-discover-assets");
 assert.match(analyzeRun.run_id, /^\d{8}T\d{6}Z-analyze-[a-f0-9]{6}$/);
 assert.deepEqual(analyzeRun.output_artifacts, [
   `runs/analyze/${analyzeRun.run_id}/proposed-artifacts/analysis-result.json`
@@ -109,6 +110,7 @@ const designRun = await runStageSkill({
   }
 });
 assert.equal(designRun.stage, "design");
+assert.equal(designRun.skill_name, "af-compose-solution");
 assert.deepEqual(designRun.output_artifacts, [
   `runs/design/${designRun.run_id}/proposed-artifacts/analysis-result.json`,
   `runs/design/${designRun.run_id}/proposed-artifacts/boundary-design.md`
@@ -118,12 +120,56 @@ const boundaryDesign = await readFile(
   join(repoRoot, `artifacts/af/req-001/runs/design/${designRun.run_id}/proposed-artifacts/boundary-design.md`),
   "utf8"
 );
-assert.match(boundaryDesign, /af-design-boundaries/);
+assert.match(boundaryDesign, /af-compose-solution/);
 
 const manifestAfterDesignRun = await store.readManifest("req-001");
 assert.equal(manifestAfterDesignRun.manifest.approvals.boundaries_approved, false);
 assert.equal(manifestAfterDesignRun.manifest.approvals.runtime_contracts_approved, false);
 assert.equal(manifestAfterDesignRun.manifest.stage_runs?.design?.latest_run_id, designRun.run_id);
+
+await store.createRoot("req-partial-design");
+await store.writeArtifact("req-partial-design", "analysis-result.json", `${JSON.stringify(fixture, null, 2)}\n`, null);
+const partialDesignManifest = await store.readManifest("req-partial-design");
+await store.writeManifest(
+  "req-partial-design",
+  {
+    ...partialDesignManifest.manifest,
+    approvals: {
+      ...partialDesignManifest.manifest.approvals,
+      analysis_reviewed: true
+    }
+  },
+  partialDesignManifest.etag
+);
+const partialDesignRunner: CodexStageRunner = {
+  async run(input) {
+    assert.equal(input.stage, "design");
+    await writeFile(join(input.proposedDir, "analysis-result.json"), `${JSON.stringify(fixture, null, 2)}\n`, "utf8");
+    return {
+      backend: "sdk",
+      thread_id: "thread-partial-design",
+      event_count: 0
+    };
+  }
+};
+const partialDesignRun = await runStageSkill({
+  repoRoot,
+  store,
+  reqId: "req-partial-design",
+  stage: "design",
+  body: { model: "gpt-5.5" },
+  codexRunner: partialDesignRunner
+});
+assert.equal(partialDesignRun.status, "failed");
+assert.match(partialDesignRun.last_error ?? "", /필수 proposed artifact가 누락되었습니다: boundary-design\.md/);
+const partialDesignDetail = await readStageRunDetail({
+  store,
+  reqId: "req-partial-design",
+  stage: "design",
+  runId: partialDesignRun.run_id
+});
+assert.deepEqual(partialDesignDetail.diff_summary.files, []);
+assert.match(partialDesignDetail.diagnostics ?? "", /필수 proposed artifact가 누락되었습니다: boundary-design\.md/);
 
 await store.createRoot("req-sdk");
 await store.writeArtifact("req-sdk", "analysis-result.json", `${JSON.stringify(fixture, null, 2)}\n`, null);
@@ -289,6 +335,7 @@ const buildRun = await runStageSkill({
 });
 assert.equal(buildRun.stage, "build");
 assert.equal(buildRun.status, "completed");
+assert.equal(buildRun.skill_name, "af-scaffold-runtime");
 assert.match(buildRun.run_id, /^\d{8}T\d{6}Z-build-[a-f0-9]{6}$/);
 assert.deepEqual(buildRun.output_artifacts, ["runtime-stub/req_001_adk/agent.py"]);
 const buildDetail = await readStageRunDetail({ store, reqId: "req-001", stage: "build", runId: buildRun.run_id });
@@ -305,6 +352,7 @@ const verifyRun = await runStageSkill({
 });
 assert.equal(verifyRun.stage, "verify");
 assert.equal(verifyRun.status, "completed");
+assert.equal(verifyRun.skill_name, "af-verify-runtime");
 assert.equal(verifyRun.validation.ok, false);
 assert.deepEqual(verifyRun.validation.errors, ["verify command failed with exit code 1"]);
 assert.deepEqual(verifyRun.output_artifacts, [

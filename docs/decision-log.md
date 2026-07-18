@@ -10,6 +10,30 @@
 
 ---
 
+## 2026-07-18 · PR pending — Stage Runner canonical skill ID 이행과 필수 proposal 완전성 강제
+
+- **결정**: Stage Runner `STAGE_DEFINITIONS`의 `skillName`·`skillPath`, UI 라벨, fake output, 테스트 fixture를 canonical vNext skill(`af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime`)로 이행한다. diff-capable stage는 등록된 필수 proposed artifact가 하나라도 누락되면 run을 `failed`로 처리하고 누락 목록 진단과 `diagnostics.md`를 남긴다.
+- **배경**: Skills vNext 원장 Blocker 2·3. Stage Runner가 legacy shim 경로를 읽는 간접 hop이 남아 있었고, Design의 2-파일 계약(`analysis-result.json` + `boundary-design.md`)이 하나만 있어도 통과하는 약한 강제였다(구 `stageRunner.ts:1301-1303`).
+- **영향**: Analyze·Design은 canonical SKILL.md를 직접 읽는다. legacy shim 4개는 direct/manual 호출 호환 전용으로 남고 제거는 skill-vnext-status §8 기준으로 별도 판정한다. 기존 manifest의 구 `skill_name` 이력은 자유형 문자열로 하위 호환된다(왕복 회귀 포함). Analyze 1-파일 행동은 불변, artifact schema·approval 계약 무변경.
+
+## 2026-07-18 · PR pending — router 복수 분기 동일-대상 수렴의 dispatch 병합 lowering
+
+- **결정**: 한 router의 복수 reviewed route value·alias가 같은 resolved runtime target으로 수렴하면 generator lowering이 route value를 정렬해 만든 단일 deterministic canonical key 아래 dispatch entry 하나만 방출한다. Generated router는 각 reviewed value·alias와 default fallback을 그 canonical key로 매핑하고, 기존 `Event.output` payload 전달은 유지한다.
+- **배경**: Skills vNext Level 4 runtime smoke가 vacation-approval Runtime Handoff import 실패를 발견했다. `edge-013`과 `edge-014`가 같은 downstream으로 수렴할 때 기존 route map은 동일 `(from,to)` pair를 두 번 만들었고, 설치된 ADK 2.3.0 `Workflow._validate_duplicate_edges`가 route key를 무시한 채 해당 pair를 중복으로 거부했다.
+- **영향**: Static/runnable ADK `Workflow(edges=...)`의 route-convergence lowering과 router event key가 병합되며 synthetic regression scenario와 generated-bundle 구조 테스트를 추가한다. 비수렴 smoke/static/dynamic bundle은 SHA-256 byte identity를 유지하고, artifact·schema·validator 계약과 승인 gate는 변경하지 않는다.
+
+## 2026-07-18 · PR pending — Skills vNext: 사용자 작업 관점 5-스킬 체계와 legacy shim
+
+- **결정**: Agent Factory coding-agent skill을 read-only lifecycle entrypoint `af-workflow`와 네 Work Skill `af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime`으로 재편한다. 새 skill은 Target Contract로 판단하고 current artifact에는 Compatibility Layer를 적용한다. 구 ID 4개는 전략 B의 제한된 legacy shim으로 유지하고, `_shared`는 version-neutral 20파일로 승계·통합·신규 재편한다. 검증 체계는 `scripts/validate-skills.mjs`, S01-S16 scenario suite, trigger matrix를 기준으로 한다.
+- **배경**: 구 4단계 Stage 이름과 skill 책임이 결합돼 있었고 legacy Adapter 분류가 분석 절차에 스며들어 복잡 runtime pattern의 선택·중단 기준이 부족했다. baseline S01에서 단일 Agent 요구에 실행 제어 근거 없는 Workflow를 추가하는 과잉 생성이 재현됐다.
+- **영향**: Product Code는 변경하지 않는다. Stage Runner Analyze·Design은 exact legacy path의 shim을 거쳐 canonical skill을 읽으므로 현행 실행을 유지하고, Build·Verify는 기존 server primitive가 실행 주체다. 이는 Full Integration이 아니며 Product schema·Stage Runner·UI·검증 gate의 blocker는 [Skills vNext Migration Status](migration/skill-vnext-status.md)에 기록한다.
+
+## 2026-07-18 · PR pending — 문서 vNext: Agent/Workflow/Tool 택소노미와 Handbook 도입
+
+- **결정**: 최상위 자산을 Agent, Workflow, Tool 세 종류로 단순화하고 Adapter와 Remote A2A를 Target 최상위 유형에서 제거한다. Tool Invocation Control의 표시명은 Workflow와 Agent로 고정해 Model·LLM 표현을 제거한다. Catalog Taxonomy와 Graph IR을 별도 계층으로 분리하고 Domain Scope, Owner, Reuse를 각각 독립 축으로 둔다. 저장소 행동을 현재 source locator와 연결하는 source-backed Handbook을 `docs/handbook/`에 도입하며, 구 문서는 `docs/archive/taxonomy-vnext-2026-07/pre-rewrite/` snapshot과 호환 pointer로 보존한다.
+- **배경**: 자산, 실행 구조, 연결 방식, 업무 맥락, 재사용 상태처럼 서로 다른 분류 축이 하나의 enum에 섞여 검토와 재사용 판단을 왜곡했다. 2026-07-18에 확인한 Google ADK 공식 문서의 Agent·Workflow·Graph·Tool·MCP·A2A 개념과 Harness Handbook 논문의 behavior-guided progressive disclosure, Register, source-backed locator 원칙을 반영했다.
+- **영향**: 문서 전용 개편이며 코드, 스키마, Catalog, DLC skills, script는 변경하지 않는다. 코드 migration은 별도 후속 단계이고 Target Contract와 Current Implementation의 gap은 `docs/migration/taxonomy-vnext-status.md`가 기록한다.
+
 ## 2026-07-17 · PR TBD — node/edge kind dispatch and generation collection have single owners
 
 - **결정**: ADK source generation의 17개 `node_kind`와 10개 `edge_kind`를 각각 한 registry row가 소유한다. Node handler는 mode별 capability, collection role, runtime endpoint/name, collision target, emission을 제공하고, edge handler는 mode별 capability, required metadata, endpoint legality, lowering, consumption ID를 제공한다. Smoke/static/dynamic assembler는 kind-agnostic mode 정책만 소유하며 공통 collector가 declaration-order bucket, toolset exclusion, feature flags, collision target, coverage를 한 번 계산한다.

@@ -112,7 +112,7 @@ const stageRunStatusTones: Record<AfStageRunStatus, StageRunnerMetricTone> = {
 export function buildAnalyzeStageRunnerConfig(input: AnalyzeStageRunnerConfigInput): StageRunnerScreenConfig {
   return {
     stage: "analyze",
-    skillName: "af-analyze-requirement",
+    skillName: "af-discover-assets",
     title: "Analyze Skill Runner",
     description: input.hasAnalysis
       ? "분석 결과가 있을 때 이 단계는 입력 보강, 재분석, JSON import 를 위한 refresh path 입니다. 검토 근거와 approval path 는 ‘2. 검토’ 이후에서 확인합니다."
@@ -142,7 +142,7 @@ export function buildAnalyzeStageRunnerConfig(input: AnalyzeStageRunnerConfigInp
 export function buildDesignStageRunnerConfig(input: DesignStageRunnerConfigInput): StageRunnerScreenConfig {
   return {
     stage: "design",
-    skillName: "af-design-boundaries",
+    skillName: "af-compose-solution",
     title: "Design Skill Runner",
     description:
       "reviewed analysis-result.json 을 기준으로 모듈 경계, Graph IR, Runtime 계약, A2A 계약 변경 제안을 생성합니다. 성공한 run 도 approval gate 를 자동으로 켜지 않습니다.",
@@ -178,7 +178,7 @@ export function buildDesignStageRunnerConfig(input: DesignStageRunnerConfigInput
 export function buildBuildStageRunnerConfig(input: BuildStageRunnerConfigInput): StageRunnerScreenConfig {
   return {
     stage: "build",
-    skillName: "runtime-stub/build",
+    skillName: "af-scaffold-runtime",
     title: "Build Stage Runner",
     description: "기존 runtime-stub 생성 primitive를 실행하고 run 이력에 기록합니다. canonical runtime-stub side effect는 기존 Build API와 동일합니다.",
     metrics: [
@@ -217,7 +217,7 @@ function buildBuildStageDisabledReason(input: BuildStageReadinessInput): string 
 export function buildVerifyStageRunnerConfig(input: VerifyStageRunnerConfigInput): StageRunnerScreenConfig {
   return {
     stage: "verify",
-    skillName: "verify/run",
+    skillName: "af-verify-runtime",
     title: "Verify Stage Runner",
     description: "allow-list 검증 명령을 실행하고 validation-report.md와 catalog-delta.yaml 제안 템플릿을 run 이력에 남깁니다.",
     metrics: [
