@@ -5,6 +5,8 @@
 `schemas` contains JSON Schema contracts for Agent Factory artifacts. These are
 source-of-truth contracts for validator, analyzer, templates, and workbench UI.
 
+Schema enums are Current Implementation (`legacy`) contracts; Target assets are defined by [Taxonomy](../docs/workbench/taxonomy.md), Target node meanings by [Graph IR](../docs/workbench/graph-ir.md), and the gap is tracked in `docs/migration/taxonomy-vnext-status.md`.
+
 ## Structure
 
 - `analysis-result.schema.json`: canonical combined analysis artifact.
@@ -18,7 +20,7 @@ source-of-truth contracts for validator, analyzer, templates, and workbench UI.
 
 ## Local Rules
 
-- Keep schema enums aligned with `packages/web/src/analyzer/types.ts`, `classificationRules.ts`, UI badges, templates, validator constants, and source generator assumptions. `scripts/validate-artifacts.test.mjs` machine-enforces analyzer/schema/validator enum alignment.
+- Keep the Current Implementation (`legacy`) schema enums aligned with `packages/web/src/analyzer/types.ts`, `classificationRules.ts`, UI badges, templates, validator constants, and source generator assumptions. `scripts/validate-artifacts.test.mjs` machine-enforces analyzer/schema/validator enum alignment.
 - Tighten contracts only with matching migration/normalization and regression fixture updates.
 - `analysis-draft` can differ from final `analysis-result`, but server hydration must bridge them explicitly.
 - Preserve `raw_requirement_to_code=false` and approved-artifact posture in scaffold-plan contracts.

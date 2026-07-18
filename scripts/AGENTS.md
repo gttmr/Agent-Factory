@@ -5,6 +5,8 @@
 `scripts` contains dependency-light root validators and source generators used by
 Agent Factory artifacts and web package tests.
 
+Validator and generator enums are Current Implementation (`legacy`) contracts; Target assets and Graph meanings are canonical in [Taxonomy](../docs/workbench/taxonomy.md) and [Graph IR](../docs/workbench/graph-ir.md), with gaps tracked in `docs/migration/taxonomy-vnext-status.md`.
+
 ## Files
 
 - `validate-artifacts.mjs`: validates templates, exported artifact roots, taxonomy, Graph IR, Remote A2A, runtime contract, and scaffold guards.
@@ -17,7 +19,7 @@ Agent Factory artifacts and web package tests.
 - Keep scripts runnable from repo root without importing web package build output.
 - Generator input must be an approved scaffold plan with `source: approved_workbench_artifact` and `raw_requirement_to_code: false`.
 - Generator defaults must be framework/runtime-neutral; scenario labels, route aliases, adapter hints, and business terms belong in reviewed artifacts or catalog/mock specs.
-- Validator constants duplicated from web analyzer types must be updated together with schemas, templates, docs, and tests; the enum alignment test must stay green.
+- Current Implementation (`legacy`) validator constants duplicated from web analyzer types must be updated together with schemas, templates, docs, and tests; the enum alignment test must stay green.
 - Generated output belongs under ignored artifact/runtime directories, not source.
 
 ## Anti-Patterns

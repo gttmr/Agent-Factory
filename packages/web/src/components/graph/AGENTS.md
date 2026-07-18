@@ -6,6 +6,8 @@ This directory renders Graph IR inside `GraphCanvas`. It owns layout, node
 appearance, edge appearance, container overlays, and validation banners. Pure
 Graph IR helpers live outside this tree under `src/graph`.
 
+Target node, edge, and asset-reference meanings are canonical in [Graph IR](../../../../../docs/workbench/graph-ir.md) and [Taxonomy](../../../../../docs/workbench/taxonomy.md); renderer identifiers that retain Adapter or Remote A2A categories are Current Implementation (`legacy`).
+
 ## Where To Look
 
 | Task | Files |
@@ -18,11 +20,11 @@ Graph IR helpers live outside this tree under `src/graph`.
 
 ## Local Rules
 
-- Graph meaning comes from active `docs/workbench/process-flow.md` and analyzer/schema contracts, not renderer convenience.
+- Graph meaning comes from canonical `docs/workbench/graph-ir.md` and the Current Implementation analyzer/schema contracts, not renderer convenience; `process-flow.md` is a compatibility pointer.
 - Edit mode must preserve finite `node.position` values and avoid moving unrelated saved nodes.
 - Container overlays are visual regions only; they must not rewrite graph membership.
 - New marker semantics require docs, validator/analyzer, rendering, CSS, and regression coverage together.
-- Keep Remote A2A boundary styling visually distinct from local workflow/adapters.
+- Keep the Current Implementation `legacy` Remote A2A boundary styling visually distinct from local Workflow and Adapter rendering.
 
 ## Anti-Patterns
 

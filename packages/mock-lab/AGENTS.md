@@ -6,6 +6,8 @@
 default user-facing surface is the integrated workbench route
 `http://127.0.0.1:5173/mock-lab`; this package also runs independently on 5176.
 
+In the Target Contract, Mock Lab provides MCP mock test doubles for Tool assets as defined by [Taxonomy](../../docs/workbench/taxonomy.md); `Adapter` labels and `catalog/adapters.yaml` below are Current Implementation (`legacy`) names.
+
 ## Structure
 
 - `src`: standalone React app for editing, saving, running, and smoke testing `MockSpec`.
@@ -16,7 +18,7 @@ default user-facing surface is the integrated workbench route
 
 ## Local Rules
 
-- `catalog/adapters.yaml` is read-only prefill input.
+- Current Implementation (`legacy`) `catalog/adapters.yaml` is read-only prefill input.
 - Canonical specs live under ignored `artifacts/mock-lab/<mock-id>/mock-spec.json`.
 - Codex draft specs stay under `drafts/<draft-id>/draft-spec.json` until explicitly loaded.
 - Server start uses the saved `mock-spec.json`; it should not require generated project files.

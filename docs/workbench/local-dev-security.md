@@ -3,6 +3,8 @@
 This note covers local Agent Factory development surfaces. It is not a
 deployment guide.
 
+Target 자산과 경계 용어의 기준은 [Taxonomy](taxonomy.md)이며, 로컬 artifact에 남아 있는 Adapter 또는 Remote A2A 필드는 Current Implementation(`legacy`) 표현이다.
+
 ## Local Surfaces
 
 - Workbench dev server: `http://127.0.0.1:5173/`.

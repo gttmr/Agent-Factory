@@ -5,6 +5,8 @@
 `templates` contains generic artifact templates and regression scenarios consumed
 by the validator, source generator tests, analyzer tests, and smoke examples.
 
+Template vocabulary follows Current Implementation (`legacy`) schemas; Target asset terminology is canonical in [Taxonomy](../docs/workbench/taxonomy.md), with gaps tracked in `docs/migration/taxonomy-vnext-status.md`.
+
 ## Structure
 
 - Top-level JSON/YAML files are generic starting templates.
@@ -14,7 +16,7 @@ by the validator, source generator tests, analyzer tests, and smoke examples.
 
 ## Local Rules
 
-- Fixtures must follow active schemas and current taxonomy.
+- Fixtures must follow active schemas and their Current Implementation (`legacy`) taxonomy enums; they do not establish the Target taxonomy.
 - Scenario data must stay synthetic; banking terminology is review scaffolding only.
 - Runnable scenarios still come from approved artifacts with `raw_requirement_to_code=false`.
 - Keep fixture updates paired with validator/generator/analyzer tests when they cover behavior.

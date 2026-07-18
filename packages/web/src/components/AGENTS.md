@@ -5,6 +5,8 @@
 Shared React components for artifact review, Graph IR visualization, category
 badges, Stage Runner controls, and graph element editing.
 
+Target asset and node meanings come from [Taxonomy](../../../../docs/workbench/taxonomy.md) and [Graph IR](../../../../docs/workbench/graph-ir.md); category/subtype components currently render the Current Implementation (`legacy`) enums.
+
 ## Structure
 
 - `CategoryBadge.tsx`: category/subtype visual single source of truth.

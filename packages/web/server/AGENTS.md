@@ -6,6 +6,8 @@
 APIs. It bridges routes to local artifact roots, Stage Runner, catalog publish,
 runtime controls, collaboration files, and integrated Mock Lab endpoints.
 
+Target asset and Graph meanings are canonical in [Taxonomy](../../../docs/workbench/taxonomy.md) and [Graph IR](../../../docs/workbench/graph-ir.md); API fields that retain `adapter` or `remote_a2a` are Current Implementation (`legacy`).
+
 ## Where To Look
 
 | Task | Files |

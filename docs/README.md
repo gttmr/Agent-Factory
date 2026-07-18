@@ -1,59 +1,53 @@
-# Documentation Index
+# Agent Factory 문서 안내
 
-이 디렉터리는 Agent Factory 분석 워크벤치 문서의 진입점이다.
-Codex CLI 같은 에이전트는 기본적으로 아래 “기본 읽기 경로”만 프롬프트에 넣고, 필요한 경우에만 참조 문서를 추가로 읽는다.
+이 문서는 Agent Factory 문서의 점진적 공개(progressive disclosure) 진입점이다. 개념을 먼저 확인한 뒤 필요한 운영 단계와 소스 위치로 내려가며, Target Contract와 Current Implementation을 섞어 읽지 않는다.
 
-## 기본 읽기 경로
+## 기본 읽기 순서
 
-1. [Analysis guide](./workbench/analysis-guide.md)
-   Raw requirement를 Stage Runner 또는 skill output으로 정규화하고 evidence, module candidate, process flow, review decision으로 바꾸는 순서를 설명한다. 첫 화면에서 개발 리더가 확인해야 하는 핵심 계약과 은행 도메인 MVP의 역할도 여기서 먼저 파악한다.
-2. [Taxonomy](./workbench/taxonomy.md)
-   `module_category`, subtype enum, catalog runtime binding의 단일 활성 기준이다.
-3. [Workflow decision guide](./workbench/workflow-decision-guide.md)
-   ADK 2.3 baseline으로 `orchestration`, `graph`, `dynamic`, `unknown`을 판단하고, 작은 흐름은 Graph IR로 내리는 기준을 설명한다.
-4. [ADK Agent Execution Modes](./workbench/adk-agent-execution-modes.md)
-   ADK `LlmAgent.mode`를 Graph IR와 runnable source 생성에서 해석하는 기준이다. Graph node 기본은 `single_turn`, `chat`은 session-history를 암묵 입력으로 받는 stateful node, `task`는 static graph node가 아니라 coordinator/sub-agent topology라는 정책을 정의한다.
-5. [Process Flow](./workbench/process-flow.md)
-   분석 결과를 어떤 node와 edge로 그릴지 설명한다.
-6. [Review Board](./workbench/review-board.md)
-   개발 리더가 후보 모듈을 승인, 보류, 거절, 추가정보 요청으로 결정하는 기준이다. 현재 워크벤치 UI에서는 DesignWorkbench(`/af/:reqId/design`)의 모듈 검토 패널과 Design Stage Runner(`af-design-boundaries`)가 Resolution Draft/patch 제안을 분담하지만, 후보 승인 정책 자체와 hard/soft 게이트 의미는 이 문서가 기준이다.
-7. [Validation](./workbench/validation.md)
-   review artifact, Stage Runner run evidence, live analyzer draft schema, 최종 artifact schema, 문서 구조를 검증하는 기준이다. ADK Runtime Handoff(현 BuildWorkbench + VerifyWorkbench)가 배포가 아니라 승인 artifact 기반 source-bundle handoff와 검증 게이트라는 점은 이 문서의 `Scaffold-plan and ADK Runtime Handoff` 절을 기준으로 한다.
-8. [Agent Factory Harness](./workbench/agent-factory-harness.md)
-   Agent Factory 전용 하네스다. raw requirement를 reviewed artifact로 바꾸고, taxonomy 분류, Remote A2A high-friction 규칙, catalog review, docs 최신화, 검증 기준을 정의한다.
+1. [Agent Factory 개요](../README.md)
+   저장소의 목적, 주요 사용자, raw requirement에서 reviewed artifact와 Runtime Handoff로 이어지는 전체 흐름을 먼저 확인한다. Runtime Handoff는 production deployment가 아니다.
+2. [자산 택소노미(Taxonomy)](./workbench/taxonomy.md)
+   Target Contract의 Agent·Workflow·Tool 정의와 업무 맥락, Owner, 재사용 거버넌스를 확인한다. 다른 문서에서 이 분류를 다시 정의하지 않는다.
+3. [그래프 중간 표현(Graph IR)](./workbench/graph-ir.md)
+   Catalog 자산과 Graph Node의 차이, Node·Edge, Invocation Control, Binding·Transport 표현을 확인한다. Workflow 내부 실행 구조의 단일 기준이다.
+4. [운영 모델(Operating Model)](./workbench/operating-model.md)
+   분석·설계·승인·Runtime Handoff·검증 단계와 missing-information gate를 확인한다. 현재 Stage Runner 동작은 문서의 Current Implementation 절에서 별도로 읽는다.
+5. [Handbook Overview](./handbook/overview.md)
+   Agent Factory 저장소의 행동 경계와 stage 간 artifact 흐름을 L1 수준에서 파악한다. 구현 세부는 Overview에 추정해 넣지 않고 뒤의 source locator로 확인한다.
+6. [Handbook Index](./handbook/index.md)와 [Registers](./handbook/registers.md)
+   Index는 필요한 행동 stage와 L3 source map을 찾는 경로를 제공한다. Registers는 stage 사이에서 생성·읽기·갱신되는 상태와 artifact의 producer·consumer를 추적한다.
+7. [필요한 Stage 문서](./handbook/stages/)
+   Index에서 고른 stage만 열어 입력·출력·분기·실패와 최신 source locator를 확인한다. 실제 구현 판단은 Stage 문서가 가리키는 현재 소스에서 다시 검증한다.
+8. Migration Status
+   [Taxonomy vNext](./migration/taxonomy-vnext-status.md)에서 Target Contract와 legacy Current Implementation 사이의 차이·영향·위험을 확인하고, [Skills vNext](./migration/skill-vnext-status.md)에서 canonical 5-skill 체계, Compatibility Layer, legacy shim, Product blocker와 forward-test 상태를 확인한다. 두 문서 모두 코드 migration 완료를 선언하지 않는다.
+9. 필요한 세부 reference
+   - [분석 가이드](./workbench/analysis-guide.md)는 raw requirement에서 evidence, 정규화 요구사항, missing information, 자산 후보를 도출하는 순서를 설명한다.
+   - [Workflow 판단 가이드](./workbench/workflow-decision-guide.md)는 Workflow 자산 여부와 representation·coordination 축을 구분하는 질문을 제공한다.
+   - [Review Board](./workbench/review-board.md)는 개발 리더가 후보 책임, 계약, 위험, 재사용 판단을 검토하는 기준을 제공한다.
+   - [Validation](./workbench/validation.md)은 artifact, 문서, Runtime Handoff의 검증 기준과 남은 불확실성 기록 원칙을 설명한다.
+   - [Local MCP Mock Lab](./mock-lab/local-mcp-mock-lab.md)은 Tool의 MCP mock을 로컬 test double로 준비하고 검증하는 Current Implementation 흐름을 설명한다.
+   - [시각화 Design System](./visualization/design-system.md)은 Workbench 화면과 Graph 표시의 시각·상호작용 규칙을 제공한다.
+   - [Target Agent Architecture](./reference/target-agent-architecture/README.md)는 Agent·Workflow·Tool, Graph Node, 프로토콜, Resource/Dependency의 목표 아키텍처 위치를 요약한다.
+   - [Local Dev Security](./workbench/local-dev-security.md)는 로컬 개발 표면과 requirement·mock·runtime 입력의 민감도 경계를 설명한다.
+   - [ADK Agent Execution Modes](./workbench/adk-agent-execution-modes.md)는 ADK 실행 모드를 Graph 및 Runtime Handoff 문맥에서 해석할 때 필요한 세부 기준을 제공한다.
 
 ## 보조 참조
 
-- [Decision log](./decision-log.md)
-  코드 의사결정이 변경된 시점·내용·배경의 이력. 인터페이스/스키마/게이트/UX 계약을 바꾸는 PR마다 머지 시점에 항목을 추가한다. 동작 명세의 기준은 여전히 각 활성 문서다.
-- [Local MCP Mock Lab](./mock-lab/local-mcp-mock-lab.md)
-  `catalog/adapters.yaml`을 read-only prefill 소스로 사용해 Mock Lab에서 `MockSpec`을 편집·저장하고, 선택적으로 Codex가 자연어 prompt에서 `MockSpec` 초안을 만들게 한 뒤, 저장된 spec만으로 MCP stdio mock server를 실행·smoke test 하는 흐름이다. 실행 중인 mock은 network MCP(`/api/mock-lab/mcp/<key>` + `/api/mock-lab/mcp-discovery`)로 노출되어 runnable ADK 번들이 호출할 수 있다. 기본 사용자 경로는 5173 workbench의 `/mock-lab`이며, `packages/mock-lab`의 5176 standalone 앱은 개발/과도기용으로 유지한다.
-- [Local dev server and input sensitivity](./workbench/local-dev-security.md)
-  5173 Workbench, 5176 standalone Mock Lab, 8765 ADK runtime smoke, 9222 Chrome DevTools 같은 local-only surface와 raw requirement, MockSpec, screenshots, runtime env 입력 민감도 기준을 정리한다.
-- [Agent Factory DLC skills](../.agents/skills)
-  `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, `af-verify-feedback`가 schema-first artifact 생산, 경계 승인, Runtime Handoff bundle 생성, 검증 feedback을 담당한다.
-- [Target agent architecture](./reference/target-agent-architecture/README.md)
-  Agent, Workflow, Adapter, Remote A2A의 target architecture 관점 참조다.
-- [Protocol profile](./reference/target-agent-architecture/protocol-profile.md)
-  local ADK boundary와 Remote A2A boundary를 구분한다.
-- [Source links](./reference/target-agent-architecture/source-links.md)
-  공개 참고 링크 목록이다.
-
-## 시각화 참조
-
-- [Design system](./visualization/design-system.md)
+- [Decision Log](./decision-log.md)는 설계 결정의 날짜·근거·영향을 보존하는 이력이다. 현재 규칙은 각 canonical 문서에서 확인한다.
+- [Agent Factory DLC skills](../.agents/skills/AGENTS.md)는 read-only entrypoint `af-workflow`와 `af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime` 네 Work Skill로 구성된다. 구 `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, `af-verify-feedback`는 compatibility shim이며, current artifact를 쓸 때는 Target 판단 뒤 Compatibility Layer로 legacy 직렬화를 생산한다. [Skills vNext Migration Status](./migration/skill-vnext-status.md)와 함께 읽는다.
 
 ## Archive
 
-`archive/` 아래 문서는 기본 프롬프트 경로가 아니며 활성 기준이 아니다.
-과거 계획, 리뷰 기록, 스캐폴딩 노트, 스킬 노트, 유지보수 프롬프트를 보존하기 위한 위치다.
+- [Archive](./archive/)는 과거 계획, 검토 기록, 스냅샷을 보존하며 활성 기준이 아니다. 현재 행동을 설명하기 위해 archive 문서를 수정하거나 규칙을 되살리지 않는다.
+- [Taxonomy vNext 2026-07 스냅샷](./archive/taxonomy-vnext-2026-07/)은 전면 개편 전 문서와 전환 근거를 보존한다. 현재 용어와 판단은 canonical 문서에서 다시 확인한다.
 
-## Canonical Sources
+## Compatibility pointers
 
-- Model-facing working index: [../AGENTS.md](../AGENTS.md)
-- Human-facing overview: [../README.md](../README.md)
-- Analyzer/source enum: [../packages/web/src/analyzer/types.ts](../packages/web/src/analyzer/types.ts)
-- Shared schemas: [../schemas](../schemas)
-- Live analyzer compact draft schema: [../schemas/analysis-draft.schema.json](../schemas/analysis-draft.schema.json)
-- 공식 ADK 문서: `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 확인한다. 현재 target은 ADK 2.3이며, ADK 2.0 GA 문서는 graph/dynamic/A2A 분류의 역사적 기준으로만 사용한다. ADK 1.x 문서는 legacy compat 질문에만 사용한다. 복제한 ADK component 요약은 active docs에 두지 않는다.
-- Skill files under `../.agents/skills/` are governed by their own `SKILL.md` files. The AF DLC stage skills are active operating entrypoints; `_shared` is reference material only.
+- [process-flow.md](./workbench/process-flow.md)는 기존 링크를 보존하는 Graph IR compatibility pointer다. 새 Graph 정의는 이 문서가 아니라 canonical `graph-ir.md`에서 확인한다.
+- [agent-factory-harness.md](./workbench/agent-factory-harness.md)는 기존 skill과 문서 링크를 보존하는 Operating Model compatibility pointer다. 현재 작업 단계와 gate는 canonical `operating-model.md`에서 확인한다.
+
+## Canonical sources
+
+- ADK 기능이나 용어를 확인할 때는 `adk-docs-mcp`에서 [공식 `llms.txt`](https://adk.dev/llms.txt)를 출발점으로 관련 공식 페이지를 찾고, 확인 날짜와 기능별 근거를 남긴다. 저장소 문서에 ADK 전체 설명을 복제하지 않는다.
+- [Google ADK 공식 문서](https://adk.dev/)는 프레임워크 동작을 확인하는 외부 기준이다. 현재 저장소 소스와 문서가 다르면 Target Contract, Current Implementation, 미확인 사항을 분리해 기록한다.
+- ADK 버전 번호는 택소노미의 본질이 아니다. 버전은 특정 연결·실행 기능의 검증 메타데이터일 뿐 Agent·Workflow·Tool의 책임 정의를 바꾸지 않는다.

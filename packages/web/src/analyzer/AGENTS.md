@@ -6,6 +6,8 @@ This directory owns client-side artifact semantics: taxonomy, graph migration,
 review gates, scaffold-plan derivation, runtime-contract modeling, import normalization,
 and tests for those contracts.
 
+The analyzer's machine-aligned `module_category` and subtype enums are Current Implementation (`legacy`); Target taxonomy is [Taxonomy](../../../../docs/workbench/taxonomy.md), Graph semantics are [Graph IR](../../../../docs/workbench/graph-ir.md), and the gap is tracked in `docs/migration/taxonomy-vnext-status.md`.
+
 ## Where To Look
 
 | Task | Files |
@@ -20,7 +22,7 @@ and tests for those contracts.
 
 ## Local Rules
 
-- Keep top-level categories to `agent`, `workflow`, `adapter`, `remote_a2a`.
+- Keep the Current Implementation `legacy` top-level categories aligned as `agent`, `workflow`, `adapter`, and `remote_a2a`; do not present that serialized set as the Target asset taxonomy.
 - Keep Graph IR execution details out of taxonomy values; sequence, route, join, loop, human input, and fan-out live in Graph IR.
 - `legacy_recommended_type` is migration metadata only.
 - Candidate-level missing information is a hard scaffold blocker; requirement-level missing information is reviewer-attested.

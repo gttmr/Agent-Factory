@@ -5,6 +5,8 @@
 This directory is the workbench design system implementation: tokens, base
 rules, primitives, category visuals, feature CSS, and route CSS.
 
+Target asset terminology is canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md); category tokens and selectors currently mirror Current Implementation (`legacy`) `agent`/`workflow`/`adapter`/`remote_a2a` enums.
+
 ## Structure
 
 - `index.css`: only import order and cascade layer wiring.
@@ -19,8 +21,8 @@ rules, primitives, category visuals, feature CSS, and route CSS.
 
 - Preserve cascade layer order: `tokens`, `base`, `primitives`, `components`, `features`, `router`, `utilities`.
 - Add new tokens in `tokens.css`; avoid route-local color/type literals.
-- Category visuals must stay aligned with `CategoryBadge.tsx` and analyzer enums.
-- Red category styling is for Remote A2A; use status tokens for errors.
+- Current Implementation (`legacy`) category visuals must stay aligned with `CategoryBadge.tsx` and analyzer enums.
+- Red category styling is for the `legacy` Remote A2A category; use status tokens for errors.
 - Broad descendant selectors can break badges. Prefer direct-child selectors for tables/lists.
 
 ## Anti-Patterns

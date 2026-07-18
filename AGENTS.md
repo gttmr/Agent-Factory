@@ -3,104 +3,57 @@
 ## Repository Role
 
 - This is the primary Agent Factory workbench repository.
-- Treat `.agents/skills`, `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active Agent Factory source of truth.
+- Treat `.agents/skills`, `packages/web`, `schemas`, `templates`, `catalog`, and `docs` as the active Agent Factory source trees.
 - Do not treat this repository as only a public skill-source extract.
-- Do not add private banking data, private endpoints, credentials, deployment scripts, or organization-specific runtime code.
+- Do not add private banking data, private endpoints, credentials, deployment scripts, real customer data, or organization-specific runtime code.
 - Edit `.agents/skills` only when the task explicitly asks for skill, DLC workflow, or skill-sync work.
 
-## Source Of Truth Map
+## Required Reading Order
 
-- `README.md`: human-facing workbench overview and taxonomy contract.
-- `AGENTS.md`: model-facing repository index and working rules.
-- `CLAUDE.md`: Claude Code-facing repository guide; keep it aligned with this file on load-bearing rules.
-- `docs/workbench/agent-factory-harness.md`: project-specific Agent Factory operating harness for intake, classification, scaffold gating, review artifacts, and verification.
-- `.agents/skills`: Agent Factory DLC skills. The active stage skills are `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, and `af-verify-feedback`; `_shared` contains shared references, not a triggerable skill.
-- `packages/web`: artifact visualization, review, guided partial edits, process flow, Graph IR, and ADK runtime handoff UI.
-- `schemas`: normalized requirement, module candidate, and process-flow schemas.
-- `catalog`: YAML catalogs for reusable runtime contracts, domain owners, and risk gates.
-- `templates`: generic artifact and scaffold-plan templates.
-- `docs`: active workbench analysis, taxonomy, workflow-decision, validation, and reference notes.
+Before non-trivial work:
+
+1. Read [docs/README.md](docs/README.md) for the active documentation path.
+2. Read [docs/handbook/README.md](docs/handbook/README.md) to locate current behavior in source.
+3. Use the canonical document that owns the decision:
+   - concepts and asset classification: [docs/workbench/taxonomy.md](docs/workbench/taxonomy.md)
+   - Workflow Graph decisions and display: [docs/workbench/graph-ir.md](docs/workbench/graph-ir.md)
+   - stages, approvals, artifacts, and verification: [docs/workbench/operating-model.md](docs/workbench/operating-model.md)
+   - Target Contract versus Current Implementation gaps: [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md)
+
+Do not duplicate or redefine a canonical taxonomy or Graph enum in this file. Link to the owning document.
+
+## Canonical Decision Rules
+
+- Do not create a top-level asset type other than Agent, Workflow, or Tool. Roles, protocols, resources, dependencies, domains, ownership, and reuse states do not become additional asset types.
+- Tool Invocation Control uses the display labels Workflow and Agent. Do not promote Model or LLM to an Invocation Control owner. Follow the canonical [Taxonomy](docs/workbench/taxonomy.md) and [Graph IR](docs/workbench/graph-ir.md).
+- Handbook locators are navigation aids, not authority over source. Before using a locator, open the current file and re-verify its symbol, callers, inputs, outputs, and side effects.
+- When documentation and code differ, state **Target Contract** and **Current Implementation** separately. Do not present a documentation target as implemented behavior.
+
+## Current Implementation Boundary (`legacy`)
+
+The current code, schemas, validators, generator, Catalog data, and skill Compatibility Layer still serialize the `legacy` field `module_category` with the `legacy` values `agent`, `workflow`, `adapter`, and `remote_a2a`. They also use `legacy` identifiers including `adapter_kind`, `agent_kind`, `workflow_kind`, `selected_by_llm`, `decision_owner`, and current Graph node and edge values. The skill tree is organized as `af-workflow` plus four canonical Work Skills; the four former stage IDs remain compatibility shims. Follow [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md) for the current map.
+
+When editing source, do not casually rename, remove, or reinterpret these `legacy` contracts. Their alignment is a separate follow-up migration, not part of documentation wording changes. Record and interpret the gap through [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md). A current identifier must be formatted as code and explicitly marked `legacy` whenever an active document discusses it.
 
 ## Local AGENTS.md Hierarchy
 
-This root file carries repository-wide policy. More specific guidance now lives
-near the active ownership boundaries:
+This root file carries repository-wide policy. More specific guidance lives near active ownership boundaries:
 
-- `.agents/skills/AGENTS.md`: DLC skill authoring and shared references.
-- `packages/web/AGENTS.md`: web workbench package, routes, UI, server middleware,
-  and verification entrypoints.
+- [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md): DLC skill authoring, canonical skill map, compatibility shims, and shared references.
+- `packages/web/AGENTS.md`: web workbench package, routes, UI, server middleware, and verification entrypoints.
 - `packages/mock-lab/AGENTS.md`: standalone Mock Lab package and MCP runtime.
-- `docs/AGENTS.md`: active docs versus historical/status snapshots.
-- `schemas/AGENTS.md`, `catalog/AGENTS.md`, `templates/AGENTS.md`,
-  `scripts/AGENTS.md`: artifact contracts, seed catalogs, fixtures, and root
-  generators/validators.
+- `docs/AGENTS.md`: active docs versus historical and status snapshots.
+- `schemas/AGENTS.md`, `catalog/AGENTS.md`, `templates/AGENTS.md`, `scripts/AGENTS.md`: artifact contracts, seed catalogs, fixtures, and root generators or validators.
 
-When editing inside one of those trees, read the nearest child `AGENTS.md`
-after this root file. Child files specialize this policy; they do not relax it.
+When editing inside one of these trees, read the nearest child `AGENTS.md` after this root file. Child files specialize this policy; they do not relax it.
 
-## Markdown Documentation Ownership
+## Documentation Ownership And Impact
 
-- `docs/README.md` indexes human-facing workbench documentation under `docs/`.
-- `.agents/skills/**` Markdown is governed by the nearest `SKILL.md`. The stage skills may be linked from `docs/README.md` because Agent Factory now treats them as the DLC operating entrypoints.
-- Historical review records belong under `docs/archive/` and must not override the canonical policy files listed above.
-
-## Documentation Impact Discipline
-
-- Before starting any source-code change, explicitly check whether the change affects `docs/` Markdown: taxonomy, catalog semantics, schemas, analyzer behavior, workflow/Graph IR rules, validation commands, UI behavior, or operating policy.
-- If the source change affects active docs, update the relevant `docs/` Markdown in the same change set.
-- If the change alters a design decision (interface, schema, gate, or UX contract), append an entry to `docs/decision-log.md` (date · PR · decision · rationale · impact) in the same change set.
-- If no doc update is needed, be prepared to state why in the finish report.
-- Do not update `docs/archive/**` for current behavior unless the task explicitly asks for archival or migration work.
-
-## Current Taxonomy
-
-Top-level `module_category` values:
-
-- `agent`
-- `workflow`
-- `adapter`
-- `remote_a2a`
-
-Adapter `adapter_kind` values:
-
-- `legacy_api`
-- `retrieval`
-- `rule_registry`
-- `data_query`
-- `template`
-- `computation`
-- `external_service`
-- `unknown`
-
-Definitions:
-
-- Agent: reasoning responsibility such as judgment, summarization, classification, or recommendation.
-- Workflow: broad Workflow Agent boundary, classified as orchestration, graph, dynamic, or unknown. Smaller sequence, fan-out/fan-in, loop, and human-input flows live inside Graph IR.
-- Adapter: callable capability used by agents or workflows.
-- Remote A2A: independent remote agent boundary with protocol-level contract.
-
-Tool/Adapter, Knowledge Retrieval, and Metadata Registry are no longer top-level categories. Retrieval and rule registries are Adapter subtypes.
-
-Catalog entries are runtime-oriented contracts. `catalog/*.yaml` is never edited directly; the approval-gated `POST /api/catalog/publish` path in Reuse Hub `등록 승인` is the only app write path, publishing versioned entries from active-root `catalog-delta.yaml` proposals. Human PR merge remains valid for bulk or seed changes. Seed catalog items may include deterministic synthetic `runtime_mock` payloads for local ADK smoke tests, but those payloads are test doubles only: no private banking data, private endpoints, credentials, deployment scripts, or real business logic.
-
-ADK taxonomy/Graph IR baseline: ADK 2.3 (current target `google-adk` 2.3.0; ADK Python 2.0 GA was May 19, 2026). This baseline governs classification only — `workflow_kind` allows only `orchestration`, `graph`, `dynamic`, and `unknown`, and ADK graph workflow maps sequence, fan-out/fan-in, loop, route, join, and human input through Graph IR nodes, containers, and edges; active docs do not use ADK 1.x workflow-agent classes as the default classification basis. The runnable source generator targets the ADK 2.3 `google.adk.workflow.Workflow` runtime; the shared requirements floor may remain lower when 2.1 -> 2.3 compatibility has been verified.
-
-## Agent Factory Harness
-
-Before non-trivial analysis, taxonomy, scaffold, export, or DLC skill work, apply `docs/workbench/agent-factory-harness.md`.
-
-Core harness rules:
-
-- Use `af-analyze-requirement` for schema-first analysis artifacts before implementation.
-- Use `af-design-boundaries` for module, Graph IR, runtime contract, Remote A2A, and reuse approval.
-- Use `af-build-runtime-stub` only after approved scaffold-plan artifacts exist.
-- Use `af-verify-feedback` to record validation evidence and catalog delta proposals.
-- Classify first: `agent`, `workflow`, `adapter`, or `remote_a2a`.
-- Keep retrieval, rule registry, and tool/adapter concepts as adapter subtypes, not top-level categories.
-- Treat Remote A2A as high-friction: require independent ownership, protocol boundary, auth, lifecycle, timeout, retry, fallback, and audit details.
-- ADK Runtime Handoff must consume approved scaffold-plan data, never raw requests or unreviewed analyzer output.
-- Preserve reviewable artifacts: normalized requirements, evidence, missing-information records, module candidates, process flows, reuse/domain mapping, risk gates, validation output, and decision notes.
-- Preserve runtime contract review artifacts when legacy, callback, Context Manager, ADK callback, or async resume behavior is involved.
+- `docs/README.md` indexes active human-facing documentation. The Handbook maps behavior to current source; source remains the final authority.
+- Before a source change, check the documentation-impact rules in [Operating Model](docs/workbench/operating-model.md). Update affected active documentation in the same change set.
+- If a change alters an interface, schema, gate, or UX contract, append a dated entry to `docs/decision-log.md` with PR, decision, rationale, and impact. The decision log preserves history; canonical documents own current rules.
+- `docs/archive/**` and `docs/handoff/claude-home/**` are not active authority and are excluded from normal documentation-currency sweeps. Do not edit them to describe current behavior unless the task explicitly asks for archival or handoff work.
+- `.agents/skills/**` Markdown is operational material governed by its nearest `SKILL.md`; do not include it in a general docs sweep or edit it without an explicit skill-related request.
 
 ## Skill And Subagent Usage
 
@@ -115,7 +68,7 @@ Use the relevant Superpowers skill before changing behavior:
 - Use `superpowers:systematic-debugging` when a regression, unexpected UI return, test failure, or confusing runtime behavior appears. Identify the root cause before patching.
 - Use `superpowers:verification-before-completion` before claiming work is complete, fixed, or ready for PR.
 
-Do not skip the user-review gate when a Superpowers workflow explicitly requires it, unless the user has already approved the concrete spec or plan in the same thread.
+Do not skip a user-review gate required by a Superpowers workflow unless the user already approved the concrete spec or plan in the same thread.
 
 ### Frontend Skill
 
@@ -127,8 +80,10 @@ Agent Factory is an operational workbench, not a marketing surface. Prefer:
 - clear task hierarchy
 - restrained colors and borders
 - utility copy in natural Korean
-- English technical terms where they are clearer, such as `Agent`, `Workflow`, `Adapter`, `Remote A2A`, `Graph IR`, and `Runtime Handoff`
+- English technical terms where clearer, such as `Agent`, `Workflow`, `Tool`, `Graph IR`, and `Runtime Handoff`
 - cards only when the card is the interaction surface
+
+The Current Implementation UI can still render the `legacy` labels `Adapter` and `Remote A2A`. When documenting or editing those current labels, identify them as `legacy` UI vocabulary; do not present them as Target Contract asset types.
 
 When changing a screen, verify that removed UI does not still render from a parent shell, context panel, inspector, or shared layout component.
 
@@ -146,56 +101,48 @@ A subagent is appropriate when:
 
 Do not use a subagent for the immediate blocking step when the main thread must act on that result before doing anything else.
 
-When the user authorizes subagents for Agent Factory work, default subagent model settings are:
+When the user authorizes subagents for Agent Factory work, use these defaults:
 
-- model: `gpt-5.5`
+- model: `gpt-5.6` (the configured Codex default; do not pass `gpt-5.5`)
 - reasoning effort: `high`
 
-For code-changing subagents, assign a clear file or module ownership boundary and instruct them not to revert or overwrite unrelated work. For review subagents, ask for concrete findings with file and line references, not broad opinions.
+For code-changing subagents, assign a clear file or module ownership boundary and instruct them not to revert or overwrite unrelated work. For review subagents, request concrete findings with current file and line references.
+
+Track every spawned subagent until its lifecycle is closed. Capture its deliverable, close it immediately after completion, and perform a final sweep before finishing. If the available tool surface cannot close completed subagents, do not start a multi-agent workflow that would leave resident runtimes behind.
 
 ## Worktree Hygiene
 
-Git worktrees created for isolated slices (subagent/Codex work, parallel branches) must be cleaned up once their work lands — do not let them accumulate.
+Git worktrees created for isolated slices must be cleaned up after their work lands.
 
-- After creating a PR and confirming it is merged, treat the source worktree and its branch as cleanup-pending in the same session: the task is not done until they are removed (or the user explicitly chooses to keep them).
-- To clean up a landed branch: `git worktree remove <path>` then `git branch -d <branch>`. Run `git worktree prune` to drop dead registrations (directories already gone).
-- Before deleting, confirm the branch is merged (`git merge-base --is-ancestor <branch> main`) or its content is already on `main`, and that the worktree has no uncommitted changes (`git -C <path> status`). Keep anything unmerged and surface it instead of deleting.
-- Periodically run `git worktree list` to spot leftovers. Never remove the primary checkout, and do not touch remote branches unless the user asks.
+- After a PR is merged, treat the source worktree and local branch as cleanup-pending in the same session unless the user explicitly keeps them.
+- Before deleting, confirm the worktree is clean and the branch is merged with `git merge-base --is-ancestor <branch> main`, or confirm its content is already on `main`.
+- Remove a landed worktree with `git worktree remove <path>`, delete its local branch with `git branch -d <branch>`, and run `git worktree prune` for dead registrations.
+- Keep and report anything unmerged or dirty. Never remove the primary checkout or touch a remote branch unless the user asks.
+- Periodically run `git worktree list` to identify leftovers.
 
 ## Editing Rules
 
-- Keep changes scoped to the requested workbench behavior.
-- Review documentation impact before source edits and keep active `docs/` Markdown current when behavior, taxonomy, catalog semantics, schemas, validation, or UI flow changes.
-- Do not introduce abstractions, configuration, or extensibility unless the present task requires it.
-- When the user asks to modify an artifact or generated ADK behavior, do not solve it by hard-coding domain terms, route aliases, product names, scenario names, or workflow-specific literals into `scripts/generate-adk-source.mjs` or another generator. First decide whether the current Graph IR / scaffold-plan / schema can express the needed behavior. If not, add a reviewed, generic contract field across schema/types/validator/UI/generator as needed, then update the artifact data to use that field.
-- Generator defaults may be deterministic, but they must be framework/runtime-neutral. Workflow-specific choices such as router labels, human choice aliases, adapter argument hints, prompt rules, and business terms belong in reviewed artifacts or catalog/mock specs, not in generator code. If a compatibility fallback is unavoidable, document why and cover it with a regression.
-- Preserve legacy migration data with `legacy_recommended_type`; do not use it as the primary classifier.
-- Remote A2A must remain high-friction and must not be inferred only because a workflow has multiple local steps.
-- ADK Runtime Handoff and scaffold generation must consume approved artifacts, not raw user requests.
-- Required runtime contracts in `AnalysisResult.runtimeContracts` must be reviewed and approved before Runtime Handoff proceeds.
-- Generated source defaults to a smoke TODO/runtime-wiring handoff. A reviewed `scaffold-plan` `output_mode: runnable` (an approved capability) emits a runnable ADK 2.3 `Workflow` (Gemini `LlmAgent` nodes + synthetic Mock Lab MCP adapters) instead — still generated only from approved artifacts (`raw_requirement_to_code` stays `false`), never from raw requests, and never containing private endpoints, credentials, or real customer data.
+- Keep changes scoped to the requested behavior. Do not add unrelated abstractions, configuration, or extensibility.
+- Keep Target Contract wording and Current Implementation behavior visibly separate.
+- Runtime Handoff and scaffold generation consume approved artifacts, never raw requirements or unreviewed analyzer output.
+- Follow [Operating Model](docs/workbench/operating-model.md) for Catalog publication; do not edit `catalog/*.yaml` as an ad hoc application path.
+- Do not solve generated behavior by hard-coding domain terms, route aliases, product names, scenario names, or Workflow-specific literals into a generator. Generator defaults must stay framework- and runtime-neutral; behavior-specific choices belong in reviewed artifacts or Catalog/mock contracts.
+- Preserve Korean workbench UI copy unless the task explicitly changes the language.
+- Before a visual change, read `docs/visualization/design-system.md`; verify the result in the real screen and capture a screenshot before reporting completion.
 
 ## WSL Browser Verification
 
-This repository is often operated from WSL while the visible Chrome window is a Windows process. Do not assume Chrome DevTools MCP can see that browser.
+This repository is often operated from WSL while the visible Chrome window is a Windows process. Do not assume a browser automation tool can see that browser.
 
-## Dev Server Reachability
-
-- Manual/browser testing for `packages/web` uses one fixed port: `5173`.
-- When the user asks to run or restart the dev server, do not let Vite auto-increment to `5174`, `5175`, or another fallback port. Use `npm run dev -- --host 0.0.0.0 --port 5173 --strictPort` outside the sandbox so the server binds where the user can reach it.
-- Before starting, check `lsof -iTCP:5173 -sTCP:LISTEN`. If an existing Agent Factory/Vite process owns the port, stop that stale process and restart on `5173`. If an unrelated process owns the port, report the blocker instead of silently moving ports.
-- Verify reachability from the same network namespace where the server is bound with `curl -I http://127.0.0.1:5173/` and, when useful, `lsof -iTCP:5173 -sTCP:LISTEN`.
-- Report only the fixed testing URL `http://127.0.0.1:5173/` unless the user explicitly approves a different port.
-
-Before using Chrome DevTools MCP navigation, DOM inspection, or screenshots, run this gate from WSL:
+Before Chrome DevTools navigation, DOM inspection, or screenshots, run this WSL gate:
 
 ```bash
 curl -s http://127.0.0.1:9222/json/version
 ```
 
-The browser tool is usable only when that command returns JSON with `webSocketDebuggerUrl`. If it fails, do not call `mcp__chrome_devtools__navigate`, `evaluate`, or `screenshot` and do not claim a screenshot was taken.
+The browser tool is usable only when the response is JSON containing `webSocketDebuggerUrl`. If the gate fails, do not call Chrome DevTools navigation, evaluation, or screenshot operations and do not claim a screenshot was taken.
 
-Known working setup in this environment:
+A known working dedicated WSL browser setup is:
 
 ```bash
 google-chrome-stable \
@@ -214,22 +161,31 @@ curl -s http://127.0.0.1:9222/json/version
 lsof -iTCP:9222 -sTCP:LISTEN
 ```
 
-Observed behavior on 2026-05-09:
+Use a separate `--user-data-dir` for the automation browser. Do not retrofit the user's normal Windows Chrome session unless its debug endpoint is first proven reachable from WSL.
 
-- Normal Windows Chrome processes were running, but none had `--remote-debugging-port=9222`.
-- `127.0.0.1:9222` and the WSL nameserver host candidate `10.255.255.254:9222` did not respond until a dedicated WSL `google-chrome-stable` process was launched.
-- After launching the WSL headless Chrome command above, Chrome DevTools MCP `navigate`, `evaluate`, and `screenshot` worked; `screenshot` returned a `/tmp/chrome-devtools-mcp-*/screenshot.png` path.
+## Dev Server Reachability
 
-Use a separate `--user-data-dir` for the automation browser. Do not try to retrofit the user's normal Windows Chrome session unless the debug endpoint is first proven reachable from WSL.
+- Manual and browser testing for `packages/web` uses the fixed port `5173`.
+- Start Vite outside the agent sandbox with `npm run dev -- --host 0.0.0.0 --port 5173 --strictPort` so the user can reach it. Do not let Vite auto-increment to another port.
+- Before starting, run `lsof -iTCP:5173 -sTCP:LISTEN`. Stop an existing stale Agent Factory/Vite owner; if an unrelated process owns the port, report the blocker instead of moving ports.
+- Verify from the same network namespace with `curl -I http://127.0.0.1:5173/` and, when useful, `lsof -iTCP:5173 -sTCP:LISTEN`.
+- Report only `http://127.0.0.1:5173/` unless the user explicitly approves another port.
 
 ## Verification
 
-- After TypeScript, React, analyzer, or export changes, run:
+After TypeScript, React, analyzer, export, or web behavior changes, run:
 
 ```bash
 cd packages/web
 npm run build
 ```
 
-- If dependency installation is needed, run `npm install` in `packages/web` before the build.
-- Do not call work complete without observable verification.
+If dependencies are missing, run `npm install` in `packages/web` before the build.
+
+For artifact, schema, Catalog projection, or validator-sensitive changes, run from the repository root:
+
+```bash
+node scripts/validate-artifacts.mjs
+```
+
+Documentation-only changes must at least pass `git diff --check`, link checks appropriate to the staged documentation set, and an edited-file inventory. Do not call work complete without observable verification; state any unverified item and why it remains unverified.

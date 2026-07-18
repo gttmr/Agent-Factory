@@ -1,276 +1,269 @@
-# Taxonomy
+> 이 문서는 Target Contract다. 현재 구현과의 차이는 [docs/migration/taxonomy-vnext-status.md](../migration/taxonomy-vnext-status.md)가 기록한다.
 
-이 문서는 Agent Factory 분석 워크벤치의 단일 활성 taxonomy 기준이다.
-값은 `packages/web/src/analyzer/types.ts`, `schemas/`, `scripts/validate-artifacts.mjs`와 맞아야 한다.
+# Agent Factory 자산 택소노미(Taxonomy)
+
+이 문서는 Agent Factory가 재사용·검토하는 자산과 그 자산에 부여하는 업무·소유·재사용 속성의 단일 기준이다. 그래프에서 자산을 실행하는 방법은 [Graph IR](graph-ir.md), 작업 단계와 승인 흐름은 [Operating Model](operating-model.md), 현재 구현과의 차이는 [Migration Status](../migration/taxonomy-vnext-status.md)가 맡는다.
+
+## 계층 분리
+
+분류를 시작할 때 먼저 어떤 질문에 답하려는지 정한다. 아래 계층은 서로 보완하지만 하나의 enum이나 상속 트리에 섞지 않는다.
+
+| 계층 | 답하는 질문 |
+| --- | --- |
+| 자산 택소노미(Asset Taxonomy) | 재사용·검토할 자산은 무엇인가? |
+| 그래프 중간 표현(Graph IR) | 이번 Workflow에서 무엇을 실행하는가? |
+| 호출 결정권(Invocation Control) | Tool 사용 여부를 누가 결정하는가? |
+| 바인딩(Binding) | 자산을 어떤 방식으로 연결하는가? |
+| 전송(Transport) | 실제 통신·실행 경로는 무엇인가? |
+| 업무 맥락(Business Context) | 어떤 업무 의미와 적용 범위를 갖는가? |
+| 소유권(Ownership) | 변경·운영·품질 책임은 누구에게 있는가? |
+| 재사용 거버넌스(Reuse Governance) | 기존 자산을 재사용하거나 Catalog 후보로 검토할 상태인가? |
+| 운영 모델(Operating Model) | 분석·설계·검토·Handoff·검증을 어떤 단계로 수행하는가? |
+| Handbook | 특정 행동은 저장소의 어디에서 구현되는가? |
+| Migration Status | Target Contract와 Current Implementation의 차이는 무엇인가? |
+
+## 최상위 자산
+
+최상위 자산은 에이전트(Agent), 워크플로(Workflow), 도구(Tool) 세 가지뿐이다. 역할명, 업무 범위, 연결 프로토콜, 재사용 상태로 새 자산 유형을 만들지 않는다.
+
+| 자산 | 정의 | 본질 |
+| --- | --- | --- |
+| Agent | 입력을 해석하고 판단·선택·분류·요약·추천·생성 등 추론 책임을 갖는 실행 자산이다. 상황에 따른 Tool 사용 여부와 다른 Agent로의 위임 여부를 판단할 수 있다. | 독립적인 판단 책임 |
+| Workflow | 둘 이상의 실행 단위를 연결해 순서·분기·병렬·반복·사용자 입력·중단과 재개·종료 조건을 소유하는 실행 자산이다. | 흐름과 실행 제어 책임 |
+| Tool | 명확한 입력 계약을 받아 특정 기능을 수행하고 명확한 결과 또는 오류를 반환하는 호출 가능 자산이다. | 구조화된 기능 계약 |
+
+### Agent가 아닌 분류
+
+`Domain`, `Common`, `Shared`, `Specialist`, `Root`, `Sub`, `Coordinator`, `Worker`는 Agent의 자산 유형이 아니다. 이 말들은 필요할 때 업무 범위, 재사용 상태, Graph 내 역할, 위임 관계를 설명할 뿐이다. Agent의 분류는 판단 책임이 독립적인지로 결정한다.
+
+### Workflow는 큰 Agent가 아니다
+
+Workflow의 핵심은 흐름 소유다. Agent가 여러 단계를 수행하거나 여러 Tool을 쓴다는 이유만으로 Workflow가 되지 않으며, Workflow 안에 Agent가 포함된다는 이유로 Workflow를 Agent의 크기 변형으로 정의하지 않는다.
+
+### Tool subtype을 만들지 않는다
+
+검색·계산·조회·변환 같은 기능 차이는 필수 subtype이 아니다. 발견성을 높여야 할 때만 선택적 다중 값 `capability_tags`를 사용한다. 태그는 자산 유형이나 실행 계약을 대체하지 않는다.
+
+## 자산이 아닌 것
+
+| 대상 | Target 표현 | 판단 기준 |
+| --- | --- | --- |
+| DB 테이블·데이터셋 | 데이터 리소스(Data Resource) | 호출 기능이 아니라 읽거나 쓰는 데이터 자체다. |
+| 규정집·문서 집합 | 지식 리소스(Knowledge Resource) | 검색·판단 기능이 아니라 지식 내용 자체다. |
+| 외부 시스템 | 외부 의존성(External Dependency) | 실행 자산이 접근하는 시스템이다. |
+| API endpoint 자체 | 외부 인터페이스/의존성(External Interface/Dependency) | 연결 대상이며 독립 판단이나 기능 계약과 같지 않다. |
+| Workflow 내부 helper | 내부 코드 | Graph의 독립 실행·검토 경계가 아니다. |
+| Workflow 내부 결정적 단계 | Function Node | 해당 Workflow 안에서만 의미가 있는 실행 단계다. |
+| 사람 입력·승인 지점 | Human Input Node | 사용자 입력 계약과 중단·재개 지점이다. |
+| 병렬 결과 합류 | Join Node | fan-in과 동기화를 위한 실행 제어다. |
+| MCP | Tool 연결 프로토콜 | Tool 자산에 접근하거나 Tool을 노출하는 연결 방식이다. |
+| A2A | Agent 노출·호출 프로토콜 | Agent 간 원격 프로토콜 경계다. |
+
+예를 들어 규정집은 Knowledge Resource, 규정 검색 기능은 Tool, 검색 결과를 적용할지 판단하는 책임은 Agent, 검색 후 판단과 승인까지 이어지는 흐름은 Workflow다.
+
+## Invocation Control
+
+호출 결정권(Invocation Control)은 Tool을 실행할지 누가 정하는지를 나타낸다. 자산 유형이나 Binding과 혼합하지 않는다.
+
+| 표시명 | 직렬화 | 의미 |
+| --- | --- | --- |
+| Workflow | `workflow` | Workflow의 명시적 Graph가 Tool 실행을 결정한다. |
+| Agent | `agent` | Agent가 런타임 상황을 판단해 Tool 사용 여부를 결정한다. |
+
+사람 대상 Target 문서에서는 Model이나 LLM을 호출 결정권자로 두지 않는다. 모델은 Agent 내부 구현 요소다. Graph 표현과 예시는 [Graph IR의 Tool Invocation Control](graph-ir.md#tool-invocation-control)을 따른다.
+
+## Binding, Transport, Backend 분리
+
+Binding은 Tool을 연결하는 방식, Transport는 실제 실행 경로, Backend는 Tool이 내부에서 접근하는 의존성이다. 세 축을 결합한 Tool subtype을 만들지 않는다.
+
+| 축 | Target 값 또는 예 | 의미 |
+| --- | --- | --- |
+| Tool Binding | `function`, `mcp`, `built_in`, `unresolved` | Tool 계약을 실행 환경에 연결하는 방식 |
+| Transport | `in_process`, `stdio`, `http`, `unknown` | 호출이 실제로 이동하거나 실행되는 경로 |
+| Backend/Dependency | EAI, Legacy API, Database, Document AI, External Service | Tool 구현이 내부에서 접근하는 대상 |
+
+`built_in`은 프레임워크가 공식 Tool 계약으로 제공·관리하는 기능에만 사용한다. ADK 공식 문서는 Agent의 `tools`에 native function, `BaseTool` 구현, `AgentTool`을 둘 수 있고 native function은 `FunctionTool`로 감싼다고 설명한다. 따라서 일반 내부 함수나 단순 라이브러리 호출을 근거 없이 `built_in`으로 분류하지 않는다. 근거는 [ADK LLM agents](https://adk.dev/agents/llm-agents/index.md)와 [Function tools](https://adk.dev/tools-custom/function-tools/index.md)를 따른다.
+
+### “Local Tool”은 유형이 아니다
+
+| 실행 사례 | Binding | Transport | Backend 예 |
+| --- | --- | --- | --- |
+| 로컬 함수 Tool | `function` | `in_process` | 없음 또는 내부 라이브러리 |
+| 로컬 MCP Tool | `mcp` | `stdio` | 로컬 프로세스 |
+| 원격 MCP Tool | `mcp` | `http` | 원격 MCP server |
+| EAI에 접근하는 Function Tool | `function` | `in_process` | EAI |
+
+로컬과 MCP는 반대 개념이 아니다. 위치는 Transport로, 연결 방식은 Binding으로 각각 표현한다. ADK 공식 문서도 MCP 연결을 local `stdio`와 remote HTTP 계열로 구분한다([MCP tools](https://adk.dev/tools-custom/mcp-tools/index.md)).
+
+## A2A 경계
+
+A2A는 자산 유형이 아니라 Agent를 노출하거나 호출하는 프로토콜이다. 원격 Agent를 호출하는 계약은 `asset_type: agent`와 `binding.kind: a2a`, Agent를 노출하는 계약은 `asset_type: agent`와 `exposure.protocol: a2a`로 표현한다.
+
+```yaml
+# 원격 Agent 호출 계약
+asset_id: agent.external-document-reviewer
+asset_type: agent
+binding:
+  kind: a2a
+
+---
+
+# Agent 노출 계약
+asset_id: agent.document-review-provider
+asset_type: agent
+exposure:
+  protocol: a2a
+```
+
+A2A 연결 계약은 독립 Owner, Agent Card, lifecycle, auth, timeout, audit를 관리한다. 원격 호출 여부가 Agent의 판단 책임을 바꾸지 않으며, A2A를 Tool/MCP 호출과 혼합하지 않는다.
+
+2026-07-18에 확인한 ADK 공식 문서는 기존 ADK Agent를 A2A server로 노출하고 `RemoteA2aAgent`로 소비하는 방법을 설명하지만, Workflow를 A2A로 노출한다고 직접 명시한 문장은 확인되지 않았다. Workflow 노출을 일반 규칙으로 확장하지 않는다. 자세한 근거는 [ADK A2A](https://adk.dev/a2a/index.md)와 [A2A exposing](https://adk.dev/a2a/quickstart-exposing/index.md)을 따른다.
+
+## Business Context와 Ownership
+
+업무 맥락(Business Context)은 자산이 적용되는 범위이고, 소유권(Ownership)은 변경·운영·품질 책임이다. 두 축을 분리하며 Owner는 Domain과 같지 않다.
+
+| 필드 | 허용 값 또는 형식 | 의미 |
+| --- | --- | --- |
+| `domain_scope` | `domain_specific`, `cross_domain`, `domain_neutral` | 하나의 업무, 여러 업무, 업무 중립 중 어디에 해당하는지 표현한다. |
+| `business_domains` | 업무 Domain 식별자 목록 | `domain_specific` 또는 `cross_domain`의 실제 업무 범위를 기록한다. |
+| `owner` | 책임 조직 식별자 | 변경·운영·품질에 책임지는 팀을 기록한다. |
+
+`공통`은 고객·수신·여신·카드·리스크와 같은 Business Domain 값이 아니다. 여러 업무에서 쓸 수 있다는 사실은 `cross_domain` 또는 `domain_neutral`로, 책임 조직은 `owner`로 표현한다. Tool Node는 참조한 Tool 자산의 Owner를 유지하고 Function Node는 부모 Workflow의 맥락을 상속한다.
+
+### OCR 자산 예시
+
+일반 OCR Tool, 여신 Workflow, 여신 전용 OCR Tool은 서로 다른 업무 범위와 소유 책임을 가질 수 있다.
+
+```yaml
+- asset_id: tool.ocr-text-extraction
+  asset_type: tool
+  name: OCR 텍스트 추출
+  domain_scope: domain_neutral
+  business_domains: []
+  owner: AI공통플랫폼팀
+
+- asset_id: workflow.loan-document-review
+  asset_type: workflow
+  name: 여신 문서 검토
+  domain_scope: domain_specific
+  business_domains:
+    - loan
+  owner: 여신AI팀
+
+- asset_id: tool.loan-application-ocr
+  asset_type: tool
+  name: 여신 신청서 OCR
+  domain_scope: domain_specific
+  business_domains:
+    - loan
+  owner: 여신AI팀
+```
+
+일반 OCR Tool이 여러 업무에서 쓰인다는 이유로 Owner가 각 업무 팀으로 바뀌지 않는다. 반대로 여신 전용 입력·오류·감사 계약이 독립적이라면 `tool.loan-application-ocr`을 별도 Tool로 검토할 수 있다.
+
+## Workflow Profile
+
+Workflow의 표현 방식과 조정 방식을 서로 다른 축으로 기록한다.
+
+```yaml
+workflow_profile:
+  representation: graph | dynamic | unresolved
+  coordination: explicit | agent_delegation | mixed
+  template_ref: string | null
+```
+
+| 축 | 값 | 해석 |
+| --- | --- | --- |
+| `representation` | `graph` | Node와 Edge가 명시된 Graph로 표현한다. |
+| `representation` | `dynamic` | 런타임 코드가 조건·반복·재귀 등 경로를 결정한다. |
+| `representation` | `unresolved` | 증거가 부족해 표현 방식을 확정하지 못했다. |
+| `coordination` | `explicit` | Workflow의 명시적 흐름이 실행 단위를 조정한다. |
+| `coordination` | `agent_delegation` | Agent가 상황에 따라 다른 Agent로 위임한다. |
+| `coordination` | `mixed` | 명시적 흐름과 Agent 위임을 함께 사용한다. |
+| `template_ref` | 문자열 또는 `null` | 검토된 구현 패턴 참조이며 subtype이 아니다. |
+
+`orchestration`은 Workflow subtype이 아니다. 조정 책임에 대한 설명이나 태그로만 사용할 수 있다. `collaborative`는 coordination 관점의 설명이고, `template`은 구현 패턴 참조다.
+
+정보 부족도 정상 유형으로 만들지 않는다. 아직 결정할 수 없다면 `representation: unresolved`, `status: needs_info`, `missing_information`을 함께 기록한다.
+
+## Reuse Governance
+
+재사용 거버넌스(Reuse Governance)는 자산 종류와 분리된 검토 상태다. 필드명은 모든 Target 문서에서 `reuse_status`를 사용한다.
+
+| `reuse_status` | 의미 |
+| --- | --- |
+| `not_reviewed` | 재사용 판단을 아직 시작하지 않았다. |
+| `reuse_existing` | 검토된 기존 자산을 참조한다. |
+| `publish_candidate` | Catalog 등록 후보로 검토한다. |
+| `project_only` | 현재 프로젝트 안에서만 사용한다. |
+| `excluded` | 재사용·등록 대상에서 제외한다. |
+
+`capability_tags`는 검색과 발견을 위한 선택적 다중 태그다. 다음 사항을 결정해서는 안 된다.
+
+- Agent/Workflow/Tool 자산 유형
+- 생성 경로 또는 실행 분기
+- 필수 subtype
+- 보안·권한 정책
+- Owner
+- `domain_scope`와 `business_domains`
+- `reuse_status`
+
+## 판별 질문
+
+분석자는 아래 순서대로 묻는다. 앞 질문에서 책임 경계가 확인되면 뒤 질문은 그 경계를 보완하는 데 사용한다.
+
+1. 입력을 해석해 독립적으로 판단·선택·분류·요약·추천·생성하는 책임이 있는가? 그렇다면 Agent 후보다.
+2. 둘 이상의 실행 단위를 연결하고 순서·분기·병렬·반복·입력 대기·중단과 재개·종료 조건을 소유하는가? 그렇다면 Workflow 후보다.
+3. 명확한 입력 계약을 받아 특정 기능을 수행하고 결과 또는 오류를 구조화해 반환하는가? 그렇다면 Tool 후보다.
+4. 실행 기능이 아니라 데이터·문서·지식·외부 시스템·endpoint 자체인가? 그렇다면 Resource, Dependency 또는 Interface로 표현한다.
+5. 하나의 Workflow 안에서만 의미가 있고 Graph 도달 시 결정적으로 실행되는 private 단계인가? 그렇다면 Function Node 후보이며 Catalog 자산으로 분류하지 않는다.
+6. 위 판단에 필요한 정보가 부족한가? 새 유형을 만들지 말고 `status: needs_info`와 `missing_information`을 기록한다.
+
+## 금지되는 분류 패턴
+
+아래 표현은 Target Contract의 활성 기준으로 사용할 수 없다.
+
+| 금지 표현 | 이유와 Target 해석 |
+| --- | --- |
+| “Adapter는 callable capability다” | Adapter를 최상위 자산으로 유지하지 않는다. 문맥에 따라 Tool, Resource, Dependency를 판별한다. |
+| “Remote A2A는 네 번째 module category다” | A2A는 Agent의 Binding 또는 Exposure protocol이다. |
+| “Agent는 specialist 또는 shared다” | 역할·재사용 범위는 Agent 유형이 아니다. |
+| “공통 Agent” | 업무 범위, Owner, 재사용 상태를 분리한다. |
+| “Domain Agent” | Business Context는 Agent 유형이 아니다. |
+| “Model이 Invocation Control을 소유한다” | 사람 대상 기준에서는 Agent가 Tool 사용 여부를 판단한다. |
+| “LLM-selected 공식 호출 제어” | Target 직렬화는 Invocation Control: Agent인 `agent`를 사용한다. |
+| “계산 Tool subtype” | 계산은 필요할 때 `capability_tags`로 찾는다. |
+| “Retrieval Adapter subtype” | 검색 기능이면 Tool 후보로, 지식 자체면 Knowledge Resource로 판별한다. |
+| “unknown은 정상 종류다” | `unresolved`와 `needs_info`, `missing_information`으로 미결 상태를 드러낸다. |
+
+## Current Implementation 대응(`legacy`)
+
+현재 코드와 스키마는 아래 `legacy` vocabulary를 직렬화한다. 이 표는 현행 값을 Target 관점에서 읽기 위한 대응표이며, 현재 구현이 Target Contract를 지원한다는 뜻이 아니다. 상세 gap은 [Migration Status](../migration/taxonomy-vnext-status.md)가 기록한다.
+
+| `legacy` | Target 해석 | 비고 |
+| --- | --- | --- |
+| `module_category: agent` | Agent 자산 후보 | 필드명과 주변 enum은 `legacy`다. |
+| `module_category: workflow` | Workflow 자산 후보 | Target Workflow Profile은 별도 축이다. |
+| `module_category: adapter` | 문맥에 따라 Tool, Resource 또는 Dependency | 일괄 Tool 변환 대상이 아니다. |
+| `module_category: remote_a2a` | Agent 자산 + A2A Binding/Exposure | 원격 프로토콜을 자산 유형으로 직렬화하는 `legacy` 값이다. |
+| `adapter_kind` (8종: `legacy_api`, `retrieval`, `rule_registry`, `data_query`, `template`, `computation`, `external_service`, `unknown`) | Tool의 선택적 `capability_tags`, Resource/Dependency, 또는 미결 정보로 재판별 | 여덟 subtype을 Target 필수 분류로 사용하지 않는다. |
+| `agent_kind` (`specialist`, `shared`) | 업무 맥락·Graph 역할·재사용 상태로 분리 | Agent subtype으로 계승하지 않는다. |
+| `workflow_kind: orchestration` | 조정 책임 설명; `workflow_profile`로 별도 판별 | Target subtype이 아니다. |
+| `workflow_kind: graph` 및 `workflow_kind: dynamic` | `workflow_profile.representation`의 `graph`/`dynamic` 후보 | coordination과 `template_ref`는 별도 검토한다. |
+| `workflow_kind: unknown` | `representation: unresolved` + `status: needs_info` + `missing_information` | 정상 유형으로 계승하지 않는다. |
+| `runtime_binding` | Binding, Transport, Backend/Dependency로 분리 | `direct_api`, `mcp`, `mcp_tool`, `local_function`, `remote_a2a`, `workflow_call`, `ui_input`, `unresolved` 등을 한 축에 둔 `legacy` 필드다. |
+| `legacy_recommended_type` | migration metadata | primary classifier가 아니다. |
 
 ## ADK 확인 기준
 
-2026-05-22 기준으로 `adk-docs-mcp`에서 `list_doc_sources -> https://adk.dev/llms.txt -> fetch_docs` 순서로 다음 문서를 확인했다.
-2026-07-03 기준 active taxonomy와 Runtime Handoff target은 ADK 2.3이다. ADK Python 2.0 GA는 Graph/Dynamic/A2A 분류의 역사적 기준이고, 현재 설치·검증 target은 `google-adk` 2.3.0이다.
-
-- `https://adk.dev/2.0/index.md`: ADK Python 2.0 GA는 2026년 5월 19일 release로 문서화되어 있고, graph-based workflows, dynamic workflows, collaborative workflows를 핵심 기능으로 둔다.
-- `https://adk.dev/graphs/index.md`: graph-based workflows는 Agents, Tools, Functions를 node로 두고 edge로 routing, branching, state management를 정의한다.
-- `https://adk.dev/workflows/index.md`: ADK workflows는 graph-based, dynamic, collaborative, template workflow를 구분한다.
-- `https://adk.dev/a2a/index.md`: ADK A2A는 remote A2A agent와의 통신을 다루며 local sub-agent, adapter, MCP tool 호출과 구분한다.
-- 릴리스 기준: ADK Python 2.0 GA(2026-05-19) 이후 2.1(2026-05-23), 2.2(2026-06-04), 2.3(2026-06-18)을 거쳐 현재 target을 2.3으로 둔다. 2.1 -> 2.3 사이에 generated code에 영향을 주는 API rename은 확인되지 않았다.
-
-이 워크벤치는 ADK 2.3 Graph IR을 기본 표현으로 쓰되, private deployment code나 credentials를 생성하지 않는다.
-
-## Workbench Graph Model
-
-Agent Factory Workbench는 Workflow-first Graph Model이다.
-`module_category`는 재사용·검토 책임의 축이고, Graph IR의 `node_kind`/`invoke_binding`/`call_control`/`mock_binding`은 실행 그래프 안에서 그 책임을 어떻게 호출하거나 대기할지 나타내는 축이다.
-
-- Workflow가 graph owner다. 순서, branch, join, loop intent, callback wait/resume, subworkflow call은 Workflow Graph IR 안에서 표현한다.
-- Agent는 judgment node다. 판단, 요약, 분류, 추천, triage, LLM toolset 선택처럼 추론 책임을 가진다.
-- Adapter는 call node다. API, retrieval, registry, computation, external service 호출은 `adapter_call`로 표현한다.
-- MCP는 category가 아니다. MCP는 `invoke_binding`, `mock_binding`, catalog/runtime contract로 표현하는 호출 방식이다.
-- Remote A2A는 독립 원격 agent protocol boundary일 때만 사용한다.
-
-## module_category
-
-허용되는 `module_category` 값은 네 개뿐이다.
-
-- `agent`
-- `workflow`
-- `adapter`
-- `remote_a2a`
-
-불명확하면 새 category를 만들지 말고 evidence, missing information, assumption을 남긴다.
-
-## catalog runtime binding
-
-Catalog에 등록된 개체는 재사용 가능한 runtime contract다.
-현재 local MVP에서는 ADK smoke를 완성된 입출력 shape로 실행하기 위해 seed catalog가 deterministic synthetic `runtime_mock`을 함께 가질 수 있다.
-`runtime_mock`은 test double이며, 실제 고객/은행 데이터, private endpoint, credential, deployment script, 운영 business logic을 담지 않는다.
-Skill-led 실행은 검토 artifact를 `artifacts/af/<req-id>/` 아래에 둘 수 있다. 이 파일들도 동일한 schema와 catalog runtime-binding 규칙을 따라야 한다.
-
-`module_category`는 책임의 종류를 나타내고, `runtime_binding`은 module candidate 또는 catalog entry의 실행/연결 방식을 나타낸다.
-Graph IR 노드별 실제 호출 방식은 `invoke_binding`과 `call_control`을 우선 읽는다.
-
-Serialized `runtime_binding` enum:
-
-| value | meaning |
-| --- | --- |
-| `unresolved` | 실행 방식이 아직 확정되지 않았다. |
-| `direct_api` | 실제 API/EAI client로 보강될 호출 경계다. 생성 skeleton에는 endpoint나 credential을 넣지 않는다. |
-| `mcp` | MCP server-level binding 또는 legacy MCP catalog/runtime binding을 나타내는 compatibility 값이다. Graph IR 노드 호출은 가능하면 `invoke_binding`으로 더 구체화한다. |
-| `mcp_tool` | MCP server/tool 계약으로 호출한다. 로컬 skeleton smoke에서는 Mock Lab binding을 통해 synthetic tool을 호출할 수 있다. |
-| `local_function` | 로컬 함수 placeholder 또는 개발자 보강 경계다. |
-| `remote_a2a` | Remote A2A 방식으로 호출되는 runtime contract다. |
-| `workflow_call` | 기존 Workflow 또는 생성 예정 Workflow skeleton을 호출하는 parent graph node다. |
-| `ui_input` | 사람 입력/승인 지점이다. |
-
-공통 Workflow는 여러 도메인에서 원격 실행 경계로 호출될 수 있으므로 catalog에서는 `module_category: workflow`와 `runtime_binding: remote_a2a`를 함께 사용할 수 있다.
-이 경우에도 독립 원격 Agent 자체를 새로 설계한다는 증거가 없으면 `module_category: remote_a2a` 후보를 새로 만들지 않는다.
-
-### Graph invoke binding
-
-Graph IR의 호출 축은 category가 아니라 node-level binding이다.
-
-Serialized `invoke_binding` enum:
-
-| value | meaning |
-| --- | --- |
-| `unresolved` | 호출 방식 미확정. |
-| `local_python` | generated/local Python wiring boundary. |
-| `direct_api` | API/EAI 등 직접 호출 경계. |
-| `mcp_tool` | Workflow가 고정한 단일 MCP tool 호출. |
-| `mcp_toolset` | Agent가 LLM으로 선택할 수 있는 MCP toolset. |
-| `local_function` | local function placeholder 또는 utility call. |
-| `internal_workflow` | 기존 Workflow 또는 생성 예정 Workflow skeleton 호출. |
-| `ui_input` | Workbench/user input boundary. |
-| `remote_a2a` | Remote A2A protocol call. |
-| `callback_wait` | callback wait/resume boundary. |
-| `unknown` | 호출 방식이 알려지지 않음. |
-
-Serialized `decision_owner` enum:
-
-| value | meaning |
-| --- | --- |
-| `workflow_code` | Workflow code 또는 deterministic graph가 선택한다. |
-| `llm` | LLM이 선택한다. |
-| `human` | 사람이 선택한다. |
-| `remote_agent` | remote agent가 선택한다. |
-| `system` | runtime/system policy가 선택한다. |
-| `unknown` | 선택 주체가 알려지지 않았다. |
-
-Serialized `call_control` enum:
-
-| value | meaning |
-| --- | --- |
-| `none` | 별도 호출 제어가 없다. |
-| `fixed_by_workflow` | Workflow가 호출 대상을 고정한다. |
-| `selected_by_llm` | LLM이 호출 대상을 선택한다. |
-| `selected_by_human` | 사람이 호출 대상을 선택한다. |
-| `event_callback` | callback event로 재개된다. |
-| `resume` | resume path를 나타낸다. |
-| `unknown` | 호출 제어가 알려지지 않았다. |
-
-Common combinations:
-
-- `invoke_binding: mcp_tool` + `call_control: fixed_by_workflow`: Workflow가 정한 단일 MCP tool을 `adapter_call` 노드가 호출한다. Mock Lab smoke 연결은 `mock_binding.provider: mock_lab`로만 저장한다.
-- `invoke_binding: mcp_toolset` + `call_control: selected_by_llm`: Agent가 승인된 MCP toolset 중에서 런타임에 tool을 선택한다. 이 경우 호출 선택권은 `decision_owner: llm`인 agent/toolset path에 있고, deterministic `adapter_call`로 모델링하지 않는다.
-- `invoke_binding: internal_workflow`: 기존 Workflow 또는 생성 예정 Workflow skeleton을 `workflow_call` 노드로 호출한다.
-- `invoke_binding: callback_wait`: callback 대기와 resume을 Graph IR execution semantics로 표시한다. 별도 module category가 아니다.
-
-### versioned catalog entry
-
-Reuse Hub `등록 승인`이 `POST /api/catalog/publish`로 추가하는 entry는 버전 메타데이터를 함께 가진다.
-
-- `id`: `<category>-<name>` 형태의 안정 식별자.
-- `version`: 같은 `(category, name)`에 대해 publish마다 1씩 증가하는 정수.
-- `status`: `published` 또는 `deprecated`. 새 버전을 publish하면 같은 이름의 이전 항목이 `deprecated`로 표시된다.
-- `provenance: catalog_published`와 출처 추적용 `published_at`, `published_from`(source req-id), 선택적 `source_candidate_id`.
-- Workflow entry가 `component_source: remote_a2a` 및 `runtime_binding: remote_a2a`로 노출되면 `a2a_provider_req_id`로 제공자 artifact root를 가리킨다. `published_from`은 publish provenance로만 사용하며 provider id로 대체하지 않는다.
-
-Catalog hydration(`useCatalog`)은 이름 기준으로 중복을 제거하면서 `deprecated`를 제외하고 최고 `version`만 Reuse Hub에 노출한다. 이 필드들은 additive이며, seed 항목(버전 메타데이터 없음)도 그대로 유효하다.
-
-## runtimeContracts
-
-`AnalysisResult.runtimeContracts`는 callback과 runtime support 경계를 검토하는 별도 artifact다. 다음 항목은 top-level `module_category`를 새로 만들지 않아도 Runtime 계약으로 검토할 수 있다.
-
-Serialized `runtime_contract_kind` enum:
-
-| value | meaning |
-| --- | --- |
-| `mcp_legacy_adapter` | MCP 또는 legacy adapter runtime contract. |
-| `eai_legacy_adapter` | EAI/legacy adapter runtime contract. |
-| `context_manager` | Context Manager contract. |
-| `callback_broker` | Callback Broker contract. |
-| `adk_callback` | ADK callback responsibilities. |
-| `async_resume` | async resume contract. |
-
-필수 Runtime 계약은 `contract_status: approved`가 되기 전까지 scaffold-plan의 blocker로 남는다. 실제 endpoint, credential, private customer payload, deployment script는 이 artifact에 넣지 않는다.
-
-## agent_kind
-
-`module_category: agent`일 때만 사용한다.
-
-- `specialist`
-- `shared`
-
-Agent는 판단, 요약, 분류, 추천, triage처럼 추론 책임을 가진 경계다.
-
-## workflow_kind
-
-`module_category: workflow`일 때만 사용한다.
-
-- `orchestration`
-- `graph`
-- `dynamic`
-- `unknown`
-
-Workflow는 큰 의미의 Workflow Agent 경계다.
-순차 실행, 병렬 fan-out/fan-in, 반복, 사람 승인 gate는 더 이상 `workflow_kind` 값이 아니다.
-그 작은 흐름은 `processFlow` Graph IR의 `node_kind`, `container_kind`, `edge_kind`, `execution_semantics`로 표현한다.
-
-- `orchestration`: 여러 Agent/Adapter/Workflow를 상위에서 조율하지만 아직 명시적 graph topology가 핵심 산출물이 아닐 때.
-- `graph`: ADK 2.3 graph-based workflow처럼 node와 edge, route, join, loop, human input이 명시적인 설계 산출물일 때.
-- `dynamic`: Python 조건문, loop, recursion, `ctx.run_node` 같은 코드가 런타임 경로를 직접 결정할 때.
-- `unknown`: 요구사항 증거가 부족해 workflow subtype을 확정할 수 없을 때.
-
-`workflow_kind: dynamic`과 `container_kind: dynamic_workflow`는 Graph IR에서 runtime 경로가 코드로 결정되는 흐름을 보존한다.
-`dynamic_workflow` container는 runtime `adk_mapping`을 선언하지 않는다. Runnable generation은 reviewed dynamic/loop shape를 감지하면 public `output_mode: "runnable"` 안에서 내부 ADK dynamic workflow builder를 선택할 수 있다.
-Generator가 만드는 dynamic Python은 `@node` + `ctx.run_node(...)` wiring skeleton과 reviewed loop decision handling까지이며, 실제 production business loop/fallback/escalation logic은 생성 bundle의 TODO 경계 안에서 전문 개발자가 보강한다.
-
-## Graph IR call nodes
-
-Workbench Graph IR는 책임 분류와 실행 노드를 분리한다.
-
-Serialized `node_kind` enum:
-
-| value | meaning |
-| --- | --- |
-| `input` | graph input boundary. |
-| `output` | graph output boundary. |
-| `agent` | Workflow 안의 판단/추론 노드. |
-| `function` | local function or generated helper node. |
-| `tool` | legacy/tool compatibility node. |
-| `adapter` | legacy adapter compatibility node. |
-| `adapter_call` | Workflow가 고정 호출하는 Adapter capability node. |
-| `human_input` | 사람 입력/승인 node. |
-| `callback_wait` | callback wait/resume node. |
-| `workflow` | legacy workflow compatibility node. |
-| `workflow_call` | 공식 subworkflow/existing workflow call node. |
-| `remote_a2a` | Remote A2A endpoint/facade node. |
-| `remote_agent_call` | Remote A2A 계약을 가진 외부 Agent call node. |
-| `join` | fan-in/join node. |
-| `router` | 조건 분기 node. |
-| `loop_control` | loop decision/control node. |
-
-The bullets below are authoring guidance for the primary call-node patterns, not a complete enum list.
-
-- `node_kind: agent`: Workflow 안의 판단/추론 노드다. LLM이 toolset을 고르는 경우 `invoke_binding: mcp_toolset`, `decision_owner: llm`, `call_control: selected_by_llm`으로 표현한다.
-- `node_kind: adapter_call`: Workflow가 고정 호출하는 Adapter capability 노드다. 단일 MCP tool 호출은 `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`로 표현하고 Mock Lab 연계는 `mock_binding`에 저장한다.
-- `node_kind: router`: 조건 분기 노드다.
-- `node_kind: human_input`: 사람 입력/승인 노드다.
-- `node_kind: callback_wait`: callback wait/resume 지점이다. `flow_kind: callback|resume` 또는 `call_control: event_callback|resume` edge semantics와 함께 검토한다.
-- `node_kind: workflow_call`: 공식 subworkflow/existing workflow 호출 노드다. 기존 Workflow, catalog Workflow, artifact Workflow, 또는 target skeleton을 parent graph에 조립한다.
-- `node_kind: remote_agent_call`: Remote A2A 계약을 가진 외부 Agent 호출 노드다.
-
-legacy node kind `adapter`, `workflow`, `remote_a2a`, `tool`, `function`은 legacy/migration 호환을 위해서만 유효하며, 새로 작성하는 노드는 call-node kind `adapter_call`, `workflow_call`, `remote_agent_call`을 우선 사용한다.
-
-`workflow_call`은 `workflow_ref`, `input_schema`, `output_schema`, `input_mapping`, `output_mapping`, `adk_skeleton_contract`를 가질 수 있다.
-target workflow가 아직 없으면 placeholder skeleton을 만들고 README/TODO에 수동 연결 필요를 남긴다.
-
-`adapter_call`은 `invoke_binding: mcp_tool`, `call_control: fixed_by_workflow`와 함께 `mock_binding.provider: mock_lab`를 가질 수 있다.
-Mock Lab은 `packages/mock-lab`의 local test double이며 catalog runtime contract를 mock으로 바꾸지 않는다.
-최소 binding은 `provider`, `package_path`, `mock_server_id`, `tool_name`, `input_schema`, `output_schema`, `sample_response_ref`, `status`다.
-`status: linked`일 때만 ADK Web smoke용 mock wiring을 생성한다.
-
-`side_effect`와 `policy`는 node-level governance summary다.
-이 필드는 그래프 검토와 UI 배지에 필요한 요약만 담고, auth/timeout/retry/fallback/data policy/callback resume 같은 source of truth는 `AnalysisResult.runtimeContracts`와 Remote A2A contract artifact에 둔다.
-
-## Graph IR edge kinds
-
-Serialized `edge_kind` enum:
-
-| value | meaning |
-| --- | --- |
-| `event_output` | normal event/output transition. |
-| `event_message` | event/message transition. |
-| `session_state` | ADK session state channel. |
-| `temp_state` | ADK temporary state channel. |
-| `user_state` | ADK user state channel. |
-| `app_state` | ADK app state channel. |
-| `artifact` | artifact save/load channel. |
-| `route` | router branch decision edge. |
-| `control` | control-flow edge such as loop/back/exit. |
-| `remote_a2a` | Remote A2A boundary-crossing edge. |
-
-## adapter_kind
-
-`module_category: adapter`일 때만 사용한다.
-
-- `legacy_api`
-- `retrieval`
-- `rule_registry`
-- `data_query`
-- `template`
-- `computation`
-- `external_service`
-- `unknown`
-
-Adapter는 Agent나 Workflow가 호출하는 callable capability다.
-MCP tool, 외부 tool server, retrieval, grounding, rule registry는 독립 원격 agent 계약이 확인되지 않는 한 Adapter 쪽에서 먼저 검토한다.
-Catalog의 Adapter는 기본적으로 실제 MCP 계약을 가진 runtime binding으로 등록한다.
-
-## remote_contract_kind
-
-`module_category: remote_a2a`일 때만 사용한다.
-
-- `a2a`
-- `unknown`
-
-Remote A2A는 독립 소유, 독립 배포, agent card 또는 discovery, 요청/응답 schema, task lifecycle, auth, timeout, retry, fallback, audit, data policy가 확인되는 원격 agent 프로토콜 경계다.
-local graph가 복잡하거나 branch, join, loop, human input을 포함한다는 이유만으로 `remote_a2a`를 만들지 않는다.
-
-현재 repo의 A2A artifact 계약은 기존 A2A 1.0/latest vocabulary를 유지한다. ADK 공식 A2A 페이지는 experimental로 표기되어 있으므로, 프로토콜 버전 변경은 별도 작업에서 검토한다.
-
-## 더 이상 최상위가 아닌 것
-
-- `Tool/Adapter`는 top-level category가 아니다.
-- `Knowledge Retrieval`은 `module_category: adapter`, `adapter_kind: retrieval`로 표현한다.
-- `Metadata Registry`와 관리되는 업무 규칙은 `module_category: adapter`, `adapter_kind: rule_registry`로 표현한다.
-- `legacy_recommended_type`은 migration metadata일 뿐 primary classifier가 아니다.
+ADK 공식 문서 근거는 2026-07-18에 확인했다. 확인 결과는 Target Taxonomy를 프레임워크 용어와 혼동하지 않도록 다음 원칙으로 사용한다.
+
+- ADK는 Agent를 목표를 자율적으로 달성하는 실행 단위로 설명하고, model·instruction·tools를 Agent의 구성요소로 둔다. Tool 선택을 사람 대상 Taxonomy에서 표현할 때는 Agent의 판단으로 기술한다([Agents](https://adk.dev/agents/index.md), [LLM agents](https://adk.dev/agents/llm-agents/index.md)).
+- ADK Workflow 문서는 graph-based, dynamic, collaborative, template을 상호 배타적인 단일 subtype보다 여러 구축 방법과 상호 보완적 구성 방식으로 설명한다. Target Contract가 representation과 coordination을 분리하는 근거로 사용한다([Workflows](https://adk.dev/workflows/index.md), [Graphs](https://adk.dev/graphs/index.md)).
+- ADK Graph는 Agent, Tool, human input task, code function을 Node로 둘 수 있다고 설명한다. Catalog 자산과 Graph Node를 분리하는 근거다([Graphs](https://adk.dev/graphs/index.md)).
+- Native function은 Agent의 tools 목록에서 `FunctionTool`로 감싸지며, Function Tool은 ADK Tool 체계에 속한다([Function tools](https://adk.dev/tools-custom/function-tools/index.md)).
+- MCP는 external application, data source, tool과의 연결을 표준화하는 프로토콜이고, A2A는 원격 Agent 간 통신 프로토콜이다([MCP](https://adk.dev/mcp/index.md), [A2A](https://adk.dev/a2a/index.md)).
+- A2A 지원은 확인한 공식 문서에서 Experimental로 표시되어 있다. Workflow A2A 노출은 직접 근거가 발견되지 않았으므로 일반화하지 않는다.
+
+ADK 버전 번호는 Taxonomy의 본질이 아니다. 버전은 특정 연결·실행 기능을 검증할 때의 근거 메타데이터이며, Agent/Workflow/Tool의 책임 정의를 바꾸는 자산 분류값으로 사용하지 않는다.

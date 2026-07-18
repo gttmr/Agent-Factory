@@ -1,6 +1,8 @@
 # ADK Agent Execution Modes
 
-이 문서는 Agent Factory가 ADK `LlmAgent.mode`를 Graph IR와 runnable source 생성에서 어떻게 해석해야 하는지 정의한다.
+> 이 문서는 Current Implementation 기준의 ADK `LlmAgent.mode` 해석 정책이다. 자산 분류는 [taxonomy.md](taxonomy.md), Graph 표현은 [graph-ir.md](graph-ir.md) 기준이다.
+
+이 문서는 Agent Factory의 현행 Graph IR와 runnable source 생성에서 ADK `LlmAgent.mode`를 어떻게 해석하는지 정의한다. 아래 직렬화 값과 생성기 규칙은 Current Implementation 설명이며 Target 자산 분류를 새로 정의하지 않는다.
 기준은 ADK Python 2.2.0 실측, 로컬 ADK 2.2.0 source inspection, `adk-docs-mcp`로 확인한 공식 ADK 문서다.
 
 핵심 결론:
@@ -58,7 +60,7 @@ ADK source behavior:
 해석:
 
 - "현재 `node_input`을 보고 LLM 한 번 호출하는 deterministic-ish graph step"에 가장 가깝다.
-- classifier, extractor, formatter, adapter-call planner, response drafter처럼 명시 input/output을 가진 node에 적합하다.
+- classifier, extractor, formatter, legacy `adapter_call` planner, response drafter처럼 명시 input/output을 가진 node에 적합하다.
 - 같은 session에서 여러 번 호출해도 이전 user turn을 근거로 답하지 않아야 한다.
 
 Agent Factory policy:

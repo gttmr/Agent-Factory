@@ -1,5 +1,7 @@
 # Web Workbench Design System
 
+이 문서의 Agent/Workflow/Adapter/Remote A2A category 시각 계약은 Current Implementation의 `legacy` 어휘이며, Target 자산 기준은 [Taxonomy](../workbench/taxonomy.md)를 따른다.
+
 이 문서는 `packages/web` 워크벤치 UI 의 디자인 시스템을 정의한다. 카테고리 색·글리프 컨트랙트, 공유 컴포넌트 패턴, 화면 배치, CSS 함정을 다룬다. Graph IR 의미와 marker 판정 규칙은 `docs/workbench/process-flow.md`를 따른다.
 
 ## 디자인 원칙

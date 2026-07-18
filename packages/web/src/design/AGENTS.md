@@ -5,6 +5,8 @@
 This directory contains DesignWorkbench support panels and pure helpers for path
 search, review notes, bottom tabs, runtime contracts, and Remote A2A editing.
 
+Target asset and protocol-boundary meanings are canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md) and [Graph IR](../../../../docs/workbench/graph-ir.md); `Remote A2A` candidate, tab, and contract names below describe Current Implementation (`legacy`) UI surfaces.
+
 ## Where To Look
 
 | Task | Files |

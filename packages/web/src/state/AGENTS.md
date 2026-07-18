@@ -7,6 +7,8 @@ layer's access point for artifact roots, manifest approvals, analysis artifacts,
 catalog data, text artifacts, verification, Stage Runner, Runtime, and Mock Lab
 discovery.
 
+Target asset terminology is canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md), while hook payload fields retain Current Implementation (`legacy`) names where required by existing APIs and artifacts.
+
 ## Where To Look
 
 | Task | Files |

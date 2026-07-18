@@ -1,85 +1,129 @@
-# Analysis Guide
+# Raw requirement 분석 가이드
 
-이 문서는 사용자 요구사항을 Agent Factory 분석 산출물로 바꾸는 기본 절차다.
-현재 기본 운영 모델은 skill-led DLC 흐름이다. Workbench는 Analyze/Design Stage Runner 패널로 `af-analyze-requirement`, `af-design-boundaries` 실행을 서버에 요청하고, proposed artifact를 diff/preview 후 적용한다.
-첫 사용자는 개발 리더이며, v1.0의 임시 은행 도메인은 `고객`, `수신`, `여신`, `카드`, `리스크`다.
+이 문서는 raw requirement를 검토 가능한 분석 artifact로 바꾸는 운영 절차를 설명한다. 자산 정의와 속성은 [Taxonomy](./taxonomy.md), Workflow 내부 실행 표현은 [Graph IR](./graph-ir.md), 작업 단계와 승인 gate는 [Operating Model](./operating-model.md)을 단일 기준으로 사용하며 여기서 다시 정의하지 않는다.
 
-## 분석 순서
+## Target Contract
 
-1. Raw requirement와 requester context를 캡처한다.
-2. 목표, 입력, 출력, 언급된 시스템, 위험 신호, 누락 정보, 모순, 가정을 정규화한다.
-3. Evidence summary를 만든다. 추정은 추정으로, 확인된 사실은 확인된 사실로 분리한다.
-4. 후보 모듈을 `agent`, `workflow`, `adapter`, `remote_a2a` 중 하나로 분류한다.
-5. 선택한 category에 맞는 subtype을 채운다.
-6. [Workflow decision guide](./workflow-decision-guide.md)에 따라 process flow를 그린다.
-7. 개발 리더가 DesignWorkbench의 모듈 검토 패널에서 후보별 책임, 계약, Graph 연결을 검토한다.
-8. `needs_info` 후보는 Design Stage Runner 또는 외부 `af-design-boundaries` producer가 제안한 Resolution Draft/patch를 diff로 확인한 뒤 canonical artifact에 적용한다.
-9. 개발 리더가 각 후보를 `approved`, `deferred`, `rejected`, `needs_info` 중 하나로 결정한다.
-10. Catalog review에서 기존 spec 재사용 여부와 신규 등록/제외 여부를 결정한다.
-11. 승인된 후보만 `scaffold-plan`으로 묶고 `af-build-runtime-stub` 또는 ADK Runtime Handoff에서 TODO/runtime wiring 경계와 structural smoke 준비 상태를 확인한다.
-12. `af-verify-feedback`로 검증 결과와 catalog delta 제안을 남긴다.
+분석의 목적은 requirement를 곧바로 구현안으로 바꾸는 것이 아니다. 확인된 근거, 정규화된 요구사항, 미결 정보, Agent·Workflow·Tool 후보와 비자산 경계를 분리해 개발 리더가 책임과 계약을 검토할 수 있게 만드는 것이다.
 
-## 분석 결과 화면
+분석 결과에는 최소한 다음 정보가 남아야 한다.
 
-Workbench의 `분석 결과` 단계는 보고서 화면이 아니라 모듈 검토 착수 전의 이해 확인 화면이다.
-개발 리더는 상단의 핵심 계약 5개(`목표`, `도메인`, `입력`, `출력`, `시스템`)가 요구사항과 맞는지 확인한 뒤 `모듈 검토로 이동`한다.
-가정, 누락 정보, 모순, 위험 신호, 정규화 JSON은 보조 근거 drawer에 둔다.
-은행 도메인 요구사항은 위험 신호가 자주 발생하므로 위험 신호는 이 단계의 통과 조건이나 경고 피로를 만드는 주 배너로 쓰지 않는다.
+- 원문 raw requirement와 requester context
+- 정규화 요구사항(normalized requirement)
+- 확인된 사실, 추정, 가정, 모순을 구분한 evidence
+- 요구사항 수준과 후보 수준의 `missing_information`
+- 자산 후보와 분류 근거
+- Resource/Dependency 및 Graph 내부 Node처럼 자산이 아닌 경계
+- 위험 신호와 사람 검토가 필요한 항목
+- Workflow 후보가 있을 때의 Graph IR 초안과 미확정 연결
 
-## Workbench import
+## 분석 절차
 
-Workbench의 분석 단계는 두 경로를 지원한다. `/af/:reqId/analyze`에서 raw requirement 텍스트를 입력해 `af-analyze-requirement` Stage Runner를 실행할 수 있고, skill-led 운영에서 외부 producer가 만든 `artifacts/af/<req-id>/analysis-result.json`과 `af-run-manifest.json`을 browser file import로 올릴 수도 있다.
-Import 연결 방식은 browser file import다. Workbench가 로컬 `artifacts/af` 디렉터리를 자동 감시하거나 manifest의 `artifact_root`와 `outputs[]` 경로를 따라 host filesystem을 직접 읽지는 않는다.
-Import된 artifact는 live analyzer 응답과 같은 client-side normalization을 거쳐 `AnalysisResult`, `ModuleCandidate[]`, Runtime 계약, A2A 계약, Graph IR 상태로 hydrate된다.
-Import되는 `processFlow`는 native Graph IR(`node_kind`, `edge_kind`, `data_label`)이어야 한다. 구버전 stage-flow/browser export의 `nodes[].type`, `edges[].edge_type`, `edges[].data_channel`, `edges[].data` 형식은 더 이상 변환하지 않으며, Workbench는 최신 `analysis-result.json` 스키마로 다시 내보내라는 import 오류를 표시한다.
-Import된 manifest는 DLC 현재 단계, 단계별 완료 수, 승인 수, 마지막 검증 결과를 상태 요약으로 보여준다. `requirement_id`가 현재 분석 artifact와 다르면 연결하지 않는다.
-누락 정보나 모순이 남아 있으면 `분석 결과` 단계로, 그렇지 않으면 `모듈 검토` 단계로 이동해 reviewer가 검토를 계속한다.
-검토 후 canonical artifact는 `artifacts/af/<req-id>/`에 그대로 남는다. Stage Runner 결과는 `runs/<stage>/<run-id>/`에 보존되고, 적용된 artifact와 manifest는 같은 root에서 파일로 확인한다.
+1. raw requirement와 requester context를 원형대로 캡처한다. 원문에 없는 책임, 시스템 동작, 데이터 계약을 보완해 넣지 않는다.
+2. 목표, 업무 맥락, 입력, 출력, 언급된 시스템·문서·데이터, 제약, 위험 신호, 누락 정보, 모순을 정규화한다.
+3. evidence를 만든다. 확인된 문장·자료·시스템 사실과 분석자의 추정·가정을 명시적으로 분리한다.
+4. 아래 후보 탐색 순서를 그대로 적용한다. 익숙한 기존 이름이나 기술 연결 방식부터 분류하지 않는다.
+5. 후보별 책임, 입출력 경계, 업무 맥락, Owner 단서, 재사용 단서, side effect와 위험을 기록한다. 이 속성으로 새 자산 유형이나 필수 subtype을 만들지 않는다.
+6. Workflow 후보에만 Graph IR 초안을 연결한다. Agent·Tool 자산과 Function Node·Human Input Node·Join Node 같은 Graph 표현을 같은 분류축에 섞지 않는다.
+7. 개발 리더가 evidence, normalized requirement, 후보 책임, missing-information gate를 확인한 뒤 분석 결과를 승인하거나 보완 요청한다.
 
-## 산출물 의미
+## 후보 탐색 순서
 
-- `analysis-result.json`: `normalizedRequirement`, evidence, module candidates, Graph IR, Runtime 계약, A2A 계약을 담는 canonical combined artifact다.
-- `normalized-requirement.json`: 요구사항을 구조화한 split convenience artifact다.
-- `analysis-summary.md`: 분류 근거, 위험, 누락 정보, 가정을 사람이 빠르게 검토할 수 있게 요약한 문서다.
-- `module-candidates.json`: 검토 대상 모듈 후보.
-- `resolution_draft`: 정보 필요 후보를 승인 가능한 artifact로 바꾸기 위한 후보별 LLM 초안. 자동 적용되지 않고 Design Stage Runner diff 또는 모듈 검토 패널에서 검토 후 반영한다.
-- `process-flow.json`: 후보 모듈 사이의 local 또는 Remote A2A 흐름.
-- `commonization-notes.json`: shared agent, adapter catalog, workflow reuse 후보 요약. 실제 등록/제외 결정은 Catalog review에서 한다.
-- `scaffold-plan.json`: 승인된 workbench artifact만 입력으로 하는 ADK Runtime Handoff 계약이다. repo 안의 template/schema는 이 계약을 검증하는 fixture로도 사용한다.
-- `af-run-manifest.json`: `artifacts/af/<req-id>/` 안에서 단계 상태, 출력 경로, 승인 상태, 검증 evidence를 연결하는 가벼운 manifest다.
-- `runs/<stage>/<run-id>/`: Stage Runner 실행 evidence다. `request.json`, `events.jsonl`, `result-summary.json`, `diff-summary.json`, 실패 시 `diagnostics.md`를 담는다. Analyze/Design은 `proposed-artifacts/*`를 diff/apply 대상으로 쓰고, Build는 canonical `runtime-stub/` 출력 목록을 기록하며, Verify는 `validation-report.md`와 `catalog-delta.yaml` proposal을 남긴다.
-- `runtime-stub/`: 승인된 `scaffold-plan.json`에서 생성한 source bundle이다. 기본 smoke 모드는 TODO source이고 runtime wiring/business logic은 후속 구현 task에서 채운다. 승인된 `output_mode: runnable` 은 `LlmAgent` + Mock Lab MCP 어댑터로 실행 가능한 ADK 2.3 `Workflow` 를 생성한다(둘 다 raw requirement가 아닌 승인 artifact에서만 생성).
-- `validation-report.md`: 검증 명령과 결과, 남은 위험을 기록한다.
-- `catalog-delta.yaml`: catalog 재사용/등록/수정 제안이다. 실제 `catalog/*.yaml` 반영은 Reuse Hub `등록 승인` publish 경로 또는 human PR merge 로만 처리한다.
+### 1. 독립 판단 책임인가 → Agent
 
-## 분석 원칙
+다음 질문으로 판단한다.
 
-- 새 taxonomy 값을 만들지 않는다. 값은 [Taxonomy](./taxonomy.md)를 따른다.
-- 여러 단계가 있다는 이유만으로 `remote_a2a`를 만들지 않는다.
-- MCP tool, retrieval, grounding, external service는 우선 `adapter` 후보로 본다.
-- Catalog entries는 mock이 아니라 reusable runtime contract로 해석한다. Mock/test double 생성은 별도 후속 기능이며 분석 산출물에 mock-only 후보를 섞지 않는다.
-- 공통 Workflow가 `runtime_binding: remote_a2a`로 등록되어 있어도 `module_category`는 `workflow`로 유지한다. 독립 원격 Agent 계약 증거가 있을 때만 `module_category: remote_a2a`를 만든다.
-- ADK component는 category가 아니다. 필요하면 module candidate의 ADK hint로 남긴다.
-- 고객 영향, 금융정보, 거래 쓰기, 신용 판단 지원은 위험 신호로 남기고 사람 검토를 요구한다.
-- Raw requirement는 직접 business logic 코드 생성으로 이어지지 않는다. ADK Runtime Handoff는 승인된 후보와 `scaffold-plan`만 사용하며, 생성물은 실제 runtime 설정과 비즈니스 로직을 TODO 경계로 남긴다.
-- LLM이 만든 Resolution Draft는 승인 근거가 아니라 검토 초안이다. object schema와 smoke 계약은 개발 리더가 DesignWorkbench에서 확인하고 명시적으로 적용해야 scaffold 입력으로 쓰인다.
+- 입력의 의미를 해석하고 상황에 따라 판단·선택·분류·요약·추천·생성하는가?
+- 같은 구조의 입력이라도 맥락과 근거에 따라 결과가 달라질 수 있는가?
+- Tool 사용 여부나 다른 Agent로의 위임 여부를 책임 있게 결정해야 하는가?
 
-## Live analyzer 실행 계약
+은행 업무 예시: 신용정보와 정책 근거를 해석해 신용평가 의견이나 등급 추천을 내는 책임은 Agent 후보다. 평가에 필요한 점수 계산 함수나 데이터 조회 기능 자체를 Agent로 분류하지 않는다.
 
-Analyze Stage Runner는 raw requirement 입력 경로에서 Codex TypeScript SDK 실행을 요청할 수 있다. Skill-led 운영에서는 외부 `af-analyze-requirement` 실행 결과를 import할 수도 있고, workbench는 후속 preview/apply, 시각화, guided edit의 보조 표면이 된다.
-단, direct live analyzer primitive가 최종 `AnalysisResult` 전체를 한 번에 생성하지 않는다는 기존 계약은 유지한다.
+### 2. 여러 실행 단위의 흐름 책임인가 → Workflow
 
-- Codex TypeScript SDK에는 `schemas/analysis-draft.schema.json` compact draft schema를 `outputSchema` turn option으로 전달한다.
-- 실행 시 `/tmp/agent-factory-codex-*/analyzer-context-index.md`를 만들어 active docs, schema, catalog 위치와 주요 section을 안내한다.
-- 모델은 index를 지도처럼 사용하고, 정확한 판단이 필요하면 원본 `docs/`, `schemas/`, `catalog/` 파일을 `rg`나 bounded `sed`로 직접 확인한다.
-- Compact draft에는 분류 판단, rationale, `catalog_entry_id`, Graph IR topology 같은 결정 정보를 담는다.
-- 서버는 draft를 catalog와 schema 기본값으로 hydrate해 기존 `AnalysisResult` 형태로 만든 뒤 기존 Graph IR/A2A normalization과 validation을 수행한다.
-- Spark 모델에서 실패해도 다른 모델로 자동 fallback하지 않는다. 실패 원인은 `max_output_tokens`, `context_window_exceeded`, `stream_incomplete`, `turn_failed`처럼 구분해 trace와 로그에 남긴다.
+다음 질문으로 판단한다.
 
-## ADK 문서 사용
+- 둘 이상의 실행 단위를 연결하는가?
+- 순서, 분기, 병렬, 반복, 사람 입력 대기, 중단·재개, 종료 조건 중 하나 이상을 소유하는가?
+- 흐름의 실패·재시도·합류 경계를 독립적으로 검토해야 하는가?
 
-ADK 공식 문서는 repo에 모두 복제하지 않는다.
-필요한 최신 내용은 `adk-docs-mcp`에서 `https://adk.dev/llms.txt`를 출발점으로 가져온다. 현재 target은 ADK 2.3이며, ADK 2.0 문서(graph workflow, graph routes, dynamic workflow, human-input 노드, A2A)는 GA 역사와 분류 축을 확인할 때 사용한다.
-이 저장소의 활성 문서는 ADK 2.3을 기본 baseline으로 작성한다. ADK Python 2.0은 2026년 5월 19일 GA로 문서화되어 있고, 현재 Runtime Handoff target은 `google-adk` 2.3.0이다.
-작은 순차, 병렬, 반복, 사람 입력 흐름은 `workflow_kind`가 아니라 Graph IR node/container/edge로 표현한다.
-MCP 결과와 직접 내려받은 공식 문서가 다르거나 현재 taxonomy와 충돌하면 구현을 멈추고 사용자에게 질문한다.
+은행 업무 예시: 대출 서류 접수, OCR 호출, 검토 판단, 보완 요청, 승인 입력을 연결하고 그 순서와 종료 조건을 소유하는 대출 서류 검토 흐름은 Workflow 후보다. 한 Agent가 여러 Tool을 사용할 수 있다는 사실만으로 Workflow가 되지는 않는다.
+
+### 3. 구조화된 호출 기능인가 → Tool
+
+다음 질문으로 판단한다.
+
+- 명확한 입력 계약을 받아 한정된 기능을 수행하는가?
+- 결과와 오류를 호출자가 처리할 수 있는 구조로 반환하는가?
+- 판단 책임보다 기능 계약, 권한, 버전, 감사 경계를 독립적으로 검토·재사용할 필요가 있는가?
+
+은행 업무 예시: 고객 식별자를 받아 허용된 고객정보 필드를 조회하고 결과 또는 오류를 반환하는 고객정보 조회 기능은 Tool 후보다. 조회 대상 고객 시스템이나 데이터 자체는 Tool이 아니라 Resource/Dependency다.
+
+### 4. 데이터·문서·시스템 그 자체인가 → Resource/Dependency
+
+다음 질문으로 판단한다.
+
+- 호출 가능한 기능이 아니라 읽고 쓰는 데이터, 지식 내용, 문서 집합 또는 외부 시스템 자체인가?
+- 독립적인 판단이나 구조화된 기능 계약 없이 다른 자산이 접근하는 대상인가?
+- API endpoint를 기능 자산과 동일시하고 있지는 않은가?
+
+은행 업무 예시: 여신 심사 규정집은 Knowledge Resource다. 규정집을 검색하는 기능은 Tool 후보이고, 검색 결과를 적용할지 판단하는 책임은 Agent 후보다. Resource/Dependency는 Agent Factory의 Agent·Workflow·Tool 자산이 아니다.
+
+### 5. Workflow 내부 private 단계인가 → Function Node
+
+다음 질문으로 판단한다.
+
+- 하나의 Workflow 안에서만 의미가 있고 Graph가 도달하면 결정적으로 실행되는가?
+- 독립 Catalog 계약, 별도 Owner, 재사용 버전 없이 부모 Workflow의 맥락을 상속하는가?
+- 독립 입출력 경계, 실패 추적, 분기·Join 기준점, 중단·재개, 감사 또는 업무 설명상 Node로 드러낼 이유가 있는가?
+
+은행 업무 예시: OCR 결과 필드를 대출 서류 검토 Workflow의 다음 단계 입력 형식으로 정규화하는 private 단계는 Function Node 후보다. 단순 trim 같은 작은 helper는 독립 Node가 아니라 내부 코드로 남길 수 있다. Function Node는 자산이 아니며, Function binding을 가진 Tool과도 다르다. 자세한 구분은 [Graph IR의 Function Node, Tool Node, Function Tool](./graph-ir.md#function-node-tool-node-function-tool-구분)을 따른다.
+
+### 6. 정보가 부족한가 → `needs_info` + `missing_information`
+
+다음 질문으로 판단한다.
+
+- 판단 책임과 기능 호출 중 무엇을 요구하는지 근거가 충분한가?
+- 둘 이상의 실행 단위와 흐름 소유 책임이 실제로 확인되는가?
+- 데이터·문서·시스템 자체와 이를 다루는 기능이 구분되어 있는가?
+- 입출력, Owner, 권한, side effect, 실패 처리처럼 승인에 필요한 계약이 빠져 있지 않은가?
+
+정보가 부족하면 `unknown` 같은 정상 유형을 만들거나 가장 가까운 subtype을 추측하지 않는다. 후보 상태를 `needs_info`로 두고 `missing_information`에 필요한 질문, 현재 evidence, 답변이 어떤 판단을 막는지를 기록한다.
+
+## Tool subtype을 추측하지 않는 규칙
+
+계산·검색·조회·변환이라는 기능 속성은 필수 Tool subtype이 아니다. 이 단어가 requirement에 있다는 이유로 별도 유형을 만들거나 기존 legacy subtype에 자동 대응시키지 않는다.
+
+발견성이 필요하면 선택적 다중 값 `capability_tags`에 `calculation`, `search`, `lookup`, `transform` 같은 검색 단서를 기록할 수 있다. `capability_tags`는 자산 유형, 코드 생성 분기, Owner, 업무 범위, 보안 정책, 재사용 상태를 결정하지 않는다.
+
+특히 검색 요구는 지식 내용 자체와 검색 기능을 나눠 본다. 규정 문서는 Knowledge Resource이고, 규정 검색 계약은 Tool 후보다. 같은 방식으로 고객 데이터는 Data Resource이고, 허용된 입력으로 고객정보를 조회하는 계약은 Tool 후보다.
+
+## Missing-information gate
+
+missing information은 두 층으로 검토한다. 요구사항 수준의 미결 정보는 분석 검토를 위한 soft gate이고, 자산 후보의 책임·계약·Graph 연결에 남은 `status: needs_info`는 후보 승인과 Runtime Handoff를 막는 hard gate다.
+
+분석자는 답을 꾸며 gate를 닫지 않는다. 수용·해결 주체와 승인 조건을 포함한 전체 규칙은 [Operating Model의 승인 게이트 모델](./operating-model.md#3-승인-게이트-모델)을 따른다.
+
+## Evidence와 normalized requirement
+
+Evidence는 분류 결론보다 먼저 남긴다. 각 항목은 출처가 있는 확인 사실, 분석자가 도출한 추정, 확인이 필요한 가정, 서로 충돌하는 진술 중 무엇인지 표시한다. 근거가 바뀌면 후보 판단을 다시 검토할 수 있어야 한다.
+
+Normalized requirement는 원문을 대체하는 요약이 아니라 검토를 위한 구조화 표현이다. 최소한 목표, 업무 맥락, 입력, 출력, Resource/Dependency, 제약, 위험, 누락 정보, 모순을 원문 evidence와 추적 가능하게 연결한다.
+
+개발 리더는 첫 확인에서 다음 사항을 본다.
+
+1. 목표, 업무 맥락, 입력, 출력, 언급된 시스템·문서·데이터가 원문과 맞는가?
+2. 확인 사실과 추정·가정이 분리되어 있는가?
+3. Agent·Workflow·Tool 후보의 책임이 서로 겹치거나 빠지지 않았는가?
+4. Resource/Dependency와 Function Node가 재사용 자산으로 잘못 승격되지 않았는가?
+5. soft/hard missing-information과 위험 신호가 승인 전에 보이는가?
+
+## Current Implementation(`legacy`)
+
+현재 분석 파이프라인은 Target Contract의 새 직렬화를 구현한 상태가 아니다. Workbench의 Analyze Stage Runner와 `af-analyze-requirement` skill은 proposal과 분석 artifact를 만들고, 검토·apply된 결과를 canonical `analysis-result.json`에 반영하는 현행 운영 경로다. Stage Runner의 단계 의미와 artifact apply 규칙은 [Operating Model의 Current Implementation](./operating-model.md#current-implementationlegacy)을 따른다.
+
+현재 분석 artifact와 schema는 legacy `module_category`와 legacy `adapter_kind` 어휘로 후보를 직렬화한다. 따라서 현행 값을 그대로 Target 자산 유형이나 Tool subtype으로 읽지 말고, evidence와 책임 경계를 기준으로 Agent·Workflow·Tool·Resource/Dependency·Function Node 중 무엇인지 다시 해석한다.
+
+`analysis-result.json`의 normalized requirement, evidence, module candidates, process flow와 Stage Runner run evidence는 현재 검토·추적을 위한 artifact다. 이 파일명과 현행 필드가 존재한다는 사실은 Target Taxonomy와 Graph IR 직렬화가 구현되었다는 뜻이 아니다.
+
+legacy 필드별 목표 해석, 영향 영역, 위험, 후속 필요 여부는 [Taxonomy vNext Migration Status](../migration/taxonomy-vnext-status.md)에서 확인한다.

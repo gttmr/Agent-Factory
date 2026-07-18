@@ -6,6 +6,8 @@
 Graph IR review, catalog governance, Runtime Handoff, Verify, Run, and integrated
 Mock Lab.
 
+Target asset terminology is owned by [Taxonomy](../../docs/workbench/taxonomy.md), and Workflow execution terminology by [Graph IR](../../docs/workbench/graph-ir.md); package identifiers such as `adapter` and `remote_a2a` describe Current Implementation (`legacy`).
+
 ## Structure
 
 - `src/routes`: route workbenches and router shell.
@@ -23,7 +25,7 @@ Mock Lab.
 - `manifest.approvals.*` is the gate source of truth. Do not recompute approval gates from candidate status in UI components.
 - Analyze/Design Stage Runner output is proposed-first; canonical artifacts change only after explicit apply.
 - `catalog/*.yaml` is not edited from ad hoc UI paths. Reuse Hub publish is the app write path for reviewed deltas.
-- UI copy is mostly Korean with technical terms like `Agent`, `Workflow`, `Adapter`, `Remote A2A`, `Graph IR`, and `Runtime Handoff`.
+- UI copy is mostly Korean. Current screens still use the `legacy` labels `Adapter` and `Remote A2A`; Target-facing copy uses `Agent`, `Workflow`, `Tool`, `Graph IR`, and `Runtime Handoff` as defined by the canonical docs.
 
 ## When Editing
 
