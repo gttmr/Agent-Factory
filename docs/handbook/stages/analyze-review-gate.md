@@ -119,7 +119,7 @@ raw requirement와 Catalog 근거에서 source-backed 분석 proposal을 만들�
 
 - Path: `packages/web/src/routes/stageRunnerScreenConfig.ts`
 - Stable anchor: `buildAnalyzeStageRunnerConfig`
-- Role in behavior: legacy `af-analyze-requirement` stage label, disabled reason, metrics, ETag와 request body를 구성한다.
+- Role in behavior: canonical `af-discover-assets` stage label(2026-07-18 코드 단계에서 legacy 라벨 이행), disabled reason, metrics, ETag와 request body를 구성한다.
 - Inputs: raw text, domain, Catalog snapshot/count, current analysis ETag
 - Outputs: `StageRunnerPanel` config와 runner request body
 - State/artifact reads: `reg.analysis-result`, `reg.catalog-entries`
@@ -129,7 +129,7 @@ raw requirement와 Catalog 근거에서 source-backed 분석 proposal을 만들�
 - External boundaries: Stage Runner HTTP/SSE는 panel과 state hook이 수행한다.
 - Failure/edge behavior: raw text가 비어 있으면 disabled reason을 반환한다.
 - Related registers: `reg.analysis-result`, `reg.stage-run-evidence`, `reg.catalog-entries`
-- Verified at commit: `7deea45`
+- Verified at commit: `a4f55a0`
 - Locator status: `active`
 
 ### Analyze skill compatibility path
@@ -146,7 +146,7 @@ raw requirement와 Catalog 근거에서 source-backed 분석 proposal을 만들�
 - External boundaries: Codex SDK의 repository file read와 workspace-write sandbox
 - Failure/edge behavior: canonical handoff가 끊기거나 proposal 밖 write가 필요하면 호환 계약이 깨진다. 제거 조건은 skill-vnext-status §8을 따른다.
 - Related registers: `reg.analysis-result`, `reg.stage-run-evidence`
-- Verified in worktree: `2026-07-18 uncommitted`
+- Verified at commit: `a4f55a0`
 - Locator status: `active`
 
 ### Analyze proposal runner and apply

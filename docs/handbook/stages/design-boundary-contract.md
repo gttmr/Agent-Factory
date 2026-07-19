@@ -190,7 +190,7 @@
 - External boundaries: Codex SDK의 repository file read와 workspace-write sandbox
 - Failure/edge behavior: (2026-07-18 이후) diff builder가 등록된 필수 proposed artifact 누락 시 run을 `failed` 처리하므로 두 파일 계약이 코드로도 강제된다.
 - Related registers: `reg.approvals`, `reg.analysis-result`, `reg.stage-run-evidence`
-- Verified in worktree: `2026-07-18 uncommitted`
+- Verified at commit: `a4f55a0`
 - Locator status: `active`
 
 ### Design proposal runner and apply

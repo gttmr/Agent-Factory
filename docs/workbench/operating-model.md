@@ -39,10 +39,10 @@ raw requirement
 
 | 단계 | 현행 route·표면 | 현행 DLC skill 및 Stage Runner 행동 |
 | --- | --- | --- |
-| Analyze | `/af/:reqId/analyze` | `af-analyze-requirement`가 proposal을 만들고 명시적 apply 뒤 canonical `analysis-result.json`을 바꾼다. |
-| Design | `/af/:reqId/design` | `af-design-boundaries`가 `analysis-result.json`과 `boundary-design.md` proposal을 만들며, `legacy` `analysis_reviewed` gate 뒤 실행된다. |
-| Build | `/af/:reqId/build` | DLC 운영 계약은 `af-build-runtime-stub`이다. 현행 Stage Runner registry는 `runtime-stub/build` server primitive를 감싸 canonical `runtime-stub/`을 직접 생성하며 apply proposal은 없다. |
-| Verify | `/af/:reqId/verify` | `af-verify-feedback`과 Verify allow-list 표면이 validation evidence, `validation-report.md`, `catalog-delta.yaml` 검토를 지원한다. |
+| Analyze | `/af/:reqId/analyze` | Stage Runner는 canonical `af-discover-assets`의 `SKILL.md`를 직접 읽어 proposal을 만들고, 명시적 apply 뒤 canonical `analysis-result.json`을 바꾼다. 구 legacy `af-analyze-requirement`는 direct/manual 호출 전용 compatibility shim이다. |
+| Design | `/af/:reqId/design` | Stage Runner는 canonical `af-compose-solution`의 `SKILL.md`를 직접 읽어 `analysis-result.json`과 `boundary-design.md` proposal을 만들며, legacy `analysis_reviewed` gate 뒤 실행된다. 구 legacy `af-design-boundaries`는 direct/manual 호출 전용 compatibility shim이다. |
+| Build | `/af/:reqId/build` | 현행 Stage Runner 명칭은 canonical `af-scaffold-runtime`이다. 실행 주체인 server primitive가 canonical `runtime-stub/`을 직접 생성하며 apply proposal은 없다. 구 legacy `af-build-runtime-stub`는 direct/manual 호출 전용 compatibility shim이다. |
+| Verify | `/af/:reqId/verify` | 현행 Stage Runner 명칭은 canonical `af-verify-runtime`이다. 실행 주체인 server primitive가 Verify allow-list를 실행하고 validation evidence, `validation-report.md`, `catalog-delta.yaml` 검토를 지원한다. 구 legacy `af-verify-feedback`은 direct/manual 호출 전용 compatibility shim이다. |
 | Run | `/af/:reqId/run` | 승인 stage가 아닌 gate-less 로컬 실행 표면이다. Runtime Handoff 이후 ADK runtime과 A2A proof를 다루며 운영 pipeline의 production deployment 단계가 아니다. |
 
 Stage Runner 실행 근거와 canonical artifact apply 규칙은 [Handbook](../handbook/README.md)에서 해당 stage의 최신 source locator를 따라 확인한다.

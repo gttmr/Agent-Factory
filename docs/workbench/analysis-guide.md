@@ -120,7 +120,9 @@ Normalized requirement는 원문을 대체하는 요약이 아니라 검토를 �
 
 ## Current Implementation(`legacy`)
 
-현재 분석 파이프라인은 Target Contract의 새 직렬화를 구현한 상태가 아니다. Workbench의 Analyze Stage Runner와 `af-analyze-requirement` skill은 proposal과 분석 artifact를 만들고, 검토·apply된 결과를 canonical `analysis-result.json`에 반영하는 현행 운영 경로다. Stage Runner의 단계 의미와 artifact apply 규칙은 [Operating Model의 Current Implementation](./operating-model.md#current-implementationlegacy)을 따른다.
+현재 분석 파이프라인은 Target Contract의 새 직렬화를 구현한 상태가 아니다. Workbench의 Analyze Stage Runner는 canonical `af-discover-assets`의 `SKILL.md`를 직접 읽어 proposal과 분석 artifact를 만들고, 검토·apply된 결과를 canonical `analysis-result.json`에 반영한다. 현행 artifact를 쓸 때는 Compatibility Layer를 적용해 legacy 직렬화 계약을 지킨다. Stage Runner의 단계 의미와 artifact apply 규칙은 [Operating Model의 Current Implementation](./operating-model.md#current-implementationlegacy)을 따른다.
+
+구 legacy `af-analyze-requirement`는 direct/manual 호출을 위한 compatibility shim이며, canonical `af-discover-assets`로 즉시 handoff한다.
 
 현재 분석 artifact와 schema는 legacy `module_category`와 legacy `adapter_kind` 어휘로 후보를 직렬화한다. 따라서 현행 값을 그대로 Target 자산 유형이나 Tool subtype으로 읽지 말고, evidence와 책임 경계를 기준으로 Agent·Workflow·Tool·Resource/Dependency·Function Node 중 무엇인지 다시 해석한다.
 

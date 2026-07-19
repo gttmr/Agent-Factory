@@ -7,14 +7,14 @@
 - Repository: `gttmr/Agent-Factory`
 - Branch: `main`
 - Base commit: `7deea452e73f63828fc14402b7e16dcf40e753ac`
-- Date: `2026-07-18`
-- Skill tree state: 승격 완료, 아직 commit되지 않은 worktree
+- Date: `2026-07-18~19`
+- Skill tree state: 승격 완료 — docs `0ee7784` → skills `b3911fd` → code `a4f55a0` 순서로 `main`에 반영
 - Codex 실행 기록: `codex-companion 1.0.6`, 기본 모델 `gpt-5.6`; 문서 갱신 시 로컬 `codex --version`은 `codex-cli 0.144.5`
 - Claude Code 실행 기록: Fable 기반 5 sessions; 문서 갱신 시 로컬 `claude --version`은 `2.1.214`
 - ADK: `.agent-factory/runtime/.venv`의 `google-adk 2.3.0` 설치를 `pip show`와 설치 소스로 확인
 - Google Agents CLI reference: `~/.agents/skills/google-agents-cli-*` 로컬 사본을 구조 참고 자료로 사용했다. 이 사본이 어느 upstream repository commit에서 왔는지는 확인되지 않았다.
 
-이 문서의 line locator는 base commit과 2026-07-18 worktree 조사 시점의 snapshot hint다. 실제 동작의 최종 권위는 현재 source다.
+이 문서의 line locator는 base commit에서 시작해 docs `0ee7784`, skills `b3911fd`, code `a4f55a0`까지 검증한 시점의 snapshot hint다. 실제 동작의 최종 권위는 현재 source다.
 
 ## 2. Migration Mode
 
@@ -109,8 +109,8 @@
 
 이번 단계에서 허용되지 않은 `docs/workbench/**`는 수정하지 않고 다음 정합화 입력으로 남긴다.
 
-- `docs/workbench/operating-model.md:42-45`: legacy `af-analyze-requirement`·`af-design-boundaries`가 shim 경유 Current Implementation이라는 설명과 canonical `af-discover-assets`·`af-compose-solution` 병기가 필요하다.
-- `docs/workbench/analysis-guide.md:123`: legacy Analyze skill ID 옆에 canonical discovery skill과 Compatibility Layer 관계를 병기해야 한다.
+- `docs/workbench/operating-model.md:42-45`: legacy `af-analyze-requirement`·`af-design-boundaries`가 shim 경유 Current Implementation이라는 설명과 canonical `af-discover-assets`·`af-compose-solution` 병기가 필요하다. **2026-07-19 반영 완료.**
+- `docs/workbench/analysis-guide.md:123`: legacy Analyze skill ID 옆에 canonical discovery skill과 Compatibility Layer 관계를 병기해야 한다. **2026-07-19 반영 완료.**
 - `docs/workbench/skill-refresh-evidence-2026-07.md`: 구 4-skill 체계를 기준으로 한 역사 원장이다. 현재 규칙으로 덮어쓰지 말고 historical evidence 표지를 유지한다.
 - Handbook은 이번 단계에서 Analyze·Design shim→canonical locator, Build·Verify server-primitive/direct-manual 경계, Index/Coverage를 갱신했다. 새 commit이 생기면 `docs/handbook/README.md`와 `overview.md`의 worktree 주석을 commit snapshot으로 바꾸고 관련 stage locator를 다시 확인해야 한다.
 - `docs/handbook/registers.md`에는 skill ID를 소유하는 register가 없어 이번 단계에서 수정하지 않았다. 향후 Stage Runner canonical ID migration이 일어나면 `reg.stage-run-evidence`의 producer·metadata locator를 재검증해야 한다.
@@ -141,7 +141,7 @@ canonical 5-skill tree 대상 forward 실행은 시나리오 16종 중 대표 �
 | workflow 라우팅(상태 확인) | PASS | PASS |
 | should-not(비-AF 요청) | PASS — 스킬 미사용 | PASS — 스킬 미사용 |
 
-미실행 잔여: S02, S04–S12, S14–S15의 개별 forward run(시나리오 fixture와 rubric은 준비 완료 — `templates/skill-scenarios/`). 이는 완료 선언을 제한하는 잔여 검증 범위로 남긴다.
+(2026-07-19 갱신) 잔여 시나리오 forward run을 완료했다: Codex는 S01–S16 전수(16/16, 전부 PASS — S07·S11은 fixture의 승인 artifact 불충분에 대한 게이트 STOP이 정답 경로), Claude Code는 10종(S01, S03 상당, S04, S05, S13, S14, S16 + 라우팅·should-not·verify) 전부 행동 PASS. 단 Claude S05 1건은 에이전트가 시나리오 fixture(rubric·기대 파일)를 자체 열람해 참조 누설로 오염 — 클린 증거에서 제외(클린 증거는 Codex S05). 상세와 fixture 보강 후속(S07·S11 완전 승인 artifact 세트, fixture 격리 worktree 실행 규약)은 [Codex evidence](../../tests/skills/evidence/codex/forward-2026-07-18.md)와 [Claude Code evidence](../../tests/skills/evidence/claude-code/forward-2026-07-18.md)에 기록했다. S08·S10 프로토타입은 오케스트레이터가 독립 재실행으로 테스트 통과를 확인했다(S08 pytest 2 passed, S10 unittest OK + 중복 전달 멱등성).
 
 ### Codex
 

@@ -57,9 +57,8 @@ Agent Factory는 raw requirement를 즉시 코드로 바꾸는 생성기가 아�
 ## Source snapshot
 
 - Repository: `gttmr/Agent-Factory`
-- Commit SHA: `7deea452e73f63828fc14402b7e16dcf40e753ac`
-- Checked date: `2026-07-18`
-- Skills vNext note: stage-facing skill locator는 `2026-07-18 uncommitted` worktree에서 추가 확인했다.
+- Snapshot commits: docs `0ee7784` → skills `b3911fd` → code `a4f55a0`
+- Checked date: `2026-07-18~19`
 - Leaf mode: file-as-leaf + stable symbol/section anchors (line ranges are snapshot hints only)
 - Coverage scope: `packages/web` (`src` + `server`), `packages/mock-lab`, `scripts`, `schemas`/`catalog`/`templates` as contract surfaces, stage-facing `.agents/skills` shim→canonical locators
 - Known exclusions: stage-facing shim→canonical locator를 제외한 `.agents/skills` 내부 구현, `generated/**`, `artifacts/**`, `docs/archive/**`, `docs/handoff/**`
