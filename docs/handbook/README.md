@@ -34,10 +34,10 @@ Target의 Agent·Workflow·Tool 분류는 [Taxonomy](../workbench/taxonomy.md), 
 ## Source snapshot
 
 - Repository: `gttmr/Agent-Factory`
-- Snapshot commits: docs `0ee7784` → skills `b3911fd` → code `a4f55a0`
-- Checked date: `2026-07-18~19`
+- Baseline commit: `0cdcb82` + 2026-07-20 integrated worktree
+- Checked date: `2026-07-20`
 - Leaf mode: file-as-leaf + stable symbol/section anchors (line ranges are snapshot hints only)
-- Coverage scope: `packages/web` (`src` + `server`), `packages/mock-lab`, `scripts`, `schemas`/`catalog`/`templates` as contract surfaces, stage-facing `.agents/skills` shim→canonical locators
-- Known exclusions: stage-facing shim→canonical locator를 제외한 `.agents/skills` 내부 구현, `generated/**`, `artifacts/**`, `docs/archive/**`, `docs/handoff/**`
+- Coverage scope: `packages/web` (`src` + `server`), `packages/mock-lab`, `scripts`, `schemas`/`catalog`/`templates` as contract surfaces, Stage Runner의 canonical five-skill locators
+- Known exclusions: stage-facing canonical skill locator를 제외한 `.agents/skills` 내부 authoring 절차, `generated/**`, `artifacts/**`, `docs/archive/**`, `docs/handoff/**`
 
 실행 중 생성되는 `artifacts/**`와 `generated/**`는 경로 계약만 설명하며 snapshot 내용은 문서화하지 않는다.

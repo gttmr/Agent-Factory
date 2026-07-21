@@ -5,6 +5,7 @@ import { CategoryBadge } from "../components/CategoryBadge";
 import { AfApiError, fetchArtifactJson, putArtifactJson } from "../state/apiClient";
 import type { CatalogHubEntry } from "../catalog/catalogIndex";
 import type { AnalysisResult } from "../analyzer/types";
+import { applyCatalogPin, catalogEntryAssetType, isCatalogPinCompatible } from "../catalog/catalogPin";
 
 interface PinTargetDialogProps {
   reqId: string;
@@ -16,7 +17,7 @@ interface PinTargetDialogProps {
 export function PinTargetDialog({ reqId, entry, onClose, onSaved }: PinTargetDialogProps) {
   const queryClient = useQueryClient();
   const [analysis, setAnalysis] = useState<{ data: AnalysisResult; etag: string | null } | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -39,43 +40,20 @@ export function PinTargetDialog({ reqId, entry, onClose, onSaved }: PinTargetDia
     };
   }, [reqId]);
 
-  const candidates = (analysis?.data.moduleCandidates ?? []).filter((candidate) => candidate.module_category === entry.category);
+  const entryAssetType = catalogEntryAssetType(entry);
+  const candidates = (analysis?.data.assetCandidates ?? []).filter((candidate) =>
+    isCatalogPinCompatible(candidate, entry)
+  );
 
   async function handlePin() {
-    if (!analysis || !selectedId) return;
+    if (!analysis || !selectedAssetId) return;
     setIsPending(true);
     setError(null);
     try {
-      const next: AnalysisResult = {
-        ...analysis.data,
-        moduleCandidates: analysis.data.moduleCandidates.map((candidate) => {
-          if (candidate.id !== selectedId) return candidate;
-          const updated: typeof candidate = {
-            ...candidate,
-            catalog_entry_id: entry.id,
-            name: entry.name,
-            reuse_candidate: true
-          };
-          if (entry.inputs && entry.inputs.length > 0 && (!candidate.inputs || candidate.inputs.length === 0)) {
-            updated.inputs = entry.inputs.map((field) => ({
-              name: field.name,
-              type: field.type,
-              required: field.required ?? false
-            }));
-          }
-          if (entry.outputs && entry.outputs.length > 0 && (!candidate.outputs || candidate.outputs.length === 0)) {
-            updated.outputs = entry.outputs.map((field) => ({
-              name: field.name,
-              type: field.type,
-              required: field.required ?? false
-            }));
-          }
-          return updated;
-        })
-      };
+      const next = applyCatalogPin(analysis.data, selectedAssetId, entry);
       await putArtifactJson(reqId, "analysis-result.json", next, analysis.etag);
       await queryClient.invalidateQueries({ queryKey: ["af", reqId, "analysis-result"] });
-      onSaved(`${entry.name} 을 ${selectedId} 에 바인딩했습니다.`);
+      onSaved(`${entry.name} 을 ${selectedAssetId} 에 바인딩했습니다.`);
       onClose();
     } catch (err) {
       setError(err instanceof AfApiError ? err.message : err instanceof Error ? err.message : "핀 저장 실패");
@@ -89,7 +67,7 @@ export function PinTargetDialog({ reqId, entry, onClose, onSaved }: PinTargetDia
       <div className="af-modal">
         <header className="af-modal-header">
           <h2>
-            {entry.name} 을 {reqId} 의 모듈에 바인딩
+            {entry.name} 을 {reqId} 의 자산 후보에 바인딩
           </h2>
           <button type="button" className="af-modal-close" aria-label="닫기" onClick={onClose}>
             ×
@@ -100,25 +78,25 @@ export function PinTargetDialog({ reqId, entry, onClose, onSaved }: PinTargetDia
           {!analysis && !error ? <p className="af-landing-message">분석 결과 불러오는 중…</p> : null}
           {analysis && candidates.length === 0 ? (
             <p className="af-landing-message">
-              현재 root 에 module_category={entry.category} 인 후보가 없습니다. Analyze/Design 에서 후보를 먼저 만들어야 합니다.
+              현재 root에 asset_type={entryAssetType}인 후보가 없습니다. Analyze/Design에서 후보를 먼저 만들어야 합니다.
             </p>
           ) : null}
           {candidates.length > 0 ? (
             <ul className="af-pin-list">
               {candidates.map((candidate) => (
-                <li key={candidate.id}>
+                <li key={candidate.asset_id}>
                   <label className="af-pin-row">
                     <input
                       type="radio"
                       name="pin-target"
-                      value={candidate.id}
-                      checked={selectedId === candidate.id}
-                      onChange={() => setSelectedId(candidate.id)}
+                      value={candidate.asset_id}
+                      checked={selectedAssetId === candidate.asset_id}
+                      onChange={() => setSelectedAssetId(candidate.asset_id)}
                     />
                     <span className="af-pin-row-header">
-                      <CategoryBadge category={candidate.module_category} />
+                      <CategoryBadge category={candidate.asset_type} />
                       <strong>{candidate.name}</strong>
-                      <code>{candidate.id}</code>
+                      <code>{candidate.asset_id}</code>
                     </span>
                     <small>
                       status: {candidate.status}
@@ -134,7 +112,7 @@ export function PinTargetDialog({ reqId, entry, onClose, onSaved }: PinTargetDia
           <Button type="button" variant="ghost" onClick={onClose}>
             취소
           </Button>
-          <Button type="button" variant="primary" onClick={handlePin} disabled={!selectedId || isPending}>
+          <Button type="button" variant="primary" onClick={handlePin} disabled={!selectedAssetId || isPending}>
             {isPending ? "저장 중…" : "바인딩 저장"}
           </Button>
         </footer>

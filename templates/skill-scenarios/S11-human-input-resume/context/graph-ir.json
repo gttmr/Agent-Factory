@@ -1,0 +1,151 @@
+{
+  "graph_id": "graph-s11-human-input-resume",
+  "source_requirement_id": "req-s11-human-input-resume",
+  "workflow_ref": "workflow-s11-human-input-resume",
+  "nodes": [
+    {
+      "id": "node-s11-input",
+      "label": "Synthetic change request",
+      "node_kind": "input"
+    },
+    {
+      "id": "node-s11-prepare",
+      "label": "Prepare synthetic approval payload",
+      "node_kind": "function",
+      "role": "prepare_input"
+    },
+    {
+      "id": "node-s11-human-approval",
+      "label": "Request synthetic change approval",
+      "node_kind": "human_input",
+      "human_input_contract": {
+        "message": "합성 변경을 적용할까요? approve 또는 reject로 답하세요.",
+        "payload_schema_ref": "schema://synthetic/change-request",
+        "response_schema_ref": "str",
+        "response_mapping": {
+          "approve": "apply",
+          "reject": "cancel"
+        },
+        "choice_options": [
+          "approve",
+          "reject"
+        ],
+        "accepted_aliases": {
+          "approve": [
+            "yes",
+            "apply"
+          ],
+          "reject": [
+            "no",
+            "cancel"
+          ]
+        },
+        "default_choice": "reject"
+      }
+    },
+    {
+      "id": "node-s11-route-decision",
+      "label": "Route reviewed human decision",
+      "node_kind": "function",
+      "role": "route"
+    },
+    {
+      "id": "node-s11-apply-change",
+      "label": "Apply synthetic change once",
+      "node_kind": "tool",
+      "tool_ref": "tool-s11-apply-synthetic-change",
+      "invocation_control": "workflow"
+    },
+    {
+      "id": "node-s11-applied-output",
+      "label": "Synthetic change applied",
+      "node_kind": "output"
+    },
+    {
+      "id": "node-s11-canceled-output",
+      "label": "Synthetic change canceled",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-s11-input-to-prepare",
+      "from": "node-s11-input",
+      "to": "node-s11-prepare",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s11-prepare-to-human",
+      "from": "node-s11-prepare",
+      "to": "node-s11-human-approval",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "state"
+    },
+    {
+      "id": "edge-s11-human-to-route",
+      "from": "node-s11-human-approval",
+      "to": "node-s11-route-decision",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "state"
+    },
+    {
+      "id": "edge-s11-route-apply",
+      "from": "node-s11-route-decision",
+      "to": "node-s11-apply-change",
+      "control": {
+        "kind": "condition",
+        "condition": "decision == apply",
+        "accepted_aliases": [
+          "approve",
+          "yes"
+        ],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s11-route-cancel",
+      "from": "node-s11-route-decision",
+      "to": "node-s11-canceled-output",
+      "control": {
+        "kind": "condition",
+        "condition": "decision == cancel",
+        "accepted_aliases": [
+          "reject",
+          "no"
+        ],
+        "default": true
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s11-apply-to-output",
+      "from": "node-s11-apply-change",
+      "to": "node-s11-applied-output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    }
+  ],
+  "regions": []
+}

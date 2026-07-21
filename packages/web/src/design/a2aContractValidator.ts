@@ -1,6 +1,6 @@
-import { A2A_CONTRACT_REQUIRED_STRING_FIELDS } from "../analyzer/a2aNormalize";
+import { A2A_CONTRACT_REQUIRED_STRING_FIELDS } from "../analyzer/a2aContracts";
 import { A2A_RUNTIME_AUTH_MODES, A2A_RUNTIME_FALLBACK_MODES } from "../analyzer/types";
-import type { A2AContract, A2ARuntimePolicy, AnalysisResult, ModuleCandidate } from "../analyzer/types";
+import type { A2AContract, A2ARuntimePolicy, AnalysisResult, AssetCandidate } from "../analyzer/types";
 
 const AGENT_CARD_FIELDS = ["discovery_method", "agent_card_url", "version", "notes"] as const;
 const ARTIFACT_CONTRACT_FIELDS = ["mutation_rules", "chunking_policy"] as const;
@@ -14,8 +14,6 @@ export function a2aContractReadinessIssues(contract: A2AContract | null | undefi
     issues.push("contract_status must be approved before ADK Runtime Handoff");
   }
   if (isBlank(contract.contract_id)) issues.push("contract_id is missing");
-  if (isBlank(contract.remote_module_id)) issues.push("remote_module_id is missing");
-
   for (const field of A2A_CONTRACT_REQUIRED_STRING_FIELDS) {
     pushStringIssue(issues, field, contract[field]);
   }
@@ -31,10 +29,16 @@ export function a2aContractReadinessIssues(contract: A2AContract | null | undefi
   ]);
   pushStringArrayIssues(issues, "input_modes", contract.input_modes);
   pushStringArrayIssues(issues, "output_modes", contract.output_modes);
-  pushObjectArrayIssues(issues, "security_schemes", contract.security_schemes, ["name", "scheme"]);
-  pushObjectArrayIssues(issues, "security_requirements", contract.security_requirements, ["scheme_name"]);
+  const securityEntriesRequired = contract.adk_runtime_policy?.auth?.mode !== "none";
+  pushObjectArrayIssues(issues, "security_schemes", contract.security_schemes, ["name", "scheme"], securityEntriesRequired);
+  pushObjectArrayIssues(issues, "security_requirements", contract.security_requirements, ["scheme_name"], securityEntriesRequired);
   for (const requirement of contract.security_requirements) {
-    pushStringArrayIssues(issues, `security_requirements.${requirement.scheme_name || "unknown"}.scopes`, requirement.scopes);
+    pushStringArrayIssues(
+      issues,
+      `security_requirements.${requirement.scheme_name || "unknown"}.scopes`,
+      requirement.scopes,
+      false
+    );
   }
   pushStringArrayIssues(issues, "skills", contract.skills);
 
@@ -70,26 +74,28 @@ export function a2aContractReadinessIssues(contract: A2AContract | null | undefi
 
 export function a2aContractsGateReady(analysis: AnalysisResult | null | undefined): boolean {
   if (!analysis) return false;
-  const remoteCandidates = remoteA2ACandidates(analysis.moduleCandidates);
-  if (remoteCandidates.length === 0) return true;
-  return remoteCandidates.every((candidate) => {
+  const a2aAssets = a2aAgentAssets(analysis.assetCandidates);
+  if (a2aAssets.length === 0) return true;
+  return a2aAssets.every((candidate) => {
     const contract = findMatchingA2AContract(candidate, analysis.a2aContracts ?? []);
     return Boolean(contract) && a2aContractReadinessIssues(contract).length === 0;
   });
 }
 
-export function remoteA2ACandidates(candidates: ModuleCandidate[]): ModuleCandidate[] {
-  return candidates.filter((candidate) => candidate.module_category === "remote_a2a");
+export function a2aAgentAssets(candidates: AssetCandidate[]): AssetCandidate[] {
+  return candidates.filter(
+    (candidate) => candidate.asset_type === "agent" && (candidate.binding?.kind === "a2a" || candidate.exposure?.protocol === "a2a")
+  );
 }
 
 export function findMatchingA2AContract(
-  candidate: ModuleCandidate,
+  candidate: AssetCandidate,
   contracts: A2AContract[]
 ): A2AContract | null {
-  const byCandidateId = contracts.find((contract) => contract.remote_module_id === candidate.id);
-  if (byCandidateId) return byCandidateId;
-  if (!candidate.a2a_contract_id) return null;
-  return contracts.find((contract) => contract.contract_id === candidate.a2a_contract_id) ?? null;
+  const byAgentRef = contracts.find((contract) => contract.agent_ref === candidate.asset_id);
+  if (byAgentRef) return byAgentRef;
+  const contractRef = candidate.binding?.kind === "a2a" ? candidate.binding.contract_ref : candidate.exposure?.contract_ref;
+  return contractRef ? contracts.find((contract) => contract.contract_id === contractRef) ?? null : null;
 }
 
 function pushStringIssue(issues: string[], field: string, value: string | null | undefined) {
@@ -102,8 +108,8 @@ function pushStringIssue(issues: string[], field: string, value: string | null |
   }
 }
 
-function pushStringArrayIssues(issues: string[], field: string, values: readonly string[]) {
-  if (!values.length) {
+function pushStringArrayIssues(issues: string[], field: string, values: readonly string[], requireAtLeastOne = true) {
+  if (requireAtLeastOne && !values.length) {
     issues.push(`${field} must include at least one reviewed value`);
     return;
   }
@@ -116,10 +122,13 @@ function pushObjectArrayIssues<T extends Record<string, unknown>>(
   issues: string[],
   field: string,
   values: readonly T[],
-  requiredFields: readonly (keyof T & string)[]
+  requiredFields: readonly (keyof T & string)[],
+  requireAtLeastOne = true
 ) {
   if (!values.length) {
-    issues.push(`${field} must include at least one reviewed value`);
+    if (requireAtLeastOne) {
+      issues.push(`${field} must include at least one reviewed value`);
+    }
     return;
   }
   values.forEach((value, index) => {

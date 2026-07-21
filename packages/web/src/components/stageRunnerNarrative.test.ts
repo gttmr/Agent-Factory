@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectProcessLog, selectStageRunnerNarrative } from "./stageRunnerNarrative.ts";
+import { selectProcessLog, selectStageRunnerNarrative, stageRunCompletionMessage } from "./stageRunnerNarrative.ts";
+
+assert.equal(
+  stageRunCompletionMessage("build"),
+  "runtime-stub이 canonical 경로에 생성되고 run 이력이 기록되었습니다. Build에는 별도 제안 적용 단계가 없습니다."
+);
+assert.match(stageRunCompletionMessage("analyze"), /canonical artifact 는 아직 변경되지 않았습니다/);
 
 const events = [
   {

@@ -27,7 +27,7 @@ export default function MockSpecEditor({
   const filteredCatalogEntries = catalog.entries.filter((entry) => {
     const query = catalogQuery.trim().toLowerCase();
     if (!query) return true;
-    return [entry.name, entry.adapter_kind, entry.owner_domain, entry.access_protocol, entry.contract_status, entry.notes]
+    return [entry.name, ...entry.capability_tags, entry.owner, entry.binding.kind, entry.contract_status, entry.notes]
       .join(" ")
       .toLowerCase()
       .includes(query);
@@ -213,7 +213,7 @@ export default function MockSpecEditor({
             <div className="modal-heading">
               <div>
                 <h2 id="catalog-tool-title">Catalog Tool Prefill</h2>
-                <p>선택한 adapter 계약으로 새 tool을 채웁니다.</p>
+                <p>선택한 Tool 계약으로 새 MCP mock을 채웁니다.</p>
               </div>
               <button className="modal-close" type="button" aria-label="Catalog prefill 닫기" onClick={() => setCatalogChooserOpen(false)}>
                 x
@@ -227,7 +227,7 @@ export default function MockSpecEditor({
                   setCatalogQuery(event.target.value);
                   setCatalogPage(0);
                 }}
-                placeholder="adapter, domain, protocol"
+                placeholder="Tool, owner, binding"
               />
             </label>
             <div className="catalog-choice-grid">
@@ -246,7 +246,8 @@ export default function MockSpecEditor({
                 <button className="catalog-choice-card" key={entry.name} type="button" onClick={() => handleCatalogToolSelect(entry)}>
                   <strong>{entry.name}</strong>
                   <span>
-                    {entry.adapter_kind} · {entry.owner_domain} · {entry.access_protocol}
+                    {entry.capability_tags.join(", ") || "capability 미지정"} · {entry.owner || "owner 미지정"} ·{" "}
+                    {entry.binding.kind}
                   </span>
                   <span className="badge-row">
                     <StatusBadge tone={entry.has_runtime_mock ? "success" : "warning"}>

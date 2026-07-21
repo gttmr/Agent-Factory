@@ -13,7 +13,6 @@ import {
   handleGetText,
   handleListRoots,
   handlePatchApprovals,
-  handlePatchValidation,
   handlePutJson,
   handlePutText
 } from "./afArtifactCrudApi";
@@ -43,11 +42,15 @@ const MARKDOWN_PATHS = new Set([
 const JSON_ARTIFACT_PATHS = new Set([
   "analysis-result.json",
   "normalized-requirement.json",
-  "module-candidates.json",
-  "process-flow.json",
-  "commonization-notes.json",
-  "a2a-contracts.json",
+  "asset-candidates.json",
+  "graph-ir.json",
   "scaffold-plan.json"
+]);
+
+const DERIVED_JSON_PATHS = new Set([
+  "normalized-requirement.json",
+  "asset-candidates.json",
+  "graph-ir.json"
 ]);
 
 const YAML_PATHS = new Set(["catalog-delta.yaml"]);
@@ -108,15 +111,15 @@ export function createAfArtifactsMiddleware(repoRoot: string) {
         return;
       }
 
-      if (sub === "manifest/validation") {
-        if (req.method === "PATCH") return await handlePatchValidation(store, reqId, req, res);
-        sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
-        return;
-      }
-
       if (JSON_ARTIFACT_PATHS.has(sub)) {
         if (req.method === "GET") return await handleGetJson(store, reqId, sub, res);
-        if (req.method === "PUT") return await handlePutJson(store, reqId, sub, req, res);
+        if (req.method === "PUT") {
+          if (DERIVED_JSON_PATHS.has(sub)) {
+            sendJson(res, 405, { error: `${sub}은 artifact sync가 생성하는 파생 artifact이므로 직접 저장할 수 없습니다.` });
+            return;
+          }
+          return await handlePutJson(repoRoot, store, reqId, sub, req, res);
+        }
         sendJson(res, 405, { error: "지원하지 않는 메서드입니다." });
         return;
       }

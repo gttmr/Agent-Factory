@@ -1,6 +1,6 @@
 # scenario-i — remote A2A runnable example
 
-`input → local_dispatcher_agent (local) → remote_credit_agent (remote_a2a) → output`.
+`input → local_dispatcher_agent (local) → remote_credit_agent (A2A-bound Agent) → output`.
 The remote node lowers to an ADK 2.x `RemoteA2aAgent` that calls a partner agent
 over the A2A protocol; the agent card URL comes from the approved A2A contract
 (`a2a-001`). Here the card points at the **local mock server** in `mock_remote/`,

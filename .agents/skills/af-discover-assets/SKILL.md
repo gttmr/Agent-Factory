@@ -52,6 +52,8 @@ Archive와 private handoff 자료를 현재 근거로 사용하지 않는다.
 
 ### Read Set
 
+먼저 [Source of Truth](../_shared/source-of-truth.md)와 [Lifecycle Invariants](../_shared/lifecycle-invariants.md)를 읽는다.
+
 최소 Read Set은 다음이다.
 
 1. requirement 원문
@@ -59,7 +61,7 @@ Archive와 private handoff 자료를 현재 근거로 사용하지 않는다.
 3. [Taxonomy Reference](../_shared/taxonomy.md)
 4. mode에 따라 [Analysis Result Output](references/analysis-result-output.md)
 
-현행 JSON을 쓸 때만 [Compatibility Layer](../_shared/compatibility-current-schema.md)를 추가로 읽는다.
+v2 JSON을 쓰기 전에 [Target Contract v2](../_shared/target-contract-v2.md)를 추가로 읽는다.
 
 ## 3. 핵심 Workflow
 
@@ -158,13 +160,13 @@ Hint마다 Evidence와 더 단순한 대안을 함께 기록한다.
 
 Stage Runner mode에서는 proposed `analysis-result.json`만 쓴다.
 
-현행 schema를 쓰는 Stage Runner 또는 canonical write에서는:
+Stage Runner 또는 canonical write에서는:
 
-1. Target 판단을 먼저 기록한다.
-2. Compatibility Layer의 문서화된 `legacy` 직렬화만 적용한다.
+1. `contract_version: "2.0"`을 기록한다.
+2. `normalizedRequirement`, `evidence`, `assetCandidates`, `a2aContracts`, `runtimeContracts`, `graph`를 모두 기록한다. A2A가 없어도 `a2aContracts: []`를 쓴다.
 3. Target rationale를 `rationale` 또는 notes에 보존한다.
-4. 매핑 불가 또는 materially lossy mapping은 중단한다.
-5. 그 영향 영역을 `docs/migration/skill-vnext-status.md`의 Blocker로 기록하도록 보고한다.
+4. strict v2로 표현할 수 없으면 중단한다.
+5. 그 영향 영역을 Blocker로 보고한다.
 
 Standalone 비검증 design note는 Target 어휘를 사용할 수 있다.
 
@@ -187,7 +189,7 @@ Standalone 비검증 design note는 Target 어휘를 사용할 수 있다.
 | 모든 discovery 작업 | [Taxonomy Reference](../_shared/taxonomy.md) | 자산·비자산·Domain·Owner·Reuse 경계 |
 | 모든 evidence 추출과 후보 판별 | [Evidence and Candidate Discovery](references/evidence-and-candidate-discovery.md) | 증거 분리와 후보 record |
 | Stage Runner 또는 `analysis-result.json` 작성 | [Analysis Result Output](references/analysis-result-output.md) | mode별 경로와 현행 shape |
-| 현행 canonical/proposed JSON 작성 | [Compatibility Layer](../_shared/compatibility-current-schema.md) | Target 판단의 current serialization |
+| v2 canonical/proposed JSON 작성 | [Target Contract v2](../_shared/target-contract-v2.md) | strict fields, asset types, Graph shape |
 
 표에 없는 Reference를 관성적으로 읽지 않는다.
 
@@ -218,7 +220,7 @@ Standalone mode:
 ### Forbidden Writes
 
 - canonical artifact from Stage Runner mode
-- `normalized-requirement.json`, `module-candidates.json`, `process-flow.json` proposal 분할 파일
+- `normalized-requirement.json`, `asset-candidates.json`, `graph-ir.json` proposal 분할 파일
 - `boundary-design.md`
 - `scaffold-plan.json`
 - `runtime-stub/`
@@ -242,11 +244,11 @@ Graph, approval 변경, runtime code는 Output이 아니다.
 - artifact root, run ID, mode, output path가 모호함
 - 사실과 가정을 분리할 수 없음
 - candidate responsibility 또는 I/O 근거가 없음
-- Resource/Dependency를 자산으로 가장해야 current schema에 맞음
+- Resource/Dependency를 자산으로 가장해야 strict v2 schema에 맞음
 - Workflow 책임 없이 Workflow 후보를 강제해야 함
 - candidate-level Missing Information이 남았는데 approved 상태가 요구됨
 - A2A/MCP/Callback/Ambient/Event Loop 계약을 이 단계에서 확정해야 함
-- Target 판단을 현행 schema에 안전하게 매핑할 수 없음
+- Target 판단을 strict v2 schema에 안전하게 표현할 수 없음
 - `analysis-result.json` parse 또는 validation 실패
 - private endpoint, credential, customer data가 필요함
 - 승인 toggle, Catalog write, Graph 확정, 코드 생성이 필요함
@@ -288,7 +290,7 @@ inventory는 `analysis-result.json` 하나여야 한다.
 - Required Missing Information이 명시됨
 - Resource와 Dependency 경계가 유지됨
 - Runtime Pattern은 Hint로만 기록됨
-- current artifact를 썼다면 validation이 성공함
+- strict v2 artifact를 썼다면 validation이 성공함
 
 handoff에는 output path, mode, candidate 요약, unresolved questions, contradictions, selected hints, validation command와 exit code를 포함한다.
 

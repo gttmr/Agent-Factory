@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ArtifactRootStore } from "./artifactRootStore.ts";
+import { ArtifactRootStore, ArtifactValidationError } from "./artifactRootStore.ts";
 import { runRuntimeStubBuild } from "./afRuntimeStubApi.ts";
 import { writeFakeScripts } from "./artifactSyncTestHarness.ts";
 
@@ -14,11 +14,24 @@ try {
   process.env.PATH = `${join(repoRoot, "bin")}:${originalPath}`;
   const store = new ArtifactRootStore({ repoRoot });
 
+  await store.createRoot("req-build-unapproved");
+  await assert.rejects(
+    runRuntimeStubBuild({ repoRoot, store, reqId: "req-build-unapproved" }),
+    (error: unknown) => {
+      assert.ok(error instanceof ArtifactValidationError);
+      assert.equal(error.statusCode, 409);
+      assert.match(error.message, /boundaries_approved/);
+      assert.match(error.message, /runtime_contracts_approved/);
+      return true;
+    }
+  );
+
   await store.createRoot("req-build-success");
   const successManifestPath = join(repoRoot, "artifacts/af/req-build-success/af-run-manifest.json");
   const successManifest = JSON.parse(await readFile(successManifestPath, "utf8"));
-  successManifest.stages.analyze.review_metadata = { owner: "analysis-reviewer" };
-  successManifest.stages.build.review_metadata = { owner: "build-reviewer" };
+  successManifest.approvals.analysis_reviewed = true;
+  successManifest.approvals.boundaries_approved = true;
+  successManifest.approvals.runtime_contracts_approved = true;
   await writeFile(successManifestPath, `${JSON.stringify(successManifest, null, 2)}\n`, "utf8");
   const approvalsBefore = successManifest.approvals;
 
@@ -30,13 +43,16 @@ try {
   assert.deepEqual(manifestAfterSuccess.stages.build.outputs, ["runtime-stub/agent.py"]);
   assert.equal(manifestAfterSuccess.stages.build.status, "pending");
   assert.deepEqual(manifestAfterSuccess.approvals, approvalsBefore);
-  assert.deepEqual(manifestAfterSuccess.stages.analyze.review_metadata, { owner: "analysis-reviewer" });
-  assert.deepEqual(manifestAfterSuccess.stages.build.review_metadata, { owner: "build-reviewer" });
 
   await store.createRoot("req-build-failure");
   const failureRoot = join(repoRoot, "artifacts/af/req-build-failure");
   const failureManifestPath = join(failureRoot, "af-run-manifest.json");
   await writeFile(join(failureRoot, "fail-generate"), "", "utf8");
+  const failureManifest = JSON.parse(await readFile(failureManifestPath, "utf8"));
+  failureManifest.approvals.analysis_reviewed = true;
+  failureManifest.approvals.boundaries_approved = true;
+  failureManifest.approvals.runtime_contracts_approved = true;
+  await writeFile(failureManifestPath, `${JSON.stringify(failureManifest, null, 2)}\n`, "utf8");
   const failureManifestBefore = await readFile(failureManifestPath);
 
   const failure = await runRuntimeStubBuild({ repoRoot, store, reqId: "req-build-failure" });

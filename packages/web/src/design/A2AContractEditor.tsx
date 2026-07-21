@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { A2A_CONTRACT_STATUSES, type A2AContract, type A2AContractStatus, type ModuleCandidate } from "../analyzer/types";
+import { A2A_CONTRACT_STATUSES, type A2AContract, type A2AContractStatus, type AssetCandidate } from "../analyzer/types";
 import { Button, SectionHeader, SelectField } from "../ui/primitives";
 import { A2AContractCapabilitySections } from "./A2AContractCapabilitySections";
 import { A2AContractCoreSections } from "./A2AContractCoreSections";
@@ -11,7 +11,7 @@ import {
 import { a2aContractReadinessIssues } from "./a2aContractValidator";
 
 interface A2AContractEditorProps {
-  candidate: ModuleCandidate;
+  candidate: AssetCandidate;
   contract: A2AContract;
   saving: boolean;
   onSave: (next: A2AContract) => void;
@@ -101,15 +101,15 @@ export function A2AContractEditor({ candidate, contract, saving, onSave, onCance
   return (
     <div className="af-a2a-inspector">
       <SectionHeader
-        eyebrow={`Remote A2A · ${draft.contract_id}`}
+        eyebrow={`A2A protocol · ${draft.contract_id}`}
         title={candidate.name}
         description={candidate.rationale}
       />
 
       <dl className="af-a2a-meta">
         <div>
-          <dt>remote_module_id</dt>
-          <dd>{draft.remote_module_id}</dd>
+          <dt>agent_ref</dt>
+          <dd>{draft.agent_ref}</dd>
         </div>
         <div>
           <dt>target_agent</dt>
@@ -154,7 +154,7 @@ export function A2AContractEditor({ candidate, contract, saving, onSave, onCance
       <div className="af-a2a-readiness-block">
         <h4>Readiness issues ({issues.length})</h4>
         {issues.length === 0 ? (
-          <p className="af-a2a-readiness-ready">readiness OK — Remote A2A 계약이 approved 상태입니다.</p>
+          <p className="af-a2a-readiness-ready">readiness OK — A2A 계약이 approved 상태입니다.</p>
         ) : (
           <ul>
             {issues.map((issue) => (

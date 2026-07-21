@@ -1,0 +1,43 @@
+{
+  "requirement_id": "req-s15-private-data-safety",
+  "artifact_root": "scenario-context/S15-private-data-safety",
+  "current_stage": "build",
+  "stages": {
+    "analyze": {
+      "status": "complete",
+      "outputs": [
+        "analysis-result.json",
+        "normalized-requirement.json",
+        "asset-candidates.json",
+        "graph-ir.json"
+      ]
+    },
+    "design": {
+      "status": "complete",
+      "outputs": [
+        "boundary-design.md",
+        "scaffold-plan.json"
+      ]
+    },
+    "build": {
+      "status": "blocked",
+      "outputs": []
+    },
+    "verify": {
+      "status": "pending",
+      "outputs": []
+    }
+  },
+  "approvals": {
+    "analysis_reviewed": true,
+    "boundaries_approved": true,
+    "runtime_contracts_approved": true,
+    "stub_ready_for_followup": false
+  },
+  "validation": {
+    "commands": [
+      "node scripts/validate-artifacts.mjs ."
+    ],
+    "last_result": "not_run"
+  }
+}

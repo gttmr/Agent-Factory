@@ -45,10 +45,12 @@
 ### R8. Remote A2A 계약 파일: 분리 `a2a-contracts.json` vs 임베디드 `a2aContracts`
 - **충돌**: 구판 artifact-contracts는 `a2a-contracts.json`을 표준 아티팩트로 나열 ↔ 현행 검증기·생성기는 `analysis-result.json.a2aContracts`만 소비(`types.ts:962-974`, `validate-artifacts.mjs:955-1045`, `remote-a2a.mjs:6-15`), artifact-sync는 분리 파일을 파생하지 않고 유일한 코드 참조는 CRUD 허용목록 1건(`afArtifactsApi.ts:49`).
 - **판정**: **임베디드 `a2aContracts`가 정본.** 재작성 스킬의 표준 아티팩트 목록에서 `a2a-contracts.json`을 제거. CRUD 허용목록 잔재는 Phase C 정리 후보로 이관.
+- **2026-07-19 후속**: strict Target v2 cutover에서 CRUD/API·store allow-list 잔재를 제거하고 split 파일의 GET·PUT을 회귀 테스트로 거부했다. Phase C 정리 후보는 완료됐다.
 
 ### R9. ADK 문서의 정적 back-edge 루프 vs 생성기의 dynamic builder 라우팅
 - **충돌**: adk.dev routes 문서는 정적 그래프 back-edge 루프를 보여줌 ↔ 현행 생성기는 순환/loop-control 형태를 정적 runnable에서 거부하고 dynamic builder로 라우팅(`graph/guards.mjs:13-20`, `agent-dynamic.mjs:96-131`).
 - **판정**: **관할 분리** — 워크벤치/생성기 산출물 계약은 리포 코드가 권위, ADK API 의미론은 adk.dev/실런타임이 권위(R4 정련). 스킬은 생성기의 현행 lowering 규칙을 가르치고, ADK 문서의 back-edge는 의미론 배경으로만 인용. 정적 루프 지원은 Phase C 생성기 후속 후보.
+- **2026-07-19 후속**: owning Workflow의 `workflow_profile.representation`을 단일 mode 결정권자로 고정했다. Region은 mode를 바꾸지 않는다. 현재 static routed-cycle은 지원하지 않으므로 `graph` cycle을 조용히 dynamic으로 전환하지 않고 fail-closed하며, `dynamic` loop는 설치된 ADK 2.3.0에서 반복·상한 종료·terminal output까지 실행 검증했다.
 
 ### R10. human_input `rerun_on_resume` 서술 강도
 - **충돌 아님(불확실성)**: 생성기는 항상 `FunctionNode(..., rerun_on_resume=True)` + `RequestInput`을 방출(`emitters/hitl.mjs:5-23`); 이것이 모든 정적 그래프 경우에 필수인지는 실런타임 미검증 (갭 분석 HYPOTHESIS).
@@ -57,9 +59,14 @@
 ### R11. 스킬 frontmatter: gcli식 풍부한 메타데이터 vs 최소형
 - **판정**: **최소형 유지**(`name`, `description`). Codex 스킬 로더의 확장 메타데이터 지원이 미확인이며, 최소형으로 잃는 것이 없다.
 
-### R12. 스킬 파일 경로의 코드 결합 (구조 제약)
-- **사실**: `packages/web/server/stageRunner.ts:38,42`가 `.agents/skills/af-analyze-requirement/SKILL.md`, `.agents/skills/af-design-boundaries/SKILL.md` 경로를 하드 참조.
-- **판정**: 4개 스킬 디렉터리명과 `SKILL.md` 파일명은 **변경 금지**. `_shared` 내부 파일은 코드 참조가 없어 자유롭게 재구성 가능(`adk-2.md` 대체 포함).
+### R12. 스킬 파일 경로의 코드 결합과 strict cutover
+- **과거 사실**: strict cutover 전 `stageRunner.ts`가 구 stage skill 경로를 하드 참조해 네 shim을 즉시 제거할 수 없었다.
+- **2026-07-19 판정**: Stage Runner가 `af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime`의 canonical `SKILL.md`를 직접 참조하도록 전환했고 구 shim 네 개를 삭제했다. canonical 다섯 디렉터리는 현재 실행 계약이므로 경로 변경 시 Stage Runner와 skill validator를 함께 갱신한다. 구 ID는 지원 경로가 아니다.
+
+### R13. state/artifact channel의 저장 key
+- **충돌**: 구 state/artifact skill은 strict Graph Edge에 `state_key`·`artifact_key`가 있는 것처럼 지시했지만 strict v2 Edge는 `id`, `from`, `to`, `control`, `channel`만 허용하고 해당 두 field를 거부한다.
+- **판정**: Graph는 `channel: state|artifact`와 Edge identity만 기록한다. 현재 generator의 runtime storage key는 Edge `id`에서 deterministic하게 파생하며, scope·schema·MIME·retention 같은 상세는 reviewed runtime contract가 소유한다. 제거된 key를 Graph에 다시 추가하지 않는다.
+- **근거**: `schemas/graph.schema.json`, `scripts/adk-source/channels.mjs`, 생성기 실행 회귀와 `scripts/validate-skills.mjs`.
 
 ## 열린 질문 처리 (갭 분석 §5)
 

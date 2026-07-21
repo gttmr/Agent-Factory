@@ -1,6 +1,6 @@
-- approved ambient contract와 package surface를 generation gate로 확인한다.
-- event normalization과 one-session-per-delivery를 구현한다.
-- duplicate 처리와 idempotent output을 검증한다.
-- retry exhaustion, DLQ, concurrency, timeout과 sink failure를 분리한다.
-- 합성 fixture와 local-only output을 사용한다.
-- deployment, credential, production resource를 생성하지 않는다.
+- strict v2 analysis/candidates/Graph, approved runtime contract, manifest, boundary design과 scaffold plan의 parity를 확인한다.
+- Ambient와 Pub/Sub가 top-level Asset 또는 Graph Node가 아니라 external runtime dependency임을 유지한다.
+- reviewed target design과 generic generator의 Current Implementation 한계를 분리한다.
+- `can_generate_source: false`와 Build `blocked`를 그대로 적용하고 명시적 blocker와 unblock 조건을 보고한다.
+- opaque 합성 fixture를 실행 설정으로 해석하지 않고 source나 runtime artifact를 생성하지 않는다.
+- approval, deployment, credential, cloud resource 또는 Catalog를 변경하지 않는다.

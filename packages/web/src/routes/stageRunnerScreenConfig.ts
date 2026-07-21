@@ -30,7 +30,7 @@ interface AnalyzeStageRunnerConfigInput {
   readonly analyzeRawText: string;
   readonly analyzeDomain: string;
   readonly catalog: AnalyzeCatalogEntry[];
-  readonly catalogCounts: Record<AnalyzeCatalogEntry["module_category"], number>;
+  readonly catalogCounts: Record<"agent" | "workflow" | "tool", number>;
   readonly currentCandidateCount: number | null;
 }
 
@@ -66,6 +66,9 @@ interface BuildStageRunnerConfigInput extends BuildStageReadinessInput {
 interface VerifyStageRunnerConfigInput {
   readonly commandKey: string;
   readonly runState: VerifyRunState;
+  readonly buildComplete: boolean;
+  readonly stubApproved: boolean;
+  readonly runtimeStubFileCount: number;
   readonly reportExists: boolean;
   readonly deltaExists: boolean;
 }
@@ -123,7 +126,7 @@ export function buildAnalyzeStageRunnerConfig(input: AnalyzeStageRunnerConfigInp
       { label: "catalog", value: `${input.catalog.length}개` },
       {
         label: "catalog 구성",
-        value: `A ${input.catalogCounts.agent} · W ${input.catalogCounts.workflow} · D ${input.catalogCounts.adapter} · R ${input.catalogCounts.remote_a2a}`
+        value: `Agent ${input.catalogCounts.agent} · Workflow ${input.catalogCounts.workflow} · Tool ${input.catalogCounts.tool}`
       }
     ],
     disabledReason: input.analyzeRawText
@@ -153,7 +156,7 @@ export function buildDesignStageRunnerConfig(input: DesignStageRunnerConfigInput
         tone: input.analysisReviewed ? "ok" : "danger"
       },
       {
-        label: "module status",
+        label: "asset status",
         value: input.hasAnalysis ? `approved ${input.approvedCandidateCount} / ${input.totalCandidateCount}` : "없음",
         tone: input.allCandidatesApproved ? "ok" : "warn"
       },
@@ -231,14 +234,26 @@ export function buildVerifyStageRunnerConfig(input: VerifyStageRunnerConfigInput
         value: input.runState.latestRunStatusLabel,
         tone: input.runState.latestRunTone
       },
+      {
+        label: "runtime-stub",
+        value: `${input.runtimeStubFileCount} files`,
+        tone: input.runtimeStubFileCount > 0 && input.stubApproved ? "ok" : "danger"
+      },
       { label: "report", value: input.reportExists ? "있음" : "없음", tone: input.reportExists ? "ok" : "warn" },
       { label: "catalog-delta", value: input.deltaExists ? "있음" : "없음", tone: input.deltaExists ? "ok" : "warn" }
     ],
-    disabledReason: null,
+    disabledReason: buildVerifyStageDisabledReason(input),
     currentArtifactEtag: null,
     runButtonLabel: "Verify 실행 기록",
     buildRunBody: (model) => ({ model, verifyCommand: input.commandKey })
   };
+}
+
+function buildVerifyStageDisabledReason(input: VerifyStageRunnerConfigInput): string | null {
+  if (!input.buildComplete) return "Build stage가 complete 상태여야 Verify를 실행할 수 있습니다.";
+  if (!input.stubApproved) return "stub_ready_for_followup=true 승인 후 Verify를 실행할 수 있습니다.";
+  if (input.runtimeStubFileCount === 0) return "검증할 runtime-stub 파일이 없습니다.";
+  return null;
 }
 
 export function summarizeVerifyRunState(manifest: AfRunManifest | null | undefined): VerifyRunState {

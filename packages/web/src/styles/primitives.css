@@ -1,7 +1,7 @@
 /* =====================================================================
    Primitives layer — the shared structural building blocks behind
    ui/primitives.tsx (Panel, SectionHeader, Button, Field, MetricPill,
-   EmptyState) plus legacy structural classes still used across screens
+   EmptyState) plus low-level structural classes used across screens
    (.panel, .stack, .actions, .tag, .eyebrow, .section-heading).
 
    New screens should compose these instead of restyling raw elements.
@@ -9,9 +9,6 @@
    ===================================================================== */
 
 /* ---- surfaces ---- */
-/* .panel is the legacy alias of .ui-panel; kept identical so both markup
-   styles resolve the same. Prefer <Panel> / .ui-panel in new code. */
-.panel,
 .ui-panel {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
@@ -226,7 +223,6 @@
 
 /* ---- responsive ---- */
 @media (max-width: 640px) {
-  .panel,
   .ui-panel {
     padding: var(--space-2xl);
   }

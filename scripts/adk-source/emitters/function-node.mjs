@@ -1,66 +1,103 @@
-import { adapterConnection } from "../adapters.mjs";
+import { toolConnection } from "../tools.mjs";
 import { emitOutgoingArtifactChannelWrites, emitOutgoingStateChannelWrites } from "../channels.mjs";
 import { funcName, nodeSymbol, pyNodeName, stateKey } from "../naming.mjs";
+import { routeValue } from "../graph/routes.mjs";
 import { escapePythonString, toPyStr, toPythonLiteral } from "../python-literals.mjs";
-import { remoteA2aRegistrySnapshotRows } from "../remote-a2a.mjs";
+import { asyncResumeContractForToolTarget } from "../resume-contracts.mjs";
 
-export function emitFunctionNodeDecl(module) {
-  return `${nodeSymbol(module)} = FunctionNode(func=${funcName(module)}, name=${toPyStr(pyNodeName(module))})`;
+export function emitFunctionNodeDecl(asset) {
+  return `${nodeSymbol(asset)} = FunctionNode(func=${funcName(asset)}, name=${toPyStr(pyNodeName(asset))})`;
 }
 
 export function emitStubFunc(target, context) {
-  const module = target.module ?? target;
-  const registryRows = registrySnapshotRowsForStub(module, context);
-  if (registryRows.length) return emitRegistrySnapshotFunc(target, context, registryRows);
+  const asset = target.asset ?? target;
+  const asyncResumeContract = asyncResumeContractForToolTarget(context, target);
+  if (asyncResumeContract) return emitGuardedSyntheticToolFunc(target, context, asyncResumeContract);
   const kindNote =
-    module.module_category === "workflow"
-      ? "검토된 결정적 워크플로우 조정자 자리표시자"
-      : adapterConnection(module) === "unconnected"
-        ? "synthetic MCP 서버가 아직 연결되지 않은 adapter"
+    asset.asset_type === "workflow"
+      ? "검토된 결정적 Workflow 조정자 자리표시자"
+      : toolConnection(asset) === "unconnected"
+        ? "연결이 아직 확정되지 않은 Tool"
         : "검토된 TODO boundary";
-  const connectionStatus = module.module_category === "adapter" ? "unconnected" : "coordinator";
+  const connectionStatus = asset.asset_type === "tool" ? "unconnected" : "coordinator";
   return `async def ${funcName(target)}(ctx: Context, node_input=None) -> dict:
-    """TODO_IMPLEMENT_HERE: ${escapePythonString(module.name)} — ${kindNote}.
+    """TODO_IMPLEMENT_HERE: ${escapePythonString(asset.name)} — ${kindNote}.
 
     검토된 합성 테스트 더블 output만 반환합니다. 실제 업무 로직은 없습니다.
     """
-    contract = COMPONENT_CONTRACTS[${toPyStr(module.id)}]
+    contract = COMPONENT_CONTRACTS[${toPyStr(asset.asset_id)}]
     payload = {
-        "module_id": ${toPyStr(module.id)},
-        "module_name": ${toPyStr(module.name)},
+        "asset_id": ${toPyStr(asset.asset_id)},
+        "asset_name": ${toPyStr(asset.name)},
         "connection_status": ${toPyStr(connectionStatus)},
-        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
-        "runtime_mock": contract.get("runtime_mock"),
+        "status": "todo_implementation_required",
         "developer_todos": contract.get("developer_todos", []),
         "input_status": "received" if node_input is not None else "empty",
     }
-    ctx.state[${toPyStr(stateKey(module))}] = payload
-${emitOutgoingStateChannelWrites(context.graphContext, module.id)}${emitOutgoingArtifactChannelWrites(context.graphContext, module.id)}    return payload`;
+    ctx.state[${toPyStr(stateKey(asset))}] = payload
+${emitOutgoingStateChannelWrites(context.graphContext, asset.asset_id)}${emitOutgoingArtifactChannelWrites(context.graphContext, asset.asset_id)}    return payload`;
 }
 
-function emitRegistrySnapshotFunc(target, context, providerRows) {
-  const module = target.module ?? target;
+function emitGuardedSyntheticToolFunc(target, context, runtimeContract) {
+  const asset = target.asset ?? target;
+  const guard = runtimeContract.side_effect_guard;
+  const inputNames = (asset.inputs ?? []).map((field) => field.name).filter(Boolean);
+  const requiredNames = (asset.inputs ?? []).filter((field) => field.required).map((field) => field.name).filter(Boolean);
+  const routeNodeId = runtimeContract.graph_ir_annotations.resume_entry_node_id;
+  const guardedRoute = (context.graph?.edges ?? []).find(
+    (edge) => edge?.from === routeNodeId && edge?.to === target.node?.id && edge?.control?.kind === "condition"
+  );
+  const reviewedRoute = routeValue(guardedRoute);
   return `async def ${funcName(target)}(ctx: Context, node_input=None) -> dict:
-    """TODO_IMPLEMENT_HERE: ${escapePythonString(module.name)} — reviewed Remote A2A provider registry projection.
-
-    검토된 Remote A2A contract/provider metadata만 session state에 투영합니다. 실제 업무 로직은 없습니다.
-    """
-    contract = COMPONENT_CONTRACTS[${toPyStr(module.id)}]
+    """Apply the reviewed synthetic side-effect boundary at most once per session ledger key."""
+    arguments, input_resolution = _collect_tool_inputs(
+        ctx,
+        ${toPyStr(asset.asset_id)},
+        ${toPythonLiteral(inputNames)},
+        ${toPythonLiteral(requiredNames)},
+        node_input=node_input,
+    )
+    _idempotency_value = arguments.get(${toPyStr(guard.idempotency_key_input)})
+    if _idempotency_value is None or not str(_idempotency_value).strip():
+        raise RuntimeError(
+            ${toPyStr(`${runtimeContract.contract_id}: idempotency key input ${guard.idempotency_key_input} is required.`)}
+        )
+    _idempotency_key = str(_idempotency_value)
+    _ledger_state_key = ${toPyStr(`af_resume_ledger:${runtimeContract.contract_id}`)}
+    _stored_ledger = ctx.state.get(_ledger_state_key)
+    _ledger = dict(_stored_ledger) if isinstance(_stored_ledger, dict) else {}
+    _fingerprint = json.dumps(
+        _json_safe_node_value(arguments), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    _record = _ledger.get(_idempotency_key)
+    if isinstance(_record, dict):
+        if _record.get("fingerprint") != _fingerprint:
+            raise RuntimeError(
+                f"${runtimeContract.contract_id}: conflicting side-effect payload rejected for idempotency key {_idempotency_key}."
+            )
+        payload = _record.get("result")
+        if not isinstance(payload, dict):
+            raise RuntimeError(${toPyStr(`${runtimeContract.contract_id}: recorded side-effect result is invalid.`)})
+        ctx.state[${toPyStr(stateKey(asset))}] = payload
+${emitOutgoingStateChannelWrites(context.graphContext, asset.asset_id, "        ")}${emitOutgoingArtifactChannelWrites(context.graphContext, asset.asset_id, "        ")}        return payload
     payload = {
-        "module_id": ${toPyStr(module.id)},
-        "module_name": ${toPyStr(module.name)},
-        "connection_status": "configured",
-        "status": "configured_remote_a2a_providers",
-        "providers": ${toPythonLiteral(providerRows, 2)},
-        "provider_count": ${providerRows.length},
-        "developer_todos": contract.get("developer_todos", []),
-        "input_status": "received" if node_input is not None else "empty",
+        "asset_id": ${toPyStr(asset.asset_id)},
+        "asset_name": ${toPyStr(asset.name)},
+        "connection_status": "in_process",
+        "status": "synthetic_side_effect_applied",
+        "applied": True,
+        "apply_count": 1,
+        "approved_route": ${toPyStr(reviewedRoute)},
+        "idempotency_key": _idempotency_key,
+        "idempotency_key_input": ${toPyStr(guard.idempotency_key_input)},
+        "delivery_semantics": ${toPyStr(guard.delivery_semantics)},
+        "ledger_scope": ${toPyStr(guard.ledger_scope)},
+        "duplicate_response": ${toPyStr(runtimeContract.resume_policy.duplicate_response)},
+        "arguments": _json_safe_node_value(arguments),
+        "input_resolution": _json_safe_node_value(input_resolution),
     }
-    ctx.state[${toPyStr(stateKey(module))}] = payload
-${emitOutgoingStateChannelWrites(context.graphContext, module.id)}${emitOutgoingArtifactChannelWrites(context.graphContext, module.id)}    return payload`;
-}
-
-function registrySnapshotRowsForStub(module, context) {
-  if (module.adk_skeleton_contract?.implementation_template !== "remote_a2a_registry_projection_stub") return [];
-  return remoteA2aRegistrySnapshotRows({ analysisResult: context.analysisResult, modules: context.modules });
+    _ledger[_idempotency_key] = {"fingerprint": _fingerprint, "result": payload}
+    ctx.state[_ledger_state_key] = _ledger
+    ctx.state[${toPyStr(stateKey(asset))}] = payload
+${emitOutgoingStateChannelWrites(context.graphContext, asset.asset_id)}${emitOutgoingArtifactChannelWrites(context.graphContext, asset.asset_id)}    return payload`;
 }

@@ -1,5 +1,5 @@
 import { buildAgentPy } from "./agent.mjs";
-import { adapterConnection } from "./adapters.mjs";
+import { toolConnection } from "./tools.mjs";
 import { agentInstruction } from "./emitters/agent-node.mjs";
 import {
   graphEdgeSemantics,
@@ -16,9 +16,9 @@ import {
   buildMockConfigYaml,
   buildNodeHelperPy,
   buildSchemasPy,
-  buildWorkflowCallsPy,
+  buildSubworkflowsPy,
   buildWorkflowPy,
-  mockBindingFromModule as supportMockBindingFromModule
+  toolConfigFromAsset as supportToolConfigFromAsset
 } from "./support/config.mjs";
 import { buildManifest as buildSupportManifest } from "./support/manifest.mjs";
 import { buildImplementationHandoff, buildReadme } from "./support/readme.mjs";
@@ -26,46 +26,54 @@ import { buildRuntimeChatSmoke, buildSampleInputsYaml } from "./support/samples.
 import { buildContractTest } from "./support/tests.mjs";
 import { buildAgentCard } from "./support/agent-card.mjs";
 import { buildA2aLauncherPy } from "./support/a2a-launcher.mjs";
+import { hasApprovedA2aExposure } from "./remote-a2a.mjs";
 
 export function buildFiles({
   artifactRoot,
   outputRoot,
   analysisResult,
   normalizedRequirement,
-  processFlow,
+  graph,
   mockLabSpec,
   scaffoldPlan,
-  modules,
+  assets,
   outputMode,
   packageName
 }) {
-  const graphContext = { modules, processFlow };
+  const graphContext = { assets, graph };
   validateGraphCoverage(graphContext);
-  const connectedAdapters = modules.filter((module) => adapterConnection(module) === "mcp_connected");
-  const unconnectedAdapters = modules.filter((module) => adapterConnection(module) === "unconnected");
+  const connectedTools = assets.filter((asset) => toolConnection(asset) === "mcp_connected");
+  const unconnectedTools = assets.filter((asset) => asset.asset_type === "tool" && toolConnection(asset) === "unconnected");
+  const a2aProviderEnabled = hasApprovedA2aExposure({ analysisResult, assets });
   const supportContext = {
     artifactRoot,
     outputRoot,
     analysisResult,
     normalizedRequirement,
-    processFlow,
+    graph,
     mockLabSpec,
     scaffoldPlan,
-    modules,
+    assets,
     outputMode,
     packageName,
     graphContext,
-    unconnectedAdapters,
+    a2aProviderEnabled,
+    unconnectedTools,
     terminalOutputIds: () => terminalOutputIds(graphContext)
   };
-  const mockBindingFromModule = (module) => supportMockBindingFromModule(module, { adapterConnection });
+  const toolConfigForAsset = (asset) => supportToolConfigFromAsset(asset, { toolConnection });
   const defaultAgentInstructionForConfig = (target) => {
-    const module = target.module ?? target;
+    const asset = target.asset ?? target;
     return agentInstruction(
       {
-        module,
-        node: target.node ?? processFlow.nodes.find((node) => node?.module_id === module.id) ?? null,
-        moduleNodeCount: target.moduleNodeCount
+        asset,
+        node:
+          target.node ??
+          graph.nodes.find(
+            (node) => node?.agent_ref === asset.asset_id || node?.tool_ref === asset.asset_id || node?.workflow_ref === asset.asset_id
+          ) ??
+          null,
+        assetNodeCount: target.assetNodeCount
       },
       { graphContext }
     );
@@ -75,61 +83,63 @@ export function buildFiles({
     [`${packageName}/agent.py`]: buildAgentPy({
       analysisResult,
       normalizedRequirement,
-      processFlow,
+      graph,
       scaffoldPlan,
-      modules,
+      assets,
       outputMode,
       packageName,
       graphContext,
-      connectedAdapters,
-      mockBindingFromModule
+      connectedTools,
+      toolConfigForAsset
     }),
     [`${packageName}/workflow.py`]: buildWorkflowPy(),
-    [`${packageName}/schemas.py`]: buildSchemasPy({ modules, adapterConnection }),
-    [`${packageName}/mock_config.yaml`]: buildMockConfigYaml({ modules, adapterConnection }),
+    [`${packageName}/schemas.py`]: buildSchemasPy({ assets, toolConnection }),
+    [`${packageName}/mock_config.yaml`]: buildMockConfigYaml({ assets, toolConnection }),
     [`${packageName}/sample_inputs.yaml`]: buildSampleInputsYaml(supportContext),
     [`${packageName}/README.md`]: buildReadme(supportContext),
-    [`${packageName}/agent.json`]: `${JSON.stringify(buildAgentCard({ packageName, normalizedRequirement }), null, 2)}\n`,
     [`${packageName}/nodes/__init__.py`]: "",
     [`${packageName}/nodes/agents.py`]: buildNodeHelperPy("agents"),
-    [`${packageName}/nodes/adapters.py`]: buildNodeHelperPy("adapters"),
+    [`${packageName}/nodes/tools.py`]: buildNodeHelperPy("tools"),
     [`${packageName}/nodes/gates.py`]: buildNodeHelperPy("gates"),
     [`${packageName}/nodes/human_inputs.py`]: buildNodeHelperPy("human_inputs"),
-    [`${packageName}/nodes/routers.py`]: buildNodeHelperPy("routers"),
-    [`${packageName}/nodes/workflow_calls.py`]: buildWorkflowCallsPy({ modules }),
+    [`${packageName}/nodes/functions.py`]: buildNodeHelperPy("functions"),
+    [`${packageName}/nodes/subworkflows.py`]: buildSubworkflowsPy({ assets }),
     [`${packageName}/workflow_manifest.json`]: `${JSON.stringify(
       buildManifest({
         outputMode,
         packageName,
         normalizedRequirement,
         analysisResult,
-        connectedAdapters,
-        unconnectedAdapters,
+        connectedTools,
+        unconnectedTools,
         scaffoldPlan,
-        modules,
-        processFlow,
+        assets,
+        graph,
         graphContext,
-        mockBindingFromModule
+        toolConfigForAsset
       }),
       null,
       2
     )}\n`,
     "scaffold-plan.json": `${JSON.stringify(scaffoldPlan, null, 2)}\n`,
     "implementation-handoff.md": buildImplementationHandoff(supportContext),
-    "af_adk_a2a_server.py": buildA2aLauncherPy(),
     "runtime-chat-smoke.json": `${JSON.stringify(buildRuntimeChatSmoke(supportContext), null, 2)}\n`,
     [`${packageName}/tests/__init__.py`]: "",
-    [`${packageName}/tests/test_workflow_contract.py`]: buildContractTest({ outputMode, packageName }),
+    [`${packageName}/tests/test_workflow_contract.py`]: buildContractTest({ outputMode, packageName, a2aProviderEnabled }),
     "README.md": buildReadme(supportContext)
   };
+  if (a2aProviderEnabled) {
+    files[`${packageName}/agent.json`] = `${JSON.stringify(buildAgentCard({ packageName, normalizedRequirement }), null, 2)}\n`;
+    files["af_adk_a2a_server.py"] = buildA2aLauncherPy();
+  }
   if (outputMode === "runnable") {
     files["agents.config.yaml"] = buildAgentsConfig({
-      modules,
+      assets,
       agentNodeTargets: orderedGraphNodeSpecs(graphContext),
       defaultAgentInstruction: defaultAgentInstructionForConfig,
-      adapterConnection
+      toolConnection
     });
-    files[".env.example"] = buildEnvExample({ analysisResult, modules });
+    files[".env.example"] = buildEnvExample({ analysisResult, assets });
     files[".gitignore"] = buildGitignore();
   }
   return files;
@@ -140,28 +150,28 @@ function buildManifest({
   packageName,
   normalizedRequirement,
   analysisResult,
-  connectedAdapters,
-  unconnectedAdapters,
+  connectedTools,
+  unconnectedTools,
   scaffoldPlan,
-  modules,
-  processFlow,
+  assets,
+  graph,
   graphContext,
-  mockBindingFromModule
+  toolConfigForAsset
 }) {
   return buildSupportManifest({
     outputMode,
     packageName,
     normalizedRequirement,
     analysisResult,
-    connectedAdapters,
-    unconnectedAdapters,
+    connectedTools,
+    unconnectedTools,
     scaffoldPlan,
-    modules,
-    processFlow,
+    assets,
+    graph,
     startNodeIds: () => startNodeIds(graphContext),
     terminalOutputIds: () => terminalOutputIds(graphContext),
     graphNodeSemantics: () => graphNodeSemantics(graphContext),
     graphEdgeSemantics: () => graphEdgeSemantics(graphContext),
-    mockBindingFromModule
+    toolConfigForAsset
   });
 }

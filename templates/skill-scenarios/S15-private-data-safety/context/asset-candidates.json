@@ -1,0 +1,101 @@
+[
+  {
+    "asset_id": "workflow-s15-private-data-safety-smoke",
+    "source_requirement_id": "req-s15-private-data-safety",
+    "catalog_entry_id": null,
+    "name": "Private Data Safety Smoke Workflow",
+    "asset_type": "workflow",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "private-data-safety",
+      "no-network-smoke",
+      "fail-closed"
+    ],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": {
+      "representation": "graph",
+      "coordination": "explicit",
+      "template_ref": null
+    },
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "The reviewed flow owns the synthetic input, external-connection boundary, and explicit no-network terminal outcome.",
+    "inputs": [
+      {
+        "name": "synthetic_query",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "synthetic_service_result",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "risk_level": "medium",
+    "risk_signals": [
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": []
+  },
+  {
+    "asset_id": "tool-s15-environment-backed-service",
+    "source_requirement_id": "req-s15-private-data-safety",
+    "catalog_entry_id": null,
+    "name": "Environment-backed Synthetic Service Tool",
+    "asset_type": "tool",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "environment-configuration",
+      "external-connection",
+      "secret-non-propagation"
+    ],
+    "binding": {
+      "kind": "function"
+    },
+    "connection": {
+      "transport": "http"
+    },
+    "workflow_profile": null,
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "The approved design requires a custom environment-backed HTTP Tool seam, but source generation remains blocked until that seam is supported without embedding endpoint or credential values.",
+    "inputs": [
+      {
+        "name": "synthetic_query",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "synthetic_service_result",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "risk_level": "medium",
+    "risk_signals": [
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": [],
+    "side_effect": "read",
+    "auth_required": true,
+    "audit_required": true,
+    "developer_todos": [
+      "Add reviewed generator support for an environment-backed external HTTP Tool before enabling source generation.",
+      "Keep the smoke path local, synthetic, and network-disabled until that support is verified."
+    ]
+  }
+]

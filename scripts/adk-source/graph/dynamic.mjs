@@ -7,22 +7,73 @@ import {
   validateAndLowerEdge
 } from "../dispatch/index.mjs";
 import { collectGenerationNodes } from "./collector.mjs";
-import { graphIndexes } from "./indexes.mjs";
+import { graphIndexes, nodeAssetRef } from "./indexes.mjs";
 import { routeAliases, routeValue } from "./routes.mjs";
 
 const TOOLSET_EXCLUSION_ROLE = "toolset_exclusion";
 
-export function hasDynamicRunnableShape({ modules, processFlow }) {
-  const graph = graphIndexes({ modules, processFlow });
-  const nodes = Array.isArray(processFlow?.nodes) ? processFlow.nodes : [];
-  const edges = Array.isArray(processFlow?.edges) ? processFlow.edges : [];
-  const containers = Array.isArray(processFlow?.containers) ? processFlow.containers : [];
-  return (
-    modules.some((module) => module.module_category === "workflow" && module.workflow_kind === "dynamic") ||
-    nodes.some((node) => node && nodeForcesDynamic(node, graph)) ||
-    edges.some((edge) => edgeForcesDynamic(edge)) ||
-    containers.some((container) => container?.container_kind === "loop_region" || container?.container_kind === "dynamic_workflow")
+export function hasDynamicRunnableShape({ assets, graph: graphIr }) {
+  return runnableWorkflowRepresentation({ assets, graph: graphIr }) === "dynamic";
+}
+
+export function runnableWorkflowRepresentation({ assets, graph }) {
+  if (graph.workflow_ref === null) return "graph";
+  const owner = assets.find((asset) => asset.asset_id === graph.workflow_ref && asset.asset_type === "workflow");
+  if (!owner) throw new Error(`Graph IR owning Workflow ${graph.workflow_ref} is missing from approved assets.`);
+  const representation = owner.workflow_profile?.representation;
+  if (representation === "unresolved") {
+    throw new Error(
+      `Owning Workflow ${owner.asset_id} representation is unresolved; runnable generation requires workflow_profile.representation graph or dynamic.`
+    );
+  }
+  if (representation !== "graph" && representation !== "dynamic") {
+    throw new Error(`Owning Workflow ${owner.asset_id} has invalid representation ${representation ?? "missing"}.`);
+  }
+  return representation;
+}
+
+export function assertStaticGraphRepresentationSupported({ assets, graph: graphIr }) {
+  const graph = graphIndexes({ assets, graph: graphIr });
+  const reasons = [];
+  for (const node of graphIr.nodes ?? []) {
+    if (nodeForcesDynamic(node, graph)) reasons.push(`node ${node.id} requires dynamic lowering`);
+  }
+  for (const edge of graphIr.edges ?? []) {
+    if (edgeForcesDynamic(edge)) reasons.push(`edge ${edge.id} uses ${edge.control?.kind}`);
+  }
+  const cycleNodeIds = graphCycleNodeIds(graphIr);
+  if (cycleNodeIds.length) reasons.push(`routed cycle involves ${cycleNodeIds.join(", ")}`);
+  if (!reasons.length) return;
+  const owner = graphIr.workflow_ref ?? "standalone Graph IR";
+  throw new Error(
+    `Owning Workflow ${owner} uses representation graph, but the current static Graph Workflow lowerer cannot safely lower ${reasons.join("; ")}. ` +
+    `Use representation dynamic only when reviewed runtime code owns path selection, or revise the Graph to an acyclic static shape.`
   );
+}
+
+function graphCycleNodeIds(graph) {
+  const ids = [...new Set((graph.nodes ?? []).map((node) => node.id))];
+  const idSet = new Set(ids);
+  const inDegree = new Map(ids.map((id) => [id, 0]));
+  const adjacency = new Map(ids.map((id) => [id, []]));
+  const seenEdges = new Set();
+  for (const edge of graph.edges ?? []) {
+    if (!idSet.has(edge.from) || !idSet.has(edge.to)) continue;
+    const key = `${edge.from}->${edge.to}`;
+    if (seenEdges.has(key)) continue;
+    seenEdges.add(key);
+    adjacency.get(edge.from).push(edge.to);
+    inDegree.set(edge.to, inDegree.get(edge.to) + 1);
+  }
+  const queue = ids.filter((id) => inDegree.get(id) === 0);
+  while (queue.length) {
+    const id = queue.shift();
+    for (const next of adjacency.get(id)) {
+      inDegree.set(next, inDegree.get(next) - 1);
+      if (inDegree.get(next) === 0) queue.push(next);
+    }
+  }
+  return ids.filter((id) => inDegree.get(id) > 0);
 }
 
 export function assertDynamicRunnableGraphSupported(context, options = {}) {
@@ -44,10 +95,8 @@ function analyzeDynamicGraph(context, options = {}) {
   const stableIndex = new Map(nodes.map((node, index) => [node.id, index]));
   validateNodeSupport(collection);
   const edges = normalizeEdges(context, collection);
-  const excludedModuleIds = collection.toolsetAdapterIds;
-  const excludedNodeIds = new Set(
-    nodes.filter((node) => typeof node.module_id === "string" && excludedModuleIds.has(node.module_id)).map((node) => node.id)
-  );
+  const excludedAssetIds = collection.agentOwnedToolIds;
+  const excludedNodeIds = new Set(nodes.filter((node) => excludedAssetIds.has(nodeAssetRef(node))).map((node) => node.id));
   const consumedEdgeIds = new Set();
 
   const forwardEdges = edges.filter((edge) => edge.dispatchRole !== "loop_back");
@@ -59,7 +108,8 @@ function analyzeDynamicGraph(context, options = {}) {
     consumedEdgeIds
   );
 
-  const loops = analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, collection.loopControlNodes);
+  const loopDecisions = loopDecisionNodes(context.graph, graph);
+  const loops = analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, loopDecisions);
   const loopByNodeId = new Map();
   for (const loop of loops) {
     for (const nodeId of loop.operationalNodeIds) {
@@ -71,9 +121,9 @@ function analyzeDynamicGraph(context, options = {}) {
       loopByNodeId.set(nodeId, loop);
     }
   }
-  for (const node of collection.loopControlNodes) {
+  for (const node of loopDecisions) {
     if (!loopByNodeId.has(node.id)) {
-      throw new Error(`dynamic runnable mode cannot lower loop_control ${node.id} outside an operational loop closure.`);
+      throw new Error(`dynamic runnable mode cannot lower loop decision source ${node.id} outside an operational loop closure.`);
     }
   }
 
@@ -133,7 +183,6 @@ function analyzeDynamicGraph(context, options = {}) {
     steps,
     coverage,
     consumedEdgeIds: [...consumedEdgeIds],
-    loopControls: collection.loopControlNodes,
     resultNodeId
   };
 }
@@ -147,8 +196,9 @@ function normalizeNodes(graph) {
     }
     if (seen.has(node.id)) throw new Error(`dynamic runnable graph has duplicate node id ${node.id}.`);
     seen.add(node.id);
-    if (typeof node.module_id === "string" && !graph.moduleById.has(node.module_id)) {
-      throw new Error(`dynamic runnable node ${node.id} references missing module ${node.module_id}.`);
+    const ref = nodeAssetRef(node);
+    if (ref && !graph.assetById.has(ref)) {
+      throw new Error(`dynamic runnable node ${node.id} references missing asset ${ref}.`);
     }
     nodes.push(node);
   }
@@ -163,7 +213,7 @@ function validateNodeSupport(collection) {
     .map((entry) => `${entry.node.id} (${entry.node.node_kind}: ${entry.reason})`);
   if (badNodes.length) {
     throw new Error(
-      `dynamic runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported dynamic roles are module-bound runs, input seeds, output terminals, human_input runs, join barriers, and loop_control nodes.`
+      `dynamic runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported dynamic roles are asset-bound runs, input seeds, output terminals, human_input runs, join barriers, and loop controls.`
     );
   }
   if (structuredHumanInputs.length) {
@@ -174,7 +224,7 @@ function validateNodeSupport(collection) {
 }
 
 function normalizeEdges(context, collection) {
-  const rawEdges = Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [];
+  const rawEdges = Array.isArray(context.graph.edges) ? context.graph.edges : [];
   const seenIds = new Set();
   return rawEdges.map((edge, index) => {
     if (edge && typeof edge.id === "string" && edge.id.trim()) {
@@ -186,7 +236,7 @@ function normalizeEdges(context, collection) {
         mode: "dynamic",
         graph: collection.graph,
         counts: collection.counts,
-        exclusions: collection.toolsetAdapterIds,
+        exclusions: collection.agentOwnedToolIds,
         index
       });
     } catch (error) {
@@ -195,16 +245,25 @@ function normalizeEdges(context, collection) {
   });
 }
 
-function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, controls) {
-  const regions = (Array.isArray(context.processFlow.containers) ? context.processFlow.containers : []).filter(
-    (container) => container?.container_kind === "loop_region"
+function loopDecisionNodes(graph, indexes) {
+  const ids = new Set(
+    (graph.edges ?? [])
+      .filter((edge) => edge?.control?.kind === "loop_back" || edge?.control?.kind === "loop_exit")
+      .map((edge) => edge.from)
+  );
+  return [...ids].map((id) => indexes.nodesById.get(id)).filter(Boolean);
+}
+
+function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, decisions) {
+  const regions = (Array.isArray(context.graph.regions) ? context.graph.regions : []).filter(
+    (region) => region?.kind === "loop"
   );
   const regionIds = new Set();
   for (const [index, region] of regions.entries()) {
     if (typeof region.id !== "string" || !region.id.trim()) {
-      throw new Error(`dynamic runnable graph has a loop_region without a non-empty id at index ${index}.`);
+      throw new Error(`dynamic runnable graph has a \`loop\` Region without a non-empty id at index ${index}.`);
     }
-    if (regionIds.has(region.id)) throw new Error(`dynamic runnable graph has duplicate loop_region id ${region.id}.`);
+    if (regionIds.has(region.id)) throw new Error(`dynamic runnable graph has duplicate \`loop\` Region id ${region.id}.`);
     regionIds.add(region.id);
   }
   const pathEdges = edges.filter((edge) => edge.dispatchRole !== "loop_back" && edge.dispatchRole !== "loop_exit");
@@ -212,46 +271,46 @@ function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, contr
   const reverse = adjacencyMap(pathEdges.map((edge) => ({ from: edge.to, to: edge.from })));
   const loops = [];
 
-  for (const controlNode of controls) {
-    const anchors = regions.filter((region) => arrayOfIds(region.contains_node_ids).includes(controlNode.id));
+  for (const decisionNode of decisions) {
+    const anchors = regions.filter((region) => arrayOfIds(region.node_ids).includes(decisionNode.id));
     if (anchors.length !== 1) {
       throw new Error(
-        `dynamic runnable mode cannot lower loop_control ${controlNode.id} unless it is anchored by exactly one loop_region container.`
+        `dynamic runnable mode cannot lower loop decision source ${decisionNode.id} unless it is anchored by exactly one \`loop\` Region.`
       );
     }
     const region = anchors[0];
-    const contained = new Set(arrayOfIds(region.contains_node_ids));
-    const declaredAnchors = [...arrayOfIds(region.entry_node_ids), ...arrayOfIds(region.exit_node_ids), controlNode.id];
+    const contained = new Set(arrayOfIds(region.node_ids));
+    const declaredAnchors = [...arrayOfIds(region.entry_node_ids), decisionNode.id];
     const missingAnchors = declaredAnchors.filter((nodeId) => !contained.has(nodeId));
     if (missingAnchors.length) {
-      throw new Error(`loop_region ${region.id} does not contain its reviewed entry/exit anchors: ${missingAnchors.join(", ")}.`);
+      throw new Error(`\`loop\` Region ${region.id} does not contain its reviewed anchors: ${missingAnchors.join(", ")}.`);
     }
-    const outgoing = edges.filter((edge) => edge.from === controlNode.id);
+    const outgoing = edges.filter((edge) => edge.from === decisionNode.id);
     const backEdges = outgoing.filter((edge) => edge.dispatchRole === "loop_back");
     const exitEdges = outgoing.filter((edge) => edge.dispatchRole === "loop_exit");
     if (!backEdges.length || !exitEdges.length) {
-      throw new Error(`loop_control ${controlNode.id} requires both loop_back and loop_exit edges.`);
+      throw new Error(`loop decision source ${decisionNode.id} requires both loop_back and loop_exit edges.`);
     }
     for (const edge of [...backEdges, ...exitEdges]) consumedEdgeIds.add(edge.key);
     if (outgoing.some((edge) => edge.dispatchRole !== "loop_back" && edge.dispatchRole !== "loop_exit")) {
-      throw new Error(`loop_control ${controlNode.id} has an unsupported non-loop outgoing edge.`);
+      throw new Error(`loop decision source ${decisionNode.id} has an unsupported non-loop outgoing edge.`);
     }
-    const backAliases = edgeAliases(backEdges, controlNode.id, "loop_back");
-    const exitAliases = edgeAliases(exitEdges, controlNode.id, "loop_exit", { allowDefault: true });
-    const canReachControl = reachableFrom([controlNode.id], reverse);
-    const operational = new Set([controlNode.id]);
+    const backAliases = edgeAliases(backEdges, decisionNode.id, "loop_back");
+    const exitAliases = edgeAliases(exitEdges, decisionNode.id, "loop_exit", { allowDefault: true });
+    const canReachDecision = reachableFrom([decisionNode.id], reverse);
+    const operational = new Set([decisionNode.id]);
     for (const backEdge of backEdges) {
       const fromEntry = reachableFrom([backEdge.to], adjacency);
-      const closure = [...fromEntry].filter((nodeId) => canReachControl.has(nodeId));
-      if (!closure.includes(backEdge.to) || !closure.includes(controlNode.id)) {
-        throw new Error(`loop_back edge ${backEdge.key} has no forward path from ${backEdge.to} to ${controlNode.id}.`);
+      const closure = [...fromEntry].filter((nodeId) => canReachDecision.has(nodeId));
+      if (!closure.includes(backEdge.to) || !closure.includes(decisionNode.id)) {
+        throw new Error(`loop_back edge ${backEdge.key} has no forward path from ${backEdge.to} to ${decisionNode.id}.`);
       }
       for (const nodeId of closure) operational.add(nodeId);
     }
-    const nestedControls = controls.filter((node) => node.id !== controlNode.id && operational.has(node.id));
-    if (nestedControls.length) {
+    const nestedDecisions = decisions.filter((node) => node.id !== decisionNode.id && operational.has(node.id));
+    if (nestedDecisions.length) {
       throw new Error(
-        `dynamic runnable mode does not support nested loop closures: ${controlNode.id} contains ${nestedControls.map((node) => node.id).join(", ")}.`
+        `dynamic runnable mode does not support nested loop closures: ${decisionNode.id} contains ${nestedDecisions.map((node) => node.id).join(", ")}.`
       );
     }
     const backTargets = new Set(backEdges.map((edge) => edge.to));
@@ -259,35 +318,32 @@ function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, contr
     const unreviewedBackTargets = [...backTargets].filter((nodeId) => !reviewedEntries.has(nodeId));
     if (unreviewedBackTargets.length) {
       throw new Error(
-        `loop_region ${region.id} must list loop_back targets as reviewed entry anchors: ${unreviewedBackTargets.join(", ")}.`
+        `\`loop\` Region ${region.id} must list loop_back targets as reviewed entry anchors: ${unreviewedBackTargets.join(", ")}.`
       );
-    }
-    if (!arrayOfIds(region.exit_node_ids).includes(controlNode.id)) {
-      throw new Error(`loop_region ${region.id} must list ${controlNode.id} as its reviewed exit anchor.`);
     }
     const invalidExitTargets = exitEdges.map((edge) => edge.to).filter((nodeId) => operational.has(nodeId));
     if (invalidExitTargets.length) {
-      throw new Error(`loop_control ${controlNode.id} has loop_exit targets inside its operational body: ${invalidExitTargets.join(", ")}.`);
+      throw new Error(`loop decision source ${decisionNode.id} has loop_exit targets inside its operational body: ${invalidExitTargets.join(", ")}.`);
     }
     const bodyOrder = stableTopologicalOrder(
       [...operational],
       pathEdges.filter((edge) => operational.has(edge.from) && operational.has(edge.to)),
       stableIndex,
-      `loop_region ${region.id}`
+      `\`loop\` Region ${region.id}`
     );
-    if (bodyOrder.at(-1) !== controlNode.id) {
-      throw new Error(`loop_region ${region.id} has an operational node without a forward path to ${controlNode.id}.`);
+    if (bodyOrder.at(-1) !== decisionNode.id) {
+      throw new Error(`\`loop\` Region ${region.id} has an operational node without a forward path to ${decisionNode.id}.`);
     }
     const bodyNodes = bodyOrder.slice(0, -1).map((nodeId) => nodes.find((node) => node.id === nodeId));
     if (!bodyNodes.length || bodyNodes.some((node) => !node)) {
-      throw new Error(`loop_region ${region.id} has no lowerable operational body before ${controlNode.id}.`);
+      throw new Error(`\`loop\` Region ${region.id} has no lowerable operational body before ${decisionNode.id}.`);
     }
     const defaultAction =
-      humanInputDefaultAction(bodyNodes, backAliases, exitAliases, controlNode.id) ?? edgeDefaultAction(backEdges, exitEdges);
+      humanInputDefaultAction(bodyNodes, backAliases, exitAliases, decisionNode.id) ?? edgeDefaultAction(backEdges, exitEdges);
     loops.push({
       regionId: region.id,
       region,
-      controlNode,
+      decisionNode,
       operationalNodeIds: operational,
       bodyOrder: bodyOrder.slice(0, -1),
       backTargets,
@@ -299,8 +355,8 @@ function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, contr
   }
 
   for (const region of regions) {
-    const anchoredControls = controls.filter((control) => arrayOfIds(region.contains_node_ids).includes(control.id));
-    if (anchoredControls.length !== 1) throw new Error(`loop_region ${region.id} requires exactly one loop_control node.`);
+    const anchoredDecisions = decisions.filter((decision) => arrayOfIds(region.node_ids).includes(decision.id));
+    if (anchoredDecisions.length !== 1) throw new Error(`\`loop\` Region ${region.id} requires exactly one decision source.`);
   }
   for (let leftIndex = 0; leftIndex < loops.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < loops.length; rightIndex += 1) {
@@ -320,10 +376,10 @@ function analyzeLoops(context, nodes, edges, stableIndex, consumedEdgeIds, contr
       const fromInside = loop.operationalNodeIds.has(edge.from);
       const toInside = loop.operationalNodeIds.has(edge.to);
       if (!fromInside && toInside && !allowedEntries.has(edge.to)) {
-        throw new Error(`loop_region ${loop.regionId} has an illegal mid-body entry edge ${edge.key} to ${edge.to}.`);
+        throw new Error(`\`loop\` Region ${loop.regionId} has an illegal mid-body entry edge ${edge.key} to ${edge.to}.`);
       }
       if (fromInside && !toInside) {
-        throw new Error(`loop_region ${loop.regionId} has an illegal early-exit edge ${edge.key} from ${edge.from}.`);
+        throw new Error(`\`loop\` Region ${loop.regionId} has an illegal early-exit edge ${edge.key} from ${edge.from}.`);
       }
     }
   }
@@ -406,7 +462,7 @@ function planCoverage(nodes, steps, excludedNodeIds, seedNodeIds) {
   const record = (step) => {
     if (step.kind === "loop") {
       for (const bodyStep of step.bodySteps) record(bodyStep);
-      coverage.set(step.controlNodeId, "loop_control");
+      coverage.set(step.decisionNodeId, "loop_decision");
       return;
     }
     if ((step.kind === "join" && !step.explicit) || !graphNodeIds.has(step.nodeId)) return;
@@ -421,29 +477,29 @@ function planCoverage(nodes, steps, excludedNodeIds, seedNodeIds) {
 
 function buildLoopStep(loop, graph, incoming, excludedNodeIds, counts) {
   const scope = loop.operationalNodeIds;
-  assertLoopControlDecisionInputIsSingleStep(loop.controlNode, graph, incoming, excludedNodeIds, scope);
+  assertLoopDecisionInputIsSingleStep(loop.decisionNode, graph, incoming, excludedNodeIds, scope);
   const bodySteps = [];
   for (const nodeId of loop.bodyOrder) {
     const node = graph.nodesById.get(nodeId);
     if (!node || excludedNodeIds.has(nodeId)) continue;
     bodySteps.push(...buildNodeSteps(node, graph, incoming, excludedNodeIds, counts, scope, loop.backTargets));
   }
-  const controlSteps = buildNodeSteps(loop.controlNode, graph, incoming, excludedNodeIds, counts, scope);
-  const controlRun = controlSteps.at(-1);
-  if (!controlRun || controlRun.kind !== "run") {
-    throw new Error(`dynamic runnable internal plan error: loop_control ${loop.controlNode.id} did not lower to a run step.`);
+  const decisionSteps = buildNodeSteps(loop.decisionNode, graph, incoming, excludedNodeIds, counts, scope);
+  const decisionRun = decisionSteps.at(-1);
+  if (!decisionRun || decisionRun.kind !== "run") {
+    throw new Error(`dynamic runnable internal plan error: loop decision source ${loop.decisionNode.id} did not lower to a run step.`);
   }
-  bodySteps.push(...controlSteps.slice(0, -1));
+  bodySteps.push(...decisionSteps.slice(0, -1));
   return {
     kind: "loop",
-    nodeId: loop.controlNode.id,
+    nodeId: loop.decisionNode.id,
     regionId: loop.regionId,
     entryNodeIds: [...loop.backTargets],
     bodySteps,
-    controlNodeId: loop.controlNode.id,
-    controlSymbol: controlRun.symbol,
-    controlInputRefs: controlRun.inputRefs,
-    controlRunId: controlRun.runId,
+    decisionNodeId: loop.decisionNode.id,
+    decisionSymbol: decisionRun.symbol,
+    decisionInputRefs: decisionRun.inputRefs,
+    decisionRunId: decisionRun.runId,
     backAliases: loop.backAliases,
     exitAliases: loop.exitAliases,
     defaultAction: loop.defaultAction,
@@ -451,9 +507,9 @@ function buildLoopStep(loop, graph, incoming, excludedNodeIds, counts) {
   };
 }
 
-function assertLoopControlDecisionInputIsSingleStep(controlNode, graph, incoming, excludedNodeIds, loopScope) {
-  const directEdges = (incoming.get(controlNode.id) ?? []).filter((edge) => !excludedNodeIds.has(edge.from));
-  const refs = effectiveInputRefs(controlNode.id, incoming, excludedNodeIds, loopScope);
+function assertLoopDecisionInputIsSingleStep(decisionNode, graph, incoming, excludedNodeIds, loopScope) {
+  const directEdges = (incoming.get(decisionNode.id) ?? []).filter((edge) => !excludedNodeIds.has(edge.from));
+  const refs = effectiveInputRefs(decisionNode.id, incoming, excludedNodeIds, loopScope);
   const explicitJoinIds = refs
     .filter((ref) => {
       const predecessor = graph.nodesById.get(ref.nodeId);
@@ -467,7 +523,7 @@ function assertLoopControlDecisionInputIsSingleStep(controlNode, graph, incoming
     ? `explicit join ${explicitJoinIds.join(", ")}`
     : "reviewed implicit fan-in";
   throw new Error(
-    `dynamic runnable mode cannot lower loop_control ${controlNode.id} with a fan-in aggregate decision input from ${source}; add a reviewed single decision-producing step between the fan-in and loop_control ${controlNode.id}.`
+    `dynamic runnable mode cannot lower loop decision source ${decisionNode.id} with a fan-in aggregate input from ${source}; add a reviewed single decision-producing step before ${decisionNode.id}.`
   );
 }
 
@@ -665,21 +721,21 @@ function loopUnitId(loop) {
   return `loop:${loop.regionId}`;
 }
 
-function edgeAliases(edges, controlNodeId, semantic, options = {}) {
+function edgeAliases(edges, decisionNodeId, semantic, options = {}) {
   const aliases = [];
   for (const edge of edges) {
-    const hasCondition = typeof edge.route_condition === "string" && edge.route_condition.trim();
-    const hasAliases = Array.isArray(edge.route_aliases) && edge.route_aliases.some((alias) => typeof alias === "string" && alias.trim());
-    if (!hasCondition && !hasAliases && !(options.allowDefault && edge.is_default_route === true)) {
-      throw new Error(`loop_control ${controlNodeId} requires reviewed route_condition or route_aliases for ${semantic} edge ${edge.key}.`);
+    const hasCondition = typeof edge.control?.condition === "string" && edge.control.condition.trim();
+    const hasAliases = Array.isArray(edge.control?.accepted_aliases) && edge.control.accepted_aliases.some((alias) => typeof alias === "string" && alias.trim());
+    if (!hasCondition && !hasAliases && !(options.allowDefault && edge.control?.default === true)) {
+      throw new Error(`loop decision source ${decisionNodeId} requires reviewed control.condition or control.accepted_aliases for ${semantic} edge ${edge.key}.`);
     }
     if (hasCondition) aliases.push(...routeAliases(routeValue(edge), edge));
-    else aliases.push(...edge.route_aliases.map((alias) => alias.trim().toLowerCase()).filter(Boolean));
+    else aliases.push(...edge.control.accepted_aliases.map((alias) => alias.trim().toLowerCase()).filter(Boolean));
   }
   return [...new Set(aliases)];
 }
 
-function humanInputDefaultAction(bodyNodes, backAliases, exitAliases, controlNodeId) {
+function humanInputDefaultAction(bodyNodes, backAliases, exitAliases, decisionNodeId) {
   const defaultChoices = bodyNodes
     .map((node) => node?.human_input_contract?.default_choice)
     .filter((choice) => typeof choice === "string" && choice.trim());
@@ -687,7 +743,7 @@ function humanInputDefaultAction(bodyNodes, backAliases, exitAliases, controlNod
     const choiceAliases = routeAliases(choice);
     const matchesBack = choiceAliases.some((alias) => backAliases.includes(alias));
     const matchesExit = choiceAliases.some((alias) => exitAliases.includes(alias));
-    if (matchesBack && matchesExit) throw new Error(`loop_control ${controlNodeId} has ambiguous human_input default_choice ${choice}.`);
+    if (matchesBack && matchesExit) throw new Error(`loop decision source ${decisionNodeId} has ambiguous human_input default_choice ${choice}.`);
     if (matchesBack) return "loop_back";
     if (matchesExit) return "loop_exit";
   }
@@ -695,8 +751,8 @@ function humanInputDefaultAction(bodyNodes, backAliases, exitAliases, controlNod
 }
 
 function edgeDefaultAction(backEdges, exitEdges) {
-  if (exitEdges.some((edge) => edge.is_default_route === true)) return "loop_exit";
-  if (backEdges.some((edge) => edge.is_default_route === true)) return "loop_back";
+  if (exitEdges.some((edge) => edge.control?.default === true)) return "loop_exit";
+  if (backEdges.some((edge) => edge.control?.default === true)) return "loop_back";
   return "loop_exit";
 }
 

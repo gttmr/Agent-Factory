@@ -34,7 +34,6 @@ async function createFixtureRepo(): Promise<{ repoRoot: string; cleanup: () => P
   const testRoot = await mkdtemp(join(tmpdir(), "af-mock-lab-bridge-"));
   const repoRoot = join(testRoot, "repo");
   await mkdir(join(repoRoot, "catalog"), { recursive: true });
-  await writeFile(join(repoRoot, "catalog", "adapters.yaml"), "adapters: []\n", "utf8");
   const store = new MockSpecStore({ repoRoot });
   await store.writeSpec(MOCK_ID, {
     mock_id: MOCK_ID,

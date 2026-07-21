@@ -53,7 +53,7 @@ Canonical write는 explicit artifact root와 user/document gate가 있을 때만
 - closed candidate-level Missing Information
 - testable success/failure scenarios
 - actual review/approval state
-- current artifact validation, 해당하는 경우
+- strict v2 artifact validation, 해당하는 경우
 
 ## Required evidence
 
@@ -73,7 +73,7 @@ Canonical write는 explicit artifact root와 user/document gate가 있을 때만
 
 Stage Runner proposal은 canonical artifact, approval, stage status를 바꾸지 않는다.
 
-Target design과 current compatibility fields를 분리해 설명한다.
+Target design과 Current Implementation evidence를 분리해 설명한다.
 
 Product gap은 `docs/migration/skill-vnext-status.md` Blocker 대상으로 보고한다.
 
@@ -98,17 +98,17 @@ find <run-dir>/proposed-artifacts -maxdepth 1 -type f -print
 - proposal 두 파일 중 하나가 없음
 - readiness 항목이 미충족인데 Ready로 표시됨
 - approval boolean을 skill이 바꿔야 함
-- current mapping이 Target rationale를 숨김
+- strict v2 구조가 Target rationale를 보존하지 못함
 - runtime source 또는 Catalog seed write가 요구됨
 
 ## Official sources checked
 
 - `packages/web/server/stageRunner.ts`
 - `docs/workbench/operating-model.md`
-- `.skills-work/r1-stagerunner-contract.md`
+- `tests/skills/evidence/research/r1-stagerunner-contract.md`
 - `scripts/validate-artifacts.mjs`
 
 ## Checked date
 
-- Checked date: 2026-07-18
+- Checked date: 2026-07-20
 - Current behavior: Design proposals require both registered files; explicit apply does not approve the design.

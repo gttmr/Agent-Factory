@@ -9,7 +9,7 @@ import {
   useStartStageRun
 } from "../state/useStageRunner";
 import { Button, Panel, SectionHeader, SelectField } from "../ui/primitives";
-import { selectProcessLog, selectStageRunnerNarrative } from "./stageRunnerNarrative";
+import { selectProcessLog, selectStageRunnerNarrative, stageRunCompletionMessage } from "./stageRunnerNarrative";
 
 interface RunnerMetric {
   label: string;
@@ -110,7 +110,7 @@ export function StageRunnerPanel({
         setActionMessage(
           summary.status === "failed"
             ? summary.last_error ?? "stage run 실패"
-            : "run output 이 생성되었습니다. canonical artifact 는 아직 변경되지 않았습니다."
+            : stageRunCompletionMessage(stage)
         );
         onRunCompleted?.(summary);
       },
@@ -125,7 +125,10 @@ export function StageRunnerPanel({
     setActionMessage(null);
     applyMutation.mutate(selectedRunId, {
       onSuccess: (result) => {
-        setActionMessage(`제안 적용 완료: ${result.applied_artifacts.join(", ")}`);
+        const skipped = result.skipped_artifacts.length
+          ? ` · 적용 제외: ${result.skipped_artifacts.map((artifact) => artifact.path).join(", ")}`
+          : "";
+        setActionMessage(`제안 적용 완료: ${result.applied_artifacts.join(", ")}${skipped}`);
         onApplied?.();
       },
       onError: (error) => {

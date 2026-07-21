@@ -14,7 +14,7 @@ export interface RemoteInputRequiredDisplayState {
 }
 
 const REMOTE_INPUT_RESUME_NOTE =
-  "현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다.";
+  "현재 Workbench/ADK Web 텍스트 채팅은 같은 원격 A2A task의 resume 경로로 검증되지 않았습니다.";
 
 export function extractRemoteInputRequiredFromAdkEvents(events: readonly unknown[]): RemoteInputRequiredDisplayState | null {
   for (let index = events.length - 1; index >= 0; index -= 1) {
@@ -32,7 +32,7 @@ export function extractRemoteInputRequiredFromAdkEvents(events: readonly unknown
       const contextId = a2aContextId(event);
       return {
         kind: "remote_input_required",
-        prompt: inputPrompt(args) ?? "Remote A2A provider 가 사람 입력을 기다립니다.",
+        prompt: inputPrompt(args) ?? "원격 A2A Agent가 사람 입력을 기다립니다.",
         payload: args ? nonEmptyString(args.payload) : null,
         function_name: functionCall.name,
         interrupt_id: interruptId,

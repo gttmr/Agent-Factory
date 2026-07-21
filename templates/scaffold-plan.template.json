@@ -1,177 +1,103 @@
 {
-  "requirement_id": "req-001",
+  "contract_version": "2.0",
+  "requirement_id": "req-template",
   "source": "approved_workbench_artifact",
   "raw_requirement_to_code": false,
-  "modules": [
+  "output_mode": "smoke",
+  "assets": [
     {
-      "id": "mod-001",
-      "name": "customer_profile_lookup",
-      "module_category": "adapter",
-      "adapter_kind": "legacy_api",
-      "agent_kind": null,
-      "workflow_kind": null,
-      "remote_contract_kind": null,
-      "scaffold_output": "contract_or_stub_only",
-      "no_runnable_business_logic": true,
-      "catalog_binding": {
-        "catalog_id": "seed-adapter-customer_profile_lookup",
-        "name": "customer_profile_lookup",
-        "component_source": "stub"
-      },
-      "developer_todos": [
-        "Review how this catalog spec should be invoked before replacing the TODO boundary.",
-        "Map reviewed inputs and outputs before wiring runtime behavior."
-      ],
-      "inputs": [
-        {
-          "name": "customer_id",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "customer_profile",
-          "type": "object"
-        }
-      ],
-      "risk_signals": ["personal_data", "audit_required"],
-      "runtime_mock": {
-        "customer_profile": {
-          "customer_id": "CUST-DEMO-001",
-          "segment": "demo-retail",
-          "kyc_status": "verified"
-        }
-      },
-      "required_review_fields": ["auth_required", "timeout", "retry", "side_effect"]
-    },
-    {
-      "id": "mod-002",
-      "name": "response_guidance_retrieval",
-      "module_category": "adapter",
-      "agent_kind": null,
-      "workflow_kind": null,
-      "adapter_kind": "retrieval",
-      "remote_contract_kind": null,
-      "scaffold_output": "contract_or_stub_only",
-      "no_runnable_business_logic": true,
-      "catalog_binding": null,
-      "developer_todos": [
-        "Review the retrieval source and access policy before replacing the TODO boundary.",
-        "Preserve reviewed citation and grounding requirements when wiring runtime behavior."
-      ],
-      "inputs": [
-        {
-          "name": "complaint_text",
-          "type": "text",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "guidance_summary",
-          "type": "text"
-        },
-        {
-          "name": "citations",
-          "type": "array"
-        }
-      ],
-      "risk_signals": ["audit_required"],
-      "runtime_mock": null,
-      "required_review_fields": ["citation_required", "grounding_required", "source_acl_required"]
+      "asset_id": "agent.template",
+      "source_requirement_id": "req-template",
+      "catalog_entry_id": null,
+      "name": "Template Agent",
+      "asset_type": "agent",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "platform",
+      "reuse_status": "project_only",
+      "capability_tags": [],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 0.9,
+      "rationale": "Reviewed agent responsibility for Template Agent",
+      "inputs": [],
+      "outputs": [],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "developer_todos": []
     }
   ],
-  "runtime_contracts": [
-    {
-      "contract_id": "rtc-001-eai-legacy",
-      "contract_kind": "eai_legacy_adapter",
-      "module_id": "mod-001",
-      "title": "customer_profile_lookup EAI Legacy Adapter",
-      "contract_status": "approved",
-      "required_review_fields": [
-        "policies.auth_policy",
-        "policies.timeout_policy",
-        "policies.retry_policy",
-        "policies.fallback_policy",
-        "policies.masking_policy",
-        "policies.data_policy"
-      ],
-      "runtime_support": {
-        "context_manager_required": false,
-        "callback_broker_required": false,
-        "human_approval_required": false,
-        "idempotency_required": false,
-        "audit_required": true,
-        "compensation_required": false
-      },
-      "operation": {
-        "operation_type": "read",
-        "side_effect_level": "read_only",
-        "callback_expected": false,
-        "async_resume_required": false
-      },
-      "identifiers": ["work_item_id", "correlation_id"],
-      "policies": {
-        "auth_policy": "synthetic reviewer-approved access policy",
-        "timeout_policy": "synthetic timeout policy",
-        "retry_policy": "synthetic retry policy",
-        "fallback_policy": "manual review when synthetic adapter is unavailable",
-        "masking_policy": "safe_summary_only",
-        "data_policy": "synthetic_or_masked_only"
-      },
-      "graph_ir_annotations": {},
-      "developer_todos": [
-        "TODO: Implement EAI client through an approved MCP or adapter contract only.",
-        "TODO: Keep raw legacy payloads outside LLM context."
-      ]
-    }
-  ],
-  "excluded_modules": [
-    {
-      "id": "mod-003",
-      "name": "unapproved_example",
-      "status": "needs_info",
-      "reason": "status is needs_info; only approved modules are eligible for scaffold generation"
-    }
-  ],
-  "manifest": {
-    "catalog_bound_modules": [
+  "runtime_contracts": [],
+  "excluded_assets": [],
+  "graph": {
+    "graph_id": "graph.template",
+    "source_requirement_id": "req-template",
+    "workflow_ref": null,
+    "nodes": [
       {
-        "module_id": "mod-001",
-        "module_name": "customer_profile_lookup",
-        "catalog_id": "seed-adapter-customer_profile_lookup",
-        "catalog_name": "customer_profile_lookup",
-        "component_source": "stub"
+        "id": "input",
+        "label": "Input",
+        "node_kind": "input"
+      },
+      {
+        "id": "agent",
+        "label": "Template Agent",
+        "node_kind": "agent",
+        "agent_ref": "agent.template",
+        "available_tools": []
+      },
+      {
+        "id": "output",
+        "label": "Output",
+        "node_kind": "output"
       }
     ],
-    "new_code_required": [
+    "edges": [
       {
-        "module_id": "mod-001",
-        "module_name": "customer_profile_lookup",
-        "reason": "catalog binding is recorded, but runtime implementation remains a TODO boundary",
-        "developer_todos": [
-          "Review how this catalog spec should be invoked before replacing the TODO boundary.",
-          "Map reviewed inputs and outputs before wiring runtime behavior."
-        ]
+        "id": "edge.input.agent",
+        "from": "input",
+        "to": "agent",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "module_id": "mod-002",
-        "module_name": "response_guidance_retrieval",
-        "reason": "no catalog binding was selected for this approved module",
-        "developer_todos": [
-          "Review the retrieval source and access policy before replacing the TODO boundary.",
-          "Preserve reviewed citation and grounding requirements when wiring runtime behavior."
-        ]
+        "id": "edge.agent.output",
+        "from": "agent",
+        "to": "output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
+      }
+    ],
+    "regions": []
+  },
+  "manifest": {
+    "catalog_bound_assets": [],
+    "new_code_required": [
+      {
+        "asset_id": "agent.template",
+        "asset_name": "Template Agent",
+        "reason": "No reviewed Catalog binding exists for this approved asset.",
+        "developer_todos": []
       }
     ]
   },
   "validation": {
     "can_generate_source": true,
     "blockers": [],
-    "warnings": [
-      "customer_profile_lookup: catalog binding is emitted as TODO/stub until runtime binding policy is approved",
-      "response_guidance_retrieval: generated as new-code TODO boundary because no catalog binding is selected"
-    ]
+    "warnings": []
   }
 }

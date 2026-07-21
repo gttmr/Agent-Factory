@@ -2,7 +2,7 @@
 
 ## 목적
 
-생성된 Runtime Handoff bundle을 로컬 ADK server로 기동해 chat 동작을 확인하고, legacy `remote_a2a` provider가 있는 경우 A2A 상태·Agent Card·input-required resume 흐름을 점검한다. 이 Stage는 승인 gate가 없는 실행 도구다.
+생성된 Runtime Handoff bundle을 로컬 ADK server로 기동해 chat 동작을 확인하고, approved Agent의 A2A Binding/Exposure가 local provider를 가리키는 경우 A2A 상태·Agent Card·input-required resume 흐름을 점검한다. 이 Stage는 승인 gate가 없는 실행 도구다.
 
 ## Trigger와 진입 조건
 
@@ -18,7 +18,7 @@
 ## 주요 입력
 
 - `runtime-stub/**`와 현재 bundle fingerprint
-- analysis module candidate의 legacy `remote_a2a` provider target
+- analysis의 approved Agent Asset, A2A Binding/Exposure와 referenced A2A contract
 - 공유 ADK venv와 runtime 환경 변수
 - optional Mock Lab MCP prerequisite
 - A2A resume의 provider requirement ID, task/context/interrupt/function ID와 response
@@ -53,7 +53,7 @@
 ## 읽는 Register
 
 - [`reg.analysis-result`](../registers.md#cross-stage-registers)
-- [`reg.module-candidates`](../registers.md#cross-stage-registers)
+- [`reg.asset-candidates`](../registers.md#cross-stage-registers)
 - [`reg.runtime-stub`](../registers.md#cross-stage-registers)
 - [`reg.runtime-process`](../registers.md#cross-stage-registers)
 - [`reg.mock-lab-lifecycle`](../registers.md#cross-stage-registers)
@@ -86,14 +86,31 @@
 - Role in behavior: runtime-stub readiness, chat controls, ADK dev UI와 optional A2A provider/resume panel을 조정한다.
 - Inputs: reqId, runtime-stub listing, analysis, chat/A2A status
 - Outputs: start·stop requests, UI link와 action message
-- State/artifact reads: `reg.runtime-stub`, `reg.analysis-result`, `reg.module-candidates`, `reg.runtime-process`, `reg.mock-lab-lifecycle`
+- State/artifact reads: `reg.runtime-stub`, `reg.analysis-result`, `reg.asset-candidates`, `reg.runtime-process`, `reg.mock-lab-lifecycle`
 - State/artifact writes: `reg.runtime-process`를 HTTP action으로 간접 갱신하고 `reg.recent-roots`를 touch한다.
 - Important callers: `AppRouter`
 - Important callees: runtime query hooks, `runtimeA2aProviderTarget`, `RuntimeA2aProviderPanel`, `MockLabPrerequisiteRows`
 - External boundaries: browser, HTTP, ADK dev UI link
 - Failure/edge behavior: stub이 없으면 controls를 숨기고 Build link를 제공하며, stale runtime은 restart action을 연다.
-- Related registers: `reg.runtime-stub`, `reg.analysis-result`, `reg.module-candidates`, `reg.runtime-process`, `reg.recent-roots`
-- Verified at commit: `7deea45`
+- Related registers: `reg.runtime-stub`, `reg.analysis-result`, `reg.asset-candidates`, `reg.runtime-process`, `reg.recent-roots`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
+- Locator status: `active`
+
+### A2A provider target selection
+
+- Path: `packages/web/src/routes/run/runtimeA2aProviderTarget.ts`
+- Stable anchor: `runtimeA2aProviderTarget`
+- Role in behavior: approved Agent Assets에서 A2A Binding/Exposure가 참조하는 contract와 `local artifact:` owner를 연결해 local provider reqId를 선택한다.
+- Inputs: strict Target `AnalysisResult`
+- Outputs: provider reqId, Agent Asset ID, A2A contract ID 또는 `null`
+- State/artifact reads: `reg.analysis-result`, `reg.asset-candidates`, `reg.a2a-contracts`
+- State/artifact writes: 없음
+- Important callers: `RunSandbox`
+- Important callees: local candidate/contract reference helpers
+- External boundaries: 없음
+- Failure/edge behavior: approved Agent, matching A2A contract, local artifact owner 중 하나라도 없으면 provider target을 반환하지 않는다. A2A는 protocol이며 Asset category가 아니다.
+- Related registers: `reg.analysis-result`, `reg.asset-candidates`, `reg.a2a-contracts`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Runtime chat HTTP actions
@@ -110,7 +127,7 @@
 - External boundaries: HTTP
 - Failure/edge behavior: method mismatch와 install은 405, unknown action은 404다.
 - Related registers: `reg.runtime-stub`, `reg.runtime-process`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### ADK chat process manager
@@ -127,7 +144,7 @@
 - External boundaries: filesystem, OS process, TCP, shared venv
 - Failure/edge behavior: package를 발견하지 못하거나 ADK 실행 파일이 없으면 start가 실패하고, 확인 불가능한 port owner는 종료하지 않는다.
 - Related registers: `reg.runtime-stub`, `reg.runtime-process`, `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### ADK session input-required reader
@@ -144,7 +161,7 @@
 - External boundaries: filesystem, ADK session HTTP
 - Failure/edge behavior: smoke config가 없으면 `af-reviewer`/`af-smoke` fallback을 쓰며, session route 실패를 data-level error로 반환한다.
 - Related registers: `reg.runtime-stub`, `reg.runtime-process`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Runtime A2A HTTP actions
@@ -161,7 +178,7 @@
 - External boundaries: HTTP, provider A2A JSON-RPC
 - Failure/edge behavior: resume identity 다섯 필드와 response가 필요하며 install은 405다.
 - Related registers: `reg.runtime-process`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### ADK A2A provider manager
@@ -178,7 +195,7 @@
 - External boundaries: filesystem, OS process, TCP, A2A HTTP, Mock Lab
 - Failure/edge behavior: prerequisite·launcher·port·venv 실패를 차단하고, cached working task는 task/get으로 다시 확인한다.
 - Related registers: `reg.runtime-stub`, `reg.runtime-process`, `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Shared A2A process-control helpers
@@ -195,7 +212,7 @@
 - External boundaries: local filesystem, OS process, TCP
 - Failure/edge behavior: invalid PID/host/port record는 null이며, stop은 platform별 termination을 시도한다. chat manager는 같은 파일의 helper가 아니라 자체 private record helper를 사용한다.
 - Related registers: `reg.runtime-stub`, `reg.runtime-process`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ## 확인되지 않은 사항

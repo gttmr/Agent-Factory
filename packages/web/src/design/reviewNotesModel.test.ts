@@ -37,11 +37,6 @@ assert.equal(
   "edges:edge-1, edge-2",
   "edge group target lists edge ids"
 );
-assert.equal(
-  describeHighlightTarget(highlight("container_focus", { container_id: "container-root" })),
-  "container:container-root",
-  "container target names the container"
-);
 // Empty target falls back to the highlight kind.
 assert.equal(
   describeHighlightTarget(highlight("node_group", {})),

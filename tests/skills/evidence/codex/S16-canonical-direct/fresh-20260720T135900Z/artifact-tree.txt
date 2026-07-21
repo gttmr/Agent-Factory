@@ -1,0 +1,2 @@
+# No files were created under SCENARIO_OUTPUT_ROOT.
+# Baseline and post-run hashes for all visible harness files were identical.

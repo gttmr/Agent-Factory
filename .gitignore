@@ -20,3 +20,5 @@ catalog/local/
 catalog/**/*.local.*
 .agent-factory/runtime.env
 .agent-factory/runtime/
+# Windows download metadata materialized as WSL sidecar files.
+*:Zone.Identifier

@@ -1,0 +1,463 @@
+{
+  "contract_version": "2.0",
+  "normalizedRequirement": {
+    "id": "req-s07-a2a-consuming",
+    "title": "Synthetic A2A consuming prototype",
+    "raw_text": "Build a local runnable prototype that delegates a synthetic policy question to an independently owned A2A Agent through a localhost test double.",
+    "domain": "synthetic-quality-assurance",
+    "requester": {
+      "team": "scenario-fixture-team",
+      "role": "reviewer"
+    },
+    "business_goal": "Verify an approved A2A consuming boundary without using a production endpoint or private data.",
+    "current_process": [
+      "Accept a synthetic policy question",
+      "Prepare the delegated task locally",
+      "Call the synthetic remote Agent through A2A",
+      "Observe the terminal task outcome",
+      "Return the synthetic answer or an explicit manual-review handoff"
+    ],
+    "inputs": [
+      {
+        "name": "policy_question",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "policy_answer",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "systems": [
+      {
+        "name": "synthetic_remote_policy_qa",
+        "access": "read_write"
+      }
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [],
+    "status": "approved"
+  },
+  "evidence": {
+    "requested_goal": "Generate a local runnable prototype for one reviewed A2A consuming boundary.",
+    "business_domain_hint": "synthetic-quality-assurance",
+    "user_role": "reviewer",
+    "input_data": [
+      "synthetic policy question"
+    ],
+    "output_data": [
+      "synthetic policy answer"
+    ],
+    "systems_mentioned": [
+      "localhost synthetic A2A Agent"
+    ],
+    "decisions_implied": [
+      "consume the independently owned Agent through A2A",
+      "keep retry and fallback as explicit handoff policy"
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [],
+    "assumptions": [
+      "The localhost Agent Card and remote task responses are synthetic test data only."
+    ]
+  },
+  "assetCandidates": [
+    {
+      "asset_id": "workflow-s07-a2a-consuming",
+      "source_requirement_id": "req-s07-a2a-consuming",
+      "catalog_entry_id": null,
+      "name": "Synthetic A2A Consuming Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "a2a-consuming",
+        "synthetic-runtime"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The approved flow coordinates local preparation, one remote A2A Agent invocation, and an explicit terminal result.",
+      "inputs": [
+        {
+          "name": "policy_question",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "policy_answer",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "risk_level": "low",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "agent-s07-local-coordinator",
+      "source_requirement_id": "req-s07-a2a-consuming",
+      "catalog_entry_id": null,
+      "name": "Synthetic Local Coordinator Agent",
+      "asset_type": "agent",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "task-preparation",
+        "synthetic-runtime"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "A local Agent prepares the reviewed synthetic question and preserves the local responsibility boundary before delegation.",
+      "inputs": [
+        {
+          "name": "policy_question",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "delegated_question",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "risk_level": "low",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "agent-s07-remote-policy-qa",
+      "source_requirement_id": "req-s07-a2a-consuming",
+      "catalog_entry_id": null,
+      "name": "Synthetic Remote Policy QA Agent",
+      "asset_type": "agent",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "External Synthetic Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "a2a",
+        "policy-qa",
+        "synthetic-runtime"
+      ],
+      "binding": {
+        "kind": "a2a",
+        "contract_ref": "a2a-207"
+      },
+      "connection": {
+        "transport": "http"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "This independently owned localhost test double is consumed through the approved A2A contract and is not a local sub-agent.",
+      "inputs": [
+        {
+          "name": "delegated_question",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "policy_answer",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "risk_level": "low",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    }
+  ],
+  "a2aContracts": [
+    {
+      "contract_id": "a2a-207",
+      "agent_ref": "agent-s07-remote-policy-qa",
+      "target_agent_name": "Synthetic Remote Policy QA",
+      "target_agent_purpose": "Return a deterministic synthetic answer for a delegated policy question.",
+      "contract_status": "approved",
+      "agent_card": {
+        "discovery_method": "localhost Agent Card supplied with the scenario context",
+        "agent_card_url": "http://127.0.0.1:18081/.well-known/agent-card.json",
+        "version": "0.1.0",
+        "notes": "The card and endpoint are local synthetic test fixtures."
+      },
+      "supported_interfaces": [
+        {
+          "url": "http://127.0.0.1:18081",
+          "protocol_binding": "HTTP+JSON",
+          "protocol_version": "A2A test contract 1.0",
+          "tenant_policy": "single synthetic test tenant"
+        }
+      ],
+      "input_modes": [
+        "text"
+      ],
+      "output_modes": [
+        "text"
+      ],
+      "security_schemes": [
+        {
+          "name": "syntheticBearer",
+          "scheme": "http_bearer"
+        }
+      ],
+      "security_requirements": [
+        {
+          "scheme_name": "syntheticBearer",
+          "scopes": []
+        }
+      ],
+      "skills": [
+        "synthetic-policy-qa"
+      ],
+      "extensions": [],
+      "message_contract": {
+        "allowed_part_fields": [
+          "text"
+        ],
+        "allowed_roles": [
+          "ROLE_USER",
+          "ROLE_AGENT"
+        ]
+      },
+      "task_lifecycle": {
+        "states": [
+          "TASK_STATE_SUBMITTED",
+          "TASK_STATE_WORKING",
+          "TASK_STATE_COMPLETED",
+          "TASK_STATE_FAILED",
+          "TASK_STATE_CANCELED"
+        ],
+        "allowed_transitions": [
+          {
+            "from": "TASK_STATE_SUBMITTED",
+            "to": "TASK_STATE_WORKING"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_COMPLETED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_FAILED"
+          },
+          {
+            "from": "TASK_STATE_WORKING",
+            "to": "TASK_STATE_CANCELED"
+          }
+        ],
+        "terminal_states": [
+          "TASK_STATE_COMPLETED",
+          "TASK_STATE_FAILED",
+          "TASK_STATE_CANCELED"
+        ],
+        "input_required_followup": "Fail the synthetic test because additional remote input is outside the approved scenario.",
+        "auth_required_followup": "Report the missing AF_A2A_SYNTHETIC_TOKEN environment variable without inventing a value."
+      },
+      "streaming": {
+        "supported": false,
+        "wrappers": [],
+        "non_streaming_fallback": "Use SendMessage and bounded GetTask polling until a terminal state."
+      },
+      "operations": [
+        "SendMessage",
+        "GetTask",
+        "CancelTask"
+      ],
+      "http_paths": [
+        "/message:send",
+        "/tasks/{id}",
+        "/tasks/{id}:cancel"
+      ],
+      "artifact_contract": {
+        "mutation_rules": "No remote artifact mutation is permitted in this synthetic text-only scenario.",
+        "chunking_policy": "No artifact chunks are emitted."
+      },
+      "adk_host_mapping": "Consume the supplied localhost Agent Card with RemoteA2aAgent.",
+      "adk_runtime_policy": {
+        "timeout_seconds": 5,
+        "auth": {
+          "mode": "bearer_env",
+          "env_var": "AF_A2A_SYNTHETIC_TOKEN",
+          "metadata_key": null
+        },
+        "retry_handoff": {
+          "max_attempts": 1,
+          "backoff_seconds": null,
+          "retry_on": []
+        },
+        "fallback_handoff": {
+          "mode": "manual_review",
+          "message": "Record the remote failure and compare the reviewed local Agent alternative; do not switch automatically."
+        }
+      },
+      "timeout": "Five-second remote call budget for the localhost test double.",
+      "retry": "No automatic retry wrapper; preserve the single approved attempt.",
+      "fallback": "Produce an observable manual-review handoff and comparison only.",
+      "cancellation": "Send CancelTask when a synthetic task is still active at cancellation time.",
+      "unsupported_operation": "Fail visibly and record the unsupported operation in test evidence.",
+      "get_task_fallback": "Use bounded polling only when SendMessage returns a non-terminal task.",
+      "push_notification_policy": null,
+      "auth": "Read a synthetic bearer value from AF_A2A_SYNTHETIC_TOKEN; never store a token in the fixture.",
+      "token_handling": "Use the environment variable at runtime and never write the value to source, logs, or artifacts.",
+      "audit": "Record synthetic correlation, lifecycle transition, terminal state, timeout, and fallback choice.",
+      "data_policy": "Only fixed synthetic policy questions and answers may cross the localhost boundary."
+    }
+  ],
+  "runtimeContracts": [
+    {
+      "contract_id": "rtc-s07-a2a-connection",
+      "contract_kind": "external_connection",
+      "asset_id": "agent-s07-remote-policy-qa",
+      "title": "Synthetic A2A consuming connection",
+      "contract_status": "approved",
+      "summary": "Bind the remote Agent to one localhost A2A test double with bounded timeout and observable manual fallback.",
+      "required_review_fields": [],
+      "reviewer_notes": "Approved for the isolated S07 runnable prototype only.",
+      "runtime_support": {
+        "context_manager_required": false,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": false,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "read",
+        "side_effect_level": "read_only",
+        "callback_expected": false,
+        "async_resume_required": false
+      },
+      "identifiers": [
+        "a2a-207",
+        "AF_A2A_SYNTHETIC_TOKEN"
+      ],
+      "policies": {
+        "auth_policy": "Read only the named synthetic environment variable and never persist its value.",
+        "timeout_policy": "Stop the remote call after five seconds.",
+        "retry_policy": "One attempt; do not add a retry wrapper.",
+        "fallback_policy": "Emit a manual-review handoff and explicit local alternative comparison.",
+        "masking_policy": "No private input is allowed; redact any unexpected value before logging.",
+        "data_policy": "Localhost synthetic text only."
+      },
+      "graph_ir_annotations": {
+        "agent_node_id": "node-s07-remote-policy-qa",
+        "protocol": "a2a"
+      },
+      "synthetic_examples": [
+        {
+          "question": "What is the synthetic review rule?",
+          "answer": "Apply the fixed synthetic rule."
+        }
+      ],
+      "developer_todos": []
+    }
+  ],
+  "graph": {
+    "graph_id": "graph-s07-a2a-consuming",
+    "source_requirement_id": "req-s07-a2a-consuming",
+    "workflow_ref": "workflow-s07-a2a-consuming",
+    "nodes": [
+      {
+        "id": "node-s07-input",
+        "label": "Synthetic policy question",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s07-local-coordinator",
+        "label": "Prepare delegated question",
+        "node_kind": "agent",
+        "agent_ref": "agent-s07-local-coordinator",
+        "available_tools": []
+      },
+      {
+        "id": "node-s07-remote-policy-qa",
+        "label": "Call synthetic remote policy QA Agent",
+        "node_kind": "agent",
+        "agent_ref": "agent-s07-remote-policy-qa",
+        "available_tools": []
+      },
+      {
+        "id": "node-s07-output",
+        "label": "Synthetic policy answer",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s07-input-to-local",
+        "from": "node-s07-input",
+        "to": "node-s07-local-coordinator",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s07-local-to-remote",
+        "from": "node-s07-local-coordinator",
+        "to": "node-s07-remote-policy-qa",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s07-remote-to-output",
+        "from": "node-s07-remote-policy-qa",
+        "to": "node-s07-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  }
+}

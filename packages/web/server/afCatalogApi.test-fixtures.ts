@@ -1,118 +1,50 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { ServerResponse } from "node:http";
 import type { IncomingMessage } from "node:http";
+import { ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { dump as dumpYaml } from "js-yaml";
 import { createAfCatalogMiddleware } from "./afCatalogApi.ts";
 
-export const validAdapterProposal = {
-  category: "adapter",
-  module_category: "adapter",
-  name: "customer_notice_template_mock_adapter",
-  adapter_kind: "template",
-  owner_domain: "고객",
-  responsibility: "고객 안내 템플릿 preview 를 반환한다.",
+export const validToolProposal = {
+  asset_id: "tool.customer.notice-template",
+  asset_type: "tool",
+  name: "고객 안내 템플릿 Tool",
+  domain_scope: "domain_specific",
+  business_domains: ["고객"],
+  owner: "AI공통플랫폼팀",
+  reuse_status: "publish_candidate",
+  capability_tags: ["template"],
+  binding: { kind: "function" },
+  connection: { transport: "in_process" },
+  workflow_profile: null,
+  exposure: null,
+  responsibility: "고객 안내 템플릿 preview를 반환한다.",
   inputs: [{ name: "customer_id", type: "string" }],
   outputs: [{ name: "message", type: "string" }],
-  composition: ["template_render"],
-  notes: "Reuse Hub 신규 등록 제안",
-  source_candidate_id: "module-1"
-};
+  runtime_mock: {
+    synthetic: true,
+    message: "합성 고객 안내문"
+  },
+  source_candidate_id: "asset-1"
+} as const;
 
-export const validRemoteA2aWorkflowProposal = {
-  category: "workflow",
-  module_category: "workflow",
-  name: "remote_review_workflow",
-  workflow_kind: "graph",
-  owner_domain: "analysis",
-  responsibility: "Route review work to an exposed A2A provider.",
-  component_source: "remote_a2a",
-  runtime_binding: "remote_a2a",
-  a2a_provider_req_id: "req-example",
-  inputs: [{ name: "case_id", type: "string", required: true }],
-  outputs: [{ name: "decision", type: "string" }],
-  composition: ["remote-review-agent"],
-  risk_signals: ["audit_required"],
-  required_before_approval: ["provider Agent Card route verified"],
-  contract_status: "a2a_ready",
-  notes: "Remote A2A workflow exposure.",
-  source_candidate_id: "workflow-candidate"
-};
-
-export const matchingDelta = [
-  "proposed_additions:",
-  "  - category: adapter",
-  "    name: customer_notice_template_mock_adapter",
-  "    owner_domain: 고객",
-  "    responsibility: 고객 안내 템플릿 preview 를 반환한다."
-].join("\n");
-
-export const matchingWorkflowDelta = [
-  "proposed_additions:",
-  "  - category: workflow",
-  "    name: remote_review_workflow",
-  "    workflow_kind: graph",
-  "    owner_domain: analysis",
-  "    responsibility: Route review work to an exposed A2A provider.",
-  "    component_source: remote_a2a",
-  "    runtime_binding: remote_a2a",
-  "    a2a_provider_req_id: req-example",
-  "    risk_signals:",
-  "      - audit_required",
-  "    required_before_approval:",
-  "      - provider Agent Card route verified",
-  "    contract_status: a2a_ready"
-].join("\n");
-
-export const staleWorkflowDelta = [
-  "proposed_additions:",
-  "  - category: workflow",
-  "    name: remote_review_workflow",
-  "    workflow_kind: graph",
-  "    owner_domain: analysis",
-  "    responsibility: Stale same-name workflow proposal without reviewed A2A exposure metadata."
-].join("\n");
-
-export const mismatchedWorkflowDelta = [
-  "proposed_additions:",
-  "  - category: workflow",
-  "    name: remote_review_workflow",
-  "    workflow_kind: graph",
-  "    owner_domain: analysis",
-  "    responsibility: Stale same-name workflow proposal with different reviewed provider metadata.",
-  "    component_source: remote_a2a",
-  "    runtime_binding: remote_a2a",
-  "    a2a_provider_req_id: req-other"
-].join("\n");
-
-export const componentOnlyRemoteA2aWorkflowDelta = [
-  "proposed_additions:",
-  "  - category: workflow",
-  "    name: remote_review_workflow",
-  "    workflow_kind: graph",
-  "    owner_domain: analysis",
-  "    responsibility: Route review work to an exposed A2A provider.",
-  "    component_source: remote_a2a",
-  "    risk_signals:",
-  "      - audit_required",
-  "    required_before_approval:",
-  "      - provider Agent Card route verified"
-].join("\n");
-
-export const runtimeOnlyRemoteA2aWorkflowDelta = [
-  "proposed_additions:",
-  "  - category: workflow",
-  "    name: remote_review_workflow",
-  "    workflow_kind: graph",
-  "    owner_domain: analysis",
-  "    responsibility: Route review work to an exposed A2A provider.",
-  "    runtime_binding: remote_a2a",
-  "    risk_signals:",
-  "      - audit_required",
-  "    required_before_approval:",
-  "      - provider Agent Card route verified"
-].join("\n");
+export const validAgentA2aProposal = {
+  asset_id: "agent.partner.remote-review",
+  asset_type: "agent",
+  name: "Partner Review Agent",
+  domain_scope: "cross_domain",
+  business_domains: ["심사"],
+  owner: "AI공통플랫폼팀",
+  reuse_status: "publish_candidate",
+  capability_tags: ["remote-review"],
+  binding: { kind: "a2a", contract_ref: "a2a.partner.remote-review.v1" },
+  connection: { transport: "http" },
+  workflow_profile: null,
+  exposure: { protocol: "a2a", contract_ref: "a2a.partner.remote-review.v1" },
+  responsibility: "A2A 경계에서 합성 심사 요청을 처리한다."
+} as const;
 
 export async function withTempRepo(run: (repoRoot: string) => Promise<void>): Promise<void> {
   const repoRoot = await mkdtemp(join(tmpdir(), "af-catalog-api-test-"));
@@ -124,101 +56,45 @@ export async function withTempRepo(run: (repoRoot: string) => Promise<void>): Pr
   }
 }
 
-export async function writeDelta(repoRoot: string, reqId: string, content: string): Promise<void> {
+export async function writeCanonicalCatalogs(repoRoot: string): Promise<void> {
+  await Promise.all([
+    writeFile(join(repoRoot, "catalog", "agents.yaml"), "agents: []\n", "utf8"),
+    writeFile(join(repoRoot, "catalog", "workflows.yaml"), "workflows: []\n", "utf8"),
+    writeFile(join(repoRoot, "catalog", "tools.yaml"), "tools: []\n", "utf8")
+  ]);
+}
+
+export async function writeDelta(repoRoot: string, reqId: string, proposals: readonly object[]): Promise<void> {
   const root = join(repoRoot, "artifacts", "af", reqId);
   await mkdir(root, { recursive: true });
-  await writeFile(join(root, "catalog-delta.yaml"), `${content}\n`, "utf8");
-}
-
-export async function writeProviderRuntimeRoot(repoRoot: string, reqId: string): Promise<void> {
-  const appDir = join(repoRoot, "artifacts", "af", reqId, "runtime-stub", "provider_app");
-  await mkdir(appDir, { recursive: true });
-  await writeFile(join(appDir, "workflow_manifest.json"), `${JSON.stringify({ package: "provider_app" }, null, 2)}\n`, "utf8");
-}
-
-export async function writeProviderAgentCard(repoRoot: string, reqId: string): Promise<void> {
-  const appDir = join(repoRoot, "artifacts", "af", reqId, "runtime-stub", "provider_app");
-  await mkdir(appDir, { recursive: true });
-  await writeFile(
-    join(appDir, "agent.json"),
-    `${JSON.stringify(
-      {
-        name: "provider_app",
-        description: "Pre-existing reviewed provider Agent Card.",
-        url: "http://127.0.0.1:8001/a2a/provider_app",
-        version: "0.1.0",
-        preferredTransport: "JSONRPC",
-        protocolVersion: "0.3.0",
-        capabilities: {
-          extensions: [],
-          streaming: false,
-          pushNotifications: false,
-          stateTransitionHistory: true
-        },
-        defaultInputModes: ["text/plain"],
-        defaultOutputModes: ["text/plain"],
-        skills: [{ id: "provider_app_workflow", name: "Provider app", description: "Reviewed provider.", tags: ["agent-factory"] }]
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
+  await writeFile(join(root, "catalog-delta.yaml"), dumpYaml({ proposed_additions: proposals }, { lineWidth: -1 }), "utf8");
 }
 
 export async function postPublish(repoRoot: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
-  const middleware = createAfCatalogMiddleware(repoRoot);
-  const req = Readable.from([JSON.stringify(body)]) as IncomingMessage;
-  req.method = "POST";
-  req.url = "/publish";
-  const chunks: string[] = [];
-  const res = new ServerResponse(req);
-  res.setHeader = function setHeader() {
-    return this;
-  };
-  res.end = function end(
-    chunk?: string | Uint8Array,
-    encodingOrCallback?: BufferEncoding | (() => void),
-    callback?: () => void
-  ) {
-    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk.toString());
-    if (typeof encodingOrCallback === "function") {
-      encodingOrCallback();
-    } else {
-      callback?.();
-    }
-    return this;
-  };
-  await middleware(req, res, (error) => {
-    throw error instanceof Error ? error : new Error("unexpected catalog middleware next()");
-  });
-  return {
-    status: res.statusCode,
-    body: chunks.join("").trim() ? (JSON.parse(chunks.join("")) as Record<string, unknown>) : {}
-  };
+  return invoke(repoRoot, "POST", "/publish", body);
 }
 
 export async function getCatalog(repoRoot: string): Promise<{ status: number; body: Record<string, unknown> }> {
+  return invoke(repoRoot, "GET", "/", null);
+}
+
+async function invoke(
+  repoRoot: string,
+  method: string,
+  url: string,
+  body: unknown
+): Promise<{ status: number; body: Record<string, unknown> }> {
   const middleware = createAfCatalogMiddleware(repoRoot);
-  const req = Readable.from([]) as IncomingMessage;
-  req.method = "GET";
-  req.url = "/";
+  const req = Readable.from(body === null ? [] : [JSON.stringify(body)]) as IncomingMessage;
+  req.method = method;
+  req.url = url;
   const chunks: string[] = [];
   const res = new ServerResponse(req);
-  res.setHeader = function setHeader() {
-    return this;
-  };
-  res.end = function end(
-    chunk?: string | Uint8Array,
-    encodingOrCallback?: BufferEncoding | (() => void),
-    callback?: () => void
-  ) {
+  res.setHeader = function setHeader() { return this; };
+  res.end = function end(chunk?: string | Uint8Array, encodingOrCallback?: BufferEncoding | (() => void), callback?: () => void) {
     if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk.toString());
-    if (typeof encodingOrCallback === "function") {
-      encodingOrCallback();
-    } else {
-      callback?.();
-    }
+    if (typeof encodingOrCallback === "function") encodingOrCallback();
+    else callback?.();
     return this;
   };
   await middleware(req, res, (error) => {

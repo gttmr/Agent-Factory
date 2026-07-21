@@ -1,0 +1,135 @@
+[
+  {
+    "asset_id": "workflow-s07-a2a-consuming",
+    "source_requirement_id": "req-s07-a2a-consuming",
+    "catalog_entry_id": null,
+    "name": "Synthetic A2A Consuming Workflow",
+    "asset_type": "workflow",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "a2a-consuming",
+      "synthetic-runtime"
+    ],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": {
+      "representation": "graph",
+      "coordination": "explicit",
+      "template_ref": null
+    },
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "The approved flow coordinates local preparation, one remote A2A Agent invocation, and an explicit terminal result.",
+    "inputs": [
+      {
+        "name": "policy_question",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "policy_answer",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "risk_level": "low",
+    "risk_signals": [
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": []
+  },
+  {
+    "asset_id": "agent-s07-local-coordinator",
+    "source_requirement_id": "req-s07-a2a-consuming",
+    "catalog_entry_id": null,
+    "name": "Synthetic Local Coordinator Agent",
+    "asset_type": "agent",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "task-preparation",
+      "synthetic-runtime"
+    ],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": null,
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "A local Agent prepares the reviewed synthetic question and preserves the local responsibility boundary before delegation.",
+    "inputs": [
+      {
+        "name": "policy_question",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "delegated_question",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "risk_level": "low",
+    "risk_signals": [
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": []
+  },
+  {
+    "asset_id": "agent-s07-remote-policy-qa",
+    "source_requirement_id": "req-s07-a2a-consuming",
+    "catalog_entry_id": null,
+    "name": "Synthetic Remote Policy QA Agent",
+    "asset_type": "agent",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "External Synthetic Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "a2a",
+      "policy-qa",
+      "synthetic-runtime"
+    ],
+    "binding": {
+      "kind": "a2a",
+      "contract_ref": "a2a-207"
+    },
+    "connection": {
+      "transport": "http"
+    },
+    "workflow_profile": null,
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "This independently owned localhost test double is consumed through the approved A2A contract and is not a local sub-agent.",
+    "inputs": [
+      {
+        "name": "delegated_question",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "policy_answer",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "risk_level": "low",
+    "risk_signals": [
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": []
+  }
+]

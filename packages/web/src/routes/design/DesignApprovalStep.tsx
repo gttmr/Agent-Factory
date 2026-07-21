@@ -72,8 +72,8 @@ export function DesignApprovalStep({
       <ul className="af-gate-summary">
         <li>analysis_reviewed: {manifest.approvals.analysis_reviewed ? "예" : "아니오"}</li>
         <li>
-          모듈 approved {analysis ? analysis.moduleCandidates.filter((candidate) => candidate.status === "approved").length : 0} /{" "}
-          {analysis?.moduleCandidates.length ?? 0}
+          Asset approved {analysis ? analysis.assetCandidates.filter((candidate) => candidate.status === "approved").length : 0} /{" "}
+          {analysis?.assetCandidates.length ?? 0}
         </li>
         <li>Graph IR errors: {errorCount} · warnings: {warningCount}</li>
         <li>코멘트: {commentCount}건 · highlights: {highlightCount}건</li>
@@ -105,7 +105,7 @@ export function DesignApprovalStep({
           Runtime 계약 {runtimeContracts.length}개 — approved {runtimeContracts.filter((contract) => contract.contract_status === "approved").length} ·
           rejected {runtimeContracts.filter((contract) => contract.contract_status === "rejected").length}
         </li>
-        <li>Remote A2A 후보 {a2aRowCount}개</li>
+        <li>A2A Binding Agent 후보 {a2aRowCount}개</li>
         <li>
           계약 readiness:{" "}
           {runtimeContracts.length === 0 && a2aRowCount === 0

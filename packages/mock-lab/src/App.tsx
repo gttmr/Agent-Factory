@@ -52,7 +52,7 @@ export default function App() {
       const [nextCatalog, nextMocks] = await Promise.all([fetchCatalogPrefill(), listMocks()]);
       setCatalog(nextCatalog);
       setMocks(nextMocks);
-      const requestedPrefill = resolveCatalogPrefillSpec(nextCatalog, readRequestedAdapterName());
+      const requestedPrefill = resolveCatalogPrefillSpec(nextCatalog, readRequestedToolName());
       if (requestedPrefill) {
         const existing = nextMocks.find(
           (mock) => mock.mock_id === requestedPrefill.mock_id || mock.server_name === requestedPrefill.server_name
@@ -234,7 +234,7 @@ function fingerprintMockSpec(spec: MockSpec): string {
   return JSON.stringify(spec);
 }
 
-function readRequestedAdapterName(): string | null {
+function readRequestedToolName(): string | null {
   if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("adapter");
+  return new URLSearchParams(window.location.search).get("tool");
 }

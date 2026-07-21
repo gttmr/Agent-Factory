@@ -32,7 +32,7 @@
 }
 
 .af-runtime-item-active > .af-runtime-item-button {
-  border-color: var(--accent, var(--cat-adapter));
+  border-color: var(--accent);
   background: var(--success-faint);
 }
 
@@ -66,8 +66,8 @@
 }
 
 .af-runtime-status-approved {
-  background: var(--cat-adapter-soft, var(--cat-adapter-soft));
-  color: var(--cat-adapter, var(--cat-adapter));
+  background: var(--success-soft);
+  color: var(--success-text);
 }
 
 .af-runtime-status-needs_info {
@@ -81,8 +81,8 @@
 }
 
 .af-runtime-status-rejected {
-  background: var(--cat-remote-soft, var(--cat-remote-soft));
-  color: var(--cat-remote, #b42318);
+  background: var(--danger-soft);
+  color: var(--danger-text);
 }
 
 .af-runtime-readiness {
@@ -92,7 +92,7 @@
 }
 
 .af-runtime-readiness-ready {
-  color: var(--cat-adapter, var(--cat-adapter));
+  color: var(--success-text);
 }
 
 .af-runtime-readiness-pending {
@@ -168,8 +168,8 @@
 
 .af-runtime-warning {
   font-size: var(--fs-sm);
-  color: var(--cat-remote, #b42318);
-  background: var(--cat-remote-soft, var(--cat-remote-soft));
+  color: var(--danger-text);
+  background: var(--danger-soft);
   padding: 8px 10px;
   border-radius: 6px;
 }

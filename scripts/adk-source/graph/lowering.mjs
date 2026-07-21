@@ -6,7 +6,7 @@ import { mergeRouteCasesByTarget } from "./routes.mjs";
 
 export function buildRunnableGraph(context, options = {}) {
   const collection = options.collection ?? collectGenerationNodes(context, { mode: "static" });
-  const { counts, graph, toolsetAdapterIds } = collection;
+  const { agentOwnedToolIds, counts, graph } = collection;
   const explicitJoinNodes = collection.explicitJoinNodes;
   const explicitJoinSymbols = new Set(explicitJoinNodes.map((node) => syntheticNodeSymbol(node)));
 
@@ -27,13 +27,13 @@ export function buildRunnableGraph(context, options = {}) {
     });
   };
 
-  const graphEdges = Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [];
+  const graphEdges = Array.isArray(context.graph.edges) ? context.graph.edges : [];
   for (const [index, edge] of graphEdges.entries()) {
     const record = validateAndLowerEdge(edge, {
       mode: "static",
       graph,
       counts,
-      exclusions: toolsetAdapterIds,
+      exclusions: agentOwnedToolIds,
       index
     });
     consumedEdgeIds.push(record.consumedEdgeId);
@@ -55,7 +55,7 @@ export function buildRunnableGraph(context, options = {}) {
   }
 
   const incoming = new Set(baseEdges.map((edge) => edge.to));
-  for (const spec of collection.moduleSpecsInDeclarationOrder) {
+  for (const spec of collection.assetSpecsInDeclarationOrder) {
     const sym = nodeSymbol(spec);
     if (!incoming.has(sym)) add("START", sym);
   }
@@ -102,7 +102,7 @@ export function buildRunnableGraph(context, options = {}) {
   }
 
   if (finalEdges.length === 0) {
-    throw new Error("processFlow does not provide any usable Graph IR edges for runnable workflow generation.");
+    throw new Error("Graph IR does not provide any usable edges for runnable workflow generation.");
   }
 
   const adjacency = new Map();

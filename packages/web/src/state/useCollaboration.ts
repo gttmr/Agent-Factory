@@ -53,7 +53,7 @@ export interface HighlightRecord {
   stage: CommentStage;
   kind: "path" | "node_group" | "edge_group" | "container_focus";
   label: string;
-  color_token: "agent" | "workflow" | "adapter" | "remote" | "neutral";
+  color_token: "agent" | "workflow" | "tool" | "a2a" | "neutral";
   target: HighlightTarget;
   author: string;
   created_at: string;

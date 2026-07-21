@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import type { GraphEditState, Selection } from "../components/GraphCanvas";
-import type { GraphEdge, GraphNode, ModuleCandidate } from "../analyzer/types";
+import type { AssetCandidate, GraphEdge, GraphNode } from "../analyzer/types";
 import { CatalogWorkflowPicker } from "../design/CatalogWorkflowPicker";
 import { buildA2AReviewRows } from "../design/A2AContractPanel";
 import { a2aContractsGateReady } from "../design/a2aContractValidator";
@@ -25,6 +25,7 @@ import {
 } from "../state/useCollaboration";
 import { useGraphIR } from "../state/useGraphIR";
 import { graphEdgeId } from "../graph/graphDisplay";
+import { assetRefForNode } from "../components/graphElementEditorModel";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { DesignApprovalStep } from "./design/DesignApprovalStep";
 import { DesignReviewStep, type DesignReviewHandlers } from "./design/DesignReviewStep";
@@ -60,18 +61,18 @@ export default function DesignWorkbench() {
   const deleteComment = useDeleteComment(reqId);
   const deleteHighlight = useDeleteHighlight(reqId);
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>("modules");
+  const [activeTab, setActiveTab] = useState<SidebarTab>("assets");
   const [selection, setSelection] = useState<Selection>({ nodeId: null, edgeId: null });
   const [graphEditState, setGraphEditState] = useState<GraphEditState | null>(null);
-  const [selectedReviewModuleId, setSelectedReviewModuleId] = useState<string | null>(null);
+  const [selectedReviewAssetId, setSelectedReviewAssetId] = useState<string | null>(null);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
-  const [selectedA2AModuleId, setSelectedA2AModuleId] = useState<string | null>(null);
+  const [selectedA2AAssetId, setSelectedA2AAssetId] = useState<string | null>(null);
   const [catalogWorkflowPickerOpen, setCatalogWorkflowPickerOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const manifest = manifestData?.manifest;
   const analysis = analysisData?.data ?? null;
-  const { graphIR, errorCount, warningCount, normalizationError } = useGraphIR(analysis);
+  const { graphIR, errorCount, warningCount, validationError } = useGraphIR(analysis);
   const comments = commentsFile?.comments ?? [];
   const highlights = highlightsFile?.highlights ?? [];
   const runtimeContracts = analysis?.runtimeContracts ?? [];
@@ -80,20 +81,20 @@ export default function DesignWorkbench() {
   const runtimeContractsReady = runtimeContractsGateReady(analysis);
   const a2aContractsReady = a2aContractsGateReady(analysis);
   const a2aRows = useMemo(
-    () => (analysis ? buildA2AReviewRows(analysis.moduleCandidates, a2aContracts) : []),
+    () => (analysis ? buildA2AReviewRows(analysis.assetCandidates, a2aContracts) : []),
     [analysis, a2aContracts]
   );
-  const selectedA2ARow = a2aRows.find((row) => row.candidate.id === selectedA2AModuleId) ?? a2aRows[0] ?? null;
-  const selectedReviewCandidate =
-    (selectedReviewModuleId ? analysis?.moduleCandidates.find((item) => item.id === selectedReviewModuleId) ?? null : null) ??
-    analysis?.moduleCandidates[0] ??
+  const selectedA2ARow = a2aRows.find((row) => row.candidate.asset_id === selectedA2AAssetId) ?? a2aRows[0] ?? null;
+  const selectedReviewAsset =
+    (selectedReviewAssetId ? analysis?.assetCandidates.find((item) => item.asset_id === selectedReviewAssetId) ?? null : null) ??
+    analysis?.assetCandidates[0] ??
     null;
-  const approvedCandidateCount = analysis ? analysis.moduleCandidates.filter((item) => item.status === "approved").length : 0;
-  const allCandidatesApproved = Boolean(analysis?.moduleCandidates.length) && approvedCandidateCount === analysis?.moduleCandidates.length;
-  const unapprovedCandidateCount = analysis ? analysis.moduleCandidates.length - approvedCandidateCount : 0;
+  const approvedCandidateCount = analysis ? analysis.assetCandidates.filter((item) => item.status === "approved").length : 0;
+  const allCandidatesApproved = Boolean(analysis?.assetCandidates.length) && approvedCandidateCount === analysis?.assetCandidates.length;
+  const unapprovedCandidateCount = analysis ? analysis.assetCandidates.length - approvedCandidateCount : 0;
   const boundariesGateEnabled = Boolean(manifest?.approvals.analysis_reviewed) && allCandidatesApproved && errorCount === 0;
   const runtimeGateEnabled = Boolean(manifest?.approvals.boundaries_approved) && runtimeContractsReady && a2aContractsReady;
-  const hasGraph = Boolean(graphIR) || Boolean(normalizationError);
+  const hasGraph = Boolean(graphIR) || Boolean(validationError);
   const reviewReady = allCandidatesApproved && errorCount === 0 && runtimeContractsReady && a2aContractsReady;
   const boundariesApproved = Boolean(manifest?.approvals.boundaries_approved);
   const runtimeApproved = Boolean(manifest?.approvals.runtime_contracts_approved);
@@ -107,14 +108,14 @@ export default function DesignWorkbench() {
     () => new Map<string, GraphEdge>((graphIR?.edges ?? []).map((edge, index) => [graphEdgeId(edge, index), edge])),
     [graphIR]
   );
-  const candidateById = useMemo(() => {
-    const map = new Map<string, ModuleCandidate>();
-    for (const candidate of analysis?.moduleCandidates ?? []) map.set(candidate.id, candidate);
+  const assetById = useMemo(() => {
+    const map = new Map<string, AssetCandidate>();
+    for (const asset of analysis?.assetCandidates ?? []) map.set(asset.asset_id, asset);
     return map;
   }, [analysis]);
   const selectedNode = selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null;
   const selectedEdge = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
-  const selectedCandidate = selectedNode?.module_id ? candidateById.get(selectedNode.module_id) ?? null : null;
+  const selectedAsset = assetById.get(assetRefForNode(selectedNode) ?? "") ?? null;
   const nodeLabel = (id: string) => nodeById.get(id)?.label ?? id;
 
   if (!reqId) return <MissingRequirement />;
@@ -126,8 +127,8 @@ export default function DesignWorkbench() {
     a2aContracts,
     queryClient,
     setActionMessage,
-    setSelectedA2AModuleId,
-    setSelectedReviewModuleId,
+    setSelectedA2AAssetId,
+    setSelectedReviewAssetId,
     setActiveTab,
     setCatalogWorkflowPickerOpen,
     saveAnalysis: (next, options) => saveAnalysisMutation.mutate({ analysis: next, etag: analysisData?.etag ?? null }, options),
@@ -138,8 +139,8 @@ export default function DesignWorkbench() {
     onSaveGraphIR: actions.saveGraphIR,
     onOpenCatalogWorkflowPicker: () => setCatalogWorkflowPickerOpen(true),
     onSaveRuntimeContract: actions.saveRuntimeContract, onSaveA2AContract: actions.saveA2AContract,
-    onSelectReviewModule: setSelectedReviewModuleId, onSaveCandidate: actions.saveCandidate,
-    onSelectContract: setSelectedContractId, onSelectA2AModule: setSelectedA2AModuleId,
+    onSelectReviewAsset: setSelectedReviewAssetId, onSaveAsset: actions.saveAsset,
+    onSelectContract: setSelectedContractId, onSelectA2AAsset: setSelectedA2AAssetId,
     onCreateA2AContract: actions.createA2AContract,
     onImportLocalA2AProvider: actions.importLocalA2AProvider,
     onAuthorNameChange: setAuthorName, onAuthorRoleChange: setAuthorRole,
@@ -198,11 +199,11 @@ export default function DesignWorkbench() {
             setActiveTab={setActiveTab}
             analysis={analysis}
             graphIR={graphIR}
-            normalizationError={normalizationError}
+            validationError={validationError}
             errorCount={errorCount}
             selection={selection}
             graphEditState={graphEditState}
-            selected={{ node: selectedNode, edge: selectedEdge, candidate: selectedCandidate, reviewCandidate: selectedReviewCandidate }}
+            selected={{ node: selectedNode, edge: selectedEdge, asset: selectedAsset, reviewAsset: selectedReviewAsset }}
             contracts={{ selectedContract, selectedContractId, selectedA2ARow, runtimeContracts, a2aContracts }}
             collaboration={{
               comments, highlights, anchor, authorName, authorRole,

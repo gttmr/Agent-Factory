@@ -1,0 +1,5 @@
+node scripts/validate-skills.mjs
+node -e 'JSON.parse(require("node:fs").readFileSync("templates/skill-scenarios/S16-canonical-direct/expected-skill.json","utf8"))'
+rg -n '^name: af-discover-assets$' .agents/skills/af-discover-assets/SKILL.md
+for d in af-analyze-requirement af-design-boundaries af-build-runtime-stub af-verify-feedback; do test ! -e ".agents/skills/$d" || exit 1; done
+test "$(find templates/skill-scenarios -maxdepth 1 -mindepth 1 -type d -name 'S[0-9][0-9]-*' | wc -l)" -eq 16

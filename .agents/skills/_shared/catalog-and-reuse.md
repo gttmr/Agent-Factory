@@ -37,7 +37,7 @@ For each reuse decision, record:
 
 - Write proposal feedback only to `artifacts/af/<req-id>/catalog-delta.yaml` or the Stage Runner Verify proposal path.
 - Do not edit `catalog/*.yaml` from a DLC skill.
-- A proposal may include reusable runtime contracts, deterministic synthetic `runtime_mock` payloads, and registration gaps.
+- Each `proposed_additions[]` item is an Agent, Workflow, or Tool entry. It may carry a deterministic synthetic `runtime_mock`; runtime contract differences belong in that entry's reviewed fields or notes, not in a separate top-level Catalog category.
 - Keep private endpoints, credentials, customer data, deployment scripts, and production logic out of proposals.
 - Proposal existence and Verify apply do not publish an entry.
 
@@ -69,7 +69,7 @@ Stop when reuse compatibility is unproven, publication approval is absent, a pro
 
 ## Checked date
 
-- Checked date: 2026-07-18
+- Checked date: 2026-07-20
 - Official sources: Agent Factory Taxonomy and Operating Model
 - Installed package version: `google-adk 2.3.0`
 - Known compatibility note: Current Catalog proposals and publish APIs are product contracts; `reuse_status` remains the Target governance vocabulary.

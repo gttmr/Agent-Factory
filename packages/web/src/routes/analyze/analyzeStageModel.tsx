@@ -1,17 +1,11 @@
-import type { CatalogHubEntry } from "../../catalog/catalogIndex";
+import type { CatalogHubEntry, CatalogIndex } from "../../catalog/catalogIndex";
 import type { StageNextAction, StageStep } from "../../layout/StageShell";
 
 export type AnalyzeStepId = "run" | "review" | "approve";
 
 export const ANALYZE_STEP_IDS: AnalyzeStepId[] = ["run", "review", "approve"];
 
-export interface AnalyzeCatalogEntry {
-  readonly id?: string;
-  readonly name: string;
-  readonly module_category: "agent" | "workflow" | "adapter" | "remote_a2a";
-  readonly subtype?: string | null;
-  readonly [key: string]: unknown;
-}
+export type AnalyzeCatalogEntry = CatalogHubEntry;
 
 export function buildAnalyzeSteps({
   hasAnalysis,
@@ -104,29 +98,7 @@ export function buildAnalyzeNextAction({
   };
 }
 
-export function flattenCatalogForAnalyzer(
-  index:
-    | { agents: CatalogHubEntry[]; workflows: CatalogHubEntry[]; adapters: CatalogHubEntry[]; remoteA2A: CatalogHubEntry[] }
-    | undefined
-): AnalyzeCatalogEntry[] {
+export function flattenCatalogForAnalyzer(index: CatalogIndex | undefined): AnalyzeCatalogEntry[] {
   if (!index) return [];
-  const groups: Array<[AnalyzeCatalogEntry["module_category"], CatalogHubEntry[]]> = [
-    ["agent", index.agents],
-    ["workflow", index.workflows],
-    ["adapter", index.adapters],
-    ["remote_a2a", index.remoteA2A]
-  ];
-  const result: AnalyzeCatalogEntry[] = [];
-  for (const [moduleCategory, entries] of groups) {
-    for (const entry of entries) {
-      result.push({
-        ...entry,
-        id: entry.id,
-        name: entry.name,
-        module_category: moduleCategory,
-        subtype: entry.subtype ?? null
-      });
-    }
-  }
-  return result;
+  return [...index.agents, ...index.workflows, ...index.tools];
 }

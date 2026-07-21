@@ -1,30 +1,30 @@
 import { toPythonIdentifier } from "../naming.mjs";
 
-export function usesRoutes(processFlow) {
-  return (Array.isArray(processFlow.edges) ? processFlow.edges : []).some((edge) => edge?.edge_kind === "route");
+export function usesRoutes(graph) {
+  return (Array.isArray(graph.edges) ? graph.edges : []).some((edge) => edge?.control?.kind === "condition");
 }
 
-export function routeCasesFor(processFlow, nodeId) {
+export function routeCasesFor(graph, nodeId) {
   const routes = [];
   const seen = new Set();
-  for (const edge of Array.isArray(processFlow.edges) ? processFlow.edges : []) {
-    if (edge?.edge_kind !== "route" || edge.from !== nodeId) continue;
+  for (const edge of Array.isArray(graph.edges) ? graph.edges : []) {
+    if (edge?.control?.kind !== "condition" || edge.from !== nodeId) continue;
     const value = routeValue(edge);
     if (seen.has(value)) continue;
     seen.add(value);
     routes.push({
       value,
       aliases: routeAliases(value, edge),
-      isDefault: edge.is_default_route === true,
-      stateKey: typeof edge.state_key === "string" && edge.state_key.trim() ? edge.state_key.trim() : null,
+      isDefault: edge.control.default === true,
+      stateKey: edge.channel === "state" ? edge.id : null,
       to: typeof edge.to === "string" ? edge.to : null
     });
   }
   return routes;
 }
 
-export function mergedRouteCasesFor(processFlow, nodeId) {
-  return mergeRouteCasesByTarget(routeCasesFor(processFlow, nodeId), (routeCase) => routeCase.to);
+export function mergedRouteCasesFor(graph, nodeId) {
+  return mergeRouteCasesByTarget(routeCasesFor(graph, nodeId), (routeCase) => routeCase.to);
 }
 
 export function mergeRouteCasesByTarget(routeCases, targetFor = (routeCase) => routeCase.target) {
@@ -61,7 +61,7 @@ function canonicalMergedRouteKey(values) {
 }
 
 export function routeValue(edge) {
-  const condition = typeof edge?.route_condition === "string" ? edge.route_condition.trim() : "";
+  const condition = typeof edge?.control?.condition === "string" ? edge.control.condition.trim() : "";
   const match = /(?:choice|route|decision)\s*==\s*["']?([A-Za-z0-9_-]+)["']?/i.exec(condition);
   if (match) return match[1];
   if (/^[A-Za-z0-9_-]+$/.test(condition)) return condition;
@@ -71,7 +71,7 @@ export function routeValue(edge) {
 export function routeAliases(value, edge = null) {
   const normalized = String(value).trim().toLowerCase();
   const aliases = new Set([normalized, normalized.replace(/_/g, " "), normalized.replace(/_/g, "-")]);
-  for (const alias of Array.isArray(edge?.route_aliases) ? edge.route_aliases : []) {
+  for (const alias of Array.isArray(edge?.control?.accepted_aliases) ? edge.control.accepted_aliases : []) {
     if (typeof alias === "string" && alias.trim()) aliases.add(alias.trim().toLowerCase());
   }
   return [...aliases].filter(Boolean);

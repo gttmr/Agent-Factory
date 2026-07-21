@@ -1,4 +1,4 @@
-/* ===== Remote A2A contract panel ===== */
+/* ===== A2A protocol contract panel ===== */
 
 .af-a2a-table {
   width: 100%;
@@ -63,7 +63,7 @@
 }
 
 .af-a2a-readiness-ready {
-  color: var(--cat-adapter, var(--cat-adapter));
+  color: var(--success-text);
 }
 
 .af-a2a-readiness-pending {
@@ -210,8 +210,8 @@
 
 .af-a2a-warning {
   font-size: var(--fs-sm);
-  color: var(--cat-remote);
-  background: var(--cat-remote-soft, var(--cat-remote-soft));
+  color: var(--danger-text);
+  background: var(--danger-soft);
   padding: 8px 10px;
   border-radius: 6px;
 }

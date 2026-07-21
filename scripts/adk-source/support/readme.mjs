@@ -1,6 +1,5 @@
 import { join, relative } from "node:path";
 import { RUNTIME_MCP_LABEL } from "../context.mjs";
-import { graphIndexes } from "../graph/indexes.mjs";
 import { remoteA2aEnvVars, remoteA2aRuntimeRows } from "../remote-a2a.mjs";
 import { sampleConversationTranscript } from "./samples.mjs";
 
@@ -32,14 +31,14 @@ Windows에서는 \`py -3 -m venv .agent-factory\\runtime\\.venv\` 후 \`.agent-f
 ## 이 번들의 역할
 
 - \`root_agent\`는 \`google.adk.workflow.Workflow\` graph입니다. Agent node는 runtime env에 따라
-  vLLM(OpenAI-compatible, \`LiteLlm\`) 또는 Gemini fallback을 쓰는 \`LlmAgent\`이고, adapter node는 deterministic
+  vLLM(OpenAI-compatible, \`LiteLlm\`) 또는 Gemini fallback을 쓰는 \`LlmAgent\`이고, Tool node는 deterministic
   \`FunctionNode\`입니다.
 - graph는 **synthetic input만** 사용합니다. private endpoint, credential, 실제 고객 데이터는 포함하지 않습니다.
 - reviewed workbench artifact에서만 생성되었습니다(\`raw_requirement_to_code=false\`).
 
 ## 설정 변경
 
-\`agents.config.yaml\`에서 각 node의 \`model\`, \`instruction\`, adapter의 \`mcp_url\`을 검토/수정하세요.
+\`agents.config.yaml\`에서 각 node의 \`model\`, \`instruction\`, Tool의 \`url\`을 검토/수정하세요.
 \`agent.py\`가 import 시점에 이 파일을 읽으므로 다음 실행부터 변경이 적용됩니다.
 
 \`.env.example\`을 repository root의 \`.agent-factory/runtime.env\`로 복사하고 공유 runtime secret은 그 파일에 둡니다.
@@ -53,13 +52,13 @@ ${buildRemoteA2aRuntimePolicyMarkdown(context)}
 
 ${buildSampleDialogueMarkdown(context)}
 
-## Adapter와 synthetic MCP provider
+## Tool과 synthetic MCP provider
 
-연결된 adapter는 streamable-HTTP로 실행 중인 synthetic MCP tool을 호출합니다
+연결된 Tool은 streamable-HTTP로 실행 중인 synthetic MCP tool을 호출합니다
 (\`AF_MOCK_LAB_MCP_URL\` base, 기본값 \`http://127.0.0.1:5173/api/mock-lab/mcp\`).
 이 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload와 \`workflow_manifest.json\`에 기록됩니다.
-synthetic MCP server가 binding/running 상태가 아닌 adapter는 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
-\`workflow_manifest.json\`의 \`runtime.unconnected_adapters\`에 표시됩니다.
+synthetic MCP server가 binding/running 상태가 아닌 Tool은 reviewed synthetic mock output을 반환하는 TODO stub으로 남고,
+\`workflow_manifest.json\`의 \`runtime.unconnected_tools\`에 표시됩니다.
 
 ## ADK development UI
 
@@ -71,18 +70,7 @@ curl -X POST http://127.0.0.1:8765/apps/${packageName}/users/af-reviewer/session
 curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @runtime-chat-smoke.json
 \`\`\`
 
-## ADK A2A provider
-
-\`\`\`bash
-AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
-AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
-python af_adk_a2a_server.py --host 127.0.0.1 --port 8001 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
-curl http://127.0.0.1:8001/a2a/${packageName}/.well-known/agent-card.json
-\`\`\`
-
-\`af_adk_a2a_server.py\` uses ADK's FastAPI/Web runner and A2A executor, but applies a local in-memory compatibility patch for ADK CLI versions whose \`api_server --a2a\` path fails before registering \`agent.json\`.
-
-When generated \`RequestInput\` nodes pause the workflow, the local provider keeps that pause as an A2A \`input-required\` task state and exposes the ADK long-running function call as \`adk_request_input\`. Agent Card metadata advertises the ADK A2A extension used by ADK 2.3 for this local executor path, but it does not prove full remote HITL resume support; verify same-task function-response continuation before treating plain chat follow-up as resume.
+${buildA2aProviderMarkdown(context, runtimeEnvPath)}
 `;
   }
   return `# ${packageName}
@@ -115,33 +103,47 @@ curl -X POST http://127.0.0.1:8765/run -H "Content-Type: application/json" -d @r
 `;
 }
 
+function buildA2aProviderMarkdown(context, runtimeEnvPath) {
+  if (context.a2aProviderEnabled !== true) return "";
+  return `## ADK A2A provider
+
+\`\`\`bash
+AF_RUNTIME_ENV_FILE=${runtimeEnvPath} \\
+AF_MOCK_LAB_MCP_URL=http://127.0.0.1:5176/api/mock-lab/mcp \\
+python af_adk_a2a_server.py --host 127.0.0.1 --port 8001 --session_service_uri memory:// --artifact_service_uri memory:// --no-reload --with_ui .
+curl http://127.0.0.1:8001/a2a/${context.packageName}/.well-known/agent-card.json
+\`\`\`
+
+\`af_adk_a2a_server.py\` uses ADK's FastAPI/Web runner and A2A executor, but applies a local in-memory compatibility patch for ADK CLI versions whose \`api_server --a2a\` path fails before registering \`agent.json\`.
+
+When generated \`RequestInput\` nodes pause the workflow, the local provider keeps that pause as an A2A \`input-required\` task state and exposes the ADK long-running function call as \`adk_request_input\`. Agent Card metadata advertises the ADK A2A extension used by ADK 2.3 for this local executor path, but it does not prove full remote HITL resume support; verify same-task function-response continuation before treating plain chat follow-up as resume.
+`;
+}
+
 export function buildImplementationHandoff(context) {
-  const { scaffoldPlan, normalizedRequirement, outputMode, unconnectedAdapters } = context;
-  const todoLines = scaffoldPlan.modules.flatMap((module) =>
-    (module.developer_todos ?? []).map((todo) => `- ${module.name}: ${todo}`)
+  const { scaffoldPlan, normalizedRequirement, outputMode, unconnectedTools = [] } = context;
+  const todoLines = scaffoldPlan.assets.flatMap((asset) =>
+    (asset.developer_todos ?? []).map((todo) => `- ${asset.name}: ${todo}`)
   );
   if (outputMode === "runnable") {
-    const unconnected = unconnectedAdapters.map((module) => `- ${module.name}: synthetic MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
-    const chatProjection = buildChatProjectionHandoffMarkdown(context);
+    const unconnected = unconnectedTools.map((asset) => `- ${asset.name}: synthetic MCP 서버를 binding하거나 합성 stub으로 유지하세요.`);
     return `# 구현 Handoff (runnable mode)
 
 ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었습니다.
 
 ## 현재 실행되는 것
 
-- Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Adapter node는 실제 실행 시점에 synthetic MCP tool을 호출합니다.
+- Agent node는 runtime env에 따라 vLLM(OpenAI-compatible) 또는 Gemini fallback을 호출하고, 연결된 Tool node는 실제 실행 시점에 synthetic MCP tool을 호출합니다.
 - 연결된 MCP 결과는 \`${RUNTIME_MCP_LABEL}\` 라벨과 함께 payload에 기록됩니다.
 - 모든 실행은 합성 input만 사용합니다.
-
-${chatProjection}
 
 ## 반드시 유지할 경계
 
 - 비공개 endpoint, credential, 고객 데이터, 배포 script를 추가하지 마세요.
-- Adapter 호출은 실제 운영 system이 아니라 local synthetic MCP 서버를 향해야 합니다.
+- Tool 호출은 실제 운영 system이 아니라 local synthetic MCP 서버를 향해야 합니다.
 - 동작은 \`agents.config.yaml\`에서 조정하고 공유 secret은 \`.agent-factory/runtime.env\`에 둡니다. secret을 코드에 hard-code하지 마세요.
 
-## 미연결 adapter
+## 미연결 Tool
 
 ${unconnected.length ? unconnected.join("\n") : "- none"}
 
@@ -166,34 +168,6 @@ ${normalizedRequirement.title}의 reviewed scaffold-plan.json에서 생성되었
 
 ${todoLines.length ? todoLines.join("\n") : "- 구현 전에 generated TODO_IMPLEMENT_HERE function을 검토하세요."}
 `;
-}
-
-function buildChatProjectionHandoffMarkdown(context) {
-  const rows = projectedChatAgents(context);
-  if (!rows.length) return "";
-  return `## ADK workflow projection
-
-- ADK 2.3 rejects static Workflow wiring where a chat-mode LlmAgent has a non-START predecessor.
-- The generator lowers these reviewed chat agents as \`single_turn\` and adds session-state/history guidance to the agent instruction: ${rows.join(", ")}.
-- Multi-turn continuity must come from reviewed workflow session state/history inputs, not from an extra local HITL branch.
-`;
-}
-
-function projectedChatAgents(context) {
-  const graph = graphIndexes(context.graphContext);
-  const modules = new Map(context.scaffoldPlan.modules.map((module) => [module.id, module]));
-  return graph.moduleNodes
-    .filter((node) => {
-      const module = modules.get(node.module_id);
-      if (!module || module.module_category !== "agent") return false;
-      const mode = module.agent_execution_mode === "chat" || node.agent_execution_mode === "chat" ? "chat" : "single_turn";
-      if (mode !== "chat") return false;
-      return (context.graphContext.processFlow.edges ?? []).some((edge) => {
-        if (edge?.to !== node.id) return false;
-        return graph.nodesById.get(edge.from)?.node_kind !== "input";
-      });
-    })
-    .map((node) => modules.get(node.module_id)?.name ?? node.module_id);
 }
 
 function runtimeEnvRelativePath({ outputRoot }) {
@@ -225,7 +199,7 @@ function buildRemoteA2aRuntimePolicyMarkdown(context) {
     const auth = row.adk_runtime_policy?.auth;
     const timeout = row.adk_runtime_policy?.timeout_seconds ?? "null";
     const authText = auth?.mode === "none" ? "none" : `${auth?.mode ?? "missing"} via ${auth?.env_var ?? "missing env"}`;
-    return `- ${row.module_name} (${row.contract_id}): timeout_seconds=${timeout}, auth=${authText}`;
+    return `- ${row.agent_name} (${row.contract_id}): timeout_seconds=${timeout}, auth=${authText}`;
   });
   return `## Remote A2A runtime policy
 
@@ -242,7 +216,7 @@ function buildRemoteA2aHandoffMarkdown(context) {
   return `## Remote A2A runtime policy
 
 ${rows
-  .map((row) => `- ${row.module_name} (${row.contract_id}): set reviewed env-backed auth before smoke runs.`)
+  .map((row) => `- ${row.agent_name} (${row.contract_id}): set reviewed env-backed auth before smoke runs.`)
   .join("\n")}
 ${envVars.length ? `- Required env vars: ${envVars.join(", ")}` : "- Required env vars: none"}
 - Remote A2A retry/fallback policy is not generated as an ADK retry wrapper; keep it in operator handoff until an ADK-supported runtime policy is reviewed.

@@ -6,14 +6,14 @@
 
 ## When to read
 
-실제 reusable contract, synthetic mock candidate, registry gap이 발견된 경우에만 읽는다.
+실제 reusable Agent/Workflow/Tool entry, synthetic mock payload, registry gap이 발견된 경우에만 읽는다.
 
 ## Decision criteria
 
 허용 proposal themes:
 
-- reusable runtime contract candidate
-- deterministic synthetic `runtime_mock`
+- reusable Agent, Workflow, or Tool entry; runtime contract 차이는 그 entry의 검토 필드와 notes에 기록한다.
+- Agent, Workflow, or Tool entry 안의 deterministic synthetic `runtime_mock`
 - registration gap
 - Reuse Hub reviewer note
 
@@ -33,10 +33,10 @@ responsibility, I/O, side effect, owner, version, security, runtime contract가 
 
 ## Artifact implications
 
-Stage Runner mode:
+Stage Runner mode에서는 server가 다음 빈 template을 항상 생성하며 Skill이 직접 쓰지 않는다.
 
 ```text
-<run-dir>/proposed-artifacts/catalog-delta.yaml
+<run-dir>/proposed-artifacts/catalog-delta.yaml (server-owned)
 ```
 
 Standalone mode:
@@ -79,5 +79,5 @@ Proposal에서 secret, private endpoint, customer data, deploy, production logic
 
 ## Checked date
 
-- Checked date: 2026-07-18
-- Catalog delta is proposal-only feedback.
+- Checked date: 2026-07-20
+- Catalog delta additions are Agent, Workflow, or Tool entries only and remain proposal-only feedback.

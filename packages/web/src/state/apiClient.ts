@@ -213,7 +213,11 @@ export async function applyStageRun(
   stage: StageRunStage,
   runId: string,
   etag?: string | null
-): Promise<{ ok: true; applied_artifacts: string[] }> {
+): Promise<{
+  ok: true;
+  applied_artifacts: string[];
+  skipped_artifacts: Array<{ path: string; reason: string }>;
+}> {
   const headers: Record<string, string> = {};
   if (etag) headers["If-Match"] = etag;
   const response = await fetch(`/api/af/${encodeURIComponent(reqId)}/stages/${stage}/runs/${encodeURIComponent(runId)}/apply`, {
@@ -221,7 +225,11 @@ export async function applyStageRun(
     headers
   });
   if (!response.ok) throw await readResponseError(response, "stage run 적용에 실패했습니다.");
-  return (await response.json()) as { ok: true; applied_artifacts: string[] };
+  return (await response.json()) as {
+    ok: true;
+    applied_artifacts: string[];
+    skipped_artifacts: Array<{ path: string; reason: string }>;
+  };
 }
 
 export async function cancelStageRun(reqId: string, stage: StageRunStage): Promise<{ ok: true; status: "cancel_requested" }> {

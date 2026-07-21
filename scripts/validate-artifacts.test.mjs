@@ -1,361 +1,658 @@
-import "./artifact-validation/validate-artifacts-saved-analysis.test.mjs";
-import "./artifact-validation/validate-artifacts-graph.test.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import {
-  registrySelectorArtifacts,
-  runValidatorExpectingFailure,
-  tempArtifactRoot,
-  validator,
-  writeJson,
-  writeRegistrySelectorArtifacts
-} from "./artifact-validation/validate-artifacts-test-utils.mjs";
-import {
-  a2aContractStatuses,
-  a2aHttpPaths,
-  a2aOperationNames,
-  a2aPartFields,
-  a2aRoles,
-  a2aRuntimeAuthModes,
-  a2aRuntimeFallbackModes,
-  a2aStreamWrappers,
-  a2aTaskStates,
-  accessProtocols,
-  adapterKinds,
-  agentExecutionModes,
-  agentKinds,
-  categories,
-  graphCallControls,
-  graphContainerKinds,
-  graphDecisionOwners,
-  graphEdgeKinds,
-  graphExecutionSemantics,
-  graphFlowKinds,
-  graphInvokeBindings,
-  graphLaneIds,
-  graphLayoutPolicies,
-  graphNodeKinds,
-  graphPolicies,
-  graphSideEffects,
-  remoteKinds,
-  runtimeContractKinds,
-  runtimeContractStatuses,
-  workflowKinds
-} from "./artifact-validation/constants.mjs";
+import * as rootEnums from "./artifact-validation/constants.mjs";
 
-test("validate-artifacts keeps analyzer, validator, and schema enums aligned", () => {
-  for (const entry of enumAlignmentEntries()) {
-    const analyzerValues = readAnalyzerConstArray(entry.typeConst);
-    assert.deepEqual(analyzerValues, [...entry.validatorSet], `${entry.label}: analyzer types.ts vs validator constants`);
-    for (const schema of entry.schemas) {
-      assert.deepEqual(analyzerValues, readSchemaEnum(schema.file, schema.pointer), `${entry.label}: analyzer types.ts vs ${schema.file} ${schema.pointer}`);
-    }
-  }
-});
+const validator = new URL("./validate-artifacts.mjs", import.meta.url).pathname;
+const schemaRoot = new URL("../schemas/", import.meta.url);
+const webTypesSource = readFileSync(new URL("../packages/web/src/analyzer/types.ts", import.meta.url), "utf8");
+const webValidatorSource = readFileSync(new URL("../packages/web/src/analyzer/targetContract.ts", import.meta.url), "utf8");
+const contractIdentityFixture = JSON.parse(
+  readFileSync(new URL("../templates/skill-scenarios/S07-a2a-consuming/context/analysis-result.json", import.meta.url), "utf8")
+);
+const asyncResumeFixture = JSON.parse(
+  readFileSync(new URL("../templates/skill-scenarios/S11-human-input-resume/context/analysis-result.json", import.meta.url), "utf8")
+);
 
-test("validate-artifacts accepts compatible registry projection selectors on Graph IR and scaffold modules", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-ok-");
-  writeRegistrySelectorArtifacts(artifactRoot, registrySelectorArtifacts());
-  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
-  rmSync(artifactRoot, { recursive: true, force: true });
-  assert.match(output, /Artifact validation OK/);
-});
-
-test("validate-artifacts rejects a Graph IR selector missing from the matching scaffold module", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-graph-only-");
-  const artifacts = registrySelectorArtifacts();
-  delete artifacts.module.adk_skeleton_contract;
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /Graph IR selector .* is not preserved in scaffold module/);
-});
-
-test("validate-artifacts rejects a scaffold selector without matching Graph IR approval", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-scaffold-only-");
-  const artifacts = registrySelectorArtifacts();
-  delete artifacts.node.adk_skeleton_contract;
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /scaffold selector .* has no matching Graph IR approval/);
-});
-
-test("validate-artifacts rejects a registry-selector Graph IR node without a scaffold module", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-missing-scaffold-module-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.plan.modules = artifacts.plan.modules.filter((item) => item.id !== artifacts.module.id);
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /Graph IR selector .* for module .* has no matching scaffold module/);
-});
-
-test("validate-artifacts rejects a registry-selector scaffold module without a Graph IR node", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-missing-graph-node-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.analysis.processFlow.nodes = artifacts.analysis.processFlow.nodes.filter(
-    (item) => item.module_id !== artifacts.module.id
-  );
-  const incomingEdge = artifacts.analysis.processFlow.edges.find((item) => item.to === artifacts.node.id);
-  const outgoingEdge = artifacts.analysis.processFlow.edges.find((item) => item.from === artifacts.node.id);
-  assert.ok(incomingEdge && outgoingEdge);
-  incomingEdge.to = outgoingEdge.to;
-  artifacts.analysis.processFlow.edges = artifacts.analysis.processFlow.edges.filter(
-    (item) => item.from !== artifacts.node.id
-  );
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /scaffold selector .* for module .* has no matching Graph IR node/);
-});
-
-test("validate-artifacts rejects different selector values across Graph IR and scaffold surfaces", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-value-drift-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.module.adk_skeleton_contract.implementation_template = "adapter_placeholder_stub";
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /Graph IR selector .* is not preserved in scaffold module .*adapter_placeholder_stub/);
-});
-
-test("validate-artifacts accepts a non-registry Graph IR template without a scaffold counterpart", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-derived-graph-template-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.node.adk_skeleton_contract.implementation_template = "function_stub";
-  delete artifacts.module.adk_skeleton_contract;
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
-  rmSync(artifactRoot, { recursive: true, force: true });
-  assert.match(output, /Artifact validation OK/);
-});
-
-test("validate-artifacts accepts a derived scaffold template without a Graph IR counterpart", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-derived-scaffold-template-");
-  const artifacts = registrySelectorArtifacts();
-  delete artifacts.node.adk_skeleton_contract;
-  artifacts.module.adk_skeleton_contract.implementation_template = "llm_agent_selection_stub";
-  writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-  const output = execFileSync(process.execPath, [validator, artifactRoot], { encoding: "utf8", stdio: "pipe" });
-  rmSync(artifactRoot, { recursive: true, force: true });
-  assert.match(output, /Artifact validation OK/);
-});
-
-test("validate-artifacts loads split module candidates when validating selector compatibility", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-split-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.candidate.module_category = "agent";
-  artifacts.candidate.agent_kind = "specialist";
-  artifacts.candidate.adapter_kind = null;
-  writeJson(`${artifactRoot}/process-flow.json`, artifacts.analysis.processFlow);
-  writeJson(`${artifactRoot}/module-candidates.json`, artifacts.analysis.moduleCandidates);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /remote_a2a_registry_projection_stub module category must be adapter/);
-});
-
-test("validate-artifacts falls back to embedded candidates for split flows without module-candidates.json", () => {
-  const artifactRoot = tempArtifactRoot("af-validator-registry-selector-embedded-");
-  const artifacts = registrySelectorArtifacts();
-  artifacts.candidate.module_category = "agent";
-  artifacts.candidate.agent_kind = "specialist";
-  artifacts.candidate.adapter_kind = null;
-  writeJson(`${artifactRoot}/process-flow.json`, artifacts.analysis.processFlow);
-  writeJson(`${artifactRoot}/analysis-result.json`, artifacts.analysis);
-  const result = runValidatorExpectingFailure(artifactRoot);
-  assert.match(result.stderr, /process-flow\.json[^\n]*remote_a2a_registry_projection_stub module category must be adapter/);
-});
-
-for (const { name, surface, mutate, expected } of [
-  { name: "wrong category", surface: "graph", mutate: ({ candidate }) => { candidate.module_category = "agent"; candidate.agent_kind = "specialist"; candidate.adapter_kind = null; }, expected: /module category must be adapter/ },
-  { name: "wrong runtime binding", surface: "scaffold", mutate: ({ module }) => { module.runtime_binding = "direct_api"; }, expected: /runtime_binding must be local_function/ },
-  { name: "wrong invoke binding", surface: "graph", mutate: ({ node }) => { node.invoke_binding = "direct_api"; }, expected: /invoke_binding must be local_function or local_python/ },
-  { name: "connected MCP adapter", surface: "scaffold", mutate: ({ module }) => { Object.assign(module, { access_protocol: "mcp", mcp_server: "mock-registry", mcp_tool_name: "lookup_registry", invoke_binding: "mcp_tool", call_control: "fixed_by_workflow" }); }, expected: /must lower through the stub-function path/ },
-  { name: "non-deterministic generation mode", surface: "graph", mutate: ({ node }) => { node.adk_skeleton_contract.generation_mode = "manual"; }, expected: /generation_mode must be deterministic_template/ },
-  { name: "smoke output mode", surface: "scaffold", mutate: ({ plan }) => { plan.output_mode = "smoke"; }, expected: /requires runnable output_mode/ }
-]) {
-  test(`validate-artifacts rejects registry projection selector with ${name} on ${surface}`, () => {
-    const artifactRoot = tempArtifactRoot("af-validator-registry-selector-bad-");
-    const artifacts = registrySelectorArtifacts();
-    if (surface === "graph") delete artifacts.module.adk_skeleton_contract;
-    else delete artifacts.node.adk_skeleton_contract;
-    mutate(artifacts);
-    writeRegistrySelectorArtifacts(artifactRoot, artifacts);
-    const result = runValidatorExpectingFailure(artifactRoot);
-    assert.match(result.stderr, expected);
-  });
-}
-
-const analyzerTypesUrl = new URL("../packages/web/src/analyzer/types.ts", import.meta.url);
-const schemaCache = new Map();
-
-function enumAlignmentEntries() {
-  return [
-    enumEntry("module categories", "moduleCategories", categories, [
-      schemaEnum("module-candidate.schema.json", "/$defs/moduleCategory"),
-      schemaEnum("analysis-result.schema.json", "/$defs/moduleCandidate/properties/module_category")
-    ]),
-    enumEntry("adapter kinds", "adapterKinds", adapterKinds, [
-      schemaEnum("module-candidate.schema.json", "/$defs/adapterKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/moduleCandidate/properties/adapter_kind")
-    ]),
-    enumEntry("agent kinds", "agentKinds", agentKinds, [
-      schemaEnum("module-candidate.schema.json", "/$defs/agentKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/moduleCandidate/properties/agent_kind")
-    ]),
-    enumEntry("workflow kinds", "workflowKinds", workflowKinds, [
-      schemaEnum("module-candidate.schema.json", "/$defs/workflowKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/moduleCandidate/properties/workflow_kind")
-    ]),
-    enumEntry("remote contract kinds", "remoteContractKinds", remoteKinds, [
-      schemaEnum("module-candidate.schema.json", "/$defs/remoteContractKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/moduleCandidate/properties/remote_contract_kind")
-    ]),
-    enumEntry("access protocols", "accessProtocols", accessProtocols, [
-      schemaEnum("module-candidate.schema.json", "/$defs/accessProtocol")
-    ]),
-    enumEntry("agent execution modes", "AGENT_EXECUTION_MODES", agentExecutionModes, [
-      schemaEnum("process-flow.schema.json", "/$defs/agentExecutionMode"),
-      schemaEnum("analysis-result.schema.json", "/$defs/agentExecutionMode")
-    ]),
-    enumEntry("graph node kinds", "GRAPH_NODE_KINDS", graphNodeKinds, [
-      schemaEnum("process-flow.schema.json", "/$defs/nodeKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/node_kind")
-    ]),
-    enumEntry("graph container kinds", "GRAPH_CONTAINER_KINDS", graphContainerKinds, [
-      schemaEnum("process-flow.schema.json", "/$defs/containerKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphContainer/properties/container_kind")
-    ]),
-    enumEntry("graph edge kinds", "GRAPH_EDGE_KINDS", graphEdgeKinds, [
-      schemaEnum("process-flow.schema.json", "/$defs/edgeKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphEdge/properties/edge_kind")
-    ]),
-    enumEntry("graph lane ids", "GRAPH_LANE_IDS", graphLaneIds, [
-      schemaEnum("process-flow.schema.json", "/$defs/laneId"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphLane/properties/id"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/lane_id")
-    ]),
-    enumEntry("graph layout policies", "GRAPH_LAYOUT_POLICIES", graphLayoutPolicies, [
-      schemaEnum("process-flow.schema.json", "/$defs/layoutPolicy"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphContainer/properties/layout_policy")
-    ]),
-    enumEntry("graph execution semantics", "GRAPH_EXECUTION_SEMANTICS", graphExecutionSemantics, [
-      schemaEnum("process-flow.schema.json", "/$defs/executionSemantics"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphEdge/properties/execution_semantics")
-    ]),
-    enumEntry("graph invoke bindings", "GRAPH_INVOKE_BINDINGS", graphInvokeBindings, [
-      schemaEnum("process-flow.schema.json", "/$defs/invokeBinding"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/invoke_binding")
-    ]),
-    enumEntry("graph decision owners", "GRAPH_DECISION_OWNERS", graphDecisionOwners, [
-      schemaEnum("process-flow.schema.json", "/$defs/decisionOwner"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/decision_owner")
-    ]),
-    enumEntry("graph call controls", "GRAPH_CALL_CONTROLS", graphCallControls, [
-      schemaEnum("process-flow.schema.json", "/$defs/callControl"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/call_control"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphEdge/properties/call_control")
-    ]),
-    enumEntry("graph flow kinds", "GRAPH_FLOW_KINDS", graphFlowKinds, [
-      schemaEnum("process-flow.schema.json", "/$defs/flowKind"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphEdge/properties/flow_kind")
-    ]),
-    enumEntry("graph side effects", "GRAPH_SIDE_EFFECTS", graphSideEffects, [
-      schemaEnum("process-flow.schema.json", "/$defs/sideEffect"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/side_effect")
-    ]),
-    enumEntry("graph policies", "GRAPH_POLICIES", graphPolicies, [
-      schemaEnum("process-flow.schema.json", "/$defs/policy"),
-      schemaEnum("analysis-result.schema.json", "/$defs/graphNode/properties/policy")
-    ]),
-    enumEntry("A2A operation names", "A2A_OPERATION_NAMES", a2aOperationNames, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aOperationName"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/operationName")
-    ]),
-    enumEntry("A2A HTTP paths", "A2A_HTTP_PATHS", a2aHttpPaths, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aHttpPath"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/httpPath")
-    ]),
-    enumEntry("A2A task states", "A2A_TASK_STATES", a2aTaskStates, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aTaskState"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/taskState")
-    ]),
-    enumEntry("A2A part fields", "A2A_PART_FIELDS", a2aPartFields, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aPartField"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/partField")
-    ]),
-    enumEntry("A2A roles", "A2A_ROLES", a2aRoles, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aRole"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/role")
-    ]),
-    enumEntry("A2A stream wrappers", "A2A_STREAM_WRAPPERS", a2aStreamWrappers, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aStreamWrapper"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/streamWrapper")
-    ]),
-    enumEntry("A2A contract statuses", "A2A_CONTRACT_STATUSES", a2aContractStatuses, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aContract/properties/contract_status"),
-      schemaEnum("a2a-contract.schema.json", "/$defs/contractStatus")
-    ]),
-    enumEntry("A2A runtime auth modes", "A2A_RUNTIME_AUTH_MODES", a2aRuntimeAuthModes, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aContract/properties/adk_runtime_policy/properties/auth/properties/mode"),
-      schemaEnum("a2a-contract.schema.json", "/properties/adk_runtime_policy/properties/auth/properties/mode")
-    ]),
-    enumEntry("A2A runtime fallback modes", "A2A_RUNTIME_FALLBACK_MODES", a2aRuntimeFallbackModes, [
-      schemaEnum("analysis-result.schema.json", "/$defs/a2aContract/properties/adk_runtime_policy/properties/fallback_handoff/properties/mode"),
-      schemaEnum("a2a-contract.schema.json", "/properties/adk_runtime_policy/properties/fallback_handoff/properties/mode")
-    ]),
-    enumEntry("runtime contract kinds", "RUNTIME_CONTRACT_KINDS", runtimeContractKinds, [
-      schemaEnum("analysis-result.schema.json", "/$defs/runtimeContractKind")
-    ]),
-    enumEntry("runtime contract statuses", "RUNTIME_CONTRACT_STATUSES", runtimeContractStatuses, [
-      schemaEnum("analysis-result.schema.json", "/$defs/runtimeContractStatus")
-    ])
+test("schema, root validator registry, and web analyzer agree on strict enums and required keys", () => {
+  const analysis = schema("analysis-result.schema.json");
+  const candidate = schema("asset-candidate.schema.json");
+  const graph = schema("graph.schema.json");
+  const normalized = schema("normalized-requirement.schema.json");
+  const enumAgreements = [
+    ["assetTypes", rootEnums.assetTypes, candidate.properties.asset_type.enum],
+    ["domainScopes", rootEnums.domainScopes, candidate.properties.domain_scope.enum],
+    ["reuseStatuses", rootEnums.reuseStatuses, candidate.properties.reuse_status.enum],
+    ["bindingKinds", rootEnums.bindingKinds, bindingKinds(candidate)],
+    ["transportKinds", rootEnums.transportKinds, candidate.$defs.connection.properties.transport.enum],
+    ["workflowRepresentations", rootEnums.workflowRepresentations, candidate.$defs.workflowProfile.properties.representation.enum],
+    ["workflowCoordinations", rootEnums.workflowCoordinations, candidate.$defs.workflowProfile.properties.coordination.enum],
+    ["graphNodeKinds", rootEnums.graphNodeKinds, graph.$defs.nodeBase.properties.node_kind.enum],
+    ["graphControlKinds", rootEnums.graphControlKinds, graph.$defs.control.properties.kind.enum],
+    ["graphRegionKinds", rootEnums.graphRegionKinds, graph.$defs.region.properties.kind.enum],
+    ["functionRoles", rootEnums.functionRoles, graph.$defs.node.oneOf[3].properties.role.enum]
   ];
-}
-
-function enumEntry(label, typeConst, validatorSet, schemas) {
-  return { label, typeConst, validatorSet, schemas };
-}
-
-function schemaEnum(file, pointer) {
-  return { file, pointer };
-}
-
-function readAnalyzerConstArray(constName) {
-  const typesText = readFileSync(analyzerTypesUrl, "utf8");
-  const match = new RegExp(`export\\s+const\\s+${constName}\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*as\\s+const`, "m").exec(typesText);
-  assert.ok(match, `packages/web/src/analyzer/types.ts is missing exported const array ${constName}`);
-  const literals = [...match[1].matchAll(/"((?:\\.|[^"\\])*)"/g)].map((literal) => JSON.parse(literal[0]));
-  assert.ok(literals.length > 0, `packages/web/src/analyzer/types.ts ${constName} has no string literals`);
-  return literals;
-}
-
-function readSchemaEnum(file, pointer) {
-  const schema = readSchema(file);
-  const schemaNode = schemaNodeAt(schema, pointer);
-  const enumValues = enumValuesFor(schemaNode);
-  assert.ok(enumValues, `${file} ${pointer} does not resolve to a string enum`);
-  return enumValues;
-}
-
-function readSchema(file) {
-  if (!schemaCache.has(file)) {
-    schemaCache.set(file, JSON.parse(readFileSync(new URL(`../schemas/${file}`, import.meta.url), "utf8")));
+  for (const [name, rootValues, schemaValues] of enumAgreements) {
+    assert.deepEqual(sorted(rootValues), sorted(schemaValues), `${name}: root/schema`);
+    assert.deepEqual(sorted(tsConstArray(webTypesSource, name)), sorted(schemaValues), `${name}: web/schema`);
   }
-  return schemaCache.get(file);
-}
+  const schemaChannels = [null, ...graph.$defs.edge.properties.channel.oneOf[0].enum];
+  assert.deepEqual(sorted(rootEnums.graphChannels), sorted(schemaChannels), "graphChannels: root/schema");
+  assert.deepEqual(sorted(tsConstArray(webTypesSource, "graphChannels")), sorted(schemaChannels.filter(Boolean)), "graphChannels: web/schema");
 
-function schemaNodeAt(schema, pointer) {
-  return pointer
-    .split("/")
-    .slice(1)
-    .reduce((node, segment) => {
-      assert.ok(node && typeof node === "object", `${pointer} is not present`);
-      return node[segment.replace(/~1/g, "/").replace(/~0/g, "~")];
-    }, schema);
-}
+  assert.deepEqual(tsConstArray(webValidatorSource, "TOP_LEVEL_KEYS"), analysis.required);
+  assert.deepEqual(tsConstArray(webValidatorSource, "REQUIRED_CANDIDATE_KEYS"), candidate.required);
+  assert.deepEqual(tsConstArray(webValidatorSource, "NORMALIZED_REQUIREMENT_KEYS"), normalized.required);
+  assert.deepEqual(tsConstArray(webValidatorSource, "EVIDENCE_KEYS"), Object.keys(analysis.$defs.evidence.properties));
+  assert.deepEqual(analysis.$defs.evidence.required, tsConstArray(webValidatorSource, "EVIDENCE_KEYS").filter((key) => key !== "accepted_missing_information"));
+  assert.deepEqual(inlineRequiredKeys(webValidatorSource, "validateGraph"), graph.required);
+  assert.deepEqual(inlineRequiredKeys(webValidatorSource, "validateEdge"), graph.$defs.edge.required);
+  assert.deepEqual(inlineRequiredKeys(webValidatorSource, "validateRegions"), graph.$defs.region.required);
+});
 
-function enumValuesFor(schemaNode) {
-  if (Array.isArray(schemaNode?.enum)) return schemaNode.enum;
-  if (Array.isArray(schemaNode?.anyOf)) {
-    return schemaNode.anyOf.find((option) => Array.isArray(option?.enum))?.enum ?? null;
+test("validator accepts strict Target-only v2 files and target filenames", () => {
+  withRoot((root, analysis) => {
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "asset-candidates.json"), analysis.assetCandidates);
+    writeJson(join(root, "graph-ir.json"), analysis.graph);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects duplicate embedded asset candidate IDs", () => {
+  withRoot((root, analysis) => {
+    analysis.assetCandidates.push(structuredClone(analysis.assetCandidates[0]));
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /assetCandidates\[1\]\.asset_id duplicates agent\.writer/);
+  });
+});
+
+test("validator rejects duplicate embedded A2A and runtime contract IDs", () => {
+  for (const [key, expected] of [
+    ["a2aContracts", /a2aContracts\[1\]\.contract_id duplicates a2a-207/],
+    ["runtimeContracts", /runtimeContracts\[1\]\.contract_id duplicates rtc-s07-a2a-connection/]
+  ]) {
+    withRoot((root) => {
+      const analysis = structuredClone(contractIdentityFixture);
+      analysis[key].push(structuredClone(analysis[key][0]));
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), expected);
+    });
   }
-  return null;
+});
+
+test("validator accepts the reviewed typed async-resume contract", () => {
+  withRoot((root) => {
+    writeJson(join(root, "analysis-result.json"), asyncResumeFixture);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects dangling async-resume Human Input and side-effect Tool references", () => {
+  for (const [field, value, expected] of [
+    ["human_input_node_id", "node-missing-human", /human_input_node_id must reference an existing Human Input Node/],
+    ["side_effect_tool_node_id", "node-missing-tool", /side_effect_tool_node_id must reference the Tool Node/]
+  ]) {
+    withRoot((root) => {
+      const analysis = structuredClone(asyncResumeFixture);
+      analysis.runtimeContracts[0].graph_ir_annotations[field] = value;
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), expected);
+    });
+  }
+});
+
+test("validator rejects async-resume guards with unknown idempotency inputs", () => {
+  withRoot((root) => {
+    const analysis = structuredClone(asyncResumeFixture);
+    analysis.runtimeContracts[0].side_effect_guard.idempotency_key_input = "missing_input";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /idempotency_key_input must reference an input/);
+  });
+});
+
+test("validator rejects duplicate approved async-resume interrupt IDs", () => {
+  withRoot((root) => {
+    const analysis = structuredClone(asyncResumeFixture);
+    analysis.runtimeContracts.push({
+      ...structuredClone(analysis.runtimeContracts[0]),
+      contract_id: "rtc-s11-async-resume-copy",
+      title: "Synthetic duplicate interrupt contract"
+    });
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /resume_policy\.interrupt_id duplicates synthetic-approval-001/);
+  });
+});
+
+test("validator validates normalized-requirement.json when present", () => {
+  withRoot((root, analysis) => {
+    const normalized = structuredClone(analysis.normalizedRequirement);
+    delete normalized.raw_text;
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "normalized-requirement.json"), normalized);
+    assert.match(fail(root), /normalized-requirement\.json\.raw_text is required/);
+  });
+});
+
+test("validator requires normalized requirement, candidates, and Graph IR splits to equal embedded analysis values", () => {
+  for (const [name, embedded, mutate, expected] of [
+    [
+      "normalized-requirement.json",
+      (analysis) => analysis.normalizedRequirement,
+      (split) => { split.title = "Split drift"; },
+      /normalized-requirement\.json must equal analysis-result\.json\.normalizedRequirement/
+    ],
+    [
+      "asset-candidates.json",
+      (analysis) => analysis.assetCandidates,
+      (split) => { split[0].rationale = "Split drift"; },
+      /asset-candidates\.json must equal analysis-result\.json\.assetCandidates/
+    ],
+    [
+      "graph-ir.json",
+      (analysis) => analysis.graph,
+      (split) => { split.graph_id = "graph.split-drift"; },
+      /graph-ir\.json must equal analysis-result\.json\.graph/
+    ]
+  ]) {
+    withRoot((root, analysis) => {
+      const split = structuredClone(embedded(analysis));
+      mutate(split);
+      writeJson(join(root, "analysis-result.json"), analysis);
+      writeJson(join(root, name), split);
+      assert.match(fail(root), expected);
+    });
+  }
+});
+
+test("validator split equality ignores JSON object key order", () => {
+  withRoot((root, analysis) => {
+    const reorderedCandidates = analysis.assetCandidates.map((asset) => Object.fromEntries(Object.entries(asset).reverse()));
+    const reorderedGraph = Object.fromEntries(Object.entries(analysis.graph).reverse());
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "asset-candidates.json"), reorderedCandidates);
+    writeJson(join(root, "graph-ir.json"), reorderedGraph);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects missing strict required fields and nested unknown properties", () => {
+  for (const [label, mutate, expected] of [
+    ["normalized requirement", (analysis) => { delete analysis.normalizedRequirement.raw_text; }, /normalizedRequirement\.raw_text is required/],
+    ["evidence", (analysis) => { delete analysis.evidence.requested_goal; }, /evidence\.requested_goal is required/],
+    ["candidate", (analysis) => { delete analysis.assetCandidates[0].confidence; }, /assetCandidates\[0\]\.confidence is required/],
+    ["node", (analysis) => { delete analysis.graph.nodes[1].label; }, /nodes\[1\]\.label is required/],
+    ["control", (analysis) => { delete analysis.graph.edges[0].control.condition; }, /control\.condition is required/],
+    ["unknown candidate field", (analysis) => { analysis.assetCandidates[0].unexpected = true; }, /assetCandidates\[0\]\.unexpected is not allowed/],
+    ["unknown edge field", (analysis) => { analysis.graph.edges[0].channel_key = "legacy"; }, /edges\[0\]\.channel_key is not allowed/]
+  ]) {
+    withRoot((root, analysis) => {
+      mutate(analysis);
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), expected, label);
+    });
+  }
+});
+
+test("validator permits standalone workflow_ref null and validates non-null Workflow refs", () => {
+  withRoot((root, analysis) => {
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+  withRoot((root, analysis) => {
+    analysis.graph.workflow_ref = "agent.writer";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.workflow_ref must reference a workflow asset/);
+  });
+  withRoot((root, analysis) => {
+    analysis.assetCandidates.unshift(assetCandidate({
+      asset_id: "workflow.target",
+      asset_type: "workflow",
+      binding: null,
+      connection: null,
+      workflow_profile: { representation: "graph", coordination: "explicit", template_ref: null },
+      rationale: "Owns the reviewed graph"
+    }));
+    analysis.graph.workflow_ref = "workflow.target";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects duplicate Graph node and edge IDs", () => {
+  withRoot((root, analysis) => {
+    analysis.graph.nodes.push({ id: "writer", label: "Duplicate writer", node_kind: "join" });
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.nodes\[3\]\.id duplicates writer/);
+  });
+  withRoot((root, analysis) => {
+    analysis.graph.edges.push({
+      id: "edge.input.writer",
+      from: "input",
+      to: "output",
+      control: control("next"),
+      channel: null
+    });
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.edges\[2\]\.id duplicates edge\.input\.writer/);
+  });
+});
+
+test("validator requires each Graph edge endpoint to reference an existing node", () => {
+  for (const endpoint of ["from", "to"]) {
+    withRoot((root, analysis) => {
+      analysis.graph.edges[0][endpoint] = "missing";
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), new RegExp(`graph\\.edges\\[0\\]\\.${endpoint} must reference an existing node`));
+    });
+  }
+});
+
+test("validator accepts valid Graph regions", () => {
+  withRoot((root, analysis) => {
+    analysis.graph.regions = [graphRegion()];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects dangling Graph region node references", () => {
+  for (const key of ["node_ids", "entry_node_ids", "exit_node_ids"]) {
+    withRoot((root, analysis) => {
+      analysis.graph.regions = [graphRegion({ [key]: ["missing"] })];
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), new RegExp(`graph\\.regions\\[0\\]\\.${key} must reference existing nodes`));
+    });
+  }
+});
+
+test("validator requires Graph region entry and exit nodes to belong to node_ids", () => {
+  for (const key of ["entry_node_ids", "exit_node_ids"]) {
+    withRoot((root, analysis) => {
+      analysis.graph.regions = [graphRegion({ node_ids: ["writer"], [key]: ["input"] })];
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), new RegExp(`graph\\.regions\\[0\\]\\.${key} must be contained in node_ids`));
+    });
+  }
+});
+
+test("validator rejects duplicate Graph region IDs and dangling parents", () => {
+  withRoot((root, analysis) => {
+    analysis.graph.regions = [graphRegion(), graphRegion({ node_ids: ["output"], entry_node_ids: ["output"], exit_node_ids: ["output"] })];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.regions\[1\]\.id duplicates region\.main/);
+  });
+  withRoot((root, analysis) => {
+    analysis.graph.regions = [graphRegion({ parent_region_id: "region.missing" })];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.regions\[0\]\.parent_region_id must reference an existing region/);
+  });
+});
+
+test("validator rejects cyclic Graph region parents", () => {
+  withRoot((root, analysis) => {
+    analysis.graph.regions = [
+      graphRegion({ id: "region.first", parent_region_id: "region.second" }),
+      graphRegion({ id: "region.second", parent_region_id: "region.first" })
+    ];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /region\.first has a cyclic parent_region_id chain/);
+  });
+});
+
+test("validator preserves source requirement and typed asset reference consistency", () => {
+  withRoot((root, analysis) => {
+    analysis.assetCandidates[0].source_requirement_id = "req-other";
+    analysis.graph.source_requirement_id = "req-other";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    const stderr = fail(root);
+    assert.match(stderr, /assetCandidates\[0\]\.source_requirement_id must equal normalizedRequirement\.id/);
+    assert.match(stderr, /graph\.source_requirement_id must equal normalizedRequirement\.id/);
+  });
+  withRoot((root, analysis) => {
+    analysis.assetCandidates.push(assetCandidate({ asset_id: "tool.writer", asset_type: "tool" }));
+    analysis.graph.nodes[1].agent_ref = "tool.writer";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /graph\.nodes\[1\]\.agent_ref must reference a agent asset/);
+  });
+  withRoot((root, analysis) => {
+    analysis.graph.nodes[1].available_tools = [{ tool_ref: "agent.writer", invocation_control: "agent" }];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /available_tools\[0\]\.tool_ref must reference a tool asset/);
+  });
+});
+
+test("validator rejects removed artifact filenames", () => {
+  for (const [name, replacement, value] of [
+    ["module-candidates.json", "asset-candidates.json", []],
+    ["process-flow.json", "graph-ir.json", {}],
+    ["commonization-notes.json", "analysis-result.json", {}]
+  ]) {
+    withRoot((root) => {
+      writeJson(join(root, name), value);
+      assert.match(fail(root), new RegExp(`${name.replace(".", "\\.")} is removed; use ${replacement.replace(".", "\\.")}`));
+    });
+  }
+});
+
+test("validator rejects every removed legacy key on assets, nodes, and edges", () => {
+  for (const [surface, key, value] of [
+    ["asset", "module_category", "agent"],
+    ["asset", "adapter_kind", "retrieval"],
+    ["asset", "runtime_binding", "local_function"],
+    ["asset", "mcp_server", "old-server"],
+    ["node", "module_id", "agent.writer"],
+    ["node", "invoke_binding", "local_python"],
+    ["node", "decision_owner", "llm"],
+    ["edge", "edge_kind", "event_output"],
+    ["edge", "flow_kind", "sequence"]
+  ]) {
+    withRoot((root, analysis) => {
+      const target = surface === "asset"
+        ? analysis.assetCandidates[0]
+        : surface === "node"
+          ? analysis.graph.nodes[1]
+          : analysis.graph.edges[0];
+      target[key] = value;
+      writeJson(join(root, "analysis-result.json"), analysis);
+      assert.match(fail(root), new RegExp(`${key} is retired vocabulary`), `${surface}.${key}`);
+    });
+  }
+});
+
+test("validator treats embedded payload schemas as opaque to retired Agent Factory vocabulary", () => {
+  withRoot((root, analysis) => {
+    analysis.assetCandidates[0].inputs = [{
+      name: "payload",
+      type: "object",
+      schema: {
+        type: "object",
+        properties: {
+          module_id: { type: "string" }
+        }
+      }
+    }];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects removed legacy values as asset, node, and edge selectors", () => {
+  withRoot((root, analysis) => {
+    analysis.assetCandidates[0].asset_type = "remote_a2a";
+    analysis.graph.nodes[1].node_kind = "remote_a2a";
+    analysis.graph.edges[0].control.kind = "remote_a2a";
+    writeJson(join(root, "analysis-result.json"), analysis);
+    const stderr = fail(root);
+    assert.match(stderr, /asset_type has invalid enum value/);
+    assert.match(stderr, /nodes\[1\].*(?:schema shape|node_kind)/);
+    assert.match(stderr, /control.kind has invalid enum value/);
+  });
+});
+
+test("validator requires A2A contracts to point to an A2A Agent through agent_ref", () => {
+  withRoot((root, analysis) => {
+    analysis.a2aContracts = [{ contract_id: "a2a-001", remote_module_id: "agent.writer", contract_status: "approved" }];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    const stderr = fail(root);
+    assert.match(stderr, /remote_module_id is retired vocabulary/);
+    assert.match(stderr, /agent_ref is required/);
+  });
+});
+
+test("validator requires every Agent A2A binding or exposure ref to resolve to a contract", () => {
+  withRoot((root) => {
+    const analysis = structuredClone(contractIdentityFixture);
+    analysis.a2aContracts = [];
+    writeJson(join(root, "analysis-result.json"), analysis);
+    assert.match(fail(root), /binding\.contract_ref a2a-207 must reference an A2A contract/);
+  });
+});
+
+test("validator requires a non-empty runtime stub for handoff approval", () => {
+  withRoot((root, analysis) => {
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "af-run-manifest.json"), approvedManifest(root));
+    assert.match(fail(root), /stub_ready_for_followup requires a non-empty runtime-stub/);
+  });
+  withRoot((root, analysis) => {
+    writeJson(join(root, "analysis-result.json"), analysis);
+    mkdirSync(join(root, "runtime-stub"));
+    writeJson(join(root, "af-run-manifest.json"), approvedManifest(root));
+    assert.match(fail(root), /stub_ready_for_followup requires a non-empty runtime-stub/);
+  });
+  withRoot((root, analysis) => {
+    writeJson(join(root, "analysis-result.json"), analysis);
+    mkdirSync(join(root, "runtime-stub"));
+    writeFileSync(join(root, "runtime-stub", "agent.py"), "# generated runtime\n");
+    writeJson(join(root, "af-run-manifest.json"), approvedManifest(root));
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+test("validator rejects scaffold plans that drift from approved Target assets", () => {
+  withRoot((root, analysis) => {
+    const plan = scaffoldPlan(analysis);
+    plan.assets[0].asset_type = "tool";
+    plan.assets[0].binding = { kind: "function", server_ref: null, tool_name: "run" };
+    plan.assets[0].connection = { transport: "in_process" };
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "scaffold-plan.json"), plan);
+    assert.match(fail(root), /drifts from the approved candidate contract/);
+  });
+});
+
+test("validator accepts an explicit Mock Lab MCP binding on an approved Tool projection", () => {
+  withRoot((root, analysis) => {
+    const tool = assetCandidate({
+      asset_id: "tool.lookup",
+      name: "Lookup",
+      asset_type: "tool",
+      binding: { kind: "function" },
+      connection: { transport: "in_process" }
+    });
+    analysis.assetCandidates.push(tool);
+    const plan = scaffoldPlan(analysis);
+    plan.assets[1].binding = { kind: "mcp", server_ref: "mock.lookup", tool_name: "lookup" };
+    plan.assets[1].connection = { transport: "stdio" };
+    writeJson(join(root, "analysis-result.json"), analysis);
+    writeJson(join(root, "scaffold-plan.json"), plan);
+    assert.match(run(root), /Artifact validation OK/);
+  });
+});
+
+function withRoot(callback) {
+  const root = mkdtempSync(join(tmpdir(), "af-validator-target-"));
+  try { callback(root, targetAnalysis()); }
+  finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+function run(root) {
+  return execFileSync(process.execPath, [validator, root], { encoding: "utf8", stdio: "pipe" });
+}
+
+function fail(root) {
+  try { run(root); }
+  catch (error) { return String(error.stderr ?? error.stdout ?? error.message); }
+  assert.fail("validator unexpectedly succeeded");
+}
+
+function targetAnalysis() {
+  const agent = assetCandidate();
+  return {
+    contract_version: "2.0",
+    normalizedRequirement: {
+      id: "req-target",
+      title: "Target",
+      raw_text: "Build a standalone writing Agent",
+      domain: "공통",
+      requester: { team: "platform", role: "developer" },
+      business_goal: "Produce a reviewed response",
+      current_process: [],
+      inputs: [],
+      outputs: [],
+      systems: [],
+      risk_signals: [],
+      missing_information: [],
+      contradictions: [],
+      status: "approved"
+    },
+    evidence: {
+      requested_goal: "Produce a reviewed response",
+      business_domain_hint: "공통",
+      user_role: "developer",
+      input_data: [],
+      output_data: [],
+      systems_mentioned: [],
+      decisions_implied: [],
+      risk_signals: [],
+      missing_information: [],
+      contradictions: [],
+      assumptions: []
+    },
+    assetCandidates: [agent],
+    a2aContracts: [],
+    runtimeContracts: [],
+    graph: {
+      graph_id: "graph.target",
+      source_requirement_id: "req-target",
+      workflow_ref: null,
+      nodes: [
+        { id: "input", label: "Input", node_kind: "input" },
+        { id: "writer", label: "Writer", node_kind: "agent", agent_ref: agent.asset_id, available_tools: [] },
+        { id: "output", label: "Output", node_kind: "output" }
+      ],
+      edges: [
+        { id: "edge.input.writer", from: "input", to: "writer", control: control("next"), channel: null },
+        { id: "edge.writer.output", from: "writer", to: "output", control: control("next"), channel: null }
+      ],
+      regions: []
+    }
+  };
+}
+
+function assetCandidate(overrides = {}) {
+  return {
+    asset_id: "agent.writer",
+    source_requirement_id: "req-target",
+    catalog_entry_id: null,
+    name: "Writer",
+    asset_type: "agent",
+    domain_scope: "domain_neutral",
+    business_domains: [],
+    owner: "platform",
+    reuse_status: "project_only",
+    capability_tags: [],
+    binding: null,
+    connection: null,
+    workflow_profile: null,
+    exposure: null,
+    confidence: 0.9,
+    rationale: "Produces the reviewed response",
+    inputs: [],
+    outputs: [],
+    risk_level: "low",
+    risk_signals: [],
+    status: "approved",
+    missing_information: [],
+    developer_todos: [],
+    ...overrides
+  };
+}
+
+function control(kind, condition = null, acceptedAliases = [], isDefault = false) {
+  return { kind, condition, accepted_aliases: acceptedAliases, default: isDefault };
+}
+
+function graphRegion(overrides = {}) {
+  return {
+    id: "region.main",
+    kind: "parallel",
+    node_ids: ["input", "writer", "output"],
+    entry_node_ids: ["input"],
+    exit_node_ids: ["output"],
+    parent_region_id: null,
+    ...overrides
+  };
+}
+
+function scaffoldPlan(analysis) {
+  return {
+    contract_version: "2.0",
+    requirement_id: analysis.normalizedRequirement.id,
+    source: "approved_workbench_artifact",
+    raw_requirement_to_code: false,
+    output_mode: "runnable",
+    assets: structuredClone(analysis.assetCandidates),
+    graph: structuredClone(analysis.graph),
+    runtime_contracts: [],
+    excluded_assets: [],
+    manifest: { catalog_bound_assets: [], new_code_required: [] },
+    validation: { can_generate_source: true, blockers: [], warnings: [] }
+  };
+}
+
+function approvedManifest(root) {
+  return {
+    requirement_id: "req-target",
+    artifact_root: root,
+    current_stage: "verify",
+    stages: {
+      analyze: { status: "complete", outputs: ["analysis-result.json"] },
+      design: { status: "complete", outputs: ["analysis-result.json", "boundary-design.md"] },
+      build: { status: "complete", outputs: ["runtime-stub/agent.py"] },
+      verify: { status: "pending", outputs: [] }
+    },
+    approvals: {
+      analysis_reviewed: true,
+      boundaries_approved: true,
+      runtime_contracts_approved: true,
+      stub_ready_for_followup: true
+    },
+    validation: { commands: [], last_result: "not_run" }
+  };
+}
+
+function writeJson(path, value) {
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function schema(name) {
+  return JSON.parse(readFileSync(new URL(name, schemaRoot), "utf8"));
+}
+
+function tsConstArray(source, name) {
+  const match = new RegExp(`(?:export\\s+)?const\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\](?:\\s+as const)?;`).exec(source);
+  assert.ok(match, `missing TypeScript array ${name}`);
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+}
+
+function inlineRequiredKeys(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  assert.notEqual(start, -1, `missing web validator function ${functionName}`);
+  const next = source.indexOf("\nfunction ", start + 1);
+  const section = source.slice(start, next === -1 ? source.length : next);
+  const match = /exactKeys\([^,]+,\s*\[[^\]]*\],\s*\[([^\]]*)\]/s.exec(section);
+  assert.ok(match, `missing exactKeys required list in ${functionName}`);
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+}
+
+function bindingKinds(candidateSchema) {
+  const values = [];
+  for (const rawBranch of candidateSchema.$defs.binding.oneOf) {
+    const branch = rawBranch.$ref
+      ? candidateSchema.$defs[rawBranch.$ref.split("/").at(-1)]
+      : rawBranch;
+    const kind = branch.properties.kind;
+    if (Array.isArray(kind.enum)) values.push(...kind.enum);
+    else if (typeof kind.const === "string") values.push(kind.const);
+  }
+  return values;
+}
+
+function sorted(values) {
+  return [...values].sort((left, right) => String(left).localeCompare(String(right)));
 }

@@ -57,7 +57,7 @@ export function AnalyzeReviewWorkspace({
             tone={remainingRequirementMissing === 0 ? "ok" : "warn"}
           />
           <ReviewStatusItem label="Risk signal" value={`${riskSignalCount}개`} tone={riskSignalCount > 0 ? "warn" : "ok"} />
-          <ReviewStatusItem label="후보 모듈" value={`${analysis.moduleCandidates.length}개`} />
+          <ReviewStatusItem label="자산 후보" value={`${analysis.assetCandidates.length}개`} />
         </div>
       </Panel>
 

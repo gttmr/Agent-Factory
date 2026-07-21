@@ -1,103 +1,74 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { buildPublishProposal, getRequiredSubtype, subtypeOptions } from "./catalogPublishProposal.ts";
-import { parseCatalogDelta, type ProposedAddition } from "./catalogDelta.ts";
+import type { AnalysisResult, AssetCandidate } from "../analyzer/types.ts";
 import { validatePublishRequest } from "../../server/catalogPublishValidation.ts";
+import { applyCatalogPin, isCatalogPinCompatible } from "./catalogPin.ts";
+import type { ProposedAddition } from "./catalogDelta.ts";
+import type { CatalogHubEntry } from "./catalogIndex.ts";
+import { buildPublishProposal } from "./catalogPublishProposal.ts";
 
-const adapterProposal: ProposedAddition = {
-  module_category: "adapter",
-  name: "customer_notice_template_mock_adapter",
-  adapter_kind: "template",
-  owner_domain: "고객",
-  responsibility: "고객 안내 템플릿 preview 를 반환한다.",
-  rationale: "Reuse Hub 신규 등록 제안"
+const proposal: ProposedAddition = {
+  asset_id: "tool.customer.notice-template",
+  asset_type: "tool",
+  name: "고객 안내 템플릿 Tool",
+  domain_scope: "domain_specific",
+  business_domains: ["고객"],
+  owner: "AI공통플랫폼팀",
+  reuse_status: "publish_candidate",
+  capability_tags: ["template"],
+  binding: { kind: "function" },
+  connection: { transport: "in_process" },
+  workflow_profile: null,
+  exposure: null
 };
 
-assert.equal(getRequiredSubtype(adapterProposal), "template");
-assert.deepEqual(buildPublishProposal(adapterProposal, ""), {
-  category: "adapter",
-  module_category: "adapter",
-  name: "customer_notice_template_mock_adapter",
-  owner_domain: "고객",
-  responsibility: "고객 안내 템플릿 preview 를 반환한다.",
-  inputs: undefined,
-  outputs: undefined,
-  composition: undefined,
-  notes: "Reuse Hub 신규 등록 제안",
-  source_candidate_id: undefined,
-  adapter_kind: "template"
-});
+assert.deepEqual(buildPublishProposal(proposal), proposal);
+assert.deepEqual(validatePublishRequest("req-target-tool", proposal), []);
+assert.match(
+  validatePublishRequest("req-target-tool", { ...proposal, asset_type: "adapter" }).join("\n"),
+  /agent, workflow, tool/
+);
 
-const workflowProposal: ProposedAddition = {
-  module_category: "workflow",
-  name: "loan_workflow"
+const entry: CatalogHubEntry = {
+  ...proposal,
+  reuse_status: "reuse_existing"
 };
-assert.equal(getRequiredSubtype(workflowProposal), null);
-assert.ok(subtypeOptions(workflowProposal).includes("graph"));
-assert.equal(buildPublishProposal(workflowProposal, "graph").workflow_kind, "graph");
+const candidate = {
+  asset_id: "asset-001",
+  source_requirement_id: "req-test",
+  catalog_entry_id: null,
+  asset_type: "tool",
+  name: "Draft Tool",
+  domain_scope: "domain_specific",
+  business_domains: ["고객"],
+  owner: "고객AI팀",
+  reuse_status: "not_reviewed",
+  capability_tags: [],
+  binding: { kind: "unresolved" },
+  connection: { transport: "unknown" },
+  workflow_profile: null,
+  exposure: null,
+  inputs: [],
+  outputs: []
+} as unknown as AssetCandidate;
+const analysis = {
+  assetCandidates: [candidate],
+  graph: { nodes: [{ id: "node-001", label: "Draft Tool", node_kind: "tool", tool_ref: "asset-001", invocation_control: "workflow" }], edges: [] }
+} as unknown as AnalysisResult;
 
-const remoteA2aWorkflowProposal: ProposedAddition = {
-  module_category: "workflow",
-  name: "remote_review_workflow",
-  workflow_kind: "graph",
-  owner_domain: "analysis",
-  responsibility: "Route review work to an exposed A2A provider.",
-  component_source: "remote_a2a",
-  runtime_binding: "remote_a2a",
-  a2a_provider_req_id: "req-example",
-  inputs: [{ name: "case_id", type: "string" }],
-  outputs: [{ name: "decision", type: "string" }],
-  composition: ["remote-review-agent"],
-  risk_signals: ["audit_required"],
-  required_before_approval: ["provider Agent Card route verified"],
-  contract_status: "a2a_ready",
-  source_candidate_id: "workflow-candidate"
-};
+assert.equal(isCatalogPinCompatible(candidate, entry), true);
+const pinned = applyCatalogPin(analysis, candidate.asset_id, entry);
+assert.equal(pinned.assetCandidates[0]?.asset_id, candidate.asset_id);
+assert.equal(pinned.assetCandidates[0]?.catalog_entry_id, proposal.asset_id);
+const pinnedNode = pinned.graph.nodes[0];
+assert.equal(pinnedNode?.node_kind, "tool");
+assert.equal(pinnedNode?.node_kind === "tool" ? pinnedNode.tool_ref : null, candidate.asset_id);
 
-assert.deepEqual(buildPublishProposal(remoteA2aWorkflowProposal, ""), {
-  category: "workflow",
-  module_category: "workflow",
-  name: "remote_review_workflow",
-  owner_domain: "analysis",
-  responsibility: "Route review work to an exposed A2A provider.",
-  inputs: [{ name: "case_id", type: "string" }],
-  outputs: [{ name: "decision", type: "string" }],
-  composition: ["remote-review-agent"],
-  risk_signals: ["audit_required"],
-  required_before_approval: ["provider Agent Card route verified"],
-  contract_status: "a2a_ready",
-  notes: undefined,
-  source_candidate_id: "workflow-candidate",
-  component_source: "remote_a2a",
-  runtime_binding: "remote_a2a",
-  a2a_provider_req_id: "req-example",
-  workflow_kind: "graph"
-});
-
-const activeWorkflowA2aDelta = readFileSync(
-  new URL("./__fixtures__/workflow-a2a-catalog-delta.yaml", import.meta.url),
-  "utf8"
-);
-const activeWorkflowA2aProposal = parseCatalogDelta(activeWorkflowA2aDelta).proposals[0];
-assert.ok(activeWorkflowA2aProposal);
-const activeWorkflowA2aPublishProposal = buildPublishProposal(
-  activeWorkflowA2aProposal,
-  activeWorkflowA2aProposal.workflow_kind ?? "graph"
-);
-assert.deepEqual(
-  {
-    name: activeWorkflowA2aPublishProposal.name,
-    contract_status: activeWorkflowA2aPublishProposal.contract_status,
-    component_source: activeWorkflowA2aPublishProposal.component_source,
-    runtime_binding: activeWorkflowA2aPublishProposal.runtime_binding,
-    a2a_provider_req_id: activeWorkflowA2aPublishProposal.a2a_provider_req_id
-  },
-  {
-    name: "page_recommendation_required_workflow",
-    contract_status: "a2a_ready",
-    component_source: "remote_a2a",
-    runtime_binding: "remote_a2a",
-    a2a_provider_req_id: "req-page-recommendation-a2a-consumer"
-  }
-);
-assert.deepEqual(validatePublishRequest("req-page-recommendation-required", activeWorkflowA2aPublishProposal), []);
+const agentA2aEntry = {
+  ...entry,
+  asset_id: "agent.remote",
+  asset_type: "agent",
+  binding: { kind: "a2a", contract_ref: "a2a.remote.v1" },
+  connection: { transport: "http" },
+  exposure: { protocol: "a2a", contract_ref: "a2a.remote.v1" }
+} as CatalogHubEntry;
+assert.equal(isCatalogPinCompatible(candidate, agentA2aEntry), false, "pin compatibility is asset_type-only");

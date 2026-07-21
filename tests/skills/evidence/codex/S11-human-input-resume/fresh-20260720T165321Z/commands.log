@@ -1,0 +1,26 @@
+# Ordered command log
+
+## Test agent
+
+| Command or action | Exit | Bounded result |
+| --- | ---: | --- |
+| Read public prompt/context and `af-workflow` | 0 | Detected that the request should go to the scaffold Work Skill, but read the router first |
+| Read `af-scaffold-runtime` and applicable repository material | 0 | Approved standalone runnable path selected |
+| `node scripts/validate-artifacts.mjs scenario-input/context` | 0 | `Artifact validation OK` |
+| `node scripts/generate-adk-source.mjs scenario-input/context scenario-output/runtime` | 0 | Runnable S11 bundle generated under the allowed project output |
+| First two shared-venv relative-path attempts | 127 each | Incorrect relative paths; no product failure |
+| Shared-venv compile and generated pytest | 0 | `4 passed`, four ADK deprecation warnings |
+| Direct generated-node probe | 0 | Stable ID, approve, duplicate result, restart replay, `apply_count=1` |
+| Write `scenario-output/runtime/validation-report.md` | 0 | Runtime evidence and uncertainty recorded |
+| Prohibited-output regex scan | 0 wrapper / scan error | Ripgrep look-ahead was unsupported; not counted as passing evidence |
+| Cleanup attempt for generated caches | rejected | Harness policy rejected broad `rm -rf`; caches remained only in the temporary output |
+
+The test agent created `/tmp/s11_runtime_probe.py` outside `SCENARIO_OUTPUT_ROOT`. It disclosed that path in its report. The evaluator recorded and removed it; the write-boundary deviation remains part of the verdict.
+
+## Evaluator
+
+- Original system-Python evaluator command failed because it did not use the repository's declared shared ADK runtime (`yaml` missing). The evaluator command was corrected rather than treating the failure as a product regression.
+- Updated `verification-commands.txt`: 11/11 commands exited `0`.
+- Shared runtime generated pytest: `4 passed`, four deprecation warnings.
+- Installed ADK Runner regression: stable interrupt ID, restart resume, duplicate and second-invocation apply count, conflicting response, reject, expiry, and wrong-ID branches all passed.
+- Source snapshot and public context comparison: no differences.

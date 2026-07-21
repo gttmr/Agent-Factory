@@ -2,9 +2,9 @@
 
 Mock Lab defines, saves, runs, and tests synthetic MCP stdio mock servers from `MockSpec` files. The default user-facing surface is now the main workbench route `http://127.0.0.1:5173/mock-lab`; this standalone package app remains useful for isolated Mock Lab development.
 
-In the Target Contract, these mocks are MCP test doubles for Tool assets defined by [Taxonomy](../../docs/workbench/taxonomy.md); current Adapter-facing paths and fields are Current Implementation (`legacy`).
+These mocks are local MCP test doubles for Tool assets defined by [Taxonomy](../../docs/workbench/taxonomy.md). Catalog prefill is selected with the `tool` query key.
 
-Running mocks are also re-exposed over network MCP (Streamable HTTP) at `/api/mock-lab/mcp/<key>`, with discovery at `/api/mock-lab/mcp-discovery`, so a generated runnable ADK bundle's Tool connection represented by a `legacy` Adapter contract can call them live. See `docs/mock-lab/local-mcp-mock-lab.md`.
+Running mocks are also re-exposed over network MCP (Streamable HTTP) at `/api/mock-lab/mcp/<key>`, with discovery at `/api/mock-lab/mcp-discovery`, so a generated runnable ADK bundle's Tool connection can call them live. See `docs/mock-lab/local-mcp-mock-lab.md`.
 
 ## Run
 
@@ -17,7 +17,7 @@ Open `http://127.0.0.1:5176/` for the standalone development app. Use `http://12
 
 ## Guardrails
 
-- Current Implementation (`legacy`) `catalog/adapters.yaml` is read-only prefill input.
+- `catalog/tools.yaml` is the only read-only Catalog prefill input. Missing or malformed Tool contracts fail closed.
 - Canonical specs are saved at `artifacts/mock-lab/<mock-id>/mock-spec.json`.
 - Codex draft output is stored separately at `artifacts/mock-lab/<mock-id>/drafts/<draft-id>/draft-spec.json` and must be explicitly loaded into the editor before saving.
 - Server start uses the saved `mock-spec.json`; it does not require generated project files.

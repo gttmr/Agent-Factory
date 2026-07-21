@@ -4,6 +4,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AfRunManifest } from "../src/analyzer/afRunManifest.ts";
+import { buildScaffoldPlan } from "../src/analyzer/scaffoldPlan.ts";
+import { driftAnalysisResult } from "./artifactSyncFixtures.ts";
 import {
   type ArtifactTestRequest,
   createRequester,
@@ -33,10 +35,32 @@ async function assertVerifyRunStreams(request: ArtifactTestRequest): Promise<voi
   assert.equal(events[3]?.data.exit_code, 0);
   assert.equal(events[3]?.data.stdout, "verify stdout line\n");
   assert.equal(events[3]?.data.stderr, "verify stderr line\n");
-  const manifest = responseJson<{ readonly validation: { readonly last_result: string } }>(
+  const manifest = responseJson<{
+    readonly current_stage: string;
+    readonly stages: { readonly verify: { readonly status: string } };
+    readonly validation: { readonly commands: readonly string[]; readonly last_result: string };
+  }>(
     await request({ url: "/req-stream/manifest" })
   );
-  assert.equal(manifest.validation.last_result, "passed");
+  assert.equal(manifest.current_stage, "verify");
+  assert.equal(manifest.stages.verify.status, "pending");
+  assert.equal(manifest.validation.last_result, "not_run");
+  assert.ok(manifest.validation.commands[0]?.startsWith("[validate_artifact_root] passed:"));
+
+  const runtimeResponse = await request({
+    url: "/req-stream/verify/run",
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: { command: "validate_generated_runtime" }
+  });
+  assert.equal(runtimeResponse.status, 200);
+  const completedManifest = responseJson<{
+    readonly stages: { readonly verify: { readonly status: string } };
+    readonly validation: { readonly commands: readonly string[]; readonly last_result: string };
+  }>(await request({ url: "/req-stream/manifest" }));
+  assert.equal(completedManifest.stages.verify.status, "complete");
+  assert.equal(completedManifest.validation.last_result, "passed");
+  assert.ok(completedManifest.validation.commands[1]?.startsWith("[validate_generated_runtime] passed:"));
 }
 
 async function assertRuntimeStubBuildStreams(request: ArtifactTestRequest): Promise<void> {
@@ -64,6 +88,44 @@ async function assertRuntimeStubBuildStreams(request: ArtifactTestRequest): Prom
   assert.deepEqual(listing.files, [{ path: "agent.py", bytes: 22 }]);
 }
 
+async function approveCompose(request: ArtifactTestRequest, reqId: string): Promise<void> {
+  const response = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: {
+      analysis_reviewed: true,
+      boundaries_approved: true,
+      runtime_contracts_approved: true,
+      stub_ready_for_followup: false
+    }
+  });
+  assert.equal(response.status, 200);
+}
+
+async function approveBuildHandoff(request: ArtifactTestRequest, reqId: string): Promise<void> {
+  const response = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { stub_ready_for_followup: true }
+  });
+  assert.equal(response.status, 200);
+}
+
+async function assertVerifyRejectsBeforeBuild(request: ArtifactTestRequest): Promise<void> {
+  const reqId = "req-verify-unready";
+  await createRoot(request, reqId);
+  const response = await request({
+    url: `/${reqId}/verify/run`,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: { command: "validate_artifact_root" }
+  });
+  assert.equal(response.status, 409);
+  assert.match(parseJsonBody<{ readonly error: string }>(response).error, /stub_ready_for_followup|Build/);
+}
+
 async function assertJsonPathsStillWork(request: ArtifactTestRequest): Promise<void> {
   const buildResponse = await request({ url: "/req-json/runtime-stub/build", method: "POST" });
   assert.equal(buildResponse.status, 200);
@@ -81,6 +143,7 @@ async function assertJsonPathsStillWork(request: ArtifactTestRequest): Promise<v
   assert.equal(build.stderr, "build stderr line\n");
   assert.match(build.command, /^node scripts\/generate-adk-source\.mjs /);
   assert.deepEqual(build.files, [{ path: "agent.py", bytes: 22 }]);
+  await approveBuildHandoff(request, "req-json");
 
   const handoffResponse = await request({ url: "/req-json/implementation-handoff.md" });
   assert.equal(handoffResponse.status, 200);
@@ -101,6 +164,242 @@ async function assertJsonPathsStillWork(request: ArtifactTestRequest): Promise<v
   assert.equal(verify.command_key, "validate_artifact_root");
   assert.equal(verify.stdout, "verify stdout line\n");
   assert.equal(verify.stderr, "verify stderr line\n");
+}
+
+async function assertRetiredA2aContractsPathIsNotExposed(
+  request: ArtifactTestRequest,
+  root: string
+): Promise<void> {
+  await writeFile(join(root, "artifacts/af/req-json/a2a-contracts.json"), "[]\n", "utf8");
+
+  for (const method of ["GET", "PUT"] as const) {
+    const response = await request({
+      url: "/req-json/a2a-contracts.json",
+      method,
+      headers: method === "PUT" ? { "content-type": "application/json" } : undefined,
+      body: method === "PUT" ? [] : undefined
+    });
+    assert.equal(response.status, 404);
+    assert.match(
+      parseJsonBody<{ readonly error: string }>(response).error,
+      /알 수 없는 아티팩트 경로입니다: a2a-contracts\.json/
+    );
+  }
+}
+
+async function assertRemovedCommonizationPathIsNotExposed(request: ArtifactTestRequest): Promise<void> {
+  for (const method of ["GET", "PUT"] as const) {
+    const response = await request({
+      url: "/req-json/commonization-notes.json",
+      method,
+      headers: method === "PUT" ? { "content-type": "application/json" } : undefined,
+      body: method === "PUT" ? {} : undefined
+    });
+    assert.equal(response.status, 404);
+    assert.match(parseJsonBody<{ readonly error: string }>(response).error, /알 수 없는 아티팩트 경로/);
+  }
+}
+
+async function assertDerivedJsonCannotBeWrittenDirectly(request: ArtifactTestRequest): Promise<void> {
+  const reqId = "req-derived-write";
+  await createRoot(request, reqId);
+  for (const path of ["normalized-requirement.json", "asset-candidates.json", "graph-ir.json"] as const) {
+    const response = await request({
+      url: `/${reqId}/${path}`,
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: path === "asset-candidates.json" ? [] : {}
+    });
+    assert.equal(response.status, 405, path);
+    assert.match(parseJsonBody<{ readonly error: string }>(response).error, /artifact sync|파생/i);
+    assert.equal((await request({ url: `/${reqId}/${path}` })).status, 404);
+  }
+}
+
+async function assertScaffoldPlanWriteIsFailClosed(request: ArtifactTestRequest): Promise<void> {
+  const reqId = "req-scaffold-write";
+  await createRoot(request, reqId);
+  const analysis = driftAnalysisResult(reqId);
+  assert.equal((await request({
+    url: `/${reqId}/analysis-result.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: analysis
+  })).status, 200);
+
+  const plan = buildScaffoldPlan({
+    normalizedRequirement: analysis.normalizedRequirement,
+    assetCandidates: analysis.assetCandidates,
+    graph: analysis.graph,
+    runtimeContracts: analysis.runtimeContracts
+  });
+  const beforeApproval = await request({
+    url: `/${reqId}/scaffold-plan.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: plan
+  });
+  assert.equal(beforeApproval.status, 409);
+  assert.match(parseJsonBody<{ readonly error: string }>(beforeApproval).error, /boundaries_approved|runtime_contracts_approved/);
+
+  await approveCompose(request, reqId);
+  const malformed = await request({
+    url: `/${reqId}/scaffold-plan.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: {}
+  });
+  assert.equal(malformed.status, 422);
+  assert.match(parseJsonBody<{ readonly error: string }>(malformed).error, /scaffold-plan/);
+  assert.equal((await request({ url: `/${reqId}/scaffold-plan.json` })).status, 404);
+
+  const drifted = await request({
+    url: `/${reqId}/scaffold-plan.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: { ...plan, graph: { ...plan.graph, graph_id: "drifted-plan-graph" } }
+  });
+  assert.equal(drifted.status, 422);
+  assert.match(JSON.stringify(parseJsonBody(drifted)), /graph/i);
+
+  assert.equal((await request({
+    url: `/${reqId}/scaffold-plan.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: plan
+  })).status, 200);
+}
+
+async function assertApprovalPatchesStayHierarchical(request: ArtifactTestRequest): Promise<void> {
+  const reqId = "req-approval-hierarchy";
+  await createRoot(request, reqId);
+
+  const wrongType = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { boundaries_approved: "true" }
+  });
+  assert.equal(wrongType.status, 400);
+
+  const unknown = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { arbitrary_gate: true }
+  });
+  assert.equal(unknown.status, 400);
+
+  const skippedPredecessor = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { runtime_contracts_approved: true }
+  });
+  assert.equal(skippedPredecessor.status, 409);
+  assert.match(parseJsonBody<{ readonly error: string }>(skippedPredecessor).error, /boundaries_approved/);
+
+  await approveCompose(request, reqId);
+  const noStub = await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { stub_ready_for_followup: true }
+  });
+  assert.equal(noStub.status, 409);
+  assert.match(parseJsonBody<{ readonly error: string }>(noStub).error, /runtime-stub/);
+
+  const lowered = responseJson<AfRunManifest>(await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { analysis_reviewed: false }
+  }));
+  assert.deepEqual(lowered.approvals, {
+    analysis_reviewed: false,
+    boundaries_approved: false,
+    runtime_contracts_approved: false,
+    stub_ready_for_followup: false
+  });
+}
+
+async function assertManifestValidationIsServerOwned(request: ArtifactTestRequest): Promise<void> {
+  const before = responseJson<AfRunManifest>(await request({ url: "/req-json/manifest" }));
+  const response = await request({
+    url: "/req-json/manifest/validation",
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { commands: ["forged"], last_result: "passed" }
+  });
+  assert.equal(response.status, 404);
+  assert.deepEqual(responseJson<AfRunManifest>(await request({ url: "/req-json/manifest" })), before);
+}
+
+async function assertAnalysisWritesInvalidateStaleApprovals(request: ArtifactTestRequest): Promise<void> {
+  const reqId = "req-analysis-revision";
+  await createRoot(request, reqId);
+  const analysis = driftAnalysisResult(reqId);
+  assert.equal((await request({
+    url: `/${reqId}/analysis-result.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: analysis
+  })).status, 200);
+  await approveCompose(request, reqId);
+  assert.equal((await request({ url: `/${reqId}/runtime-stub/build`, method: "POST" })).status, 200);
+  await request({
+    url: `/${reqId}/manifest/approvals`,
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: { stub_ready_for_followup: true }
+  });
+  assert.equal((await request({
+    url: `/${reqId}/verify/run`,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: { command: "validate_artifact_root" }
+  })).status, 200);
+
+  const designEdit = {
+    ...analysis,
+    graph: { ...analysis.graph, graph_id: "graph-revised-design" }
+  };
+  assert.equal((await request({
+    url: `/${reqId}/analysis-result.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: designEdit
+  })).status, 200);
+  const afterDesign = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` }));
+  assert.equal(afterDesign.current_stage, "design");
+  assert.equal(afterDesign.approvals.analysis_reviewed, true);
+  assert.equal(afterDesign.approvals.boundaries_approved, false);
+  assert.equal(afterDesign.approvals.runtime_contracts_approved, false);
+  assert.equal(afterDesign.approvals.stub_ready_for_followup, false);
+  assert.equal(afterDesign.stages.design.status, "pending");
+  assert.equal(afterDesign.stages.build.status, "pending");
+  assert.deepEqual(afterDesign.validation, { commands: [], last_result: "not_run" });
+
+  await approveCompose(request, reqId);
+  const analyzeEdit = {
+    ...designEdit,
+    normalizedRequirement: { ...designEdit.normalizedRequirement, title: "Revised requirement" }
+  };
+  assert.equal((await request({
+    url: `/${reqId}/analysis-result.json`,
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: analyzeEdit
+  })).status, 200);
+  const afterAnalyze = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` }));
+  assert.equal(afterAnalyze.current_stage, "analyze");
+  assert.deepEqual(afterAnalyze.approvals, {
+    analysis_reviewed: false,
+    boundaries_approved: false,
+    runtime_contracts_approved: false,
+    stub_ready_for_followup: false
+  });
+  assert.equal(afterAnalyze.stages.analyze.status, "pending");
 }
 
 async function assertVerifyRunRejectsArbitraryCommand(request: ArtifactTestRequest): Promise<void> {
@@ -238,13 +537,26 @@ try {
   process.env.AF_ADK_A2A_PORT = String(await getAvailablePort());
   const request = createRequester(repoRoot);
 
+  await assertVerifyRejectsBeforeBuild(request);
+
   await createRoot(request, "req-stream");
-  await assertVerifyRunStreams(request);
+  await approveCompose(request, "req-stream");
   await assertRuntimeStubBuildStreams(request);
+  await approveBuildHandoff(request, "req-stream");
+  await assertVerifyRunStreams(request);
 
   await createRoot(request, "req-json");
+  await approveCompose(request, "req-json");
   await assertJsonPathsStillWork(request);
+  await assertRetiredA2aContractsPathIsNotExposed(request, repoRoot);
+  await assertRemovedCommonizationPathIsNotExposed(request);
   await assertVerifyRunRejectsArbitraryCommand(request);
+
+  await assertDerivedJsonCannotBeWrittenDirectly(request);
+  await assertScaffoldPlanWriteIsFailClosed(request);
+  await assertApprovalPatchesStayHierarchical(request);
+  await assertManifestValidationIsServerOwned(request);
+  await assertAnalysisWritesInvalidateStaleApprovals(request);
 
   await createRoot(request, "req-runtime");
   await assertRuntimeChatLifecycle(request, repoRoot);

@@ -18,7 +18,7 @@ export interface BuildStageState {
   readonly stubApproved: boolean;
   readonly summary: {
     readonly outputMode: string;
-    readonly moduleCount: number | null;
+    readonly assetCount: number | null;
     readonly runtimeStubFileCount: number;
     readonly stubApproved: boolean;
   };
@@ -59,7 +59,7 @@ export function useBuildStageState(reqId: string | undefined): BuildStageState {
     stubApproved,
     summary: {
       outputMode: scaffoldPlan?.output_mode ?? "smoke",
-      moduleCount: scaffoldPlan?.modules.length ?? null,
+      assetCount: scaffoldPlan?.assets.length ?? null,
       runtimeStubFileCount,
       stubApproved
     }
@@ -70,7 +70,7 @@ export function BuildStageSummary({ summary }: { readonly summary: BuildStageSta
   return (
     <>
       <BuildSummaryItem label="출력 모드" value={summary.outputMode} />
-      <BuildSummaryItem label="모듈" value={summary.moduleCount === null ? "—" : `${summary.moduleCount}개`} />
+      <BuildSummaryItem label="자산" value={summary.assetCount === null ? "—" : `${summary.assetCount}개`} />
       <BuildSummaryItem label="stub 파일" value={`${summary.runtimeStubFileCount}개`} />
       <BuildSummaryItem label="게이트" value={summary.stubApproved ? "stub_ready✓" : "stub_ready·"} />
     </>

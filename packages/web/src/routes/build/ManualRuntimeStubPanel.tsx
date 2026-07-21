@@ -39,7 +39,7 @@ export function ManualRuntimeStubPanel({
         title="Runtime stub 수동 생성"
         description={
           outputMode === "runnable"
-            ? "scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 실행형 ADK 2.3 Workflow(ADK LlmAgent + Mock Lab MCP 어댑터)를 생성합니다. 승인된 artifact 에서만 생성되며 private endpoint/credential/실데이터는 포함하지 않습니다."
+            ? "scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 실행형 ADK 2.3 Workflow(ADK LlmAgent + Mock Lab MCP Tool 연결)를 생성합니다. 승인된 artifact 에서만 생성되며 private endpoint/credential/실데이터는 포함하지 않습니다."
             : "scripts/generate-adk-source.mjs 를 spawn 하여 artifacts/af/<id>/runtime-stub/ 에 synthetic smoke stub 을 생성합니다. business logic 은 TODO 로만 남습니다."
         }
         action={

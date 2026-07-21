@@ -613,21 +613,21 @@
   padding-top: 8px;
 }
 
-.af-mcp-binding-module {
+.af-mcp-binding-asset {
   display: flex;
   flex-direction: column;
   gap: 3px;
   min-width: 0;
 }
 
-.af-mcp-binding-module strong {
+.af-mcp-binding-asset strong {
   color: var(--text-strong);
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 
-.af-mcp-binding-module code,
-.af-mcp-binding-module span {
+.af-mcp-binding-asset code,
+.af-mcp-binding-asset span {
   color: var(--text-muted);
   font-size: var(--fs-xs);
   overflow-wrap: anywhere;

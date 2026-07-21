@@ -1,885 +1,262 @@
 import assert from "node:assert/strict";
+import { buildRuntimeContracts, requiredRuntimeContractKeys, runtimeContractReadinessIssues } from "./runtimeContracts.ts";
 import { buildScaffoldPlan } from "./scaffoldPlan.ts";
-import { buildRuntimeContracts, runtimeContractReadinessIssues } from "./runtimeContracts.ts";
-import type { CatalogEntry } from "../catalog/types.ts";
-import type { AdkSkeletonContract, ModuleCandidate, NormalizedRequirement, ProcessFlow, RuntimeContract } from "./types.ts";
+import { assetCandidate, runtimeContract, strictAnalysisFixture } from "./targetContract.testFixture.ts";
+import type { AssetCandidate, GraphIR, RuntimeContract } from "./types.ts";
 
-const normalizedRequirement: NormalizedRequirement = {
-  id: "req-ko-defaults",
-  title: "페이지 추천 워크플로우",
-  raw_text: "사용자 CDP 데이터를 바탕으로 추천 페이지를 고른다.",
-  domain: "공통",
-  requester: { team: "마케팅", role: "기획자" },
-  business_goal: "사용자에게 적합한 페이지를 추천한다.",
-  current_process: [],
-  inputs: [],
-  outputs: [],
-  systems: [],
-  risk_signals: [],
-  missing_information: [],
-  contradictions: [],
-  status: "approved"
-};
+const analysis = strictAnalysisFixture();
+const plan = buildScaffoldPlan({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: analysis.assetCandidates,
+  graph: analysis.graph,
+  runtimeContracts: []
+});
+assert.equal(plan.contract_version, "2.0");
+assert.equal(plan.raw_requirement_to_code, false);
+assert.equal(plan.assets.length, 2);
+assert.equal(plan.validation.can_generate_source, true);
+assert.equal("modules" in plan, false);
 
-const flow: ProcessFlow = {
-  requirement_id: "req-ko-defaults",
-  graph_id: "graph-req-ko-defaults",
-  root_workflow_module_id: null,
-  nodes: [],
+const emptyPlan = buildScaffoldPlan({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: [],
+  graph: { ...analysis.graph, workflow_ref: null, nodes: [], edges: [], regions: [] }
+});
+assert.equal(emptyPlan.validation.can_generate_source, false);
+assert.ok(emptyPlan.validation.blockers.some((blocker) => blocker.includes("approved Asset")));
+
+function planFor(assetCandidates: AssetCandidate[], graph: GraphIR, runtimeContracts: RuntimeContract[] = []) {
+  return buildScaffoldPlan({
+    normalizedRequirement: analysis.normalizedRequirement,
+    assetCandidates,
+    graph,
+    runtimeContracts
+  });
+}
+
+const deferredWorkflow = { ...analysis.assetCandidates[0]!, status: "deferred" as const };
+const deferredAgent = { ...analysis.assetCandidates[1]!, status: "deferred" as const };
+const approvedTool = assetCandidate({
+  asset_id: "tool.lookup",
+  name: "Lookup Tool",
+  asset_type: "tool",
+  binding: { kind: "function" },
+  connection: { transport: "in_process" }
+});
+const deferredTool = { ...approvedTool, status: "deferred" as const };
+const approvedSubworkflow = assetCandidate({
+  asset_id: "workflow.child",
+  name: "Child Workflow",
+  asset_type: "workflow",
+  workflow_profile: { representation: "graph", coordination: "explicit", template_ref: null }
+});
+const deferredSubworkflow = { ...approvedSubworkflow, status: "deferred" as const };
+
+const referenceCases: Array<{ name: string; assets: AssetCandidate[]; graph: GraphIR; reference: string }> = [
+  { name: "root Workflow", assets: [deferredWorkflow, analysis.assetCandidates[1]!], graph: analysis.graph, reference: "workflow.review" },
+  { name: "Agent Node", assets: [analysis.assetCandidates[0]!, deferredAgent], graph: analysis.graph, reference: "agent.reviewer" },
+  {
+    name: "Tool Node",
+    assets: [analysis.assetCandidates[0]!, deferredTool],
+    graph: { ...analysis.graph, nodes: analysis.graph.nodes.map((node) => node.id === "node-agent" ? { id: "node-agent", label: "Lookup", node_kind: "tool", tool_ref: "tool.lookup", invocation_control: "workflow" } : node) },
+    reference: "tool.lookup"
+  },
+  {
+    name: "available Tool",
+    assets: [analysis.assetCandidates[0]!, analysis.assetCandidates[1]!, deferredTool],
+    graph: { ...analysis.graph, nodes: analysis.graph.nodes.map((node) => node.node_kind === "agent" ? { ...node, available_tools: [{ tool_ref: "tool.lookup", invocation_control: "agent" }] } : node) },
+    reference: "tool.lookup"
+  },
+  {
+    name: "Subworkflow Node",
+    assets: [analysis.assetCandidates[0]!, deferredSubworkflow],
+    graph: { ...analysis.graph, nodes: analysis.graph.nodes.map((node) => node.id === "node-agent" ? { id: "node-agent", label: "Child", node_kind: "subworkflow", workflow_ref: "workflow.child" } : node) },
+    reference: "workflow.child"
+  },
+  {
+    name: "wrong approved Asset type",
+    assets: [analysis.assetCandidates[0]!, approvedTool],
+    graph: { ...analysis.graph, nodes: analysis.graph.nodes.map((node) => node.node_kind === "agent" ? { ...node, agent_ref: approvedTool.asset_id } : node) },
+    reference: "tool.lookup"
+  }
+];
+for (const testCase of referenceCases) {
+  const referencePlan = planFor(testCase.assets, testCase.graph);
+  assert.equal(referencePlan.validation.can_generate_source, false, `${testCase.name} must resolve through the approved projection`);
+  assert.ok(referencePlan.validation.blockers.some((blocker) => blocker.includes(testCase.reference)));
+}
+
+for (const unresolvedApproved of [
+  assetCandidate({ binding: { kind: "unresolved" }, connection: { transport: "unknown" } }),
+  assetCandidate({ binding: { kind: "function" }, connection: { transport: "unknown" } }),
+  assetCandidate({
+    asset_id: "workflow.review",
+    asset_type: "workflow",
+    workflow_profile: { representation: "unresolved", coordination: "explicit", template_ref: null }
+  }),
+  assetCandidate({ missing_information: ["auth"] })
+]) {
+  const unresolvedPlan = planFor([unresolvedApproved], {
+    ...analysis.graph,
+    workflow_ref: null,
+    nodes: [{ id: "node-input", label: "Input", node_kind: "input" }],
+    edges: [],
+    regions: []
+  });
+  assert.equal(unresolvedPlan.validation.can_generate_source, false);
+  assert.ok(unresolvedPlan.validation.blockers.some((blocker) => blocker.includes(unresolvedApproved.asset_id)));
+}
+
+const blockedCandidate = assetCandidate({ asset_id: "tool.write", asset_type: "tool", status: "needs_info", missing_information: ["auth"], binding: { kind: "mcp", server_ref: "mcp.write", tool_name: "write" }, connection: { transport: "http" }, side_effect: "write" });
+const contracts = buildRuntimeContracts({ normalizedRequirement: analysis.normalizedRequirement, assetCandidates: [blockedCandidate] });
+assert.equal(contracts[0]?.asset_id, "tool.write");
+assert.equal(contracts[0]?.contract_kind, "mcp_connection");
+assert.ok(runtimeContractReadinessIssues(contracts[0]!).length > 0);
+const blockedPlan = buildScaffoldPlan({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: [analysis.assetCandidates[0]!, blockedCandidate],
+  graph: analysis.graph,
+  runtimeContracts: contracts,
+  outputMode: "runnable"
+});
+assert.equal(blockedPlan.validation.can_generate_source, false);
+assert.ok(blockedPlan.validation.blockers.some((blocker) => blocker.includes("정보 필요")));
+
+const runtimeCandidate = assetCandidate({
+  asset_id: "tool.runtime-boundary",
+  name: "Runtime Boundary Tool",
+  asset_type: "tool",
+  binding: { kind: "mcp", server_ref: "mcp.runtime", tool_name: "invoke" },
+  connection: { transport: "http" },
+  inputs: [{ name: "change_id", type: "string", required: true }],
+  side_effect: "write",
+  risk_signals: ["human_approval_required", "external_message"]
+});
+const runtimeKeys = requiredRuntimeContractKeys({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: [runtimeCandidate, { ...approvedTool, status: "deferred" }]
+});
+assert.deepEqual(runtimeKeys, [
+  { asset_id: "tool.runtime-boundary", contract_kind: "mcp_connection" },
+  { asset_id: "tool.runtime-boundary", contract_kind: "external_connection" },
+  { asset_id: "tool.runtime-boundary", contract_kind: "context_manager" },
+  { asset_id: "tool.runtime-boundary", contract_kind: "adk_callback" },
+  { asset_id: "tool.runtime-boundary", contract_kind: "callback_broker" },
+  { asset_id: "tool.runtime-boundary", contract_kind: "async_resume" }
+]);
+const a2aRuntimeKeys = requiredRuntimeContractKeys({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: [
+    assetCandidate({
+      asset_id: "agent.remote",
+      binding: { kind: "a2a", contract_ref: "a2a.remote.v1" },
+      connection: { transport: "http" }
+    }),
+    assetCandidate({
+      asset_id: "agent.provider",
+      exposure: { protocol: "a2a", contract_ref: "a2a.provider.v1" }
+    })
+  ]
+});
+assert.deepEqual(a2aRuntimeKeys, [
+  { asset_id: "agent.provider", contract_kind: "external_connection" },
+  { asset_id: "agent.remote", contract_kind: "external_connection" }
+]);
+const runtimeGraph: GraphIR = {
+  ...analysis.graph,
+  workflow_ref: null,
+  nodes: [{ id: "node-tool", label: "Runtime", node_kind: "tool", tool_ref: runtimeCandidate.asset_id, invocation_control: "workflow" }],
   edges: [],
-  containers: [],
-  lanes: [],
-  validation: { ok: true, errors: [], warnings: [] }
+  regions: []
 };
-
-const reviewedInput = [{ name: "user_segment", type: "string", required: true, schema: {} }];
-const reviewedOutput = [{ name: "recommended_page", type: "string", required: true, schema: {} }];
-
-function candidate(overrides: Partial<ModuleCandidate> = {}): ModuleCandidate {
-  return {
-    id: "mod-001",
-    source_requirement_id: "req-ko-defaults",
-    name: "page_recommendation_agent",
-    module_category: "agent",
-    agent_kind: "specialist",
-    workflow_kind: null,
-    adapter_kind: null,
-    remote_contract_kind: null,
-    confidence: 0.9,
-    rationale: "CDP 신호를 해석해 추천 페이지 후보를 좁힌다.",
-    inputs: reviewedInput,
-    outputs: reviewedOutput,
-    reuse_candidate: false,
-    risk_level: "low",
-    risk_signals: [],
-    status: "approved",
-    missing_information: [],
-    developer_todos: [],
-    smoke_spec: {
-      sample_user_message: "신규 방문자에게 보여줄 페이지를 추천해줘.",
-      synthetic_inputs: { user_segment: "new_visitor" },
-      expected_output_shape: {},
-      expected_event_markers: [],
-      mock_sources: [],
-      ready: true
-    },
-    ...overrides
-  };
+const missingRuntimePlan = planFor([runtimeCandidate], runtimeGraph);
+assert.equal(missingRuntimePlan.validation.can_generate_source, false);
+for (const key of runtimeKeys) {
+  assert.ok(missingRuntimePlan.validation.blockers.some((blocker) => blocker.includes(`${key.asset_id}:${key.contract_kind}`)));
 }
 
-function catalogEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
-  return {
-    id: "cat-page-agent",
-    name: "page_recommendation_agent",
-    module_category: "agent",
-    agent_kind: "specialist",
-    component_source: "stub",
-    responsibility: "검토된 CDP 신호만 사용해 추천 페이지를 설명한다.",
-    inputs: reviewedInput,
-    outputs: reviewedOutput,
-    risk_signals: [],
-    provenance: "seeded",
-    ...overrides
-  };
-}
-
-const runnablePlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [candidate()],
-  processFlow: flow,
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-
-const runnableModule = runnablePlan.modules[0];
-assert.ok(runnableModule.instruction?.includes("당신은"), "agent instruction must be Korean-first");
-assert.ok(runnableModule.instruction?.includes("입력"), "agent instruction must describe inputs in Korean");
-assert.ok(runnableModule.instruction?.includes("출력"), "agent instruction must describe outputs in Korean");
-assert.ok(runnableModule.instruction?.includes("검토된 synthetic 입력"), "guardrail must be Korean-first");
-assert.doesNotMatch(runnableModule.instruction ?? "", /You are|Responsibility|Inputs you receive|Outputs you must produce/);
-assert.equal(runnableModule.model, "hosted_vllm/local-model");
-assert.equal(runnableModule.agent_execution_mode, "single_turn");
-assert.ok(runnablePlan.manifest.new_code_required[0].reason.includes("카탈로그"));
-assert.ok(runnableModule.developer_todos.every((todo) => /검토|구현|매핑|자격|승인/.test(todo)));
-assert.ok(
-  runnablePlan.validation.warnings.some((warning) => /LlmAgent smoke TODO skeleton/.test(warning)),
-  "runnable agent warning must say this is a smoke TODO skeleton"
-);
-assert.ok(
-  runnablePlan.validation.warnings.every((warning) => !/fully implemented|generated as/.test(warning)),
-  "runnable warnings must not imply a complete production implementation"
-);
-
-const chatPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [candidate()],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-agent",
-        label: "page_recommendation_agent",
-        module_id: "mod-001",
-        node_kind: "agent",
-        execution_kind: "agent",
-        agent_execution_mode: "chat",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "local_graph",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        review_status: "approved"
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(chatPlan.modules[0].agent_execution_mode, "chat");
-
-const workflowCallPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({
-      id: "mod-risk-workflow",
-      name: "이탈위험 판단 Workflow",
-      module_category: "workflow",
-      agent_kind: null,
-      workflow_kind: "graph",
-      inputs: [{ name: "customer_id", type: "string", required: true }],
-      outputs: [{ name: "risk_result", type: "object", required: true }]
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-risk-workflow",
-        label: "이탈위험 판단 Workflow 호출",
-        module_id: "mod-risk-workflow",
-        node_kind: "workflow_call",
-        execution_kind: "workflow_call",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "local_graph",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        workflow_ref: { id: "wf-risk-check", version: "v1", source: "catalog", display_name: "이탈위험 판단 Workflow" },
-        input_mapping: { customer_id: "$state.customer.id" },
-        output_mapping: { risk_result: "$result" },
-        review_status: "approved"
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-const workflowCallModule = workflowCallPlan.modules[0];
-assert.ok(workflowCallModule);
-assert.ok(workflowCallModule.adk_skeleton_contract);
-assert.equal(workflowCallModule.node_kind, "workflow_call");
-assert.equal(
-  (workflowCallModule as unknown as { invoke_binding?: string | null }).invoke_binding,
-  "internal_workflow",
-  "workflow_call nodes should default to internal_workflow invoke_binding"
-);
-assert.deepEqual(workflowCallModule.workflow_ref, {
-  id: "wf-risk-check",
-  version: "v1",
-  source: "catalog",
-  display_name: "이탈위험 판단 Workflow"
-});
-assert.equal(workflowCallModule.adk_skeleton_contract.scaffold_level, "mock_testable_skeleton");
-assert.equal(workflowCallModule.adk_skeleton_contract.implementation_template, "workflow_call_stub");
-assert.ok(workflowCallModule.developer_todos.some((todo) => todo.includes("workflow_call")));
-
-const mockBindingPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({
-      id: "mod-customer-profile",
-      name: "고객 프로파일 조회",
-      module_category: "adapter",
-      agent_kind: null,
-      adapter_kind: "legacy_api",
-      access_protocol: "mcp",
-      mcp_server: "mock-customer-profile",
-      mcp_tool_name: "get_customer_profile",
-      mcp_schema_ref: "catalog.customer_profile_request.v1",
-      outputs: [{ name: "profile", type: "object", required: true }]
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-profile",
-        label: "고객 프로파일 조회",
-        module_id: "mod-customer-profile",
-        node_kind: "adapter_call",
-        execution_kind: "adapter_call",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "adapter",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        runtime_binding: "mcp_tool",
-        invoke_binding: "mcp_tool",
-        decision_owner: "workflow_code",
-        call_control: "fixed_by_workflow",
-        side_effect: "read",
-        policy: "audit_required",
-        mock_binding: {
-          provider: "mock_lab",
-          package_path: "packages/mock-lab",
-          mock_server_id: "mock-customer-profile",
-          tool_name: "get_customer_profile",
-          input_schema: "catalog.customer_profile_request.v1",
-          output_schema: "catalog.customer_profile_response.v1",
-          sample_response_ref: "mock_samples.customer_profile.basic",
-          status: "linked"
-        },
-        review_status: "approved"
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-const mockBindingModule = mockBindingPlan.modules[0];
-assert.ok(mockBindingModule);
-assert.ok(mockBindingModule.adk_skeleton_contract);
-assert.equal(mockBindingModule.node_kind, "adapter_call");
-assert.equal(mockBindingModule.runtime_binding, "mcp_tool");
-assert.equal((mockBindingModule as unknown as { invoke_binding?: string | null }).invoke_binding, "mcp_tool");
-assert.equal((mockBindingModule as unknown as { decision_owner?: string | null }).decision_owner, "workflow_code");
-assert.equal((mockBindingModule as unknown as { call_control?: string | null }).call_control, "fixed_by_workflow");
-assert.equal((mockBindingModule as unknown as { side_effect?: string | null }).side_effect, "read");
-assert.equal((mockBindingModule as unknown as { policy?: string | null }).policy, "audit_required");
-assert.deepEqual(mockBindingModule.mock_binding, {
-  provider: "mock_lab",
-  package_path: "packages/mock-lab",
-  mock_server_id: "mock-customer-profile",
-  tool_name: "get_customer_profile",
-  input_schema: "catalog.customer_profile_request.v1",
-  output_schema: "catalog.customer_profile_response.v1",
-  sample_response_ref: "mock_samples.customer_profile.basic",
-  status: "linked"
-});
-assert.ok(
-  mockBindingPlan.validation.warnings.some((warning) => /Mock Lab MCP synthetic adapter skeleton/.test(warning)),
-  "runnable MCP adapter warning must describe the synthetic skeleton boundary"
-);
-assert.equal(mockBindingModule.adk_skeleton_contract.implementation_template, "mcp_mock_adapter_stub");
-
-const graphSemanticsPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({ id: "mod-a", name: "A_agent" }),
-    candidate({
-      id: "mod-b",
-      name: "B_adapter",
-      module_category: "adapter",
-      agent_kind: null,
-      adapter_kind: "data_query",
-      inputs: [{ name: "query", type: "string", required: true }],
-      outputs: [{ name: "rows", type: "object", required: true }]
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-a",
-        label: "A_agent",
-        module_id: "mod-a",
-        node_kind: "agent",
-        execution_kind: "agent",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "local_graph",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        review_status: "approved"
-      },
-      {
-        id: "node-b",
-        label: "B_adapter",
-        module_id: "mod-b",
-        node_kind: "adapter_call",
-        execution_kind: "adapter_call",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "adapter",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        // adapter_call is a fixed call node: mcp_tool + fixed_by_workflow.
-        // (LLM-selected toolset semantics — mcp_toolset / selected_by_llm —
-        // belong on an agent node and are rejected by the validator; covered in
-        // validate-artifacts.test.mjs and graphMigration.test.ts.)
-        invoke_binding: "mcp_tool",
-        decision_owner: "workflow_code",
-        call_control: "fixed_by_workflow",
-        side_effect: "read",
-        policy: "timeout_retry_required",
-        input_mapping: { query: "agent_query" },
-        output_mapping: { rows: "adapter_rows" },
-        review_status: "approved"
-      },
-      {
-        id: "node-router",
-        label: "Route",
-        module_id: null,
-        node_kind: "router",
-        execution_kind: null,
-        adk_node_role: "synthetic",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "local_graph",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        review_status: "n/a"
-      }
-    ],
-    edges: [
-      {
-        id: "edge-a-b",
-        from: "node-a",
-        to: "node-b",
-        from_port: null,
-        to_port: null,
-        edge_kind: "session_state",
-        execution_semantics: "fan_out",
-        data_label: "agent_to_adapter",
-        schema_ref: "agent_to_adapter.v1",
-        route_condition: null,
-        state_key: "agent_query",
-        artifact_key: null,
-        a2a_contract_id: null,
-        is_remote_boundary_crossing: false,
-        flow_kind: "fan_out",
-        call_control: "fixed_by_workflow"
-      },
-      {
-        id: "edge-route",
-        from: "node-router",
-        to: "node-b",
-        from_port: null,
-        to_port: null,
-        edge_kind: "route",
-        execution_semantics: "conditional",
-        data_label: "",
-        schema_ref: null,
-        route_condition: "choice == approve",
-        state_key: null,
-        artifact_key: null,
-        a2a_contract_id: null,
-        is_remote_boundary_crossing: false,
-        flow_kind: "route",
-        call_control: "fixed_by_workflow",
-        route_aliases: ["승인"],
-        is_default_route: true
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.invoke_binding, "mcp_tool");
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.decision_owner, "workflow_code");
-assert.equal(graphSemanticsPlan.graph?.nodes.find((node) => node.id === "node-b")?.call_control, "fixed_by_workflow");
-assert.deepEqual(graphSemanticsPlan.modules.find((module) => module.id === "mod-b")?.input_mapping, { query: "agent_query" });
-assert.deepEqual(graphSemanticsPlan.modules.find((module) => module.id === "mod-b")?.output_mapping, { rows: "adapter_rows" });
-assert.equal(graphSemanticsPlan.graph?.edges[0]?.flow_kind, "fan_out");
-assert.equal(graphSemanticsPlan.graph?.edges[0]?.call_control, "fixed_by_workflow");
-assert.equal((graphSemanticsPlan.graph?.edges[0] as { state_key?: string | null } | undefined)?.state_key, "agent_query");
-assert.equal((graphSemanticsPlan.graph?.edges[0] as { schema_ref?: string | null } | undefined)?.schema_ref, "agent_to_adapter.v1");
-const graphSemanticsRouteEdge = graphSemanticsPlan.graph?.edges.find((edge) => edge.id === "edge-route");
-assert.deepEqual((graphSemanticsRouteEdge as { route_aliases?: string[] | null } | undefined)?.route_aliases, [
-  "승인"
-]);
-assert.equal((graphSemanticsRouteEdge as { is_default_route?: boolean | null } | undefined)?.is_default_route, true);
-
-const selectedToolsetPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({
-      id: "mod-toolset-adapter",
-      name: "LLM 선택 Toolset",
-      module_category: "adapter",
-      agent_kind: null,
-      adapter_kind: "data_query",
-      access_protocol: "mcp",
-      mcp_server: "mock-toolset",
-      mcp_tool_name: "lookup_any",
-      inputs: [{ name: "query", type: "string", required: true }],
-      outputs: [{ name: "result", type: "object", required: true }]
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-toolset",
-        label: "LLM 선택 Toolset",
-        module_id: "mod-toolset-adapter",
-        node_kind: "adapter_call",
-        execution_kind: "adapter_call",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "adapter",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        invoke_binding: "mcp_toolset",
-        decision_owner: "llm",
-        call_control: "selected_by_llm",
-        mock_binding: {
-          provider: "mock_lab",
-          package_path: "packages/mock-lab",
-          mock_server_id: "mock-toolset",
-          tool_name: "lookup_any",
-          input_schema: null,
-          output_schema: null,
-          sample_response_ref: null,
-          status: "linked"
-        },
-        adk_skeleton_contract: {
-          scaffold_level: "mock_testable_skeleton",
-          target_runtime: "adk_python_2_x",
-          implementation_template: "mcp_mock_adapter_stub",
-          manual_completion_required: true,
-          developer_todos: ["stale mock adapter metadata"]
-        },
-        review_status: "approved"
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-const selectedToolsetModule = selectedToolsetPlan.modules[0];
-assert.equal(selectedToolsetModule.mock_binding?.status, "missing");
-assert.equal(selectedToolsetModule.adk_skeleton_contract?.scaffold_level, "handoff");
-assert.equal(selectedToolsetModule.adk_skeleton_contract?.implementation_template, "adapter_placeholder_stub");
-
-const registryProjectionContract: AdkSkeletonContract = {
-  scaffold_level: "mock_testable_skeleton",
-  target_runtime: "adk_python_2_x",
-  generation_mode: "deterministic_template",
-  implementation_template: "remote_a2a_registry_projection_stub",
-  manual_completion_required: true,
-  developer_todos: ["review Remote A2A provider projection"]
-};
-const registryProjectionPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({
-      id: "mod-registry-projection",
-      name: "Registry Projection Adapter",
-      module_category: "adapter",
-      agent_kind: null,
-      adapter_kind: "data_query",
-      access_protocol: "local",
-      inputs: [],
-      outputs: [{ name: "registry_payload", type: "object", required: true }]
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "node-registry-projection",
-        label: "Registry Projection Adapter",
-        module_id: "mod-registry-projection",
-        node_kind: "adapter_call",
-        execution_kind: "adapter_call",
-        adk_node_role: "workflow_node",
-        owner_scope: "local",
-        container_id: null,
-        lane_id: "adapter",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        runtime_binding: "local_function",
-        invoke_binding: "local_function",
-        call_control: "fixed_by_workflow",
-        adk_skeleton_contract: registryProjectionContract,
-        review_status: "approved"
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.deepEqual(registryProjectionPlan.modules[0].adk_skeleton_contract, registryProjectionContract);
-assert.ok(
-  registryProjectionPlan.validation.blockers.every((blocker) => !blocker.includes("remote_a2a_registry_projection_stub")),
-  "compatible runnable registry selector must remain blocker-free"
-);
-
-const smokeRegistryProjectionPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [
-    candidate({
-      id: "mod-smoke-registry-projection",
-      name: "Smoke Registry Projection Adapter",
-      module_category: "adapter",
-      agent_kind: null,
-      adapter_kind: "data_query",
-      access_protocol: "local"
-    })
-  ],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        ...flow.nodes[0],
-        id: "node-smoke-registry-projection",
-        label: "Smoke Registry Projection Adapter",
-        module_id: "mod-smoke-registry-projection",
-        node_kind: "adapter_call",
-        execution_kind: "adapter_call",
-        lane_id: "adapter",
-        runtime_binding: "local_function",
-        invoke_binding: "local_function",
-        call_control: "fixed_by_workflow",
-        adk_skeleton_contract: registryProjectionContract
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "smoke"
-});
-assert.equal(smokeRegistryProjectionPlan.modules[0].adk_skeleton_contract?.implementation_template, "adapter_placeholder_stub");
-assert.equal(smokeRegistryProjectionPlan.validation.can_generate_source, false);
-assert.ok(
-  smokeRegistryProjectionPlan.validation.blockers.some(
-    (blocker) =>
-      blocker.includes("Smoke Registry Projection Adapter") &&
-      blocker.includes("remote_a2a_registry_projection_stub") &&
-      blocker.includes("output_mode runnable 필요")
-  ),
-  "smoke derivation must explain why the reviewed registry selector cannot be preserved"
-);
-
-const reusedRegistryCandidate = candidate({
-  id: "mod-reused-registry-projection",
-  name: "Reused Registry Projection Adapter",
-  module_category: "adapter",
-  agent_kind: null,
-  adapter_kind: "data_query",
-  access_protocol: "local",
-  outputs: [{ name: "registry_payload", type: "object", required: true }]
-});
-const reusedRegistryNode: NonNullable<ProcessFlow["nodes"]>[number] = {
-  id: "node-reused-registry-projection-a",
-  label: "Reused Registry Projection Adapter A",
-  module_id: reusedRegistryCandidate.id,
-  node_kind: "adapter_call" as const,
-  execution_kind: "adapter_call",
-  adk_node_role: "workflow_node",
-  owner_scope: "local" as const,
-  container_id: null,
-  lane_id: "adapter" as const,
-  input_ports: [],
-  output_ports: [],
-  schema_refs: [],
-  runtime_binding: "local_function" as const,
-  invoke_binding: "local_function" as const,
-  call_control: "fixed_by_workflow" as const,
-  review_status: "approved" as const
-};
-const conflictingReusedRegistryPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [reusedRegistryCandidate],
-  processFlow: {
-    ...flow,
-    nodes: [
-      reusedRegistryNode,
-      {
-        ...reusedRegistryNode,
-        id: "node-reused-registry-projection-b",
-        label: "Reused Registry Projection Adapter B",
-        adk_skeleton_contract: registryProjectionContract
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(conflictingReusedRegistryPlan.validation.can_generate_source, false);
-assert.ok(
-  conflictingReusedRegistryPlan.validation.blockers.some(
-    (blocker) => blocker.includes(reusedRegistryCandidate.id) && blocker.includes("implementation_template")
-  ),
-  "reused modules with different selector presence must block scaffold-plan derivation"
-);
-
-const identicalReusedRegistryPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [reusedRegistryCandidate],
-  processFlow: {
-    ...flow,
-    nodes: [
-      { ...reusedRegistryNode, adk_skeleton_contract: registryProjectionContract },
-      {
-        ...reusedRegistryNode,
-        id: "node-reused-registry-projection-b",
-        label: "Reused Registry Projection Adapter B",
-        adk_skeleton_contract: structuredClone(registryProjectionContract)
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(identicalReusedRegistryPlan.validation.can_generate_source, true);
-assert.deepEqual(identicalReusedRegistryPlan.modules[0].adk_skeleton_contract, registryProjectionContract);
-assert.ok(
-  identicalReusedRegistryPlan.validation.blockers.every((blocker) => !blocker.includes("implementation_template")),
-  "identical selectors on reused nodes must remain derivable"
-);
-
-const catalogPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [candidate({ catalog_entry_id: "cat-page-agent" })],
-  processFlow: flow,
-  catalogEntries: [catalogEntry()],
-  outputMode: "runnable"
-});
-
-assert.ok(catalogPlan.modules[0].instruction?.includes("검토된 CDP 신호"));
-assert.ok(catalogPlan.modules[0].developer_todos.every((todo) => /catalog|런타임|입력|출력/.test(todo)));
-assert.ok(catalogPlan.validation.warnings.every((warning) => !/generated as|runtime-wiring TODO/.test(warning)));
-
-const catalogIdFirstPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [candidate({ name: "renamed_page_agent", catalog_entry_id: "cat-page-agent" })],
-  processFlow: flow,
-  catalogEntries: [
-    catalogEntry({ id: "wrong-name-match", name: "renamed_page_agent", responsibility: "이름 fallback은 legacy 전용입니다." }),
-    catalogEntry({ id: "cat-page-agent", name: "catalog_original_agent", responsibility: "ID로 고정된 catalog 계약입니다." })
-  ],
-  outputMode: "runnable"
-});
-assert.equal(catalogIdFirstPlan.modules[0].catalog_binding?.catalog_id, "cat-page-agent");
-assert.ok(catalogIdFirstPlan.modules[0].instruction?.includes("ID로 고정된 catalog 계약"));
-
-const runtimeContractWithLabelFields: RuntimeContract = {
-  contract_id: "rtc-mock-lab-label-fields",
-  contract_kind: "mcp_legacy_adapter",
-  module_id: "mod-001",
-  title: "Mock Lab label-field contract",
-  contract_status: "approved",
-  summary: "Synthetic Mock Lab contract",
-  required_review_fields: ["mock_server_id", "tool_name", "data_policy"],
-  reviewer_notes: "",
-  runtime_support: {
-    context_manager_required: false,
-    callback_broker_required: false,
-    human_approval_required: false,
-    idempotency_required: false,
-    audit_required: true,
-    compensation_required: false
-  },
-  operation: {
-    operation_type: "read",
-    side_effect_level: "read_only",
-    callback_expected: false,
-    async_resume_required: false
-  },
-  identifiers: [],
+const readyRuntimeContracts = buildRuntimeContracts({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: [runtimeCandidate]
+}).map((contract) => ({
+  ...contract,
+  contract_status: "approved" as const,
   policies: {
-    auth_policy: "synthetic only",
-    timeout_policy: "local smoke",
-    retry_policy: "none",
-    fallback_policy: "manual review",
-    masking_policy: "synthetic",
-    data_policy: "Synthetic data only"
+    ...contract.policies,
+    auth_policy: "reviewed",
+    timeout_policy: "reviewed",
+    retry_policy: "reviewed"
   },
-  graph_ir_annotations: {
-    mock_server_id: "wf-page-recommendation-mock",
-    tool_name: "search_page_candidates"
-  },
-  synthetic_examples: [],
-  developer_todos: []
-};
-const normalizedContracts = buildRuntimeContracts({
-  normalizedRequirement,
-  moduleCandidates: [],
-  existingContracts: [runtimeContractWithLabelFields]
-});
-assert.deepEqual(normalizedContracts[0].required_review_fields, [
-  "graph_ir_annotations.mock_server_id",
-  "graph_ir_annotations.tool_name",
-  "policies.data_policy"
-]);
-assert.deepEqual(runtimeContractReadinessIssues(normalizedContracts[0]), []);
+  ...(contract.contract_kind === "async_resume" ? {
+    identifiers: ["runtime-boundary-approval-001"],
+    resume_policy: {
+      interrupt_id: "runtime-boundary-approval-001",
+      correlation_scope: "invocation" as const,
+      timeout_seconds: 60,
+      on_timeout: "expire_without_side_effect" as const,
+      duplicate_response: "return_recorded_result" as const,
+      conflicting_response: "reject" as const,
+      restart_policy: "resume_incomplete_replay_completed" as const
+    },
+    side_effect_guard: {
+      tool_ref: runtimeCandidate.asset_id,
+      idempotency_key_input: "change_id",
+      delivery_semantics: "at_most_once" as const,
+      ledger_scope: "session_state" as const
+    }
+  } : {})
+}));
+assert.equal(planFor([runtimeCandidate], runtimeGraph, readyRuntimeContracts).validation.can_generate_source, true);
 
-// --- root workflow candidate exclusion ---
-// The root workflow (root_workflow_module_id) maps to the generated Workflow itself
-// (no graph node), so it must not become a scaffold module or a needs-info blocker.
-const rootFlow: ProcessFlow = { ...flow, root_workflow_module_id: "mod-root" };
-const rootWorkflowCandidate = candidate({
-  id: "mod-root",
-  name: "case_graph_workflow",
-  module_category: "workflow",
-  agent_kind: null,
-  workflow_kind: "graph",
-  status: "needs_info",
-  missing_information: ["루프 정책 확정"]
+const unapprovedRuntimePlan = planFor(
+  [runtimeCandidate],
+  runtimeGraph,
+  readyRuntimeContracts.map((contract, index) => index === 0 ? { ...contract, contract_status: "draft" } : contract)
+);
+assert.equal(unapprovedRuntimePlan.validation.can_generate_source, false);
+assert.ok(unapprovedRuntimePlan.validation.blockers.some((blocker) => blocker.includes("contract_status")));
+
+const duplicateRequiredContract = runtimeContract({
+  ...readyRuntimeContracts[0],
+  contract_id: `${readyRuntimeContracts[0]!.contract_id}-duplicate`
 });
-const childCandidate = candidate({ id: "mod-002", name: "child_agent" });
-const rootPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [rootWorkflowCandidate, childCandidate],
-  processFlow: rootFlow,
-  catalogEntries: [],
+const duplicateRuntimePlan = planFor([runtimeCandidate], runtimeGraph, [...readyRuntimeContracts, duplicateRequiredContract]);
+assert.equal(duplicateRuntimePlan.validation.can_generate_source, false);
+assert.ok(duplicateRuntimePlan.validation.blockers.some((blocker) => blocker.includes("exactly once")));
+
+const standaloneAgentPlan = planFor([analysis.assetCandidates[1]!], { ...analysis.graph, workflow_ref: null });
+assert.equal(standaloneAgentPlan.validation.can_generate_source, true);
+const standaloneToolPlan = planFor([approvedTool], {
+  ...runtimeGraph,
+  nodes: [{ id: "node-tool", label: "Lookup", node_kind: "tool", tool_ref: approvedTool.asset_id, invocation_control: "workflow" }]
+});
+assert.equal(standaloneToolPlan.validation.can_generate_source, true);
+
+for (const graph of [
+  { ...analysis.graph, workflow_ref: null, nodes: [{ id: "node-function", label: "Private", node_kind: "function" as const, role: "transform" as const }] },
+  { ...analysis.graph, workflow_ref: null, nodes: [analysis.graph.nodes[1]!, { id: "node-tool", label: "Lookup", node_kind: "tool" as const, tool_ref: approvedTool.asset_id, invocation_control: "workflow" as const }], edges: [] },
+  { ...analysis.graph, workflow_ref: null, regions: [{ id: "region-1", kind: "parallel" as const, node_ids: ["node-agent"], entry_node_ids: ["node-agent"], exit_node_ids: ["node-agent"], parent_region_id: null }] }
+]) {
+  const ownershipPlan = planFor([analysis.assetCandidates[1]!, approvedTool], graph as GraphIR);
+  assert.equal(ownershipPlan.validation.can_generate_source, false);
+  assert.ok(ownershipPlan.validation.blockers.some((blocker) => blocker.includes("owning approved Workflow")));
+}
+
+const cyclicStaticGraph = structuredClone(analysis.graph);
+cyclicStaticGraph.edges.push({
+  id: "edge-cycle",
+  from: "node-agent",
+  to: "node-agent",
+  control: { kind: "next", condition: null, accepted_aliases: [], default: false },
+  channel: "event"
+});
+const cyclicStaticPlan = buildScaffoldPlan({
+  normalizedRequirement: analysis.normalizedRequirement,
+  assetCandidates: analysis.assetCandidates,
+  graph: cyclicStaticGraph,
+  runtimeContracts: [],
   outputMode: "runnable"
 });
-assert.deepEqual(rootPlan.modules.map((m) => m.id), ["mod-002"], "root workflow candidate must be excluded from scaffold modules");
-assert.ok(rootPlan.excluded_modules.some((m) => m.id === "mod-root"), "root workflow candidate should be listed in excluded_modules");
-assert.ok(
-  rootPlan.validation.blockers.every((b) => !b.includes("정보 필요 후보")),
-  "root workflow's needs_info must not produce a scaffold blocker"
-);
-assert.equal(rootPlan.validation.can_generate_source, true, "plan with the root excluded and an approved child should be generatable");
-
-const dynamicWorkflowCandidate = candidate({
-  id: "mod-dynamic-wf",
-  name: "이탈위험 동적 Workflow",
-  module_category: "workflow",
-  agent_kind: null,
-  workflow_kind: "dynamic"
-});
-const dynamicRunnablePlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [dynamicWorkflowCandidate],
-  processFlow: {
-    ...flow,
-    containers: [
-      {
-        id: "container-dynamic",
-        module_id: null,
-        label: "Dynamic region",
-        container_kind: "dynamic_workflow",
-        adk_mapping: null,
-        contains_node_ids: [],
-        entry_node_ids: [],
-        exit_node_ids: [],
-        layout_policy: "free",
-        parent_container_id: null
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(
-  dynamicRunnablePlan.validation.can_generate_source,
-  true,
-  "runnable plan with a dynamic workflow module can use the internal dynamic builder"
-);
-assert.ok(
-  dynamicRunnablePlan.validation.blockers.every((b) => !b.includes("Dynamic Workflow")),
-  "dynamic workflow module should not produce a workflow_call redirect blocker"
-);
-assert.ok(
-  dynamicRunnablePlan.validation.blockers.every((b) => !b.includes("dynamic_workflow container")),
-  "dynamic_workflow container should not produce a blocker"
-);
-
-const loopWithoutReviewedDecisionPlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [candidate()],
-  processFlow: {
-    ...flow,
-    nodes: [
-      {
-        id: "loop-control",
-        label: "loop-control",
-        module_id: null,
-        node_kind: "loop_control",
-        execution_kind: null,
-        adk_node_role: "synthetic",
-        owner_scope: "local",
-        container_id: "container-loop",
-        lane_id: "local_graph",
-        input_ports: [],
-        output_ports: [],
-        schema_refs: [],
-        review_status: "approved"
-      }
-    ],
-    edges: [
-      {
-        id: "loop-back",
-        from: "loop-control",
-        to: "loop-control",
-        from_port: null,
-        to_port: null,
-        edge_kind: "control",
-        execution_semantics: "loop_back",
-        data_label: "retry",
-        schema_ref: null,
-        route_condition: null,
-        state_key: null,
-        artifact_key: null,
-        a2a_contract_id: null,
-        is_remote_boundary_crossing: false
-      },
-      {
-        id: "loop-exit",
-        from: "loop-control",
-        to: "loop-control",
-        from_port: null,
-        to_port: null,
-        edge_kind: "control",
-        execution_semantics: "loop_exit",
-        data_label: "done",
-        schema_ref: null,
-        route_condition: null,
-        state_key: null,
-        artifact_key: null,
-        a2a_contract_id: null,
-        is_remote_boundary_crossing: false
-      }
-    ]
-  },
-  catalogEntries: [],
-  outputMode: "runnable"
-});
-assert.equal(
-  loopWithoutReviewedDecisionPlan.validation.can_generate_source,
-  false,
-  "runnable loop plan without reviewed loop decisions must not be generatable"
-);
-assert.ok(
-  loopWithoutReviewedDecisionPlan.validation.blockers.some((b) => b.includes("route_condition") || b.includes("route_aliases")),
-  "loop_control should request reviewed loop decision conditions"
-);
-
-const dynamicSmokePlan = buildScaffoldPlan({
-  normalizedRequirement,
-  moduleCandidates: [dynamicWorkflowCandidate],
-  processFlow: flow,
-  catalogEntries: [],
-  outputMode: "smoke"
-});
-assert.ok(
-  dynamicSmokePlan.validation.blockers.every((b) => !b.includes("Dynamic Workflow")),
-  "smoke mode must not block a dynamic workflow handoff"
-);
+assert.equal(cyclicStaticPlan.validation.can_generate_source, false);
+assert.ok(cyclicStaticPlan.validation.blockers.some((blocker) => /representation graph.*cycle/i.test(blocker)));
+console.log("Target scaffold plan tests passed");

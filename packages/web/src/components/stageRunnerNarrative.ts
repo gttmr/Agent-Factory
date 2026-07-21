@@ -31,6 +31,12 @@ export function selectStageRunnerNarrative(events: readonly StageRunnerNarrative
   };
 }
 
+export function stageRunCompletionMessage(stage: StageRunStage): string {
+  return stage === "build"
+    ? "runtime-stub이 canonical 경로에 생성되고 run 이력이 기록되었습니다. Build에는 별도 제안 적용 단계가 없습니다."
+    : "run output 이 생성되었습니다. canonical artifact 는 아직 변경되지 않았습니다.";
+}
+
 export function selectProcessLog(events: readonly StageRunnerNarrativeEvent[]): string | null {
   const processEvents: Array<{ readonly stream: string; readonly snippet: string }> = [];
   for (const event of events) {
@@ -103,3 +109,4 @@ function parseTodoLine(line: string): TodoItem | null {
 function isTodoItem(item: TodoItem | null): item is TodoItem {
   return item !== null;
 }
+import type { StageRunStage } from "../state/apiClient";

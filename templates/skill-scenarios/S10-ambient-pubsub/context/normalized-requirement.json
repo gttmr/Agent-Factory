@@ -1,0 +1,49 @@
+{
+  "id": "req-s10-event-processing",
+  "title": "Synthetic external event processing design",
+  "raw_text": "Review a synthetic external event delivery design with normalization, one session per delivery identity, bounded retry, and an exhausted-failure handoff, without claiming unsupported runtime generation.",
+  "domain": "synthetic-event-processing",
+  "requester": {
+    "team": "scenario-fixture-team",
+    "role": "reviewer"
+  },
+  "business_goal": "Preserve a reviewed external event-processing boundary while stopping source generation until the generic runtime supports the event source, retry, and DLQ behavior.",
+  "current_process": [
+    "Receive an opaque synthetic delivery at the external runtime boundary",
+    "Validate and normalize the delivery envelope",
+    "Create one logical session for the delivery identity",
+    "Process the normalized synthetic event",
+    "Apply bounded retry and hand exhausted failures to an external dead-letter boundary"
+  ],
+  "inputs": [
+    {
+      "name": "synthetic_delivery",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "processing_outcome",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "systems": [
+    {
+      "name": "synthetic_external_event_source",
+      "access": "read"
+    },
+    {
+      "name": "synthetic_result_boundary",
+      "access": "write"
+    }
+  ],
+  "risk_signals": [
+    "external_message",
+    "audit_required"
+  ],
+  "missing_information": [],
+  "contradictions": [],
+  "status": "approved"
+}

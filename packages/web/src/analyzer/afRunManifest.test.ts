@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { parseAfRunManifest, serializeAfRunManifest, summarizeAfRunManifest } from "./afRunManifest.ts";
 
-const manifest = parseAfRunManifest(
-  JSON.stringify({
+const manifestValue = {
     requirement_id: "req-001",
     artifact_root: "artifacts/af/req-001",
     current_stage: "design",
@@ -37,14 +36,13 @@ const manifest = parseAfRunManifest(
         codex: {
           backend: "sdk",
           thread_id: "thread-001",
-          event_count: 7,
-          usage: {
-            input_tokens: 1
-          }
+          event_count: 7
         }
       }
     }
-  }),
+  };
+const manifest = parseAfRunManifest(
+  JSON.stringify(manifestValue),
   "af-run-manifest.json"
 );
 
@@ -62,6 +60,7 @@ assert.deepEqual(manifest.stage_runs?.analyze?.codex, {
   event_count: 7
 });
 assert.equal(manifest.stage_runs?.design, undefined);
+assert.deepEqual(manifest, manifestValue, "valid manifests must parse without projection loss");
 
 const summary = summarizeAfRunManifest(manifest);
 assert.equal(summary.stageLabel, "설계");
@@ -76,7 +75,11 @@ const serialized = serializeAfRunManifest(manifest);
 assert.ok(serialized.endsWith("\n"));
 assert.equal(JSON.parse(serialized).requirement_id, "req-001");
 assert.equal(JSON.parse(serialized).stage_runs.analyze.skill_name, "af-discover-assets");
-assert.equal(JSON.parse(serialized).stage_runs.analyze.codex.usage, undefined);
+assert.deepEqual(JSON.parse(serialized), manifestValue, "valid parse/serialize must round-trip deeply");
+
+const emptyStageRunsValue = { ...manifestValue, stage_runs: {} };
+const emptyStageRunsManifest = parseAfRunManifest(JSON.stringify(emptyStageRunsValue), "empty-stage-runs.json");
+assert.deepEqual(JSON.parse(serializeAfRunManifest(emptyStageRunsManifest)), emptyStageRunsValue);
 
 const historicalManifestValue = JSON.parse(serialized);
 historicalManifestValue.stage_runs.analyze.skill_name = "historical-custom-skill";
@@ -84,5 +87,71 @@ const historicalManifest = parseAfRunManifest(JSON.stringify(historicalManifestV
 assert.equal(historicalManifest.stage_runs?.analyze?.skill_name, "historical-custom-skill");
 assert.equal(JSON.parse(serializeAfRunManifest(historicalManifest)).stage_runs.analyze.skill_name, "historical-custom-skill");
 
+const unknownFieldCases = [
+  { ...manifestValue, extension: true },
+  { ...manifestValue, stages: { ...manifestValue.stages, extension: {} } },
+  { ...manifestValue, stages: { ...manifestValue.stages, analyze: { ...manifestValue.stages.analyze, extension: true } } },
+  { ...manifestValue, approvals: { ...manifestValue.approvals, extension: true } },
+  { ...manifestValue, validation: { ...manifestValue.validation, extension: true } },
+  { ...manifestValue, stage_runs: { ...manifestValue.stage_runs, analyze: { ...manifestValue.stage_runs.analyze, extension: true } } },
+  {
+    ...manifestValue,
+    stage_runs: {
+      ...manifestValue.stage_runs,
+      analyze: {
+        ...manifestValue.stage_runs.analyze,
+        codex: { ...manifestValue.stage_runs.analyze.codex, usage: { input_tokens: 1 } }
+      }
+    }
+  }
+];
+for (const unknownFieldCase of unknownFieldCases) {
+  assert.throws(() => parseAfRunManifest(JSON.stringify(unknownFieldCase), "unknown.json"), /알 수 없는 필드/);
+}
+
 assert.throws(() => parseAfRunManifest("[]", "bad.json"), /object/);
 assert.throws(() => parseAfRunManifest(JSON.stringify({ requirement_id: "" }), "bad.json"), /requirement_id/);
+assert.throws(
+  () => parseAfRunManifest(JSON.stringify({ ...JSON.parse(serialized), current_stage: undefined }), "bad.json"),
+  /current_stage/
+);
+assert.throws(
+  () =>
+    parseAfRunManifest(
+      JSON.stringify({ ...JSON.parse(serialized), stages: { ...JSON.parse(serialized).stages, build: { status: "done", outputs: [] } } }),
+      "bad.json"
+    ),
+  /stages\.build\.status/
+);
+assert.throws(
+  () =>
+    parseAfRunManifest(
+      JSON.stringify({ ...JSON.parse(serialized), approvals: { ...JSON.parse(serialized).approvals, boundaries_approved: undefined } }),
+      "bad.json"
+    ),
+  /approvals\.boundaries_approved/
+);
+assert.throws(
+  () =>
+    parseAfRunManifest(
+      JSON.stringify({ ...JSON.parse(serialized), validation: { commands: ["ok", 1], last_result: "passed" } }),
+      "bad.json"
+    ),
+  /validation\.commands/
+);
+assert.throws(
+  () =>
+    parseAfRunManifest(
+      JSON.stringify({
+        ...JSON.parse(serialized),
+        approvals: {
+          analysis_reviewed: true,
+          boundaries_approved: false,
+          runtime_contracts_approved: true,
+          stub_ready_for_followup: false
+        }
+      }),
+      "bad.json"
+    ),
+  /runtime_contracts_approved.*boundaries_approved/
+);

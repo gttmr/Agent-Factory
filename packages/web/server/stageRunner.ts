@@ -1,6 +1,8 @@
-import { randomBytes } from "node:crypto";
-import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import { appendFile, lstat, mkdir, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
+import { promisify } from "node:util";
 import { Codex, type ThreadEvent, type ThreadItem, type Usage } from "@openai/codex-sdk";
 import type {
   AfRunManifest,
@@ -8,8 +10,14 @@ import type {
   AfStageRunManifestEntry,
   AfStageRunStatus
 } from "../src/analyzer/afRunManifest";
-import { normalizeAnalysisResultForWorkbench } from "../src/analyzer/analysisResultNormalization";
-import type { AnalysisResult, CodexAnalyzerModel, ModuleCandidate, ModuleSmokeSpec } from "../src/analyzer/types";
+import { parseTargetAnalysisResult } from "../src/analyzer/targetAnalysisResult";
+import {
+  TARGET_CONTRACT_VERSION,
+  type AnalysisResult,
+  type AssetCandidate,
+  type AssetSmokeSpec,
+  type CodexAnalyzerModel
+} from "../src/analyzer/types";
 import {
   ArtifactConflictError,
   ArtifactRootStore,
@@ -18,6 +26,10 @@ import {
 } from "./artifactRootStore";
 import { loadServerScaffoldCatalog } from "./artifactSyncCatalog";
 import { runRuntimeStubBuild, type RuntimeStubBuildResult } from "./afRuntimeStubApi";
+import { assertBuildApprovals } from "./runManifestBuild";
+import { invalidateApprovalsForAnalysisChange } from "./runManifestApprovals";
+import { writeVerifyManifestResult } from "./manifestValidation";
+import { assertVerifyReady } from "./verifyReadiness";
 import {
   normalizeVerifyCommandKey,
   runVerifyCommand,
@@ -25,6 +37,8 @@ import {
   type VerifyCommandResult
 } from "./afVerifyRunApi";
 import { validateAnalysisResult } from "./validators";
+
+const execFileAsync = promisify(execFile);
 
 export const skillRunnerStages = ["analyze", "design", "build", "verify"] as const;
 export type SkillRunnerStage = (typeof skillRunnerStages)[number];
@@ -282,6 +296,7 @@ const defaultPrimitiveRunner: StagePrimitiveRunner = {
       store: input.store,
       reqId: input.reqId,
       commandKey: input.commandKey,
+      recordManifest: false,
       signal: input.signal,
       onStdout: (chunk) =>
         void input.emit({ phase: "process_event", title: "stdout", message: "verify stdout", snippet: chunk }),
@@ -340,10 +355,17 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
   let outputArtifacts: string[] = [];
   let validationErrors: string[] = [];
   let diffSummary: StageRunDiffSummary = { files: [] };
+  let verifyCommandResult: VerifyCommandResult | null = null;
   try {
     assertNotCanceled(input.signal);
     if (definition.requiresDesignReady) {
       await assertDesignReady(input.store, input.reqId);
+    }
+    if (stage === "build") {
+      await assertBuildApprovals(input.store, input.reqId);
+    }
+    if (stage === "verify") {
+      await assertVerifyReady(input.store, input.reqId);
     }
 
     switch (definition.runnerKind) {
@@ -372,6 +394,7 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
           proposedDir,
           emit
         });
+        verifyCommandResult = result;
         validationErrors = result.ok ? [] : [`verify command failed with exit code ${result.exit_code}`];
         await writeVerifyProposedArtifacts({ proposedDir, reqId: input.reqId, runId, result });
         break;
@@ -381,17 +404,34 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
           await runFakeStage({ store: input.store, reqId: input.reqId, stage, body, proposedDir, emit });
         } else {
           const runner = input.codexRunner ?? new SdkCodexStageRunner();
-          codexMetadata = await runner.run({
-            repoRoot: input.repoRoot,
-            rootDir,
-            runDir,
-            proposedDir,
-            stage,
-            skillPath: definition.skillPath,
-            model,
-            signal: input.signal,
-            emit
-          });
+          const workspaceBefore = await captureWorkspaceSnapshot(input.repoRoot, rootDir);
+          try {
+            codexMetadata = await runner.run({
+              repoRoot: input.repoRoot,
+              rootDir,
+              runDir,
+              proposedDir,
+              stage,
+              skillPath: definition.skillPath,
+              model,
+              signal: input.signal,
+              emit
+            });
+          } finally {
+            const workspaceAfter = await captureWorkspaceSnapshot(input.repoRoot, rootDir);
+            const unexpectedChanges = listUnexpectedWorkspaceChanges({
+              before: workspaceBefore,
+              after: workspaceAfter,
+              repoRoot: input.repoRoot,
+              runDir,
+              proposedDir
+            });
+            if (unexpectedChanges.length) {
+              throw new Error(
+                `proposed-artifacts 밖의 워크트리 변경이 감지되었습니다: ${unexpectedChanges.join(", ")}`
+              );
+            }
+          }
         }
         break;
       default:
@@ -460,7 +500,10 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
       }
       await emit({
         phase: "completed",
-        message: "stage run 이 완료되었습니다. canonical artifact 는 아직 변경되지 않았습니다.",
+        message:
+          stage === "build"
+            ? "stage run 이 완료되었습니다. runtime-stub이 canonical 경로에 생성되었으며 별도 Apply 단계가 없습니다."
+            : "stage run 이 완료되었습니다. canonical artifact 는 아직 변경되지 않았습니다.",
         title: "stage run completed"
       });
     }
@@ -489,6 +532,15 @@ export async function runStageSkill(input: RunStageSkillInput): Promise<StageRun
     codex: codexMetadata
   };
   await writeJsonFile(join(runDir, "result-summary.json"), summary);
+  if (stage === "verify" && verifyCommandResult) {
+    await writeVerifyManifestResult(
+      input.store,
+      input.reqId,
+      verifyCommandResult.command_key,
+      verifyCommandResult.command,
+      summary.validation.ok
+    );
+  }
   await updateStageRunManifest(input.store, input.reqId, stage, summary);
   return summary;
 }
@@ -637,43 +689,235 @@ export async function applyStageRun({
   stage: string;
   runId: string;
   ifMatch?: string | null;
-}): Promise<{ ok: true; applied_artifacts: string[] }> {
+}): Promise<StageRunApplyResult> {
   const safeStage = assertSkillRunnerStage(stage);
   const runDir = resolveRunDir(store, reqId, safeStage, runId);
-  const summary = await readJsonFile<StageRunSummary>(join(runDir, "result-summary.json"));
-  if (summary.status !== "completed" && summary.status !== "applied") {
-    throw new ArtifactValidationError(422, "완료되지 않은 run 은 적용할 수 없습니다.");
-  }
-  const diffSummary = await readJsonFile<StageRunDiffSummary>(join(runDir, "diff-summary.json"));
-  const invalid = diffSummary.files.find((file) => !file.valid);
-  if (invalid) {
-    throw new ArtifactValidationError(422, `${invalid.path} 검증 실패 run 은 적용할 수 없습니다.`);
+  return await store.withCanonicalWriteLock(reqId, async () => {
+    const summary = await readJsonFile<StageRunSummary>(join(runDir, "result-summary.json"));
+    if (summary.status !== "completed" && summary.status !== "applied") {
+      throw new ArtifactValidationError(422, "완료되지 않은 run 은 적용할 수 없습니다.");
+    }
+    const diffSummary = await readJsonFile<StageRunDiffSummary>(join(runDir, "diff-summary.json"));
+    const verifyManifest = safeStage === "verify" ? (await store.readManifest(reqId)).manifest : null;
+    const failedVerify =
+      safeStage === "verify" &&
+      (summary.validation?.ok !== true ||
+        verifyManifest?.validation.last_result !== "passed" ||
+        verifyManifest.stage_runs?.verify?.latest_run_id !== runId);
+    const applicableFiles = failedVerify
+      ? diffSummary.files.filter((file) => file.path === "validation-report.md")
+      : diffSummary.files;
+    const skippedArtifacts = failedVerify
+      ? diffSummary.files
+          .filter((file) => file.path !== "validation-report.md")
+          .map((file) => ({
+            path: file.path,
+            reason: "필수 Verify evidence가 모두 통과한 최신 run이 아니므로 Catalog 변경은 적용할 수 없습니다."
+          }))
+      : [];
+    if (failedVerify && applicableFiles.length === 0) {
+      throw new ArtifactValidationError(422, "Verify evidence 미충족 run 에 적용 가능한 validation-report.md가 없습니다.");
+    }
+    const invalid = applicableFiles.find((file) => !file.valid);
+    if (invalid) {
+      throw new ArtifactValidationError(422, `${invalid.path} 검증 실패 run 은 적용할 수 없습니다.`);
+    }
+
+    const prepared: Array<{
+      file: StageRunArtifactDiff;
+      content: string;
+      changed: boolean;
+      previousContent: string | null;
+    }> = [];
+    for (const file of applicableFiles) {
+      const content = await readFile(join(runDir, file.proposed_path), "utf8");
+      const currentProposedEtag = computeEtag(content);
+      const currentValidationErrors = validateCurrentProposal(file.path, content);
+      const proposalDiagnostics: string[] = [];
+      if (currentProposedEtag !== file.proposed_etag) {
+        proposalDiagnostics.push(`ETag 변경 (run 기록 ${file.proposed_etag}, 현재 ${currentProposedEtag})`);
+      }
+      if (currentValidationErrors.length) {
+        proposalDiagnostics.push(`현재 proposed artifact 검증 실패: ${currentValidationErrors.join("; ")}`);
+      }
+      if (proposalDiagnostics.length) {
+        throw new ArtifactValidationError(
+          422,
+          `${file.path} proposed artifact 무결성 확인 실패: ${proposalDiagnostics.join("; ")}. Stage를 다시 실행한 뒤 검토해 주세요.`
+        );
+      }
+      const current = await store.readArtifact(reqId, file.path).catch((error) => {
+        if (error instanceof ArtifactValidationError && error.statusCode === 404) return null;
+        throw error;
+      });
+      const expected = ifMatch && applicableFiles.length === 1 ? ifMatch : file.base_etag;
+      const actual = current?.etag ?? "0";
+      if ((expected ?? "0") !== actual) {
+        throw new ArtifactConflictError(expected ?? "0", actual);
+      }
+      prepared.push({
+        file,
+        content,
+        changed: current?.content !== content,
+        previousContent: current?.content ?? null
+      });
+    }
+
+    if (
+      (safeStage === "analyze" || safeStage === "design") &&
+      prepared.some(({ file, changed }) => file.path === "analysis-result.json" && changed)
+    ) {
+      const { manifest } = await store.readManifest(reqId);
+      await store.writeManifest(reqId, invalidateApprovalsForAnalysisChange(manifest, safeStage), null);
+    }
+
+    const applied = await writeCanonicalArtifactBatch(store, reqId, prepared);
+
+    const nextSummary: StageRunSummary = {
+      ...summary,
+      status: "applied",
+      finished_at: new Date().toISOString()
+    };
+    await writeJsonFile(join(runDir, "result-summary.json"), nextSummary);
+    await updateStageRunManifest(store, reqId, safeStage, nextSummary);
+    return { ok: true, applied_artifacts: applied, skipped_artifacts: skippedArtifacts };
+  });
+}
+
+type WorkspaceSnapshot = Map<string, string>;
+
+export interface StageRunApplyResult {
+  ok: true;
+  applied_artifacts: string[];
+  skipped_artifacts: Array<{ path: string; reason: string }>;
+}
+
+async function captureWorkspaceSnapshot(repoRoot: string, activeRootDir: string): Promise<WorkspaceSnapshot> {
+  let visibleStdout: string;
+  let ignoredStdout: string;
+  try {
+    const options = { cwd: repoRoot, encoding: "utf8" as const, maxBuffer: 64 * 1024 * 1024 };
+    const [visibleResult, ignoredResult] = await Promise.all([
+      execFileAsync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], options),
+      execFileAsync(
+        "git",
+        ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
+        options
+      )
+    ]);
+    visibleStdout = visibleResult.stdout;
+    ignoredStdout = ignoredResult.stdout;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Stage Runner 워크트리 스냅샷을 만들 수 없습니다: ${message}`);
   }
 
-  const applied: string[] = [];
-  for (const file of diffSummary.files) {
-    const content = await readFile(join(runDir, file.proposed_path), "utf8");
-    const current = await store.readArtifact(reqId, file.path).catch((error) => {
-      if (error instanceof ArtifactValidationError && error.statusCode === 404) return null;
+  const snapshot: WorkspaceSnapshot = new Map();
+  const gitPaths = visibleStdout.split("\0").filter(Boolean);
+  const ignoredFilePaths = ignoredStdout
+    .split("\0")
+    .filter((path) => path && !path.endsWith("/"))
+    .filter((path) => !hasExcludedWorkspaceSegment(path));
+  const activeRootPaths = await listTreePaths(activeRootDir);
+  const paths = [
+    ...new Set([...gitPaths, ...ignoredFilePaths, ...activeRootPaths.map((path) => relative(repoRoot, path))])
+  ].sort();
+  for (const path of paths) {
+    snapshot.set(path, await fingerprintWorkspacePath(resolve(repoRoot, path)));
+  }
+  return snapshot;
+}
+
+async function listTreePaths(rootDir: string): Promise<string[]> {
+  const paths: string[] = [];
+  async function visit(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true }).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw error;
     });
-    const expected = ifMatch && diffSummary.files.length === 1 ? ifMatch : file.base_etag;
-    const actual = current?.etag ?? "0";
-    if ((expected ?? "0") !== actual) {
-      throw new ArtifactConflictError(expected ?? "0", actual);
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory() && !hasExcludedWorkspaceSegment(entry.name)) await visit(path);
+      else paths.push(path);
     }
-    await store.writeArtifact(reqId, file.path, content, current?.etag ?? "0");
-    applied.push(file.path);
   }
+  await visit(rootDir);
+  return paths;
+}
 
-  const nextSummary: StageRunSummary = {
-    ...summary,
-    status: "applied",
-    finished_at: new Date().toISOString()
-  };
-  await writeJsonFile(join(runDir, "result-summary.json"), nextSummary);
-  await updateStageRunManifest(store, reqId, safeStage, nextSummary);
-  return { ok: true, applied_artifacts: applied };
+async function fingerprintWorkspacePath(path: string): Promise<string> {
+  const info = await lstat(path).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  });
+  if (!info) return "missing";
+  if (info.isSymbolicLink()) {
+    return `symlink:${info.mode}:${await readlink(path)}`;
+  }
+  if (!info.isFile()) return `other:${info.mode}:${info.size}`;
+  const content = await readFile(path);
+  return `file:${info.mode}:${content.byteLength}:${createHash("sha256").update(content).digest("hex")}`;
+}
+
+function listUnexpectedWorkspaceChanges({
+  before,
+  after,
+  repoRoot,
+  runDir,
+  proposedDir
+}: {
+  before: WorkspaceSnapshot;
+  after: WorkspaceSnapshot;
+  repoRoot: string;
+  runDir: string;
+  proposedDir: string;
+}): string[] {
+  const allowedPrefixes = [relative(repoRoot, proposedDir)].map(normalizeWorkspacePath);
+  const allowedFiles = new Set(
+    [join(runDir, "events.jsonl"), join(runDir, "codex-events.jsonl")]
+      .map((path) => relative(repoRoot, path))
+      .map(normalizeWorkspacePath)
+  );
+  const allPaths = new Set([...before.keys(), ...after.keys()]);
+  return [...allPaths]
+    .filter((path) => before.get(path) !== after.get(path))
+    .map((path) => ({
+      path: normalizeWorkspacePath(path),
+      kind: workspaceMutationKind(before.get(path), after.get(path))
+    }))
+    .filter(
+      ({ path }) =>
+        !allowedFiles.has(path) &&
+        !allowedPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+    )
+    .map(({ path, kind }) => `${kind}: ${path}`)
+    .sort();
+}
+
+function workspaceMutationKind(before: string | undefined, after: string | undefined): "added" | "modified" | "deleted" {
+  if (before === undefined || before === "missing") return "added";
+  if (after === undefined || after === "missing") return "deleted";
+  return "modified";
+}
+
+function normalizeWorkspacePath(path: string): string {
+  return path.split(sep).join("/");
+}
+
+function hasExcludedWorkspaceSegment(path: string): boolean {
+  return normalizeWorkspacePath(path)
+    .split("/")
+    .some((segment) => segment === ".git" || segment === "node_modules");
+}
+
+function validateCurrentProposal(path: string, content: string): string[] {
+  if (path !== "analysis-result.json") return [];
+  try {
+    return validateAnalysisResult(JSON.parse(content));
+  } catch (error) {
+    return [`JSON parse 실패: ${error instanceof Error ? error.message : String(error)}`];
+  }
 }
 
 export function assertSkillRunnerStage(stage: string): SkillRunnerStage {
@@ -842,7 +1086,7 @@ async function runFakeStage(input: {
     if (!rawText) throw new ArtifactValidationError(400, "Analyze run 에는 rawText 가 필요합니다.");
     const canonical = await readCanonicalAnalysis(input.store, input.reqId).catch(() => null);
     const base = canonical ?? createMinimalAnalysis(input.reqId, rawText, input.body.input?.domain ?? "공통");
-    const proposed = normalizeAnalysisResultForWorkbench({
+    const proposed = parseTargetAnalysisResult({
       ...base,
       normalizedRequirement: {
         ...base.normalizedRequirement,
@@ -866,15 +1110,9 @@ async function runFakeStage(input: {
   }
 
   const canonical = await readCanonicalAnalysis(input.store, input.reqId);
-  const proposed = normalizeAnalysisResultForWorkbench({
+  const proposed = parseTargetAnalysisResult({
     ...canonical,
-    moduleCandidates: canonical.moduleCandidates.map((candidate) => resolveCandidateForDesign(candidate)),
-    processFlow: {
-      ...canonical.processFlow,
-      nodes: canonical.processFlow.nodes?.map((node) =>
-        node.module_id ? { ...node, review_status: "approved" } : node
-      )
-    }
+    assetCandidates: canonical.assetCandidates.map((candidate) => resolveCandidateForDesign(candidate))
   });
   await writeJsonFile(join(input.proposedDir, "analysis-result.json"), proposed);
   await writeFile(
@@ -884,7 +1122,7 @@ async function runFakeStage(input: {
       "",
       "`af-compose-solution` fake runner output.",
       "",
-      "- Module candidates with candidate-level missing_information are proposed as resolved.",
+      "- Asset candidates with candidate-level missing_information are proposed as resolved.",
       "- approval gate values are intentionally unchanged.",
       "- Review this diff before applying canonical artifacts."
     ].join("\n"),
@@ -1183,10 +1421,10 @@ async function assertDesignReady(store: ArtifactRootStore, reqId: string): Promi
 
 async function readCanonicalAnalysis(store: ArtifactRootStore, reqId: string): Promise<AnalysisResult> {
   const artifact = await store.readArtifact(reqId, "analysis-result.json");
-  return JSON.parse(artifact.content) as AnalysisResult;
+  return parseTargetAnalysisResult(JSON.parse(artifact.content));
 }
 
-function resolveCandidateForDesign(candidate: ModuleCandidate): ModuleCandidate {
+function resolveCandidateForDesign(candidate: AssetCandidate): AssetCandidate {
   if (!candidate.missing_information.length && candidate.status === "approved") return candidate;
   const resolved = candidate.missing_information;
   return {
@@ -1203,7 +1441,7 @@ function resolveCandidateForDesign(candidate: ModuleCandidate): ModuleCandidate 
   };
 }
 
-function createSmokeSpec(candidate: ModuleCandidate): ModuleSmokeSpec {
+function createSmokeSpec(candidate: AssetCandidate): AssetSmokeSpec {
   return {
     sample_user_message: `${candidate.name} smoke 입력을 검증한다.`,
     synthetic_inputs: Object.fromEntries(candidate.inputs.map((field) => [field.name, `synthetic_${field.type}`])),
@@ -1211,14 +1449,17 @@ function createSmokeSpec(candidate: ModuleCandidate): ModuleSmokeSpec {
       type: "object",
       properties: Object.fromEntries(candidate.outputs.map((field) => [field.name, { type: field.type || "string" }]))
     },
-    expected_event_markers: [`${candidate.id}:completed`],
+    expected_event_markers: [`${candidate.asset_id}:completed`],
     mock_sources: ["skill-runner-fake"],
     ready: true
   };
 }
 
 function createMinimalAnalysis(reqId: string, rawText: string, domain: string): AnalysisResult {
+  const assetId = `agent.${reqId.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "proposal"}`;
+  const domainSpecific = domain.trim() && domain.trim() !== "공통";
   return {
+    contract_version: TARGET_CONTRACT_VERSION,
     normalizedRequirement: {
       id: reqId,
       title: "Skill Runner 분석 제안",
@@ -1248,18 +1489,60 @@ function createMinimalAnalysis(reqId: string, rawText: string, domain: string): 
       contradictions: [],
       assumptions: ["fake runner proposal"]
     },
-    moduleCandidates: [],
+    assetCandidates: [
+      {
+        asset_id: assetId,
+        source_requirement_id: reqId,
+        catalog_entry_id: null,
+        name: "요구사항 검토 Agent",
+        asset_type: "agent",
+        domain_scope: domainSpecific ? "domain_specific" : "domain_neutral",
+        business_domains: domainSpecific ? [domain.trim()] : [],
+        owner: "unassigned",
+        reuse_status: "not_reviewed",
+        capability_tags: ["requirement-review"],
+        binding: null,
+        connection: null,
+        workflow_profile: null,
+        exposure: null,
+        confidence: 0.5,
+        rationale: "fake runner가 검토용으로 만든 standalone Agent 후보입니다.",
+        inputs: [{ name: "raw_requirement", type: "text", required: true, schema: {} }],
+        outputs: [{ name: "analysis_result", type: "object", required: true, schema: {} }],
+        risk_level: "low",
+        risk_signals: [],
+        status: "needs_info",
+        missing_information: ["owner와 책임 경계를 검토해야 합니다."]
+      }
+    ],
     a2aContracts: [],
     runtimeContracts: [],
-    processFlow: {
-      requirement_id: reqId,
+    graph: {
       graph_id: "graph-001",
-      root_workflow_module_id: null,
-      nodes: [],
-      edges: [],
-      containers: [],
-      lanes: [],
-      validation: { ok: true, errors: [], warnings: [] }
+      source_requirement_id: reqId,
+      workflow_ref: null,
+      nodes: [
+        { id: "node-input", label: "Input", node_kind: "input" },
+        { id: "node-agent", label: "요구사항 검토 Agent", node_kind: "agent", agent_ref: assetId, available_tools: [] },
+        { id: "node-output", label: "Output", node_kind: "output" }
+      ],
+      edges: [
+        {
+          id: "edge-001",
+          from: "node-input",
+          to: "node-agent",
+          control: { kind: "next", condition: null, accepted_aliases: [], default: false },
+          channel: "event"
+        },
+        {
+          id: "edge-002",
+          from: "node-agent",
+          to: "node-output",
+          control: { kind: "next", condition: null, accepted_aliases: [], default: false },
+          channel: "event"
+        }
+      ],
+      regions: []
     }
   };
 }
@@ -1314,8 +1597,8 @@ function summarizeArtifact(path: string, content: string | null): string {
   try {
     const parsed = JSON.parse(content);
     if (path === "analysis-result.json" && parsed?.normalizedRequirement) {
-      const candidates = Array.isArray(parsed.moduleCandidates) ? parsed.moduleCandidates.length : 0;
-      return `${parsed.normalizedRequirement.title ?? "analysis"} · module ${candidates}개`;
+      const candidates = Array.isArray(parsed.assetCandidates) ? parsed.assetCandidates.length : 0;
+      return `${parsed.normalizedRequirement.title ?? "analysis"} · asset ${candidates}개`;
     }
   } catch {
     return "JSON parse 실패";
@@ -1348,7 +1631,6 @@ async function updateStageRunManifest(
   stage: SkillRunnerStage,
   summary: StageRunSummary
 ): Promise<void> {
-  const { manifest } = await store.readManifest(reqId);
   const entry: AfStageRunManifestEntry = {
     latest_run_id: summary.run_id,
     status: summary.status,
@@ -1366,14 +1648,59 @@ async function updateStageRunManifest(
       event_count: summary.codex.event_count
     };
   }
-  const next: AfRunManifest = {
-    ...manifest,
-    stage_runs: {
-      ...(manifest.stage_runs ?? {}),
-      [stage]: entry
+  await store.withCanonicalWriteLock(reqId, async () => {
+    const { manifest } = await store.readManifest(reqId);
+    const next: AfRunManifest = {
+      ...manifest,
+      stage_runs: {
+        ...(manifest.stage_runs ?? {}),
+        [stage]: entry
+      }
+    };
+    await store.writeManifest(reqId, next, null);
+  });
+}
+
+async function writeCanonicalArtifactBatch(
+  store: ArtifactRootStore,
+  reqId: string,
+  prepared: Array<{
+    file: StageRunArtifactDiff;
+    content: string;
+    previousContent: string | null;
+  }>
+): Promise<string[]> {
+  const attempted: typeof prepared = [];
+  const applied: string[] = [];
+  try {
+    for (const artifact of prepared) {
+      attempted.push(artifact);
+      await store.writeArtifact(reqId, artifact.file.path, artifact.content, null);
+      applied.push(artifact.file.path);
     }
-  };
-  await store.writeManifest(reqId, next, null);
+    return applied;
+  } catch (writeError) {
+    const rollbackErrors: Error[] = [];
+    for (const artifact of attempted.reverse()) {
+      try {
+        if (artifact.previousContent === null) {
+          await rm(store.resolveArtifactPath(reqId, artifact.file.path, "write"), { force: true });
+        } else {
+          await store.writeArtifact(reqId, artifact.file.path, artifact.previousContent, null);
+        }
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError)));
+      }
+    }
+    if (rollbackErrors.length) {
+      const primaryMessage = writeError instanceof Error ? writeError.message : String(writeError);
+      const rollbackMessage = rollbackErrors.map((error) => error.message).join("; ");
+      throw new Error(
+        `canonical artifact batch write와 rollback이 모두 실패했습니다. approval gate는 revoked 상태로 유지됩니다. write: ${primaryMessage}; rollback: ${rollbackMessage}`
+      );
+    }
+    throw writeError;
+  }
 }
 
 async function appendEvent(runDir: string, event: StageRunEvent): Promise<void> {

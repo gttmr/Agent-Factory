@@ -1,6 +1,7 @@
-- approved callback contract와 output boundary를 확인한다.
-- before-tool Continue와 Override를 정확히 구현·시험한다.
-- Runner-wide guardrail에 Plugin 우선 판단을 적용한다.
-- 차단 case에서 Tool side effect가 발생하지 않음을 검증한다.
-- state와 audit evidence를 최소·redacted 형태로 남긴다.
-- 코드가 승인 범위와 synthetic-only 경계를 벗어나지 않는다.
+- strict v2 aggregate/split parity, 승인 manifest, Graph, `adk_callback` 계약과 scaffold plan을 확인한다.
+- design-reviewed runtime contract와 scaffold/runtime implementation readiness를 구분한다.
+- callback edge, `can_generate_source: false`, explicit blocker, Build `blocked`, `stub_ready_for_followup: false`를 정확히 근거로 든다.
+- source generation 전에 중단하고 runtime stub, handoff, test-success 또는 runnable-support 주장을 만들지 않는다.
+- callback을 ordinary transition으로 낮추거나 smoke/custom prototype으로 우회하지 않는다.
+- 향후 구현 검증 범위로 Continue, Override, pre-Tool short-circuit, fail-closed error, redacted `audit:last_guardrail_decision`을 보존한다.
+- 합성 데이터 경계와 기존 approval을 변경하지 않는다.

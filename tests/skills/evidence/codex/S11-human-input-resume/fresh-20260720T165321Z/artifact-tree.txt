@@ -1,0 +1,27 @@
+runtime/.env.example
+runtime/.gitignore
+runtime/README.md
+runtime/agents.config.yaml
+runtime/implementation-handoff.md
+runtime/runtime-chat-smoke.json
+runtime/s11_human_input_resume_runtime/README.md
+runtime/s11_human_input_resume_runtime/__init__.py
+runtime/s11_human_input_resume_runtime/agent.py
+runtime/s11_human_input_resume_runtime/mock_config.yaml
+runtime/s11_human_input_resume_runtime/nodes/__init__.py
+runtime/s11_human_input_resume_runtime/nodes/agents.py
+runtime/s11_human_input_resume_runtime/nodes/functions.py
+runtime/s11_human_input_resume_runtime/nodes/gates.py
+runtime/s11_human_input_resume_runtime/nodes/human_inputs.py
+runtime/s11_human_input_resume_runtime/nodes/subworkflows.py
+runtime/s11_human_input_resume_runtime/nodes/tools.py
+runtime/s11_human_input_resume_runtime/sample_inputs.yaml
+runtime/s11_human_input_resume_runtime/schemas.py
+runtime/s11_human_input_resume_runtime/tests/__init__.py
+runtime/s11_human_input_resume_runtime/tests/test_workflow_contract.py
+runtime/s11_human_input_resume_runtime/workflow.py
+runtime/s11_human_input_resume_runtime/workflow_manifest.json
+runtime/scaffold-plan.json
+runtime/validation-report.md
+
+Transient `__pycache__` and `.pytest_cache` entries were produced by compile/pytest in the temporary output and are excluded from this reviewable source inventory.

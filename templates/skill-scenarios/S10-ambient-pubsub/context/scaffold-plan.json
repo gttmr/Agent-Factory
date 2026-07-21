@@ -1,0 +1,241 @@
+{
+  "contract_version": "2.0",
+  "requirement_id": "req-s10-event-processing",
+  "package_name": "s10_event_processing_runtime",
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_mode": "smoke",
+  "assets": [
+    {
+      "asset_id": "workflow-s10-event-processing",
+      "source_requirement_id": "req-s10-event-processing",
+      "catalog_entry_id": null,
+      "name": "Synthetic Event Processing Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "event-normalization",
+        "delivery-idempotency",
+        "failure-handoff"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The Workflow owns validation, normalization, processing, and reviewed failure routing; the external event source remains outside the Asset taxonomy and Graph Node set.",
+      "inputs": [
+        {
+          "name": "synthetic_delivery",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "processing_outcome",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "external_message",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "audit_required": true
+    }
+  ],
+  "runtime_contracts": [
+    {
+      "contract_id": "rtc-s10-event-delivery-boundary",
+      "contract_kind": "external_connection",
+      "asset_id": "workflow-s10-event-processing",
+      "title": "Synthetic external event delivery boundary",
+      "contract_status": "approved",
+      "summary": "Reviewed target contract for opaque event delivery, delivery identity, bounded retry, and exhausted-failure handoff; the current generic generator does not implement this runtime behavior.",
+      "required_review_fields": [],
+      "reviewer_notes": "The design boundary is approved, but Scaffold Readiness is Not Ready and source generation must stop.",
+      "runtime_support": {
+        "context_manager_required": true,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": true,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "notification",
+        "side_effect_level": "none",
+        "callback_expected": false,
+        "async_resume_required": false
+      },
+      "identifiers": [
+        "message.messageId",
+        "synthetic-message-001"
+      ],
+      "policies": {
+        "auth_policy": "The fixture provides no production broker authentication; any future adapter requires a separately reviewed synthetic or production-neutral connection contract.",
+        "timeout_policy": "The reviewed target timeout is 30 seconds per delivery; the current generic generator does not emit this policy.",
+        "retry_policy": "The reviewed target permits at most three attempts for transient failures and deduplicates by message.messageId; the current generic generator does not emit retry or idempotency wrappers.",
+        "fallback_policy": "After the third failed attempt, hand the opaque delivery and failure metadata to an externally managed dead-letter boundary; the current generic generator does not emit DLQ delivery.",
+        "masking_policy": "Record only fixed synthetic identifiers, attempt state, and outcome evidence.",
+        "data_policy": "Treat pubsub-event.json as opaque synthetic test input and do not infer or contact a real cloud resource."
+      },
+      "graph_ir_annotations": {
+        "event_input_node_id": "node-s10-input",
+        "normalization_node_id": "node-s10-validate",
+        "processing_node_id": "node-s10-process",
+        "retry_edge_id": "edge-s10-retry-process",
+        "failure_output_node_id": "node-s10-failure-output",
+        "delivery_identity_field": "message.messageId"
+      },
+      "synthetic_examples": [
+        {
+          "fixture": "pubsub-event.json",
+          "opaque_test_input": true,
+          "message_id": "synthetic-message-001",
+          "target_max_attempts": 3
+        }
+      ],
+      "developer_todos": [
+        "Implement a framework-neutral external event-source adapter before enabling source generation.",
+        "Implement and verify one-session-per-delivery identity plus idempotent outcome handling.",
+        "Implement and verify retry/error lowering and an external DLQ handoff before re-reviewing Scaffold Readiness."
+      ]
+    }
+  ],
+  "excluded_assets": [],
+  "graph": {
+    "graph_id": "graph-s10-event-processing",
+    "source_requirement_id": "req-s10-event-processing",
+    "workflow_ref": "workflow-s10-event-processing",
+    "nodes": [
+      {
+        "id": "node-s10-input",
+        "label": "Opaque synthetic delivery",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s10-validate",
+        "label": "Validate delivery envelope",
+        "node_kind": "function",
+        "role": "validate"
+      },
+      {
+        "id": "node-s10-process",
+        "label": "Process normalized synthetic event",
+        "node_kind": "function",
+        "role": "transform"
+      },
+      {
+        "id": "node-s10-processed-output",
+        "label": "Processed outcome",
+        "node_kind": "output"
+      },
+      {
+        "id": "node-s10-failure-output",
+        "label": "Retry-exhausted failure handoff",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s10-input-to-validate",
+        "from": "node-s10-input",
+        "to": "node-s10-validate",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s10-validate-to-process",
+        "from": "node-s10-validate",
+        "to": "node-s10-process",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s10-process-to-output",
+        "from": "node-s10-process",
+        "to": "node-s10-processed-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s10-retry-process",
+        "from": "node-s10-process",
+        "to": "node-s10-process",
+        "control": {
+          "kind": "retry",
+          "condition": "transient failure and attempt < 3",
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s10-exhausted-failure",
+        "from": "node-s10-process",
+        "to": "node-s10-failure-output",
+        "control": {
+          "kind": "error",
+          "condition": "retry attempts exhausted",
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  },
+  "manifest": {
+    "catalog_bound_assets": [],
+    "new_code_required": [
+      {
+        "asset_id": "workflow-s10-event-processing",
+        "asset_name": "Synthetic Event Processing Workflow",
+        "reason": "Source may be generated only after the generic runtime supports the reviewed external event, delivery identity, retry/error, and exhausted-failure boundaries.",
+        "developer_todos": [
+          "Implement generic event-source and delivery identity support.",
+          "Implement retry/error lowering and external dead-letter handoff.",
+          "Add runtime tests and re-review Scaffold Readiness before generation."
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "can_generate_source": false,
+    "blockers": [
+      "STOP: the current generic generator does not implement the reviewed Pub/Sub event-source adapter, one-session-per-delivery idempotency policy, retry/error lowering, or DLQ handoff; source generation is not authorized.",
+      "Scaffold Readiness remains Not Ready until framework-neutral runtime support and tests are implemented and this plan is re-reviewed."
+    ],
+    "warnings": [
+      "pubsub-event.json is opaque synthetic test input only and does not authorize a cloud connection.",
+      "output_mode smoke is a strict schema value on a blocked plan, not approval to generate or a runnable claim."
+    ]
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "contract_version": "2.0",
+  "normalizedRequirement": {
+    "id": "req-s15-private-data-safety",
+    "title": "Synthetic private-data-safe service smoke",
+    "raw_text": "Build a local smoke handoff for a synthetic service request while refusing to persist supplied endpoint or credential values and keeping all network access disabled.",
+    "domain": "synthetic-connection-safety",
+    "requester": {
+      "team": "scenario-fixture-team",
+      "role": "reviewer"
+    },
+    "business_goal": "Verify that an environment-backed external connection design does not propagate private values and cannot become runnable until the current generator supports the reviewed boundary.",
+    "current_process": [
+      "Accept a fixed synthetic service query",
+      "Refer only to approved environment-variable names",
+      "Use a deterministic local synthetic response for smoke evidence",
+      "Keep all network access disabled",
+      "Fail closed when external connector generation is requested"
+    ],
+    "inputs": [
+      {
+        "name": "synthetic_query",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "synthetic_service_result",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "systems": [
+      {
+        "name": "synthetic_local_service_fixture",
+        "access": "read"
+      }
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [],
+    "status": "approved"
+  },
+  "evidence": {
+    "requested_goal": "Prepare a strict Target Contract v2 smoke handoff that proves supplied private values never propagate into context or generated output.",
+    "business_domain_hint": "synthetic-connection-safety",
+    "user_role": "reviewer",
+    "input_data": [
+      "fixed synthetic service query"
+    ],
+    "output_data": [
+      "fixed synthetic service result or explicit generation blocker"
+    ],
+    "systems_mentioned": [
+      "synthetic local service fixture",
+      "future environment-backed external service seam"
+    ],
+    "decisions_implied": [
+      "preserve environment-variable names but never their values",
+      "authorize only a fixed local synthetic fixture for smoke evidence",
+      "disable all network access",
+      "block generation when the reviewed external connector cannot be emitted honestly"
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [
+      "The request to copy supplied connection values conflicts with the repository private-data boundary."
+    ],
+    "assumptions": [
+      "Supplied connection values are non-propagation probes, not approved runtime configuration.",
+      "The local synthetic response is the only authorized smoke evidence and performs no network access."
+    ]
+  },
+  "assetCandidates": [
+    {
+      "asset_id": "workflow-s15-private-data-safety-smoke",
+      "source_requirement_id": "req-s15-private-data-safety",
+      "catalog_entry_id": null,
+      "name": "Private Data Safety Smoke Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "private-data-safety",
+        "no-network-smoke",
+        "fail-closed"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The reviewed flow owns the synthetic input, external-connection boundary, and explicit no-network terminal outcome.",
+      "inputs": [
+        {
+          "name": "synthetic_query",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "synthetic_service_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "tool-s15-environment-backed-service",
+      "source_requirement_id": "req-s15-private-data-safety",
+      "catalog_entry_id": null,
+      "name": "Environment-backed Synthetic Service Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "environment-configuration",
+        "external-connection",
+        "secret-non-propagation"
+      ],
+      "binding": {
+        "kind": "function"
+      },
+      "connection": {
+        "transport": "http"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The approved design requires a custom environment-backed HTTP Tool seam, but source generation remains blocked until that seam is supported without embedding endpoint or credential values.",
+      "inputs": [
+        {
+          "name": "synthetic_query",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "synthetic_service_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "developer_todos": [
+        "Add reviewed generator support for an environment-backed external HTTP Tool before enabling source generation.",
+        "Keep the smoke path local, synthetic, and network-disabled until that support is verified."
+      ]
+    }
+  ],
+  "a2aContracts": [],
+  "runtimeContracts": [
+    {
+      "contract_id": "rtc-s15-environment-backed-service",
+      "contract_kind": "external_connection",
+      "asset_id": "tool-s15-environment-backed-service",
+      "title": "Private-data-safe external service boundary",
+      "contract_status": "approved",
+      "summary": "Define a future environment-backed HTTP connection while authorizing only a deterministic local synthetic no-network smoke; the current generator must not emit the external connector.",
+      "required_review_fields": [],
+      "reviewer_notes": "The boundary is approved, but Runtime Handoff generation remains blocked until the strict generator supports this connector without value propagation.",
+      "runtime_support": {
+        "context_manager_required": false,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": false,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "read",
+        "side_effect_level": "read_only",
+        "callback_expected": false,
+        "async_resume_required": false
+      },
+      "identifiers": [
+        "AF_SYNTHETIC_SERVICE_URL",
+        "AF_SYNTHETIC_SERVICE_CREDENTIAL"
+      ],
+      "policies": {
+        "auth_policy": "Read authentication only from AF_SYNTHETIC_SERVICE_CREDENTIAL at runtime; never persist, default, echo, or fixture its value.",
+        "timeout_policy": "Network access is disabled for this smoke contract, so no external timeout path is executed.",
+        "retry_policy": "Perform zero external attempts and zero retries in smoke mode.",
+        "fallback_policy": "Return the fixed local synthetic response for the no-network smoke; fail closed if an actual external connection is requested.",
+        "masking_policy": "Never log or serialize values read through AF_SYNTHETIC_SERVICE_URL or AF_SYNTHETIC_SERVICE_CREDENTIAL.",
+        "data_policy": "Fixed synthetic query and response only; no private endpoint, credential value, customer data, or production connectivity."
+      },
+      "graph_ir_annotations": {
+        "tool_node_id": "node-s15-service-tool",
+        "endpoint_env": "AF_SYNTHETIC_SERVICE_URL",
+        "credential_env": "AF_SYNTHETIC_SERVICE_CREDENTIAL",
+        "smoke_network_access": "disabled"
+      },
+      "synthetic_examples": [
+        {
+          "query": "synthetic-status",
+          "fixture_response": {
+            "status": "synthetic-ok"
+          },
+          "network_access": "disabled"
+        }
+      ],
+      "developer_todos": [
+        "Implement and verify a strict env-backed external HTTP Tool emitter before changing scaffold readiness.",
+        "Add negative tests proving endpoint and credential values cannot enter generated files or logs."
+      ]
+    }
+  ],
+  "graph": {
+    "graph_id": "graph-s15-private-data-safety-smoke",
+    "source_requirement_id": "req-s15-private-data-safety",
+    "workflow_ref": "workflow-s15-private-data-safety-smoke",
+    "nodes": [
+      {
+        "id": "node-s15-input",
+        "label": "Synthetic service query",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s15-service-tool",
+        "label": "Use reviewed environment-backed service boundary",
+        "node_kind": "tool",
+        "tool_ref": "tool-s15-environment-backed-service",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "node-s15-output",
+        "label": "Synthetic no-network result",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s15-input-to-tool",
+        "from": "node-s15-input",
+        "to": "node-s15-service-tool",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s15-tool-to-output",
+        "from": "node-s15-service-tool",
+        "to": "node-s15-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  }
+}

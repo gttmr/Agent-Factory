@@ -1,164 +1,102 @@
 import assert from "node:assert/strict";
 import {
   GRAPH_ELEMENT_GROUPS,
+  TARGET_NODE_KIND_OPTIONS,
   availableGraphElementGroups,
-  isEdgeKindEditable,
-  isNodeModuleLinkEditable,
+  assetRefForNode,
+  graphRegionLabel,
+  isA2AProtocolBoundary,
+  isAssetBoundNodeKind,
+  invocationControlLabel,
   nextGraphElementGroupAfterSelectionChange
 } from "./graphElementEditorModel.ts";
-import type { GraphEdge, GraphNode } from "../analyzer/types";
+import type { AssetCandidate, GraphEdge, GraphNode } from "../analyzer/types";
 
-function node(patch: Partial<GraphNode>): GraphNode {
-  return {
-    id: "node-1",
-    label: "Node",
-    module_id: null,
-    node_kind: "input",
-    execution_kind: null,
-    adk_node_role: null,
-    owner_scope: "local",
-    container_id: null,
-    lane_id: "input",
-    input_ports: [],
-    output_ports: [],
-    schema_refs: [],
-    review_status: "n/a",
-    ...patch
-  };
-}
+const edge: GraphEdge = {
+  id: "edge-route",
+  from: "route",
+  to: "target",
+  control: {
+    kind: "condition",
+    condition: "choice == run",
+    accepted_aliases: ["run", "실행"],
+    default: false
+  },
+  channel: "event"
+};
 
-function edge(from = "node-1", to = "node-2", patch: Partial<GraphEdge> = {}): GraphEdge {
-  return {
-    id: "edge-1",
-    from,
-    to,
-    from_port: null,
-    to_port: null,
-    edge_kind: "event_output",
-    execution_semantics: "normal_transition",
-    data_label: "",
-    schema_ref: null,
-    route_condition: null,
-    state_key: null,
-    artifact_key: null,
-    a2a_contract_id: null,
-    is_remote_boundary_crossing: false,
-    ...patch
-  };
-}
+const agentNode: GraphNode = {
+  id: "agent-node",
+  label: "Agent",
+  node_kind: "agent",
+  agent_ref: "asset-agent",
+  available_tools: [{ tool_ref: "asset-tool", invocation_control: "agent" }]
+};
 
+const agentAsset = {
+  asset_id: "asset-agent",
+  asset_type: "agent",
+  binding: { kind: "a2a", contract_ref: "a2a-agent" },
+  exposure: null,
+  inputs: [{ name: "message", type: "string", required: true }],
+  outputs: [],
+  risk_level: "low",
+  risk_signals: [],
+  missing_information: []
+} as unknown as AssetCandidate;
+
+assert.deepEqual(
+  TARGET_NODE_KIND_OPTIONS.map((option) => option.value),
+  ["input", "agent", "tool", "function", "human_input", "subworkflow", "join", "output"],
+  "editor offers only Target node kinds"
+);
+assert.equal(graphRegionLabel("parallel"), "병렬 실행 범위");
+assert.equal(graphRegionLabel("loop"), "반복 실행 범위");
+assert.equal(invocationControlLabel("workflow"), "Workflow");
+assert.equal(invocationControlLabel("agent"), "Agent");
 assert.deepEqual(
   GRAPH_ELEMENT_GROUPS.map((group) => group.id),
-  ["summary", "io", "flow", "runtime", "risk", "adk", "raw"],
-  "Graph element detail groups follow the contextual information architecture"
+  ["summary", "io", "flow", "runtime", "risk", "raw"],
+  "legacy ADK/runtime implementation groups do not survive in the Target editor"
+);
+assert.equal(isAssetBoundNodeKind("agent"), true);
+assert.equal(isAssetBoundNodeKind("tool"), true);
+assert.equal(isAssetBoundNodeKind("subworkflow"), true);
+assert.equal(isAssetBoundNodeKind("function"), false);
+assert.equal(assetRefForNode(agentNode), "asset-agent");
+assert.equal(
+  assetRefForNode({ id: "tool-node", label: "Tool", node_kind: "tool", tool_ref: "asset-tool", invocation_control: "workflow" }),
+  "asset-tool"
+);
+assert.equal(
+  assetRefForNode({ id: "workflow-node", label: "Workflow", node_kind: "subworkflow", workflow_ref: "asset-workflow" }),
+  "asset-workflow"
+);
+assert.equal(isA2AProtocolBoundary(agentNode, agentAsset), true, "A2A is a marker on an Agent-bound node");
+assert.equal(
+  isA2AProtocolBoundary(
+    { id: "tool-node", label: "Tool", node_kind: "tool", tool_ref: "asset-tool", invocation_control: "workflow" },
+    { ...agentAsset, asset_id: "asset-tool", asset_type: "tool" }
+  ),
+  false,
+  "A2A never becomes a Tool category"
+);
+
+assert.deepEqual(
+  availableGraphElementGroups({ selectedNode: agentNode, selectedEdge: null, asset: agentAsset }).map((group) => group.id),
+  ["summary", "io", "runtime", "risk", "raw"],
+  "Agent details expose typed refs, available tools, asset IO, and review risk"
 );
 assert.deepEqual(
-  availableGraphElementGroups({
-    selectedNode: node({
-      node_kind: "adapter_call",
-      schema_refs: ["customer.lookup.request.v1", "customer.lookup.response.v1"],
-      mock_binding: {
-        provider: "mock_lab",
-        package_path: "packages/mock-lab",
-        mock_server_id: "wf-customer",
-        tool_name: "lookup_customer",
-        input_schema: "customer.lookup.request.v1",
-        output_schema: "customer.lookup.response.v1",
-        sample_response_ref: "customer.lookup.basic",
-        status: "linked"
-      },
-      invoke_binding: "mcp_tool",
-      call_control: "fixed_by_workflow"
-    }),
-    selectedEdge: null,
-    candidate: null
-  }).map((group) => group.id),
-  ["summary", "io", "runtime", "raw"],
-  "adapter calls show IO and runtime details without irrelevant ADK or flow groups"
-);
-assert.deepEqual(
-  availableGraphElementGroups({
-    selectedNode: node({
-      node_kind: "adapter_call",
-      schema_refs: ["customer.lookup.request.v1"],
-      adk_skeleton_contract: {
-        scaffold_level: "mock_testable_skeleton",
-        implementation_template: "adapter_placeholder_stub",
-        manual_completion_required: true,
-        developer_todos: ["Wire the MCP adapter."]
-      }
-    }),
-    selectedEdge: null,
-    candidate: null
-  }).map((group) => group.id),
-  ["summary", "io", "raw"],
-  "ADK Skeleton is workflow-only even when legacy adapter data carries a skeleton field"
-);
-assert.deepEqual(
-  availableGraphElementGroups({
-    selectedNode: node({
-      node_kind: "workflow_call",
-      workflow_ref: { id: "wf-risk", version: "v1", source: "catalog", display_name: "Risk" },
-      input_mapping: { payload: "$state.payload" },
-      output_mapping: { result: "$result" },
-      adk_skeleton_contract: {
-        scaffold_level: "mock_testable_skeleton",
-        implementation_template: "workflow_call_placeholder_stub",
-        manual_completion_required: true,
-        developer_todos: ["Define the subworkflow contract."]
-      }
-    }),
-    selectedEdge: null,
-    candidate: null
-  }).map((group) => group.id),
-  ["summary", "io", "runtime", "adk", "raw"],
-  "workflow calls expose mapping, runtime target, and ADK skeleton details"
-);
-assert.deepEqual(
-  availableGraphElementGroups({
-    selectedNode: null,
-    selectedEdge: edge("router", "analysis", {
-      edge_kind: "route",
-      execution_semantics: "conditional",
-      flow_kind: "route",
-      route_condition: "choice == run_analysis",
-      route_aliases: ["run", "분석"],
-      is_default_route: false
-    }),
-    candidate: null
-  }).map((group) => group.id),
-  ["summary", "flow", "raw"],
-  "route edges focus on flow details and hide Mock/ADK"
+  availableGraphElementGroups({ selectedNode: null, selectedEdge: edge, asset: null }).map((group) => group.id),
+  ["summary", "flow", "runtime", "raw"],
+  "edges expose control, condition aliases, and channel without legacy edge fields"
 );
 assert.equal(
   nextGraphElementGroupAfterSelectionChange(
-    "adk",
-    availableGraphElementGroups({
-      selectedNode: node({ node_kind: "adapter_call", schema_refs: ["customer.lookup.request.v1"] }),
-      selectedEdge: null,
-      candidate: null
-    })
+    "risk",
+    availableGraphElementGroups({ selectedNode: null, selectedEdge: edge, asset: null })
   ),
   "summary",
-  "selection changes fall back to summary when the previous group is unavailable"
+  "selection changes fall back when the previous group is unavailable"
 );
-
-assert.equal(
-  isNodeModuleLinkEditable(node({ node_kind: "adapter_call" }), []),
-  true,
-  "new module-bound adapter nodes may link a module before graph wiring"
-);
-assert.equal(
-  isNodeModuleLinkEditable(node({ node_kind: "adapter_call" }), [edge("node-1", "node-2")]),
-  false,
-  "wired nodes lock module linkage"
-);
-assert.equal(
-  isNodeModuleLinkEditable(node({ node_kind: "workflow_call", workflow_ref: { id: "wf-risk", version: "v1", source: "catalog", display_name: "Risk" } }), []),
-  false,
-  "workflow_call nodes with a target contract lock module linkage"
-);
-
-assert.equal(isEdgeKindEditable(edge("router", "target", { edge_kind: "route" })), false);
-assert.equal(isEdgeKindEditable(edge("source", "remote", { edge_kind: "remote_a2a" })), false);
-assert.equal(isEdgeKindEditable(edge("source", "target", { edge_kind: "event_output" })), true);

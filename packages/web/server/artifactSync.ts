@@ -11,8 +11,8 @@ import type { CatalogEntry } from "../src/catalog/types";
 
 const DERIVED_JSON_PATHS = [
   "normalized-requirement.json",
-  "module-candidates.json",
-  "process-flow.json",
+  "asset-candidates.json",
+  "graph-ir.json",
   "scaffold-plan.json"
 ] as const;
 
@@ -52,8 +52,8 @@ export async function syncArtifactRoot(input: SyncArtifactRootInput): Promise<Ar
   const catalogEntries = input.catalogEntries ?? await loadServerScaffoldCatalog(input.repoRoot);
   const scaffoldPlan = buildScaffoldPlan({
     normalizedRequirement: analysis.normalizedRequirement,
-    moduleCandidates: analysis.moduleCandidates,
-    processFlow: analysis.processFlow,
+    assetCandidates: analysis.assetCandidates,
+    graph: analysis.graph,
     runtimeContracts: analysis.runtimeContracts,
     catalogEntries: [...catalogEntries],
     outputMode
@@ -128,8 +128,8 @@ function serializeDerivedArtifacts(analysis: AnalysisResult, scaffoldPlan: Scaff
 }> {
   return [
     { path: "normalized-requirement.json", content: serializeJson(analysis.normalizedRequirement) },
-    { path: "module-candidates.json", content: serializeJson(analysis.moduleCandidates) },
-    { path: "process-flow.json", content: serializeJson(analysis.processFlow) },
+    { path: "asset-candidates.json", content: serializeJson(analysis.assetCandidates) },
+    { path: "graph-ir.json", content: serializeJson(analysis.graph) },
     { path: "scaffold-plan.json", content: serializeJson(scaffoldPlan) }
   ];
 }

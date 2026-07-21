@@ -1,0 +1,44 @@
+{
+  "id": "req-s07-a2a-consuming",
+  "title": "Synthetic A2A consuming prototype",
+  "raw_text": "Build a local runnable prototype that delegates a synthetic policy question to an independently owned A2A Agent through a localhost test double.",
+  "domain": "synthetic-quality-assurance",
+  "requester": {
+    "team": "scenario-fixture-team",
+    "role": "reviewer"
+  },
+  "business_goal": "Verify an approved A2A consuming boundary without using a production endpoint or private data.",
+  "current_process": [
+    "Accept a synthetic policy question",
+    "Prepare the delegated task locally",
+    "Call the synthetic remote Agent through A2A",
+    "Observe the terminal task outcome",
+    "Return the synthetic answer or an explicit manual-review handoff"
+  ],
+  "inputs": [
+    {
+      "name": "policy_question",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "policy_answer",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "systems": [
+    {
+      "name": "synthetic_remote_policy_qa",
+      "access": "read_write"
+    }
+  ],
+  "risk_signals": [
+    "audit_required"
+  ],
+  "missing_information": [],
+  "contradictions": [],
+  "status": "approved"
+}

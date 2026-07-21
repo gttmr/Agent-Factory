@@ -1,0 +1,27 @@
+[
+  {
+    "asset_id": "agent.template",
+    "source_requirement_id": "req-template",
+    "catalog_entry_id": null,
+    "name": "Template Agent",
+    "asset_type": "agent",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "platform",
+    "reuse_status": "project_only",
+    "capability_tags": [],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": null,
+    "exposure": null,
+    "confidence": 0.9,
+    "rationale": "Reviewed agent responsibility for Template Agent",
+    "inputs": [],
+    "outputs": [],
+    "risk_level": "low",
+    "risk_signals": [],
+    "status": "approved",
+    "missing_information": [],
+    "developer_todos": []
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "id": "req-s15-private-data-safety",
+  "title": "Synthetic private-data-safe service smoke",
+  "raw_text": "Build a local smoke handoff for a synthetic service request while refusing to persist supplied endpoint or credential values and keeping all network access disabled.",
+  "domain": "synthetic-connection-safety",
+  "requester": {
+    "team": "scenario-fixture-team",
+    "role": "reviewer"
+  },
+  "business_goal": "Verify that an environment-backed external connection design does not propagate private values and cannot become runnable until the current generator supports the reviewed boundary.",
+  "current_process": [
+    "Accept a fixed synthetic service query",
+    "Refer only to approved environment-variable names",
+    "Use a deterministic local synthetic response for smoke evidence",
+    "Keep all network access disabled",
+    "Fail closed when external connector generation is requested"
+  ],
+  "inputs": [
+    {
+      "name": "synthetic_query",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "synthetic_service_result",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "systems": [
+    {
+      "name": "synthetic_local_service_fixture",
+      "access": "read"
+    }
+  ],
+  "risk_signals": [
+    "audit_required"
+  ],
+  "missing_information": [],
+  "contradictions": [],
+  "status": "approved"
+}

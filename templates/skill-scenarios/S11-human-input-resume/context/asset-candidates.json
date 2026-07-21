@@ -1,0 +1,104 @@
+[
+  {
+    "asset_id": "workflow-s11-human-input-resume",
+    "source_requirement_id": "req-s11-human-input-resume",
+    "catalog_entry_id": null,
+    "name": "Synthetic Human Input Resume Workflow",
+    "asset_type": "workflow",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "human-input",
+      "api-resume",
+      "idempotency"
+    ],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": {
+      "representation": "graph",
+      "coordination": "explicit",
+      "template_ref": null
+    },
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "The approved graph must pause, correlate a later response to the same invocation, route the decision, and preserve at-most-once synthetic change behavior.",
+    "inputs": [
+      {
+        "name": "synthetic_change_request",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "change_outcome",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "risk_level": "medium",
+    "risk_signals": [
+      "transaction_write",
+      "human_approval_required",
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": []
+  },
+  {
+    "asset_id": "tool-s11-apply-synthetic-change",
+    "source_requirement_id": "req-s11-human-input-resume",
+    "catalog_entry_id": null,
+    "name": "Apply Synthetic Change Tool",
+    "asset_type": "tool",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "synthetic-write",
+      "idempotent"
+    ],
+    "binding": {
+      "kind": "function"
+    },
+    "connection": {
+      "transport": "in_process"
+    },
+    "workflow_profile": null,
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "A dedicated Tool makes the reviewed side-effect boundary and duplicate-protection requirement observable in tests.",
+    "inputs": [
+      {
+        "name": "change_id",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "decision",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "applied",
+        "type": "boolean",
+        "required": true
+      }
+    ],
+    "risk_level": "medium",
+    "risk_signals": [
+      "transaction_write",
+      "human_approval_required",
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": [],
+    "side_effect": "write",
+    "audit_required": true
+  }
+]

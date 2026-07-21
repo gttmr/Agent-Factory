@@ -1,5 +1,5 @@
 import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
-import type { AnalysisResult, ModuleCandidate } from "../../analyzer/types";
+import type { AnalysisResult, AssetCandidate } from "../../analyzer/types";
 import { A2AContractInspector, A2AContractSidebar } from "../../design/A2AContractPanel";
 import type { buildA2AReviewRows } from "../../design/A2AContractPanel";
 import { LocalA2AProviderImport as LocalA2AProviderImportControl } from "../../design/LocalA2AProviderImport";
@@ -13,8 +13,8 @@ interface DesignA2ATabProps {
   readonly a2aContracts: AnalysisResult["a2aContracts"];
   readonly selectedA2ARow: DesignA2AReviewRow | null;
   readonly saving: boolean;
-  readonly onSelectA2AModule: (moduleId: string) => void;
-  readonly onCreateA2AContract: (candidate: ModuleCandidate) => void;
+  readonly onSelectA2AAsset: (assetId: string) => void;
+  readonly onCreateA2AContract: (candidate: AssetCandidate) => void;
   readonly onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
   readonly onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
 }
@@ -25,7 +25,7 @@ export function DesignA2ATab({
   a2aContracts,
   selectedA2ARow,
   saving,
-  onSelectA2AModule,
+  onSelectA2AAsset,
   onCreateA2AContract,
   onImportLocalA2AProvider,
   onSaveA2AContract
@@ -45,9 +45,9 @@ export function DesignA2ATab({
           새 계약 생성
         </Button>
       </div>
-      <A2AContractSidebar candidates={analysis.moduleCandidates} contracts={a2aContracts} selectedModuleId={selectedA2ARow?.candidate.id ?? null} onSelect={onSelectA2AModule} />
+      <A2AContractSidebar assets={analysis.assetCandidates} contracts={a2aContracts} selectedAssetId={selectedA2ARow?.candidate.asset_id ?? null} onSelect={onSelectA2AAsset} />
       <A2AContractInspector
-        key={`${selectedA2ARow?.candidate.id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
+        key={`${selectedA2ARow?.candidate.asset_id ?? "none"}:${selectedA2ARow?.contract?.contract_id ?? "missing"}`}
         candidate={selectedA2ARow?.candidate ?? null}
         contract={selectedA2ARow?.contract ?? null}
         saving={saving}

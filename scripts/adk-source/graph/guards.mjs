@@ -2,7 +2,6 @@ import { edgeCapability } from "../dispatch/index.mjs";
 import { collectGenerationNodes } from "./collector.mjs";
 
 export function assertRunnableGraphSupported(context, options = {}) {
-  const unsupportedContainerKinds = new Set(["dynamic_workflow", "loop_region"]);
   const collection = options.collection ?? collectGenerationNodes(context, { mode: "static" });
   const structuredHumanInputs = collection.unsupportedNodes.filter((entry) => entry.code === "structured_human_input");
   const badNodes = collection.unsupportedNodes
@@ -10,7 +9,7 @@ export function assertRunnableGraphSupported(context, options = {}) {
     .map((entry) => `${entry.node.id} (${entry.node.node_kind}: ${entry.reason})`);
   if (badNodes.length > 0) {
     throw new Error(
-      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported nodes are input/output, synthetic human_input/join/router, and module-bound agent/adapter/workflow/remote_a2a/remote_agent_call nodes (no loop-control or module_id-null intermediary nodes). Use smoke mode.`
+      `runnable mode cannot lower these nodes yet: ${badNodes.join(", ")}. Supported Target nodes are input, agent, tool, function, human_input, subworkflow, join, and output.`
     );
   }
   if (structuredHumanInputs.length > 0) {
@@ -19,46 +18,45 @@ export function assertRunnableGraphSupported(context, options = {}) {
     );
   }
 
-  const containers = Array.isArray(context.processFlow.containers) ? context.processFlow.containers : [];
-  const badContainers = containers
-    .filter((container) => container && unsupportedContainerKinds.has(container.container_kind))
-    .map((container) => `${container.id} (${container.container_kind})`);
-  if (badContainers.length > 0) {
-    throw new Error(
-      `runnable mode does not support these container regions yet: ${badContainers.join(", ")}. parallel_region, human_review_region, and remote_boundary are visual groupings only; use smoke mode or wait for loop/dynamic lowering.`
-    );
-  }
-
-  const edges = Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [];
+  const edges = Array.isArray(context.graph.edges) ? context.graph.edges : [];
   const badEdges = [];
-  const defaultRouteEdgesByRouter = new Map();
+  const conditionRouteNodeIds = new Set();
+  const defaultRouteEdgesByNode = new Map();
   for (const [index, edge] of edges.entries()) {
     const dispatch = edgeCapability(edge, {
       mode: "static",
       graph: collection.graph,
       counts: collection.counts,
-      exclusions: collection.toolsetAdapterIds,
+      exclusions: collection.agentOwnedToolIds,
       index
     });
     if (!dispatch.capability.supported) {
       badEdges.push(
-        `${dispatch.edge.from}->${dispatch.edge.to} (${dispatch.edge.edge_kind}/${dispatch.edge.execution_semantics}: ${dispatch.capability.reason})`
+        `${dispatch.edge.from}->${dispatch.edge.to} (${dispatch.edge.control.kind}/${dispatch.edge.channel ?? "control"}: ${dispatch.capability.reason})`
       );
       continue;
     }
-    if (dispatch.handler.kind !== "route" || dispatch.edge.is_default_route !== true) continue;
-    const defaults = defaultRouteEdgesByRouter.get(dispatch.edge.from) ?? [];
+    if (dispatch.handler.kind !== "condition") continue;
+    conditionRouteNodeIds.add(dispatch.edge.from);
+    if (dispatch.edge.control.default !== true) continue;
+    const defaults = defaultRouteEdgesByNode.get(dispatch.edge.from) ?? [];
     defaults.push(dispatch.edge.id ?? `${dispatch.edge.from}->${dispatch.edge.to}`);
-    defaultRouteEdgesByRouter.set(dispatch.edge.from, defaults);
+    defaultRouteEdgesByNode.set(dispatch.edge.from, defaults);
   }
   if (badEdges.length > 0) {
     throw new Error(
-      `runnable mode does not support these edges yet: ${badEdges.join(", ")}. Supported DAG edges include normal fan-out/fan-in transitions, reviewed router route edges, and genuine remote_a2a edges; use smoke mode or wait for loop/dynamic lowering.`
+      `runnable mode does not support these edges yet: ${badEdges.join(", ")}.`
     );
   }
-  const duplicateDefaults = [...defaultRouteEdgesByRouter.entries()]
+  const missingDefaults = [...conditionRouteNodeIds].filter((nodeId) => !defaultRouteEdgesByNode.has(nodeId));
+  if (missingDefaults.length > 0) {
+    throw new Error(
+      `runnable mode route nodes have no explicit default/unmatched contract: ${missingDefaults.join(", ")}.`
+    );
+  }
+  const duplicateDefaults = [...defaultRouteEdgesByNode.entries()]
     .filter(([, defaults]) => defaults.length > 1)
-    .map(([routerId, defaults]) => `${routerId}: ${defaults.join(", ")}`);
+    .map(([routeNodeId, defaults]) => `${routeNodeId}: ${defaults.join(", ")}`);
   if (duplicateDefaults.length > 0) {
     throw new Error(`runnable mode route graph has multiple default route edges: ${duplicateDefaults.join("; ")}.`);
   }

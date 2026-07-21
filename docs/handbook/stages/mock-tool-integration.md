@@ -18,7 +18,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 ## 주요 입력
 
 - 사용자가 편집한 MockSpec 또는 Codex SDK draft prompt
-- read-only Catalog legacy `adapter` prefill 후보
+- read-only Target Tool prefill 후보
 - tool input/output JSON Schema와 synthetic response/error scenario
 - saved mock identity와 MCP request
 
@@ -31,7 +31,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 
 ## Main Flow
 
-1. Mock Lab UI는 saved mocks와 legacy `catalog/adapters.yaml` prefill을 불러오고 draft 편집 상태를 유지한다.
+1. Mock Lab UI는 saved mocks와 strict Target `catalog/tools.yaml` prefill을 불러오고 draft 편집 상태를 유지한다.
 2. 사용자는 직접 편집하거나 Codex SDK가 만든 isolated draft를 선택한다. draft 선택은 canonical spec을 자동 교체하지 않는다.
 3. save는 MockSpec과 guardrail/schema를 검증한 뒤 canonical file과 audit event를 쓴다.
 4. server start는 반드시 saved spec을 다시 읽고 local Node child process를 기동한다.
@@ -59,7 +59,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 
 ## 이전·다음 Stage
 
-- 이전 또는 seed: [catalog-publication](catalog-publication.md)의 legacy `adapter` entry
+- 이전 또는 seed: [catalog-publication](catalog-publication.md)의 Target Tool entry
 - 다음: [runtime-handoff-build](runtime-handoff-build.md)의 Mock Lab binding, [runtime-execution](runtime-execution.md)의 prerequisite 확인
 - 독립 사용: Mock Lab 자체 authoring·smoke workflow
 
@@ -70,7 +70,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - Codex SDK
 - local Node child process와 stdio JSON-RPC
 - MCP Streamable HTTP
-- read-only `catalog/adapters.yaml`
+- read-only `catalog/tools.yaml`
 
 ## L3 Source Map
 
@@ -88,7 +88,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: browser, HTTP
 - Failure/edge behavior: invalid·dirty·running state를 구분해 save/run/test를 차단하고 unsaved 전환 전에 확인한다.
 - Related registers: `reg.catalog-entries`, `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Mock Lab HTTP composition
@@ -105,7 +105,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: HTTP, local filesystem, child process, MCP
 - Failure/edge behavior: malformed path/body와 method mismatch를 구분하고 typed `MockLabError`를 HTTP status로 변환한다.
 - Related registers: `reg.catalog-entries`, `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Mock artifact store
@@ -122,7 +122,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: local filesystem
 - Failure/edge behavior: invalid ID·path escape·ID mismatch를 거부하고 missing canonical spec은 404다.
 - Related registers: `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Codex SDK draft registry
@@ -139,7 +139,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: Codex SDK, local filesystem
 - Failure/edge behavior: timeout 기본값은 10분이고 JSON 추출·schema validation 실패를 failed draft로 기록한다. canonical spec은 직접 쓰지 않는다.
 - Related registers: `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### Saved-spec process registry
@@ -156,7 +156,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: Node child process, stdio, filesystem
 - Failure/edge behavior: 같은 mock 중복 start는 409, request timeout은 기본 5초이며 persisted running은 live process가 없으면 stopped로 읽는다.
 - Related registers: `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### MCP network bridge
@@ -173,7 +173,7 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: MCP Streamable HTTP, stdio-backed child
 - Failure/edge behavior: missing/expired session은 404, stopped mock initialize는 409, ambiguous alias는 binding 실패다.
 - Related registers: `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ### MockSpec and value validation
@@ -190,24 +190,24 @@ synthetic·local-only MockSpec을 작성·검증·저장하고 saved spec 기반
 - External boundaries: 없음
 - Failure/edge behavior: spec structural/guardrail 위반은 error이며 success response/schema 불일치 일부는 warning으로 보고한다.
 - Related registers: `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
-### Catalog legacy adapter prefill
+### Target Tool prefill
 
 - Path: `packages/mock-lab/server/catalogPrefillLoader.ts`
-- Stable anchor: `loadCatalogPrefill`, `sanitizeToolName`
-- Role in behavior: legacy `catalog/adapters.yaml`의 mock-ready/stub 후보를 synthetic MockSpec 초안으로 투영한다.
-- Inputs: repo root와 legacy adapter entries
+- Stable anchor: `loadCatalogPrefill`, `sanitizeMockId`
+- Role in behavior: strict `catalog/tools.yaml`의 MCP-bound mock-ready Tool 후보를 synthetic MockSpec 초안으로 변환한다.
+- Inputs: repo root, Target Tool entries
 - Outputs: Catalog prefill payload
 - State/artifact reads: `reg.catalog-entries`
 - State/artifact writes: 없음
 - Important callers: `createMockLabMiddleware`
 - Important callees: YAML parser, local field/schema mappers
 - External boundaries: local filesystem
-- Failure/edge behavior: 후보 조건은 legacy `contract_status`, `runtime_mock`, `component_source`이며 source Catalog를 수정하지 않는다.
+- Failure/edge behavior: exact `tools` bucket과 Target Tool fields를 요구한다. MCP `binding`/stdio `connection`과 Asset `inputs`/`outputs`를 권위로 사용하며, 후보 조건은 `contract_status: mock_ready` 또는 `runtime_mock: true`다. source Catalog는 수정하지 않고 deprecated row를 제외한 최신 version을 선택한다.
 - Related registers: `reg.catalog-entries`, `reg.mock-lab-lifecycle`
-- Verified at commit: `7deea45`
+- Verified at: baseline `0cdcb82` + 2026-07-19 worktree
 - Locator status: `active`
 
 ## 확인되지 않은 사항

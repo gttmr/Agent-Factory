@@ -1,6 +1,14 @@
-import type { GraphEdge, GraphNode, ModuleCandidate } from "../analyzer/types";
+import {
+  graphNodeKinds,
+  type AssetCandidate,
+  type GraphEdge,
+  type GraphNode,
+  type GraphRegionKind,
+  type InvocationControl,
+  type NodeKind
+} from "../analyzer/types";
 
-export type GraphElementGroupId = "summary" | "io" | "flow" | "runtime" | "risk" | "adk" | "raw";
+export type GraphElementGroupId = "summary" | "io" | "flow" | "runtime" | "risk" | "raw";
 export type GraphElementTabId = GraphElementGroupId;
 
 export interface GraphElementGroup {
@@ -12,62 +20,77 @@ export const GRAPH_ELEMENT_GROUPS: readonly GraphElementGroup[] = [
   { id: "summary", label: "요약" },
   { id: "io", label: "입출력" },
   { id: "flow", label: "흐름" },
-  { id: "runtime", label: "호출·런타임" },
+  { id: "runtime", label: "호출·채널" },
   { id: "risk", label: "검토·리스크" },
-  { id: "adk", label: "ADK Skeleton" },
   { id: "raw", label: "원본" }
 ];
 
 export const GRAPH_ELEMENT_TABS = GRAPH_ELEMENT_GROUPS;
 
-const MODULE_NODE_KINDS = new Set<GraphNode["node_kind"]>([
-  "agent",
-  "workflow",
-  "workflow_call",
-  "adapter",
-  "adapter_call",
-  "remote_a2a",
-  "remote_agent_call"
-]);
+const NODE_KIND_LABELS: Record<NodeKind, string> = {
+  input: "입력",
+  agent: "Agent",
+  tool: "Tool",
+  function: "Function",
+  human_input: "사람 입력",
+  subworkflow: "Subworkflow",
+  join: "병합",
+  output: "출력"
+};
 
-export function isModuleBoundNodeKind(kind: GraphNode["node_kind"]): boolean {
-  return MODULE_NODE_KINDS.has(kind);
+export const TARGET_NODE_KIND_OPTIONS = graphNodeKinds.map((value) => ({ value, label: NODE_KIND_LABELS[value] }));
+
+const GRAPH_REGION_LABELS: Record<GraphRegionKind, string> = {
+  parallel: "병렬 실행 범위",
+  loop: "반복 실행 범위"
+};
+
+export function graphRegionLabel(kind: GraphRegionKind): string {
+  return GRAPH_REGION_LABELS[kind];
 }
 
-export function hasIncidentEdge(nodeId: string, edges: GraphEdge[]): boolean {
-  return edges.some((edge) => edge.from === nodeId || edge.to === nodeId);
+const INVOCATION_CONTROL_LABELS: Record<InvocationControl, string> = {
+  workflow: "Workflow",
+  agent: "Agent"
+};
+
+export function invocationControlLabel(value: InvocationControl): string {
+  return INVOCATION_CONTROL_LABELS[value];
 }
 
-export function hasNodeContract(node: GraphNode): boolean {
+export function isAssetBoundNodeKind(kind: GraphNode["node_kind"]): boolean {
+  return kind === "agent" || kind === "tool" || kind === "subworkflow";
+}
+
+export function assetRefForNode(node: GraphNode | null | undefined): string | null {
+  if (!node) return null;
+  if (node.node_kind === "agent") return node.agent_ref;
+  if (node.node_kind === "tool") return node.tool_ref;
+  if (node.node_kind === "subworkflow") return node.workflow_ref;
+  return null;
+}
+
+export function isA2AProtocolBoundary(
+  node: GraphNode | null | undefined,
+  asset: AssetCandidate | null | undefined
+): boolean {
   return Boolean(
-    node.workflow_ref ||
-      node.input_schema ||
-      node.output_schema ||
-      node.input_mapping ||
-      node.output_mapping ||
-      node.mock_binding ||
-      (node.schema_refs?.length ?? 0) > 0
+    node?.node_kind === "agent" &&
+      asset?.asset_type === "agent" &&
+      (asset.binding?.kind === "a2a" || asset.exposure?.protocol === "a2a")
   );
-}
-
-export function isNodeModuleLinkEditable(node: GraphNode, edges: GraphEdge[]): boolean {
-  return isModuleBoundNodeKind(node.node_kind) && !hasIncidentEdge(node.id, edges) && !hasNodeContract(node);
-}
-
-export function isEdgeKindEditable(edge: GraphEdge): boolean {
-  return edge.edge_kind !== "route" && edge.edge_kind !== "remote_a2a";
 }
 
 export interface GraphElementGroupInput {
   readonly selectedNode: GraphNode | null;
   readonly selectedEdge: GraphEdge | null;
-  readonly candidate: ModuleCandidate | null;
+  readonly asset: AssetCandidate | null;
 }
 
 export function availableGraphElementGroups(input: GraphElementGroupInput): readonly GraphElementGroup[] {
-  const { selectedNode, selectedEdge, candidate } = input;
+  const { selectedNode, selectedEdge, asset } = input;
   if (!selectedNode && !selectedEdge) return [];
-  return GRAPH_ELEMENT_GROUPS.filter((group) => isGraphElementGroupAvailable(group.id, selectedNode, selectedEdge, candidate));
+  return GRAPH_ELEMENT_GROUPS.filter((group) => isGroupAvailable(group.id, selectedNode, selectedEdge, asset));
 }
 
 export function nextGraphElementGroupAfterSelectionChange(
@@ -81,91 +104,22 @@ export function nextGraphElementTabAfterSelectionChange(currentTab: GraphElement
   return nextGraphElementGroupAfterSelectionChange(currentTab, GRAPH_ELEMENT_GROUPS);
 }
 
-function isGraphElementGroupAvailable(
+function isGroupAvailable(
   groupId: GraphElementGroupId,
   node: GraphNode | null,
   edge: GraphEdge | null,
-  candidate: ModuleCandidate | null
+  asset: AssetCandidate | null
 ): boolean {
-  if (groupId === "summary" || groupId === "raw") return Boolean(node || edge);
-  if (node) return isNodeGroupAvailable(groupId, node, candidate);
-  if (edge) return isEdgeGroupAvailable(groupId, edge);
-  return false;
-}
-
-function isNodeGroupAvailable(groupId: GraphElementGroupId, node: GraphNode, candidate: ModuleCandidate | null): boolean {
-  if (groupId === "io") return hasNodeIoDetails(node, candidate);
-  if (groupId === "flow") return hasNodeFlowDetails(node);
-  if (groupId === "runtime") return hasNodeRuntimeDetails(node);
-  if (groupId === "risk") return hasNodeRiskDetails(node, candidate);
-  if (groupId === "adk") return hasNodeAdkDetails(node);
-  return false;
-}
-
-function isEdgeGroupAvailable(groupId: GraphElementGroupId, edge: GraphEdge): boolean {
-  if (groupId === "io") {
-    return Boolean(edge.data_label || edge.schema_ref || edge.state_key || edge.artifact_key || edge.a2a_contract_id);
+  if (groupId === "summary" || groupId === "raw") return true;
+  if (edge) {
+    if (groupId === "flow") return true;
+    if (groupId === "runtime") return edge.channel !== null;
+    return false;
   }
-  if (groupId === "flow") return true;
-  if (groupId === "risk") return Boolean(edge.is_remote_boundary_crossing || edge.edge_kind === "remote_a2a");
+  if (!node) return false;
+  if (groupId === "io") return node.node_kind === "human_input" || Boolean(asset?.inputs.length || asset?.outputs.length);
+  if (groupId === "flow") return node.node_kind === "function" || node.node_kind === "human_input";
+  if (groupId === "runtime") return isAssetBoundNodeKind(node.node_kind);
+  if (groupId === "risk") return Boolean(asset?.risk_level || asset?.risk_signals.length || asset?.missing_information.length);
   return false;
-}
-
-function hasNodeIoDetails(node: GraphNode, candidate: ModuleCandidate | null): boolean {
-  return Boolean(
-    node.input_schema ||
-      node.output_schema ||
-      hasValues(node.schema_refs) ||
-      hasPortSchemas(node.input_ports) ||
-      hasPortSchemas(node.output_ports) ||
-      hasMapping(node.input_mapping) ||
-      hasMapping(node.output_mapping) ||
-      node.human_input_contract ||
-      hasValues(candidate?.inputs) ||
-      hasValues(candidate?.outputs)
-  );
-}
-
-function hasNodeFlowDetails(node: GraphNode): boolean {
-  return node.node_kind === "router" || node.node_kind === "human_input" || node.node_kind === "callback_wait" || node.node_kind === "loop_control";
-}
-
-function hasNodeRuntimeDetails(node: GraphNode): boolean {
-  return Boolean(
-    node.invoke_binding ||
-      node.runtime_binding ||
-      node.decision_owner ||
-      node.call_control ||
-      node.execution_kind ||
-      node.agent_execution_mode ||
-      node.mock_binding ||
-      node.workflow_ref
-  );
-}
-
-function hasNodeAdkDetails(node: GraphNode): boolean {
-  if (node.node_kind !== "workflow" && node.node_kind !== "workflow_call") return false;
-  return Boolean(node.adk_skeleton_contract || node.adk_node_role);
-}
-
-function hasNodeRiskDetails(node: GraphNode, candidate: ModuleCandidate | null): boolean {
-  return Boolean(
-    node.side_effect ||
-      node.policy ||
-      candidate?.risk_level ||
-      hasValues(candidate?.risk_signals) ||
-      hasValues(candidate?.missing_information)
-  );
-}
-
-function hasMapping(value: Record<string, string> | null | undefined): boolean {
-  return Boolean(value && Object.keys(value).length > 0);
-}
-
-function hasPortSchemas(ports: readonly { readonly schema_ref: string | null }[]): boolean {
-  return ports.some((port) => Boolean(port.schema_ref));
-}
-
-function hasValues(value: readonly unknown[] | null | undefined): boolean {
-  return Boolean(value && value.length > 0);
 }

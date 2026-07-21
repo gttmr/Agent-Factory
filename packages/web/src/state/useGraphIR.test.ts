@@ -1,60 +1,137 @@
 import assert from "node:assert/strict";
-import simpleScenario from "../../../../templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json" with { type: "json" };
-import { parseAnalysisResultArtifact } from "../analyzer/analysisArtifactImport.ts";
+import type { AnalysisResult, GraphIR } from "../analyzer/types.ts";
 import { deriveGraphIRForAnalysis } from "./useGraphIR.ts";
 
-const unsupportedLegacyGraphMessage = "구버전 그래프 형식은 더 이상 지원되지 않습니다";
-const nativeAnalysis = parseAnalysisResultArtifact(JSON.stringify(simpleScenario), "analysis-result.json").analysis;
+const graph: GraphIR = {
+  graph_id: "graph.use-graph-ir",
+  source_requirement_id: "req-use-graph-ir",
+  workflow_ref: "workflow.use-graph-ir",
+  nodes: [
+    { id: "input", label: "Input", node_kind: "input" },
+    { id: "output", label: "Output", node_kind: "output" }
+  ],
+  edges: [
+    {
+      id: "edge.input.output",
+      from: "input",
+      to: "output",
+      control: { kind: "next", condition: null, accepted_aliases: [], default: false },
+      channel: null
+    }
+  ],
+  regions: []
+};
 
-// Given: a native Graph IR analysis result.
-const nativeResult = deriveGraphIRForAnalysis(nativeAnalysis);
+const analysis = analysisWithGraph(graph);
 
-// Then: the derivation returns a renderable graph and no normalization error.
-assert.ok(nativeResult.graphIR);
-assert.equal(nativeResult.errorCount, 0);
-assert.equal(nativeResult.normalizationError, undefined);
+// Strict current Graph IR is consumed directly, without migration, coercion,
+// backfill, cloning, or persisted-validation merging.
+const current = deriveGraphIRForAnalysis(analysis);
+assert.equal(current.graphIR, graph);
+assert.equal(current.errorCount, 0);
+assert.equal(current.warningCount, 0);
+assert.equal(current.validationError, undefined);
 
 const originalWarn = console.warn;
-let warningEmitted = false;
+const warnings: string[] = [];
 
 try {
-  console.warn = (...args: unknown[]) => {
-    warningEmitted = String(args[0]).includes("[useGraphIR] migration failed:");
-  };
+  console.warn = (...args: unknown[]) => warnings.push(args.map(String).join(" "));
 
-  // Given: an on-disk analysis root still carrying the old stage-flow keys.
-  const legacyStageFlowAnalysis = {
-    ...nativeAnalysis,
-    processFlow: {
-      requirement_id: "req-legacy-design",
-      graph_id: "graph-001",
-      root_workflow_module_id: null,
-      nodes: [{ id: "node-agent", label: "Agent", type: "agent" }],
-      edges: [
-        {
-          id: "edge-001",
-          from: "node-agent",
-          to: "node-output",
-          edge_type: "event",
-          data_channel: "event_output",
-          data: "payload"
-        }
-      ],
-      containers: [],
-      lanes: [],
-      validation: { ok: true, errors: [], warnings: [] }
-    } as never
-  };
+  const retiredOnly = {
+    ...analysis,
+    graph: undefined,
+    processFlow: graph
+  } as unknown as AnalysisResult;
+  const retiredResult = deriveGraphIRForAnalysis(retiredOnly);
+  assert.equal(retiredResult.graphIR, null);
+  assert.equal(retiredResult.errorCount, 1);
+  assert.equal(retiredResult.warningCount, 0);
+  assert.match(retiredResult.validationError ?? "", /graph/i);
 
-  // When: Design derives Graph IR for rendering.
-  const legacyResult = deriveGraphIRForAnalysis(legacyStageFlowAnalysis);
+  const persistedValidation = {
+    ...graph,
+    validation: { ok: true, errors: [], warnings: [] }
+  } as unknown as GraphIR;
+  const persistedValidationResult = deriveGraphIRForAnalysis(analysisWithGraph(persistedValidation));
+  assert.equal(persistedValidationResult.graphIR, null);
+  assert.equal(persistedValidationResult.errorCount, 1);
 
-  // Then: it blocks rendering instead of returning the raw legacy graph.
-  assert.equal(legacyResult.graphIR, null);
-  assert.equal(legacyResult.errorCount, 1);
-  assert.equal(legacyResult.warningCount, 0);
-  assert.match(legacyResult.normalizationError ?? "", new RegExp(unsupportedLegacyGraphMessage));
-  assert.equal(warningEmitted, true);
+  const missingChannel = structuredClone(graph) as GraphIR;
+  delete (missingChannel.edges[0] as Partial<GraphIR["edges"][number]>).channel;
+  const missingChannelResult = deriveGraphIRForAnalysis(analysisWithGraph(missingChannel));
+  assert.equal(missingChannelResult.graphIR, null);
+  assert.equal(missingChannelResult.errorCount, 1);
+  assert.match(missingChannelResult.validationError ?? "", /channel/);
+
+  assert.equal(warnings.length, 3);
+  assert.ok(warnings.every((warning) => warning.includes("[useGraphIR] validation failed:")));
 } finally {
   console.warn = originalWarn;
+}
+
+assert.deepEqual(deriveGraphIRForAnalysis(null), { graphIR: null, errorCount: 0, warningCount: 0 });
+
+function analysisWithGraph(value: GraphIR): AnalysisResult {
+  return {
+    contract_version: "2.0",
+    normalizedRequirement: {
+      id: "req-use-graph-ir",
+      title: "Use strict Graph IR",
+      raw_text: "Render only the current graph contract.",
+      domain: "workbench",
+      requester: { team: "platform", role: "developer" },
+      business_goal: "Reject retired graph shapes.",
+      current_process: [],
+      inputs: [],
+      outputs: [],
+      systems: [],
+      risk_signals: [],
+      missing_information: [],
+      contradictions: [],
+      status: "approved"
+    },
+    evidence: {
+      requested_goal: "Render strict Graph IR.",
+      business_domain_hint: "workbench",
+      user_role: "developer",
+      input_data: [],
+      output_data: [],
+      systems_mentioned: [],
+      decisions_implied: [],
+      risk_signals: [],
+      missing_information: [],
+      contradictions: [],
+      assumptions: []
+    },
+    assetCandidates: [
+      {
+        asset_id: "workflow.use-graph-ir",
+        source_requirement_id: "req-use-graph-ir",
+        catalog_entry_id: null,
+        name: "Use Graph IR Workflow",
+        asset_type: "workflow",
+        domain_scope: "domain_neutral",
+        business_domains: [],
+        owner: "platform",
+        reuse_status: "project_only",
+        capability_tags: [],
+        binding: null,
+        connection: null,
+        workflow_profile: { representation: "graph", coordination: "explicit", template_ref: null },
+        exposure: null,
+        confidence: 1,
+        rationale: "Owns the strict graph used by this hook regression test.",
+        inputs: [],
+        outputs: [],
+        risk_level: "low",
+        risk_signals: [],
+        status: "approved",
+        missing_information: []
+      }
+    ],
+    a2aContracts: [],
+    runtimeContracts: [],
+    graph: value
+  };
 }

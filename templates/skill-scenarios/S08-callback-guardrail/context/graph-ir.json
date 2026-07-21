@@ -1,0 +1,109 @@
+{
+  "graph_id": "graph-s08-callback-guardrail",
+  "source_requirement_id": "req-s08-callback-guardrail",
+  "workflow_ref": "workflow-s08-callback-guardrail",
+  "nodes": [
+    {
+      "id": "node-s08-input",
+      "label": "Synthetic operation request",
+      "node_kind": "input"
+    },
+    {
+      "id": "node-s08-prepare",
+      "label": "Prepare redacted guardrail input",
+      "node_kind": "function",
+      "role": "prepare_input"
+    },
+    {
+      "id": "node-s08-route-decision",
+      "label": "Route callback guardrail decision",
+      "node_kind": "function",
+      "role": "route"
+    },
+    {
+      "id": "node-s08-tool",
+      "label": "Execute allowed synthetic operation",
+      "node_kind": "tool",
+      "tool_ref": "tool-s08-synthetic-operation",
+      "invocation_control": "workflow"
+    },
+    {
+      "id": "node-s08-executed-output",
+      "label": "Synthetic operation executed",
+      "node_kind": "output"
+    },
+    {
+      "id": "node-s08-blocked-output",
+      "label": "Synthetic operation blocked",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-s08-input-to-prepare",
+      "from": "node-s08-input",
+      "to": "node-s08-prepare",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s08-before-tool-callback",
+      "from": "node-s08-prepare",
+      "to": "node-s08-route-decision",
+      "control": {
+        "kind": "callback",
+        "condition": "before_tool guardrail decision is available",
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "state"
+    },
+    {
+      "id": "edge-s08-allow-to-tool",
+      "from": "node-s08-route-decision",
+      "to": "node-s08-tool",
+      "control": {
+        "kind": "condition",
+        "condition": "guardrail_decision == allow",
+        "accepted_aliases": [
+          "continue"
+        ],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s08-block-to-output",
+      "from": "node-s08-route-decision",
+      "to": "node-s08-blocked-output",
+      "control": {
+        "kind": "condition",
+        "condition": "guardrail_decision == block",
+        "accepted_aliases": [
+          "override",
+          "error"
+        ],
+        "default": true
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s08-tool-to-output",
+      "from": "node-s08-tool",
+      "to": "node-s08-executed-output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    }
+  ],
+  "regions": []
+}

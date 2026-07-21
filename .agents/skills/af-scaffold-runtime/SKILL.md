@@ -25,15 +25,17 @@ Production deployment, private integration, credential provisioning, 업무 로�
 
 ### Preconditions
 
-다음을 모두 확인한다.
+먼저 Workbench mode와 Standalone mode 중 하나를 고정하고 다음을 확인한다.
 
 1. approved Compose result가 존재한다.
 2. Scaffold Readiness가 `ready`이며 근거가 있다.
-3. `scaffold-plan.json` 또는 동등한 approved scaffold plan이 존재한다.
-4. required runtime contracts와 A2A contracts가 approved다.
-5. candidate-level Missing Information이 비어 있다.
-6. output mode와 exact output path가 명시됐다.
-7. required dependency와 installed package를 검사할 수 있다.
+3. Workbench mode에서는 `boundaries_approved=true`와 `runtime_contracts_approved=true`이며, server artifact-sync가 valid canonical analysis에서 `scaffold-plan.json`을 파생할 수 있다.
+4. Standalone mode에서는 `scaffold-plan.json` 또는 동등한 approved scaffold plan이 이미 존재한다.
+5. required runtime contracts와 A2A Agent binding/exposure contracts가 approved다.
+6. current generator를 실행할 artifact root에는 complete strict `af-run-manifest.json`이 있다.
+7. candidate-level Missing Information이 비어 있다.
+8. output mode와 exact output path가 명시됐다.
+9. required dependency와 installed package를 검사할 수 있다.
 
 승인 산출물이 없으면 즉시 STOP한다.
 
@@ -42,17 +44,20 @@ Production deployment, private integration, credential provisioning, 업무 로�
 ### Inputs
 
 - approved `analysis-result.json`과 derived artifacts
-- approved `boundary-design.md`와 `scaffold-plan.json`
-- manifest approval evidence, manifest가 있는 경우
+- approved `boundary-design.md`
+- Standalone mode의 기존 approved `scaffold-plan.json`; Workbench mode에서는 artifact-sync가 이를 파생한다.
+- complete `af-run-manifest.json`과 approval evidence
 - selected Runtime Pattern contracts
 - explicit output mode와 output root
 - synthetic mock contract와 environment-variable names
 
 ### Read Set
 
+먼저 [Source of Truth](../_shared/source-of-truth.md)와 [Lifecycle Invariants](../_shared/lifecycle-invariants.md)를 읽는다.
+
 항상 [Artifact Sync and Generation](references/artifact-sync-and-generation.md)과 [Output Modes and Handoff](references/output-modes-and-handoff.md)를 읽는다.
 
-current artifact 입력을 쓰거나 보정할 때만 [Compatibility Layer](../_shared/compatibility-current-schema.md)를 읽는다.
+v2 artifact를 읽거나 보정할 때 [Target Contract v2](../_shared/target-contract-v2.md)를 읽는다.
 
 선택된 pattern이 있을 때 [Runtime Pattern Selection](../_shared/runtime-pattern-selection.md)에서 해당 card만 연다.
 
@@ -78,7 +83,7 @@ Workbench artifact-sync를 실행하는 경우 canonical write는 server-owned f
 - approved candidates와 source analysis의 ID가 일치하는지 확인한다.
 - Graph 또는 no-Graph decision이 review됐는지 확인한다.
 - Binding, Invocation Control, auth variable name, failure policy를 확인한다.
-- required runtime/A2A contracts의 status를 확인한다.
+- required runtime contracts와 A2A Agent binding/exposure의 status를 확인한다.
 - `raw_requirement_to_code=false`를 확인한다.
 
 하나라도 실패하면 generation을 시작하지 않는다.
@@ -90,8 +95,8 @@ Workbench artifact-sync를 실행하는 경우 canonical write는 server-owned f
 | Conceptual mode | 의미 | Current Product mapping |
 | --- | --- | --- |
 | Skeleton | structure, interface, TODO boundary | 독립 current value 없음; 필요 시 `smoke`의 명시적 TODO 범위 |
-| Smoke | synthetic data와 local mock으로 실행 가능 | `smoke` (`legacy` Current Implementation) |
-| Runnable Prototype | 승인 구조의 local runtime wiring | `runnable` (`legacy` Current Implementation) |
+| Smoke | synthetic data와 local mock으로 실행 가능 | `smoke` |
+| Runnable Prototype | 승인 구조의 local runtime wiring | `runnable` |
 | Production | production endpoint와 운영 정책 | 지원하지 않음 |
 
 현행 Product에는 `smoke`와 `runnable`만 유효하다.
@@ -190,9 +195,9 @@ Consuming은 verified remote component, discovery, timeout, auth interceptor, fa
 
 설치된 package의 import와 signature를 확인하지 못하면 생성하지 않는다.
 
-#### 11단계: current compatibility와 output을 검토한다
+#### 11단계: strict v2 contract와 output을 검토한다
 
-current canonical artifact를 수정해야 한다면 Compatibility Layer를 적용한다.
+canonical artifact를 수정해야 한다면 strict Target Contract v2를 적용한다.
 
 Target rationale를 지우는 매핑이나 지원되지 않는 field가 필요하면 중단하고 `docs/migration/skill-vnext-status.md` Blocker로 기록하도록 보고한다.
 
@@ -205,7 +210,7 @@ generated code가 approved artifact와 다른 책임·Graph·contract를 추가�
 | 모든 scaffold | [Artifact Sync and Generation](references/artifact-sync-and-generation.md) | sync/generator 순서 |
 | output mode와 handoff | [Output Modes and Handoff](references/output-modes-and-handoff.md) | current mode와 non-goals |
 | pattern이 선택됨 | [Runtime Pattern Selection](../_shared/runtime-pattern-selection.md) | 해당 ADK card 선택 |
-| current artifact write | [Compatibility Layer](../_shared/compatibility-current-schema.md) | compatibility output |
+| v2 artifact read/write | [Target Contract v2](../_shared/target-contract-v2.md) | strict fields and Graph contract |
 | 생성 뒤 검증 | [Generated Output Checks](references/generated-output-checks.md) | compile/test/safety evidence |
 
 pattern card는 본문의 direct link에서 필요한 것만 읽는다.
@@ -241,7 +246,9 @@ approved artifact와 일치하는 scaffold, synthetic tests, handoff, fresh veri
 
 ## 6. Stop Conditions
 
-- approved Compose result 또는 scaffold plan이 없음
+- approved Compose result가 없음
+- Workbench mode에서 Design approval gate가 닫혀 있거나 canonical analysis로 scaffold plan을 파생할 수 없음
+- Standalone mode에서 approved scaffold plan이 없음
 - `raw_requirement_to_code=false`가 아님
 - candidate Missing Information 또는 required approval이 열려 있음
 - current artifact validation이나 artifact-sync가 실패함
@@ -250,7 +257,7 @@ approved artifact와 일치하는 scaffold, synthetic tests, handoff, fresh veri
 - selected pattern contract가 불완전함
 - package/version/import/signature를 확인할 수 없음
 - unsupported Graph/pattern lowering이 필요함
-- compatibility mapping이 불가능함
+- approved Target contract를 generator가 지원하지 않음
 - credential, private endpoint, production logic, deploy 권한이 필요함
 - compile, generated test, local smoke가 실패함
 

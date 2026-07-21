@@ -182,7 +182,7 @@ async function liveTools(registry: MockProcessRegistry, mockId: string): Promise
   }
 }
 
-// Resolve a path key to a mock_id. The catalog logical mcp_server name is not
+// Resolve a path key to a mock_id. The Catalog binding.server_ref is not
 // the mock_id, so accept mock_id (unique, wins), then server_name, then
 // source.catalog_entry_name. Ambiguous alias matches resolve to null rather
 // than silently binding the wrong mock.

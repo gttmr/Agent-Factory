@@ -1,17 +1,17 @@
 import { Button, EmptyState, Panel, SectionHeader } from "../../ui/primitives";
-import type { ScaffoldOutputMode, ScaffoldPlan, ScaffoldPlanModule } from "../../analyzer/types";
+import type { AssetCandidate, ScaffoldOutputMode, ScaffoldPlan } from "../../analyzer/types";
 import type { MockLabDiscoveryPayload } from "../../state/useMockLabDiscovery";
 import type { AdkGraphReadiness } from "./buildReadiness";
 import { hasMockLabBindingTargets } from "../../mock-lab/mockLabIntegration";
 import { MockLabBindingPanel } from "./MockLabBindingPanel";
 
-interface AdapterConnections {
-  readonly connected: readonly ScaffoldPlanModule[];
-  readonly unconnected: readonly ScaffoldPlanModule[];
+interface ToolConnections {
+  readonly connected: readonly AssetCandidate[];
+  readonly unconnected: readonly AssetCandidate[];
 }
 
 interface ManualScaffoldPanelProps {
-  readonly adapterConnections: AdapterConnections;
+  readonly toolConnections: ToolConnections;
   readonly adkGraphReadiness: AdkGraphReadiness;
   readonly blockers: readonly string[];
   readonly designGatesReady: boolean;
@@ -22,7 +22,7 @@ interface ManualScaffoldPanelProps {
     readonly isLoading: boolean;
   };
   readonly modeDirty: boolean;
-  readonly onMockLabBinding: (module: ScaffoldPlanModule, value: string) => void;
+  readonly onMockLabBinding: (asset: AssetCandidate, value: string) => void;
   readonly onOutputModeChange: (mode: ScaffoldOutputMode) => void;
   readonly onSavePlan: () => void;
   readonly outputMode: ScaffoldOutputMode;
@@ -35,7 +35,7 @@ interface ManualScaffoldPanelProps {
 }
 
 export function ManualScaffoldPanel({
-  adapterConnections,
+  toolConnections,
   adkGraphReadiness,
   blockers,
   designGatesReady,
@@ -58,7 +58,7 @@ export function ManualScaffoldPanel({
       <SectionHeader
         eyebrow="advanced/manual"
         title="Scaffold plan 수동 제어"
-        description="approved 상태 모듈과 승인된 runtime contract 만 포함됩니다. blockers 가 비어 있어야 runtime-stub 생성이 가능합니다."
+        description="승인된 Agent, Workflow, Tool과 Runtime Contract만 포함됩니다. blockers가 비어 있어야 Runtime Handoff를 생성할 수 있습니다."
         action={
           <Button
             type="button"
@@ -80,7 +80,7 @@ export function ManualScaffoldPanel({
       {scaffoldLoading ? <p className="af-landing-message">scaffold-plan 불러오는 중…</p> : null}
       {effectivePlan ? (
         <ScaffoldPlanSummary
-          adapterConnections={adapterConnections}
+          toolConnections={toolConnections}
           adkGraphReadiness={adkGraphReadiness}
           outputMode={outputMode}
           plan={effectivePlan}
@@ -99,7 +99,7 @@ export function ManualScaffoldPanel({
         />
       ) : null}
       {outputMode === "runnable" && effectivePlan && !hasMockLabBindingTargets(effectivePlan) ? (
-        <p className="af-landing-message">Mock Lab MCP 바인딩 대상 adapter가 없습니다. 현재 plan은 agent/workflow 중심 runtime-stub으로 생성됩니다.</p>
+        <p className="af-landing-message">Mock Lab MCP 바인딩 대상 Tool이 없습니다. 현재 plan은 Agent/Workflow 중심 Runtime Handoff로 생성됩니다.</p>
       ) : null}
       <BlockerList title="blockers" entries={blockers} open />
       <BlockerList title="warnings" entries={warnings} />
@@ -140,7 +140,7 @@ function OutputModeToggle({
       </Button>
       <span className="af-output-mode-hint">
         {outputMode === "runnable"
-          ? "ADK LlmAgent 그래프 + Mock Lab MCP 어댑터를 실행합니다. LLM provider와 secret은 .agent-factory/runtime.env 에 둡니다."
+          ? "ADK LlmAgent 그래프 + Mock Lab MCP Tool 연결을 실행합니다. LLM provider와 secret은 .agent-factory/runtime.env 에 둡니다."
           : "synthetic 스모크 핸드오프입니다 (LLM/키 불필요)."}
       </span>
     </div>
@@ -148,20 +148,20 @@ function OutputModeToggle({
 }
 
 function ScaffoldPlanSummary({
-  adapterConnections,
+  toolConnections,
   adkGraphReadiness,
   outputMode,
   plan
 }: {
-  readonly adapterConnections: AdapterConnections;
+  readonly toolConnections: ToolConnections;
   readonly adkGraphReadiness: AdkGraphReadiness;
   readonly outputMode: ScaffoldOutputMode;
   readonly plan: ScaffoldPlan;
 }) {
   return (
     <ul className="af-gate-summary">
-      <li>모듈 후보 → 승인된 모듈 {plan.modules.length}개 / 제외 {plan.excluded_modules.length}개</li>
-      <li>런타임 계약 {plan.runtime_contracts.length}개</li>
+      <li>승인된 자산 {plan.assets.length}개 / 제외된 자산 {plan.excluded_assets.length}개</li>
+      <li>Runtime Contract {plan.runtime_contracts.length}개</li>
       <li>can_generate_source: {plan.validation.can_generate_source ? "예" : "아니오"}</li>
       <li>blockers: {plan.validation.blockers.length}건, warnings: {plan.validation.warnings.length}건</li>
       {outputMode === "runnable" ? (
@@ -178,14 +178,14 @@ function ScaffoldPlanSummary({
               : ""}
           </li>
           <li>
-            ADK static control: join {adkGraphReadiness.joinNodes}개 · loop_control {adkGraphReadiness.loopControlNodes}개 ·
-            dynamic workflow module {adkGraphReadiness.dynamicWorkflowModules}개
+            ADK control: Join {adkGraphReadiness.joinNodes}개 · 반복 실행 범위 {adkGraphReadiness.loopRegions}개 ·
+            Dynamic Workflow {adkGraphReadiness.dynamicWorkflowAssets}개
           </li>
           <li>
-            어댑터 MCP 바인딩(선언): 선언됨 {adapterConnections.connected.length} · 미선언{" "}
-            {adapterConnections.unconnected.length}
-            {adapterConnections.unconnected.length > 0
-              ? ` (미선언: ${adapterConnections.unconnected.map((module) => module.name).join(", ")})`
+            Tool MCP Binding(선언): 선언됨 {toolConnections.connected.length} · 미선언{" "}
+            {toolConnections.unconnected.length}
+            {toolConnections.unconnected.length > 0
+              ? ` (미선언: ${toolConnections.unconnected.map((asset) => asset.name).join(", ")})`
               : ""}
             . 실제 연결 여부는 실행 시 Mock Lab MCP discovery로 확인합니다.
           </li>

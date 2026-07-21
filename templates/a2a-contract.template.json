@@ -1,6 +1,6 @@
 {
   "contract_id": "a2a-001",
-  "remote_module_id": "mod-remote-placeholder",
+  "agent_ref": "agent.remote-placeholder",
   "target_agent_name": "needs_info",
   "target_agent_purpose": "needs_info",
   "contract_status": "needs_info",
@@ -22,7 +22,9 @@
     "allowed_roles": []
   },
   "task_lifecycle": {
-    "states": ["TASK_STATE_SUBMITTED"],
+    "states": [
+      "TASK_STATE_SUBMITTED"
+    ],
     "allowed_transitions": [],
     "terminal_states": [],
     "input_required_followup": "needs_info",
@@ -40,6 +42,23 @@
     "chunking_policy": "needs_info"
   },
   "adk_host_mapping": "needs_info",
+  "adk_runtime_policy": {
+    "timeout_seconds": 30,
+    "auth": {
+      "mode": "none",
+      "env_var": null,
+      "metadata_key": null
+    },
+    "retry_handoff": {
+      "max_attempts": null,
+      "backoff_seconds": null,
+      "retry_on": []
+    },
+    "fallback_handoff": {
+      "mode": "none",
+      "message": null
+    }
+  },
   "timeout": "needs_info",
   "retry": "needs_info",
   "fallback": "needs_info",

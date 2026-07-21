@@ -1,97 +1,145 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import fixture from "../../../templates/regression-scenarios/scenario-a-simple-local-specialist/analysis-result.json" with { type: "json" };
-import graphWorkflowFixture from "../../../templates/regression-scenarios/scenario-d-graph-workflow/analysis-result.json" with { type: "json" };
+import { resolve } from "node:path";
 import { validateAnalysisResult } from "./analysisResultValidation.ts";
 import { runCodexAnalyzer, type CodexAnalyzerRunner } from "./codexAnalyzer.ts";
 
-const repoRoot = await mkdtemp(join(tmpdir(), "af-codex-analyzer-"));
+const candidateBase = {
+  source_requirement_id: "req-001",
+  catalog_entry_id: null,
+  domain_scope: "domain_neutral",
+  business_domains: [],
+  owner: "platform",
+  reuse_status: "project_only",
+  capability_tags: [],
+  connection: { transport: "unknown" },
+  confidence: 0.9,
+  inputs: [],
+  outputs: [],
+  risk_level: "low",
+  risk_signals: [],
+  status: "needs_info",
+  missing_information: [],
+  developer_todos: []
+} as const;
 
-try {
-  const schemaDir = join(repoRoot, "schemas");
-  await mkdir(schemaDir, { recursive: true });
-  await writeFile(join(schemaDir, "analysis-result.schema.json"), `${JSON.stringify({ type: "object" })}\n`, "utf8");
-  await writeFile(join(schemaDir, "analysis-draft.schema.json"), `${JSON.stringify({ type: "object" })}\n`, "utf8");
-
-  const runner: CodexAnalyzerRunner = {
-    async run(input) {
-      assert.equal(input.model, "gpt-5.5");
-      assert.equal(input.repoRoot, repoRoot);
-      assert.equal(typeof input.prompt, "string");
-      assert.deepEqual(input.outputSchema, { type: "object" });
-      return {
-        outputText: JSON.stringify({
-          ...fixture,
-          normalizedRequirement: {
-            ...fixture.normalizedRequirement,
-            raw_text: "SDK analyzer requirement"
-          }
-        }),
-        stdout: "{\"type\":\"thread.started\"}\n",
-        stderr: "",
-        diagnostics: {
-          elapsedMs: 12,
-          eventCount: 1,
-          lastEventType: "thread.started",
-          eventTypeCounts: { "thread.started": 1 },
-          lastTraceTitle: "Thread 시작",
-          lastTraceSnippet: "thread-test"
-        }
-      };
-    }
-  };
-
-  const run = await runCodexAnalyzer({
-    repoRoot,
-    schemaPath: join(schemaDir, "analysis-result.schema.json"),
-    draftSchemaPath: join(schemaDir, "analysis-draft.schema.json"),
-    input: {
-      rawText: "SDK analyzer requirement",
-      domain: "공통"
+const strictTarget = {
+  contract_version: "2.0",
+  normalizedRequirement: {
+    id: "req-001",
+    title: "A2A target contract",
+    raw_text: "Call a remote reviewer",
+    domain: "공통",
+    requester: { team: "platform", role: "developer" },
+    business_goal: "Review a request",
+    current_process: [],
+    inputs: [],
+    outputs: [],
+    systems: [],
+    risk_signals: [],
+    missing_information: [],
+    contradictions: [],
+    status: "draft"
+  },
+  evidence: {
+    requested_goal: "Review a request",
+    business_domain_hint: "공통",
+    user_role: "developer",
+    input_data: [],
+    output_data: [],
+    systems_mentioned: [],
+    decisions_implied: [],
+    risk_signals: [],
+    missing_information: [],
+    contradictions: [],
+    assumptions: []
+  },
+  assetCandidates: [
+    {
+      ...candidateBase,
+      asset_id: "workflow.review",
+      name: "Review workflow",
+      asset_type: "workflow",
+      binding: null,
+      connection: null,
+      workflow_profile: { representation: "graph", coordination: "explicit", template_ref: null },
+      exposure: null,
+      rationale: "Owns control flow"
     },
-    model: "gpt-5.5",
-    catalog: [],
-    codexRunner: runner
-  });
+    {
+      ...candidateBase,
+      asset_id: "agent.remote-reviewer",
+      name: "Remote reviewer",
+      asset_type: "agent",
+      binding: null,
+      connection: null,
+      workflow_profile: null,
+      exposure: null,
+      rationale: "Owns a remote review decision"
+    }
+  ],
+  a2aContracts: [],
+  runtimeContracts: [],
+  graph: {
+    graph_id: "graph-001",
+    source_requirement_id: "req-001",
+    workflow_ref: "workflow.review",
+    nodes: [
+      { id: "node-agent", label: "Remote reviewer", node_kind: "agent", agent_ref: "agent.remote-reviewer", available_tools: [] }
+    ],
+    edges: [],
+    regions: []
+  }
+};
 
-  assert.equal((run.output as typeof fixture).normalizedRequirement.raw_text, "SDK analyzer requirement");
-  assert.equal(run.diagnostics.eventCount, 1);
-  assert.equal(run.promptChars > 0, true);
-  assert.equal(run.timeoutMs > 0, true);
-} finally {
-  await rm(repoRoot, { recursive: true, force: true });
+assert.deepEqual(validateAnalysisResult(strictTarget), [], "strict Target v2 shape should be accepted");
+
+for (const key of ["moduleCandidates", "processFlow"] as const) {
+  const legacy = structuredClone(strictTarget) as Record<string, unknown>;
+  legacy[key] = {};
+  assert.match(validateAnalysisResult(legacy).join("\n"), new RegExp(key));
 }
 
-const invalidReviewedAdkFields = structuredClone(fixture);
-invalidReviewedAdkFields.processFlow.nodes[0].node_kind = "human_input";
-invalidReviewedAdkFields.processFlow.nodes[0].lane_id = "human_input";
-invalidReviewedAdkFields.processFlow.nodes[0].human_input_contract = {
-  message: " ",
-  payload_schema_ref: { schema: "AddressForm" },
-  response_schema_ref: "AddressForm",
-  response_mapping: []
+const versionless = structuredClone(strictTarget) as Record<string, unknown>;
+delete versionless.contract_version;
+assert.match(validateAnalysisResult(versionless).join("\n"), /contract_version/);
+
+const badBinding = structuredClone(strictTarget);
+badBinding.assetCandidates[1]!.binding = { kind: "a2a" } as never;
+assert.match(validateAnalysisResult(badBinding).join("\n"), /contract_ref/);
+
+const oldGraph = structuredClone(strictTarget);
+Object.assign(oldGraph.graph.edges, [{
+  id: "edge-001",
+  from: "node-agent",
+  to: "node-agent",
+  edge_kind: "remote_a2a",
+  flow_kind: "sequence",
+  call_control: "fixed_by_workflow"
+}]);
+assert.match(validateAnalysisResult(oldGraph).join("\n"), /edge_kind|flow_kind|call_control/);
+
+const repoRoot = resolve(process.cwd(), "../..");
+const runner: CodexAnalyzerRunner = {
+  async run(input) {
+    assert.equal(input.model, "gpt-5.5");
+    assert.equal(JSON.stringify(input.outputSchema).includes('"$ref"'), false, "SDK schema must bundle canonical external refs");
+    return {
+      outputText: JSON.stringify(strictTarget),
+      stdout: "",
+      stderr: "",
+      diagnostics: { elapsedMs: 1, eventCount: 0, eventTypeCounts: {} }
+    };
+  }
 };
-invalidReviewedAdkFields.processFlow.edges[0].edge_kind = "event_output";
-invalidReviewedAdkFields.processFlow.edges[0].route_aliases = ["route-only"];
-invalidReviewedAdkFields.processFlow.edges[0].is_default_route = true;
-invalidReviewedAdkFields.processFlow.edges.push({
-  ...invalidReviewedAdkFields.processFlow.edges[0],
-  id: "edge-999",
-  edge_kind: "route",
-  route_condition: "choice == duplicate",
-  route_aliases: [" "],
-  is_default_route: true
+const run = await runCodexAnalyzer({
+  repoRoot,
+  schemaPath: resolve(repoRoot, "schemas/analysis-result.schema.json"),
+  draftSchemaPath: resolve(repoRoot, "schemas/analysis-draft.schema.json"),
+  input: { rawText: "Call a remote reviewer", domain: "공통" },
+  model: "gpt-5.5",
+  catalog: [],
+  codexRunner: runner
 });
+assert.deepEqual(run.output, strictTarget, "analyzer must return the strict result without hydration or migration");
 
-const invalidReviewedAdkFieldErrors = validateAnalysisResult(invalidReviewedAdkFields);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /human_input_contract\.message/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /payload_schema_ref/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /response_mapping/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /response_schema_ref/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /route_aliases is allowed only on route or loop decision edges/);
-assert.match(invalidReviewedAdkFieldErrors.join("\n"), /is_default_route is allowed only on route or loop decision edges/);
-
-const loopDecisionRouteMetadataErrors = validateAnalysisResult(graphWorkflowFixture);
-assert.deepEqual(loopDecisionRouteMetadataErrors, []);
+console.log("codex analyzer strict Target contract validation tests passed");

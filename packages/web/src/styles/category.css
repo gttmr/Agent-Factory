@@ -1,7 +1,7 @@
 /* =====================================================================
    Components layer — cross-screen category visuals. This is the CSS half
    of the category single-source-of-truth; the markup half is
-   components/CategoryBadge.tsx. Module Review, Graph IR, Catalog, A2A
+   components/CategoryBadge.tsx. Asset Review, Graph IR, Catalog, A2A
    review, and Domain Map all render through these classes so colors and
    glyphs stay in sync.
 
@@ -23,13 +23,6 @@
   line-height: 1;
 }
 
-.subtype-glyph {
-  width: auto;
-  min-width: 18px;
-  padding: 0 var(--space-2xs);
-  font-size: var(--fs-2xs);
-}
-
 .cat-glyph.cat-agent {
   background: var(--cat-agent-soft);
   color: var(--cat-agent);
@@ -38,18 +31,13 @@
   background: var(--cat-workflow-soft);
   color: var(--cat-workflow);
 }
-.cat-glyph.cat-adapter {
-  background: var(--cat-adapter-soft);
-  color: var(--cat-adapter);
-}
-.cat-glyph.cat-remote {
-  background: var(--cat-remote-soft);
-  color: var(--cat-remote);
+.cat-glyph.cat-tool {
+  background: var(--cat-tool-soft);
+  color: var(--cat-tool);
 }
 
-/* ---- category + subtype badges ---- */
-.category-badge,
-.subtype-badge {
+/* ---- category badges ---- */
+.category-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -72,27 +60,15 @@
   border-color: var(--cat-workflow-line);
   color: var(--cat-workflow);
 }
-.category-badge.cat-adapter {
-  background: var(--cat-adapter-soft);
-  border-color: var(--cat-adapter-line);
-  color: var(--cat-adapter);
-}
-.category-badge.cat-remote {
-  background: var(--cat-remote-soft);
-  border-color: var(--cat-remote-line);
-  color: var(--cat-remote);
+.category-badge.cat-tool {
+  background: var(--cat-tool-soft);
+  border-color: var(--cat-tool-line);
+  color: var(--cat-tool);
 }
 
-.category-badge .cat-glyph,
-.subtype-badge .cat-glyph {
+.category-badge .cat-glyph {
   background: rgba(255, 255, 255, 0.55);
   color: inherit;
-}
-
-.subtype-badge {
-  background: var(--surface-muted);
-  border-color: var(--line);
-  color: var(--text-strong);
 }
 
 /* ---- protocol badge ---- */
@@ -115,6 +91,12 @@
   background: var(--tint-lavender);
   border-color: var(--line-strong);
   color: var(--accent);
+}
+
+.protocol-badge.protocol-a2a {
+  background: var(--protocol-a2a-soft);
+  border-color: var(--protocol-a2a-line);
+  color: var(--protocol-a2a);
 }
 
 .protocol-badge .cat-glyph {
@@ -157,11 +139,8 @@
 .row-stripe.cat-workflow {
   background: var(--cat-workflow);
 }
-.row-stripe.cat-adapter {
-  background: var(--cat-adapter);
-}
-.row-stripe.cat-remote {
-  background: var(--cat-remote);
+.row-stripe.cat-tool {
+  background: var(--cat-tool);
 }
 
 /* ---- Domain × Capability map ----

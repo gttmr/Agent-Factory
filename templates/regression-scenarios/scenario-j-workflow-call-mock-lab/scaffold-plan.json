@@ -1,269 +1,162 @@
 {
-  "requirement_id": "req-workflow-call-mock-lab",
+  "contract_version": "2.0",
+  "requirement_id": "req-scenario-j",
   "source": "approved_workbench_artifact",
   "raw_requirement_to_code": false,
   "output_mode": "runnable",
-  "modules": [
+  "assets": [
     {
-      "id": "mod-customer-profile",
-      "name": "고객 프로파일 조회 Adapter",
-      "module_category": "adapter",
-      "agent_kind": null,
-      "workflow_kind": null,
-      "adapter_kind": "legacy_api",
-      "remote_contract_kind": null,
-      "scaffold_output": "runnable",
-      "no_runnable_business_logic": false,
-      "catalog_binding": null,
-      "developer_todos": [
-        "Mock Lab MCP tool binding을 확인하세요.",
-        "실제 EAI/API client는 전문 개발자가 수동 보강하세요."
-      ],
-      "inputs": [
-        {
-          "name": "customer_id",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "profile",
-          "type": "object",
-          "required": true
-        }
-      ],
-      "required_review_fields": [],
-      "risk_signals": [
-        "personal_data",
-        "audit_required"
-      ],
-      "runtime_mock": null,
-      "instruction": null,
-      "model": null,
-      "agent_execution_mode": null,
-      "access_protocol": "mcp",
-      "mcp_server": "mock-customer-profile",
-      "mcp_tool_name": "get_customer_profile",
-      "mcp_schema_ref": "catalog.customer_profile_request.v1",
-      "mcp_auth_mode": "none",
-      "runtime_binding": "mcp_tool",
-      "invoke_binding": "mcp_tool",
-      "decision_owner": "workflow_code",
-      "call_control": "fixed_by_workflow",
-      "side_effect": "read",
-      "policy": "audit_required",
-      "node_kind": "adapter_call",
-      "workflow_ref": null,
-      "input_mapping": null,
-      "output_mapping": null,
-      "mock_binding": {
-        "provider": "mock_lab",
-        "package_path": "packages/mock-lab",
-        "mock_server_id": "mock-customer-profile",
-        "tool_name": "get_customer_profile",
-        "input_schema": "catalog.customer_profile_request.v1",
-        "output_schema": "catalog.customer_profile_response.v1",
-        "sample_response_ref": "mock_samples.customer_profile.basic",
-        "status": "linked"
+      "asset_id": "tool.mock-lab",
+      "source_requirement_id": "req-scenario-j",
+      "catalog_entry_id": null,
+      "name": "Mock Lab Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "platform",
+      "reuse_status": "project_only",
+      "capability_tags": [],
+      "binding": {
+        "kind": "mcp",
+        "server_ref": "mock-lab",
+        "tool_name": "lookup"
       },
-      "adk_skeleton_contract": {
-        "scaffold_level": "mock_testable_skeleton",
-        "target_runtime": "adk_python_2_x",
-        "entrypoint": "root_agent",
-        "generation_mode": "deterministic_template",
-        "implementation_template": "mcp_mock_adapter_stub",
-        "manual_completion_required": true,
-        "developer_todos": [
-          "replace_mock_with_real_eai_client"
-        ]
-      }
+      "connection": {
+        "transport": "http"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 0.9,
+      "rationale": "Reviewed tool responsibility for Mock Lab Tool",
+      "inputs": [],
+      "outputs": [],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "developer_todos": []
     },
     {
-      "id": "mod-risk-workflow",
-      "name": "이탈위험 판단 Workflow 호출",
-      "module_category": "workflow",
-      "agent_kind": null,
-      "workflow_kind": "graph",
-      "adapter_kind": null,
-      "remote_contract_kind": null,
-      "scaffold_output": "runnable",
-      "no_runnable_business_logic": false,
-      "catalog_binding": null,
-      "developer_todos": [
-        "workflow_call target skeleton 연결 방식을 확인하세요.",
-        "input/output mapping을 검토하세요."
-      ],
-      "inputs": [
-        {
-          "name": "customer_id",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "risk_result",
-          "type": "object",
-          "required": true
-        }
-      ],
-      "required_review_fields": [],
-      "risk_signals": [
-        "audit_required"
-      ],
-      "runtime_mock": null,
-      "instruction": null,
-      "model": null,
-      "agent_execution_mode": null,
-      "access_protocol": null,
-      "mcp_server": null,
-      "mcp_tool_name": null,
-      "mcp_schema_ref": null,
-      "mcp_auth_mode": null,
-      "runtime_binding": "workflow_call",
-      "invoke_binding": "internal_workflow",
-      "decision_owner": "workflow_code",
-      "call_control": "fixed_by_workflow",
-      "side_effect": "none",
-      "policy": "audit_required",
-      "node_kind": "workflow_call",
-      "workflow_ref": {
-        "id": "wf-risk-check",
-        "version": "v1",
-        "source": "catalog",
-        "display_name": "이탈위험 판단 Workflow"
+      "asset_id": "workflow.child",
+      "source_requirement_id": "req-scenario-j",
+      "catalog_entry_id": null,
+      "name": "Child Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "platform",
+      "reuse_status": "project_only",
+      "capability_tags": [],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
       },
-      "input_mapping": {
-        "customer_id": "$state.customer.id"
-      },
-      "output_mapping": {
-        "risk_result": "$result"
-      },
-      "mock_binding": null,
-      "adk_skeleton_contract": {
-        "scaffold_level": "mock_testable_skeleton",
-        "target_runtime": "adk_python_2_x",
-        "entrypoint": "root_agent",
-        "generation_mode": "deterministic_template",
-        "implementation_template": "workflow_call_stub",
-        "manual_completion_required": true,
-        "developer_todos": [
-          "confirm_workflow_call_contract"
-        ]
-      }
+      "exposure": null,
+      "confidence": 0.9,
+      "rationale": "Reviewed workflow responsibility for Child Workflow",
+      "inputs": [],
+      "outputs": [],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "developer_todos": []
     }
   ],
   "runtime_contracts": [],
+  "excluded_assets": [],
   "graph": {
+    "graph_id": "graph.scenario-j",
+    "source_requirement_id": "req-scenario-j",
+    "workflow_ref": null,
     "nodes": [
       {
-        "id": "node-input",
-        "module_id": null,
-        "node_kind": "input",
-        "invoke_binding": null,
-        "decision_owner": null,
-        "call_control": null,
-        "side_effect": null,
-        "policy": null
+        "id": "input",
+        "label": "Input",
+        "node_kind": "input"
       },
       {
-        "id": "node-customer-profile",
-        "module_id": "mod-customer-profile",
-        "node_kind": "adapter_call",
-        "invoke_binding": "mcp_tool",
-        "decision_owner": "workflow_code",
-        "call_control": "fixed_by_workflow",
-        "side_effect": "read",
-        "policy": "audit_required"
+        "id": "tool",
+        "label": "Mock Lab Tool",
+        "node_kind": "tool",
+        "tool_ref": "tool.mock-lab",
+        "invocation_control": "workflow"
       },
       {
-        "id": "node-risk-workflow",
-        "module_id": "mod-risk-workflow",
-        "node_kind": "workflow_call",
-        "invoke_binding": "internal_workflow",
-        "decision_owner": "workflow_code",
-        "call_control": "fixed_by_workflow",
-        "side_effect": "none",
-        "policy": "audit_required"
+        "id": "child",
+        "label": "Child Workflow",
+        "node_kind": "subworkflow",
+        "workflow_ref": "workflow.child"
       },
       {
-        "id": "node-output",
-        "module_id": null,
-        "node_kind": "output",
-        "invoke_binding": null,
-        "decision_owner": null,
-        "call_control": null,
-        "side_effect": null,
-        "policy": null
+        "id": "output",
+        "label": "Output",
+        "node_kind": "output"
       }
     ],
     "edges": [
       {
-        "id": "edge-1",
-        "from": "node-input",
-        "to": "node-customer-profile",
-        "edge_kind": "event_output",
-        "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null
+        "id": "edge.input.tool",
+        "from": "input",
+        "to": "tool",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "id": "edge-2",
-        "from": "node-customer-profile",
-        "to": "node-risk-workflow",
-        "edge_kind": "event_output",
-        "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null
+        "id": "edge.tool.child",
+        "from": "tool",
+        "to": "child",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "id": "edge-3",
-        "from": "node-risk-workflow",
-        "to": "node-output",
-        "edge_kind": "event_output",
-        "flow_kind": "sequence",
-        "call_control": "fixed_by_workflow",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null
+        "id": "edge.child.output",
+        "from": "child",
+        "to": "output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       }
-    ]
+    ],
+    "regions": []
   },
-  "excluded_modules": [],
   "manifest": {
-    "catalog_bound_modules": [],
+    "catalog_bound_assets": [],
     "new_code_required": [
       {
-        "module_id": "mod-customer-profile",
-        "module_name": "고객 프로파일 조회 Adapter",
-        "reason": "Mock Lab MCP test double을 실제 EAI/API client로 교체해야 합니다.",
-        "developer_todos": [
-          "replace_mock_with_real_eai_client"
-        ]
+        "asset_id": "tool.mock-lab",
+        "asset_name": "Mock Lab Tool",
+        "reason": "No reviewed Catalog binding exists for this approved asset.",
+        "developer_todos": []
       },
       {
-        "module_id": "mod-risk-workflow",
-        "module_name": "이탈위험 판단 Workflow 호출",
-        "reason": "target workflow skeleton 연결 방식을 확인해야 합니다.",
-        "developer_todos": [
-          "confirm_workflow_call_contract"
-        ]
+        "asset_id": "workflow.child",
+        "asset_name": "Child Workflow",
+        "reason": "No reviewed Catalog binding exists for this approved asset.",
+        "developer_todos": []
       }
     ]
   },
   "validation": {
     "can_generate_source": true,
     "blockers": [],
-    "warnings": [
-      "이 fixture는 production code가 아니라 workflow_call + Mock Lab skeleton handoff 계약 샘플입니다."
-    ]
+    "warnings": []
   }
 }

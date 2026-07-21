@@ -21,7 +21,7 @@ Move small serializable state and versioned binary outputs across approved runti
 
 ## Required questions
 
-- What is the producer, consumer, key/filename, schema/MIME type, and scope?
+- What is the producer, consumer, Graph edge identity, channel kind, schema/MIME type, and scope?
 - Is persistence required beyond process, invocation, session, or user?
 - Which service implementation owns persistence and retention?
 - When is the state/artifact action committed?
@@ -29,13 +29,13 @@ Move small serializable state and versioned binary outputs across approved runti
 
 ## Agent Factory representation
 
-Represent state and artifacts as runtime data channels on Graph edges and contracts, not assets. Keep session, user, app, and invocation scopes explicit. Reference [event-loop.md](event-loop.md) when commit timing matters.
+Represent state and artifacts as runtime data channels on Graph edges and contracts, not assets. Keep session, user, app, and invocation scopes explicit. Open `_shared/adk/event-loop.md` separately when commit timing matters.
 
 ## Compose Artifact
 
-Record producer, consumer, state key or artifact filename, scope, schema/MIME type, persistence service, retention, access control, version behavior, overwrite/idempotency policy, commit point, missing-value behavior, and synthetic fixture.
+Record producer, consumer, Graph edge identity, channel kind, scope, schema/MIME type, persistence service, retention, access control, version behavior, overwrite/idempotency policy, commit point, missing-value behavior, and synthetic fixture.
 
-For current Graph compatibility, state edge kind determines scope and requires `state_key`; artifact edges require `artifact_key`. Preserve the Target channel rationale separately.
+In strict v2 Graphs, an edge records only `channel` for state or artifact movement. The current generator derives the runtime storage key deterministically from the edge `id`; do not add a separate state or artifact key field.
 
 ## Scaffold Output
 
@@ -61,7 +61,7 @@ The returned revision starts at 0 and increases. `session_id=None` selects user-
 
 Official docs also describe agent output-key, context-state, and event-action update paths. Inspect the exact installed constructor before emitting fields not captured in the package check.
 
-Preserve valid current-generator guardrails during review: stop on multiple distinct outgoing state channels from one Agent, Agent artifact output, unsupported non-connected state/artifact consumers, duplicate state-key producers, or missing `state_key`/`artifact_key`. Reverify current emitter source before changing these limits.
+Preserve valid current-generator guardrails during review: stop on multiple distinct outgoing state channels from one Agent, Agent artifact output, unsupported non-connected state/artifact consumers, or derived runtime storage-key collisions. Reverify current emitter source before changing these limits.
 
 ## Verification Scenarios
 

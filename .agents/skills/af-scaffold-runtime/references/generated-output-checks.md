@@ -31,7 +31,7 @@ Network install이나 package upgrade는 사용자 승인 없이 수행하지 �
 
 Generated file 존재는 compile 또는 runtime success의 증거가 아니다.
 
-Current artifact validation은 behavior quality의 증거가 아니다.
+Strict v2 artifact validation은 behavior quality의 증거가 아니다.
 
 ## Scaffold implications
 

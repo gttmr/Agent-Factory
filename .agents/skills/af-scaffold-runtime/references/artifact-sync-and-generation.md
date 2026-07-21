@@ -43,26 +43,27 @@ Server order는 다음이다.
 1. canonical `analysis-result.json` 읽기와 validation
 2. current output mode 결정
 3. `normalized-requirement.json` write
-4. `module-candidates.json` write
-5. `process-flow.json` write
+4. `asset-candidates.json` write
+5. `graph-ir.json` write
 6. `scaffold-plan.json` write
 7. optional deterministic generation
 8. optional artifact validation
 
-Standalone direct generation은 approved `scaffold-plan.json`이 이미 있을 때만 허용한다.
+Standalone direct generation은 approved `scaffold-plan.json`과 complete `af-run-manifest.json`이 이미 있을 때만 허용한다.
 
 ## Required evidence
 
 - valid canonical analysis
 - approved candidates와 contracts
-- scaffold plan `source`와 `raw_requirement_to_code=false`
+- complete manifest와 `analysis_reviewed`, `boundaries_approved`, `runtime_contracts_approved` evidence
+- Workbench sync가 파생한 scaffold plan의 `source`와 `raw_requirement_to_code=false`, 또는 Standalone mode의 기존 approved scaffold plan
 - exact output mode와 root
 - no blockers or unresolved candidate information
 - current generator support for selected Graph/pattern
 
 ## Artifact implications
 
-Artifact sync는 derived artifact를 server-owned flow로 갱신한다.
+Artifact sync는 derived artifact를 server-owned flow로 갱신한다. `normalized-requirement.json`, `asset-candidates.json`, `graph-ir.json`은 외부 PUT 대상이 아니다.
 
 Generator는 approval boolean을 쓰지 않는다.
 
@@ -86,7 +87,8 @@ node scripts/validate-artifacts.mjs <artifact-root>
 
 ## Stop conditions
 
-- analysis 또는 scaffold plan이 없음
+- Workbench mode에서 valid canonical analysis나 required Design approval이 없음
+- Standalone mode에서 approved scaffold plan 또는 complete manifest가 없음
 - invalid current output mode
 - sync drift/error가 해소되지 않음
 - source candidate/contract가 unapproved
@@ -103,5 +105,5 @@ node scripts/validate-artifacts.mjs <artifact-root>
 
 ## Checked date
 
-- Checked date: 2026-07-18
+- Checked date: 2026-07-20
 - Current Product modes: `smoke`, `runnable` only.

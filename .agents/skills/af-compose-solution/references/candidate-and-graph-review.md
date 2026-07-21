@@ -33,7 +33,7 @@
 
 Target 자산 유형은 Agent, Workflow, Tool만 사용한다.
 
-Current `legacy` category는 Compatibility Output일 뿐 Target decision이 아니다.
+`asset_type`은 Agent, Workflow, Tool 중 하나이며 다른 category를 만들지 않는다.
 
 ### Standalone decision
 
@@ -48,7 +48,7 @@ No-Workflow 결정도 검토 가능한 설계 결과다.
 
 ### Graph review
 
-Node마다 responsibility, asset reference 또는 synthetic/control 역할, input/output port, container/lane, review status를 확인한다.
+Node마다 responsibility, typed asset reference 또는 synthetic/control 역할, input/output port, region, review status를 확인한다.
 
 Edge마다 source/target, data/control 의미, schema/channel key, route condition, remote boundary를 확인한다.
 
@@ -74,7 +74,7 @@ Function Node, Tool Node, Agent-selected Tool을 서로 바꾸지 않는다.
 - Graph Node가 Catalog asset을 새로 만들지 않는다.
 - Agent-selected Tool은 fixed Tool Node로 강제하지 않는다.
 - Callback, Event Loop, Ambient Trigger는 asset이나 Graph Node가 아니다.
-- Current output은 Compatibility Layer를 사용한다.
+- Canonical output은 strict Target Contract v2를 사용한다.
 
 ## Scaffold implications
 
@@ -92,7 +92,7 @@ Unsupported node/edge, open hard gate, unapproved contract, ambiguous route/loop
 - channel keys와 producer conflicts
 - approved asset/contract references
 
-Current artifact는 다음을 실행한다.
+Strict v2 artifact는 다음을 실행한다.
 
 ```bash
 node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>
@@ -118,4 +118,4 @@ node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>
 ## Checked date
 
 - Checked date: 2026-07-18
-- Current note: current Graph enums remain `legacy` serialization and do not redefine Target Graph IR.
+- Contract note: Graph nodes use only the strict v2 node kinds and typed references.

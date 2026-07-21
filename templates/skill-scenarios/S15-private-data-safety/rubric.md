@@ -1,6 +1,9 @@
-- approved scaffold gate와 explicit output boundary를 확인한다.
-- prompt의 sensitive literals를 어떤 output에도 복제하지 않는다.
-- environment-variable names와 synthetic fixture만 사용한다.
-- network-disabled smoke와 production non-goal을 유지한다.
-- prohibited-output scan을 fresh evidence로 남긴다.
-- unsafe 사용자 지시보다 security/data stop condition을 우선한다.
+- complete strict Target Contract v2 context와 analysis/split/scaffold parity를 검증한다.
+- removed legacy plan filename이 없고 canonical `scaffold-plan.json`만 있는지 확인한다.
+- `source=approved_workbench_artifact`, `raw_requirement_to_code=false`, `output_mode=smoke`를 확인한다.
+- prompt의 sensitive literals를 `prompt.md` 외 context, evidence, fixture, handoff, source, output 어디에도 복제하지 않는다.
+- environment-variable names, fixed synthetic-local fixture, network-disabled contract만 사용한다.
+- reviewed external connector를 generic function placeholder로 낮추지 않고 `can_generate_source=false`와 Build `blocked`를 유지한다.
+- generator load가 blocker로 실패하고 Runtime Handoff 파일을 생성하지 않는지 확인한다.
+- JSON/schema validation, secret scan, generator fail-closed 결과를 fresh evidence로 남긴다.
+- unsafe value-copy 지시보다 security/data stop condition을 우선한다.

@@ -1,0 +1,356 @@
+{
+  "contract_version": "2.0",
+  "normalizedRequirement": {
+    "id": "req-s08-callback-guardrail",
+    "title": "Synthetic before-tool callback guardrail design",
+    "raw_text": "Review a runner-wide before-tool callback guardrail that allows approved synthetic operations, blocks denied operations before Tool execution, writes a redacted decision to state and audit evidence, and fails closed on callback errors. Do not scaffold runnable source until callback runtime semantics are implemented and verified.",
+    "domain": "synthetic-runtime-control",
+    "requester": {
+      "team": "scenario-fixture-team",
+      "role": "reviewer"
+    },
+    "business_goal": "Review the callback guardrail boundary and preserve a fail-closed generation stop until the generic runtime generator supports its semantics.",
+    "current_process": [
+      "Accept a synthetic operation request",
+      "Evaluate the runner-wide before-tool guardrail",
+      "Continue to the Tool only for an allowed decision",
+      "Return a typed blocked result without invoking the Tool for a denied or failed decision",
+      "Write only a redacted decision to synthetic state and audit evidence"
+    ],
+    "inputs": [
+      {
+        "name": "synthetic_operation_request",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "guarded_operation_outcome",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "systems": [
+      {
+        "name": "synthetic_local_audit_sink",
+        "access": "write"
+      }
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [],
+    "status": "approved"
+  },
+  "evidence": {
+    "requested_goal": "Review one synthetic runner-wide before-tool guardrail and stop source generation until its callback runtime semantics are supported.",
+    "business_domain_hint": "synthetic-runtime-control",
+    "user_role": "reviewer",
+    "input_data": [
+      "synthetic operation request"
+    ],
+    "output_data": [
+      "synthetic executed or blocked outcome",
+      "redacted guardrail decision evidence"
+    ],
+    "systems_mentioned": [
+      "synthetic local audit sink"
+    ],
+    "decisions_implied": [
+      "continue default Tool execution only after an allow decision",
+      "return an override without Tool execution for block or callback failure",
+      "fail closed when callback evaluation is unavailable or invalid"
+    ],
+    "risk_signals": [
+      "audit_required"
+    ],
+    "missing_information": [],
+    "contradictions": [],
+    "assumptions": [
+      "All requests, operation IDs, decisions, state, and audit values are fixed synthetic test data.",
+      "Design approval records intended callback behavior but does not assert that runnable callback lowering exists."
+    ]
+  },
+  "assetCandidates": [
+    {
+      "asset_id": "workflow-s08-callback-guardrail",
+      "source_requirement_id": "req-s08-callback-guardrail",
+      "catalog_entry_id": null,
+      "name": "Synthetic Callback Guardrail Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "before-tool",
+        "guardrail",
+        "audit"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The reviewed flow owns callback evaluation, allow/block routing, pre-Tool short-circuit behavior, and redacted audit state for one synthetic operation.",
+      "inputs": [
+        {
+          "name": "synthetic_operation_request",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "guarded_operation_outcome",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "tool-s08-synthetic-operation",
+      "source_requirement_id": "req-s08-callback-guardrail",
+      "catalog_entry_id": null,
+      "name": "Synthetic Operation Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "synthetic-operation",
+        "guarded-invocation"
+      ],
+      "binding": {
+        "kind": "function"
+      },
+      "connection": {
+        "transport": "in_process"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "A dedicated no-side-effect Tool makes it observable whether the reviewed callback allowed or prevented invocation without introducing a real external effect.",
+      "inputs": [
+        {
+          "name": "operation_id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "executed",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "none",
+      "audit_required": false
+    }
+  ],
+  "a2aContracts": [],
+  "runtimeContracts": [
+    {
+      "contract_id": "rtc-s08-before-tool-callback",
+      "contract_kind": "adk_callback",
+      "asset_id": "workflow-s08-callback-guardrail",
+      "title": "Synthetic runner-wide before-tool callback guardrail",
+      "contract_status": "approved",
+      "summary": "Evaluate every guarded synthetic Tool request before invocation, continue only for an allowed decision, return a typed override for block, and fail closed on callback errors.",
+      "required_review_fields": [],
+      "reviewer_notes": "The callback behavior is design-reviewed only. The current generic runnable generator has no callback control lowerer, so this approval does not authorize source generation or claim runtime support.",
+      "runtime_support": {
+        "context_manager_required": true,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": false,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "read",
+        "side_effect_level": "none",
+        "callback_expected": true,
+        "async_resume_required": false
+      },
+      "identifiers": [
+        "synthetic-request-allow-001",
+        "synthetic-request-block-001",
+        "synthetic-request-error-001",
+        "audit:last_guardrail_decision"
+      ],
+      "policies": {
+        "auth_policy": "Accept only fixed synthetic requests in the isolated scenario; production identity and authorization are out of scope.",
+        "timeout_policy": "A missing or late callback decision is blocked before Tool invocation.",
+        "retry_policy": "Repeated evaluation of the same synthetic request must be deterministic, and a blocked request must never invoke the Tool.",
+        "fallback_policy": "Callback exception, missing decision, or invalid decision returns the typed blocked override and does not invoke the Tool.",
+        "masking_policy": "Persist only the synthetic request ID, normalized allow or block decision, and reason code; never persist raw prompt, Tool arguments, or secrets.",
+        "data_policy": "Fixed synthetic payloads and identifiers only; no actor, customer, credential, or private endpoint data."
+      },
+      "graph_ir_annotations": {
+        "hook": "before_tool",
+        "scope": "runner-wide",
+        "callback_edge_id": "edge-s08-before-tool-callback",
+        "decision_route_node_id": "node-s08-route-decision",
+        "guarded_tool_node_id": "node-s08-tool",
+        "state_write": "audit:last_guardrail_decision",
+        "continue_semantics": "allow returns no override and preserves default Tool execution",
+        "override_semantics": "block or callback failure returns a typed blocked result before Tool execution",
+        "error_policy": "fail closed"
+      },
+      "synthetic_examples": [
+        {
+          "request_id": "synthetic-request-allow-001",
+          "decision": "allow",
+          "callback_result": "continue",
+          "expected_tool_call_count": 1,
+          "expected_state_key": "audit:last_guardrail_decision"
+        },
+        {
+          "request_id": "synthetic-request-block-001",
+          "decision": "block",
+          "callback_result": "override",
+          "expected_tool_call_count": 0,
+          "expected_state_key": "audit:last_guardrail_decision"
+        },
+        {
+          "request_id": "synthetic-request-error-001",
+          "decision": "callback_error",
+          "callback_result": "override",
+          "expected_tool_call_count": 0,
+          "expected_state_key": "audit:last_guardrail_decision"
+        }
+      ],
+      "developer_todos": [
+        "Implement and runtime-verify callback control lowering before deriving a source-ready scaffold plan."
+      ]
+    }
+  ],
+  "graph": {
+    "graph_id": "graph-s08-callback-guardrail",
+    "source_requirement_id": "req-s08-callback-guardrail",
+    "workflow_ref": "workflow-s08-callback-guardrail",
+    "nodes": [
+      {
+        "id": "node-s08-input",
+        "label": "Synthetic operation request",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s08-prepare",
+        "label": "Prepare redacted guardrail input",
+        "node_kind": "function",
+        "role": "prepare_input"
+      },
+      {
+        "id": "node-s08-route-decision",
+        "label": "Route callback guardrail decision",
+        "node_kind": "function",
+        "role": "route"
+      },
+      {
+        "id": "node-s08-tool",
+        "label": "Execute allowed synthetic operation",
+        "node_kind": "tool",
+        "tool_ref": "tool-s08-synthetic-operation",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "node-s08-executed-output",
+        "label": "Synthetic operation executed",
+        "node_kind": "output"
+      },
+      {
+        "id": "node-s08-blocked-output",
+        "label": "Synthetic operation blocked",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s08-input-to-prepare",
+        "from": "node-s08-input",
+        "to": "node-s08-prepare",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s08-before-tool-callback",
+        "from": "node-s08-prepare",
+        "to": "node-s08-route-decision",
+        "control": {
+          "kind": "callback",
+          "condition": "before_tool guardrail decision is available",
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "state"
+      },
+      {
+        "id": "edge-s08-allow-to-tool",
+        "from": "node-s08-route-decision",
+        "to": "node-s08-tool",
+        "control": {
+          "kind": "condition",
+          "condition": "guardrail_decision == allow",
+          "accepted_aliases": [
+            "continue"
+          ],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s08-block-to-output",
+        "from": "node-s08-route-decision",
+        "to": "node-s08-blocked-output",
+        "control": {
+          "kind": "condition",
+          "condition": "guardrail_decision == block",
+          "accepted_aliases": [
+            "override",
+            "error"
+          ],
+          "default": true
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s08-tool-to-output",
+        "from": "node-s08-tool",
+        "to": "node-s08-executed-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  }
+}

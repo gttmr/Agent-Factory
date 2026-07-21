@@ -110,7 +110,7 @@ Evidence summary에는 다음을 분리한다.
 
 모든 후보가 Evidence locator, responsibility, I/O, risk, missing-information 상태를 갖는지 점검한다.
 
-current JSON을 작성했다면 다음을 실행한다.
+strict v2 JSON을 작성했다면 다음을 실행한다.
 
 ```bash
 node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>
@@ -135,4 +135,4 @@ node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>
 ## Checked date
 
 - Checked date: 2026-07-18
-- Current schema note: current candidate serialization is `legacy`; Target classification precedes compatibility mapping.
+- Contract note: `assetCandidates` serializes only Agent, Workflow, and Tool classifications.

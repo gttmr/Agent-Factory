@@ -60,7 +60,7 @@ ADK source behavior:
 해석:
 
 - "현재 `node_input`을 보고 LLM 한 번 호출하는 deterministic-ish graph step"에 가장 가깝다.
-- classifier, extractor, formatter, legacy `adapter_call` planner, response drafter처럼 명시 input/output을 가진 node에 적합하다.
+- classifier, extractor, formatter, Tool 호출 계획기, response drafter처럼 명시 input/output을 가진 node에 적합하다.
 - 같은 session에서 여러 번 호출해도 이전 user turn을 근거로 답하지 않아야 한다.
 
 Agent Factory policy:

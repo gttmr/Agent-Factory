@@ -44,9 +44,17 @@ type SseEntry = {
 export async function writeFakeScripts(root: string): Promise<void> {
   const scriptsDir = join(root, "scripts");
   const binDir = join(root, "bin");
+  const catalogDir = join(root, "catalog");
   await mkdir(scriptsDir, { recursive: true });
   await mkdir(binDir, { recursive: true });
+  await mkdir(catalogDir, { recursive: true });
+  await Promise.all([
+    writeFile(join(catalogDir, "agents.yaml"), "agents: []\n"),
+    writeFile(join(catalogDir, "workflows.yaml"), "workflows: []\n"),
+    writeFile(join(catalogDir, "tools.yaml"), "tools: []\n")
+  ]);
   await writeFile(join(scriptsDir, "validate-artifacts.mjs"), "/* served by the test node shim */\n");
+  await writeFile(join(scriptsDir, "validate-generated-runtime.mjs"), "/* served by the test node shim */\n");
   await writeFile(join(scriptsDir, "generate-adk-source.mjs"), "/* served by the test node shim */\n");
   await writeFile(join(binDir, "python3"), "#!/bin/sh\necho 'unexpected fake python3 args: $@' >&2\nexit 2\n");
   await chmod(join(binDir, "python3"), 0o755);
@@ -107,8 +115,8 @@ export async function readCommandLog(root: string): Promise<readonly string[]> {
 export async function readDerivedArtifactTexts(rootDir: string): Promise<Record<string, string>> {
   return {
     "normalized-requirement.json": await readFile(join(rootDir, "normalized-requirement.json"), "utf8"),
-    "module-candidates.json": await readFile(join(rootDir, "module-candidates.json"), "utf8"),
-    "process-flow.json": await readFile(join(rootDir, "process-flow.json"), "utf8"),
+    "asset-candidates.json": await readFile(join(rootDir, "asset-candidates.json"), "utf8"),
+    "graph-ir.json": await readFile(join(rootDir, "graph-ir.json"), "utf8"),
     "scaffold-plan.json": await readFile(join(rootDir, "scaffold-plan.json"), "utf8")
   };
 }
@@ -172,6 +180,13 @@ function fakeNodeScript(): string {
     "    echo 'verify stdout line'",
     "    echo 'verify stderr line' >&2",
     "    if [ -f \"$root_dir/fail-validate\" ]; then exit 7; fi",
+    "    exit 0",
+    "    ;;",
+    "  scripts/validate-generated-runtime.mjs)",
+    "    root_dir=\"$1\"",
+    "    echo 'generated runtime stdout line'",
+    "    echo 'generated runtime stderr line' >&2",
+    "    if [ -f \"$root_dir/fail-runtime-verify\" ]; then exit 8; fi",
     "    exit 0",
     "    ;;",
     "  scripts/generate-adk-source.mjs)",

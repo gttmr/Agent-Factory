@@ -1,0 +1,30 @@
+# Validation
+
+## Deterministic evaluator
+
+- Scenario commands: 11/11 exit `0` after switching compile/pytest to `.agent-factory/runtime/.venv/bin/python`.
+- Skill validator: 5 skills, 0 errors, 0 warnings.
+- Artifact root: `Artifact validation OK`.
+- Generated contract tests: 4 passed on `google-adk 2.3.0`.
+- Source and public context diff: no differences.
+
+## Installed ADK Runtime result
+
+```json
+{"google_adk_version":"2.3.0","interrupt_id":"synthetic-approval-001","apply_count":1,"duplicate_apply_count":1,"restarted_apply_count":1,"conflict":"rejected","timeout":"expired_without_side_effect","wrong_id":"rejected"}
+```
+
+Observed invariants:
+
+- abandoned pending request had no side-effect ledger;
+- a new Runner resumed the same invocation with the approved stable ID;
+- approve reached the applied terminal and recorded `apply_count=1`;
+- duplicate response and a second invocation with the same idempotency key replayed the recorded result;
+- conflicting response and wrong interrupt ID were rejected;
+- reject and expiry reached the cancel path without creating the side-effect ledger.
+
+## Behavior deviations
+
+- The agent read `af-workflow` before the explicitly matching `af-scaffold-runtime`.
+- It wrote a transient probe to `/tmp/s11_runtime_probe.py`, outside the scenario output root.
+- Full mandatory-reference loading could not be certified from the retained command stream.

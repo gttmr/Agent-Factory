@@ -8,12 +8,12 @@ description: >-
 
 ## 1. 목적
 
-검토 가능한 Agent·Workflow·Tool 후보를 **어떻게 실행할지** 조합한다. 먼저 standalone asset으로 충분한지 판단하고, 필요한 경우에만 Workflow와 Graph IR을 만든다.
+검토 가능한 Agent·Workflow·Tool 후보를 **어떻게 실행할지** 조합한다. 먼저 standalone asset으로 충분한지 판단하고, 필요한 경우에만 owning Workflow를 만든다. strict v2 artifact를 쓸 때는 standalone에도 `workflow_ref: null`인 Graph envelope를 유지한다.
 
 주요 Output은 다음이다.
 
-- standalone/Workflow 결정과 Graph IR의 Node·Edge·container·channel
-- Tool Invocation Control·Binding, A2A Connection/Exposure, State·Artifact channel
+- standalone/Workflow 결정과 Graph IR의 Node·Edge·control·channel·regions
+- Tool Invocation Control·Binding, A2A Agent Binding/Exposure, State·Artifact channel
 - Human Input/Resume, Callback/Plugin, Ambient Trigger, Runtime Policy 계약
 - Missing Information과 Scaffold Readiness
 
@@ -45,11 +45,11 @@ Discover 결과가 없거나 검토 불가능하면 `af-discover-assets`로 되�
 
 ### Read Set
 
-최소 Read Set은 candidate source, active mode, [Graph IR Reference](../_shared/graph-ir.md), [Candidate and Graph Review](references/candidate-and-graph-review.md)다.
+먼저 [Source of Truth](../_shared/source-of-truth.md)와 [Lifecycle Invariants](../_shared/lifecycle-invariants.md)를 읽는다. 최소 Read Set은 candidate source, active mode, [Graph IR Reference](../_shared/graph-ir.md), [Candidate and Graph Review](references/candidate-and-graph-review.md)다.
 
 패턴 Evidence가 있을 때만 [Runtime Pattern Selection](../_shared/runtime-pattern-selection.md)을 읽는다.
 
-현행 artifact를 쓸 때만 [Compatibility Layer](../_shared/compatibility-current-schema.md)를 읽는다.
+v2 artifact를 쓸 때 [Target Contract v2](../_shared/target-contract-v2.md)를 읽는다.
 
 ## 3. 핵심 Workflow
 
@@ -86,18 +86,18 @@ Skill은 readiness를 보고할 뿐 manifest approval boolean을 직접 바꾸�
 
 | 판단 | 질문 | 결과 |
 | --- | --- | --- |
-| A | 독립 Agent 또는 Tool 하나로 충분한가 | standalone, Graph 없음 |
+| A | 독립 Agent 또는 Tool 하나로 충분한가 | standalone, owning Workflow 없음, `workflow_ref: null` Graph envelope |
 | B | 명시적 순서·분기·합류·반복 소유자가 필요한가 | Workflow와 Graph 검토 |
-| C | Agent delegation으로 충분한가 | Agent 관계, 불필요한 Graph 없음 |
+| C | Agent delegation으로 충분한가 | Agent 관계, owning Workflow 없음, strict v2 standalone Graph envelope |
 | D | deterministic Graph와 Agent delegation이 모두 필요한가 | 혼합 구조와 control 경계 |
 
-Workflow가 불필요하면 no-Graph 결정을 명시한다.
+Workflow가 불필요하면 no-owning-Workflow 결정을 명시한다. design note에서는 Graph를 생략할 수 있지만, strict v2 `analysis-result.json`에는 6-field Graph envelope와 `workflow_ref: null`을 반드시 직렬화한다.
 
-#### 4단계: Graph가 필요한 경우에만 조합한다
+#### 4단계: Workflow Graph 또는 standalone Graph envelope를 조합한다
 
 사용 가능한 Target Node 책임은 Input, Agent, Tool, Function, Human Input, Subworkflow, Join, Output이다.
 
-정확한 정의와 current mapping은 [Graph IR Reference](../_shared/graph-ir.md)를 따른다.
+정확한 정의와 strict v2 shape은 [Graph IR Reference](../_shared/graph-ir.md)를 따른다.
 
 Function Node는 Workflow 내부 private deterministic transform·validate·route·merge이며 부모 Workflow의 Domain과 Owner를 상속하고 독립 Catalog Tool 계약을 만들지 않는다.
 
@@ -171,7 +171,7 @@ Event Loop:
 다음이 모두 충족될 때만 Ready다.
 
 - asset responsibility와 I/O
-- standalone 또는 Graph 구조
+- standalone Graph envelope 또는 Workflow-owned Graph 구조
 - Binding과 Invocation Control
 - 선택한 Runtime Pattern 계약
 - required auth variable 이름
@@ -183,11 +183,11 @@ Event Loop:
 
 #### 9단계: mode별 output을 작성하고 검증한다
 
-현행 proposed/canonical artifact에는 Compatibility Layer를 적용한다.
+proposed/canonical artifact에는 strict Target Contract v2를 적용한다.
 
 Target rationale를 `rationale`, review notes, 또는 `boundary-design.md`에 보존한다.
 
-매핑 불가 사례는 current enum으로 숨기지 않고 `docs/migration/skill-vnext-status.md` Blocker로 기록하도록 보고한다.
+표현 불가 사례는 새 enum으로 숨기지 않고 Blocker로 보고한다.
 
 Standalone validator 비대상 design note는 Target 어휘를 사용할 수 있다.
 
@@ -198,7 +198,7 @@ Standalone validator 비대상 design note는 Target 어휘를 사용할 수 있
 | 모든 composition | [Graph IR Reference](../_shared/graph-ir.md) | Target Graph와 Invocation Control |
 | 후보 결정 또는 Graph review | [Candidate and Graph Review](references/candidate-and-graph-review.md) | approve/defer/reject와 Graph findings |
 | pattern Evidence 존재 | [Runtime Pattern Selection](../_shared/runtime-pattern-selection.md) | 필요한 ADK card만 조건부 로드 |
-| Stage Runner/current artifact write | [Compatibility Layer](../_shared/compatibility-current-schema.md) | current `legacy` serialization |
+| Stage Runner/v2 artifact write | [Target Contract v2](../_shared/target-contract-v2.md) | strict fields, asset refs, Graph shape |
 | output/readiness 작성 | [Design Output and Readiness](references/design-output-and-readiness.md) | mode별 files와 Scaffold gate |
 
 선택하지 않은 pattern card는 읽지 않는다.
@@ -243,12 +243,12 @@ Standalone mode:
 - reviewed Discover output이 없음
 - Stage Runner Design에서 canonical analysis 또는 `analysis_reviewed=true`가 없음
 - candidate responsibility, I/O, risk, owner가 불충분함
-- candidate-level Missing Information이 남음
+- candidate-level Missing Information은 Design proposal에 `needs_info`/`deferred`, unresolved gate, `Not Ready`로 기록한 뒤 approval·Runtime Handoff·Scaffold 전에 중단한다. 이를 안전하게 기록할 수 없음
 - standalone/Workflow 선택 근거가 없음
 - Graph reachability, route, Join, loop, channel, resume 계약이 불완전함
 - required Runtime Pattern 계약이 draft 또는 `needs_info`임
-- A2A Agent와 embedded contract의 1:1 pairing이 없음
-- Target design을 current schema에 안전하게 매핑할 수 없음
+- A2A Agent의 binding 또는 exposure contract가 불완전함
+- Target design을 strict v2 schema에 안전하게 표현할 수 없음
 - Design proposal 두 파일 중 하나라도 없음
 - schema/validator가 실패함
 - 코드 생성이나 approval 변경 없이는 진행할 수 없음
@@ -257,7 +257,7 @@ Standalone mode:
 
 ### Observable Verification
 
-Current artifact validation:
+Strict v2 artifact validation:
 
 ```bash
 node scripts/validate-artifacts.mjs <artifact-root-or-proposed-dir>

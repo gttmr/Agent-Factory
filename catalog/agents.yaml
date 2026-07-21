@@ -1,10 +1,20 @@
 agents:
-  - name: 1차 Page 선택 Agent
-    agent_kind: specialist
-    owner_domain: 공통
+  - asset_id: agent.page-recommendation.initial-page-selector
+    asset_type: agent
+    name: 1차 Page 선택 Agent
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - page-selection
+      - judgment
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile: null
+    exposure: null
     contract_status: mock_ready
     responsibility: RAG 후보를 읽고 초기 추천 후보를 설명하는 judgment node다.
     inputs:
@@ -18,7 +28,6 @@ agents:
       - name: initial_selection
         type: object
         required: true
-    scaffold_output: agent_shell_only
     risk_signals:
       - customer_impact
       - audit_required
@@ -29,12 +38,22 @@ agents:
         rationale: 꿀머니 혜택 조회 목적과 직접 연결된 페이지입니다.
         requires_user_confirmation: true
     notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
-  - name: 분석 결과 종합 Agent
-    agent_kind: specialist
-    owner_domain: 공통
+  - asset_id: agent.page-recommendation.analysis-synthesizer
+    asset_type: agent
+    name: 분석 결과 종합 Agent
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - analysis-synthesis
+      - judgment
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile: null
+    exposure: null
     contract_status: mock_ready
     responsibility: 세 분석 mock 결과를 종합해 Page/Page Group 후보를 다시 선택하는 judgment node다.
     inputs:
@@ -51,7 +70,6 @@ agents:
       - name: synthesized_page_selection
         type: object
         required: true
-    scaffold_output: agent_shell_only
     risk_signals:
       - customer_impact
       - audit_required
@@ -65,12 +83,22 @@ agents:
           - t2s relation score
         requires_user_confirmation: true
     notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
-  - name: 목적 분류 Agent
-    agent_kind: specialist
-    owner_domain: 공통
+  - asset_id: agent.page-recommendation.objective-classifier
+    asset_type: agent
+    name: 목적 분류 Agent
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - objective-classification
+      - judgment
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile: null
+    exposure: null
     contract_status: mock_ready
     responsibility: get_scenario_taxonomy가 제공한 분류체계를 참고해 objective_text를 대/중/소 분류로 매핑하는 judgment node다.
     inputs:
@@ -84,7 +112,6 @@ agents:
       - name: objective_classification
         type: object
         required: true
-    scaffold_output: agent_shell_only
     risk_signals:
       - customer_impact
       - audit_required
@@ -95,14 +122,24 @@ agents:
         category_small: 이탈률분석
         confidence: 0.91
     notes: req-page-recommendation-required catalog-only scenario를 위한 synthetic Agent 계약이다. 실제 판단 기준이나 운영 데이터는 포함하지 않는다.
-  - name: Adapter Arguments 생성 Agent
-    agent_kind: specialist
-    owner_domain: 공통
+  - asset_id: agent.page-recommendation.tool-argument-builder
+    asset_type: agent
+    name: Tool Arguments 생성 Agent
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - tool-argument-generation
+      - reasoning
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile: null
+    exposure: null
     contract_status: mock_ready
-    responsibility: 목적/시나리오 분류 확인 응답과 이전 objective context를 결합해 후속 MCP Adapter 호출 인자를 구성하는 reasoning node다.
+    responsibility: 목적/시나리오 분류 확인 응답과 이전 objective context를 결합해 후속 MCP Tool 호출 인자를 구성하는 reasoning node다.
     inputs:
       - name: objective_text
         type: string
@@ -114,15 +151,14 @@ agents:
         type: object
         required: false
     outputs:
-      - name: adapter_arguments
+      - name: tool_arguments
         type: object
         required: true
-    scaffold_output: agent_shell_only
     risk_signals:
       - customer_impact
       - audit_required
     runtime_mock:
-      adapter_arguments:
+      tool_arguments:
         objective_text: 꿀머니 이탈률 분석할래
         product_hint: 꿀머니 혜택
         customer_behavior_hint: 혜택 조회 중단

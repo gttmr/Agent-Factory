@@ -1,4 +1,9 @@
-import type { RuntimeContract, RuntimeContractStatus } from "../analyzer/types";
+import type {
+  AsyncResumePolicy,
+  AsyncResumeSideEffectGuard,
+  RuntimeContract,
+  RuntimeContractStatus
+} from "../analyzer/types";
 
 type PolicyField = readonly [keyof RuntimeContract["policies"], string];
 type RuntimeSupportField = readonly [keyof RuntimeContract["runtime_support"], string];
@@ -51,6 +56,8 @@ export interface RuntimeContractEditorDraft {
   readonly policies: RuntimeContract["policies"];
   readonly runtime_support: RuntimeContract["runtime_support"];
   readonly operation: RuntimeContract["operation"];
+  readonly resume_policy: AsyncResumePolicy | null | undefined;
+  readonly side_effect_guard: AsyncResumeSideEffectGuard | null | undefined;
   readonly graph_ir_annotations: RuntimeContract["graph_ir_annotations"];
 }
 
@@ -61,6 +68,8 @@ export function createRuntimeContractEditorDraft(contract: RuntimeContract): Run
     policies: { ...contract.policies },
     runtime_support: { ...contract.runtime_support },
     operation: { ...contract.operation },
+    resume_policy: contract.resume_policy ? { ...contract.resume_policy } : contract.resume_policy,
+    side_effect_guard: contract.side_effect_guard ? { ...contract.side_effect_guard } : contract.side_effect_guard,
     graph_ir_annotations: { ...contract.graph_ir_annotations }
   };
 }
@@ -76,7 +85,35 @@ export function applyRuntimeContractEditorDraft(
     policies: { ...draft.policies },
     runtime_support: { ...draft.runtime_support },
     operation: { ...draft.operation },
+    ...(contract.contract_kind === "async_resume"
+      ? {
+          resume_policy: draft.resume_policy ? { ...draft.resume_policy } : null,
+          side_effect_guard: draft.side_effect_guard ? { ...draft.side_effect_guard } : null
+        }
+      : {}),
     graph_ir_annotations: { ...draft.graph_ir_annotations }
+  };
+}
+
+export function createDefaultAsyncResumePolicy(contract: RuntimeContract): AsyncResumePolicy {
+  const reviewedIdentifier = contract.identifiers.find((identifier) => identifier.trim());
+  return {
+    interrupt_id: reviewedIdentifier ?? `${contract.contract_id}-interrupt`,
+    correlation_scope: "invocation",
+    timeout_seconds: 60,
+    on_timeout: "expire_without_side_effect",
+    duplicate_response: "return_recorded_result",
+    conflicting_response: "reject",
+    restart_policy: "resume_incomplete_replay_completed"
+  };
+}
+
+export function createDefaultAsyncResumeSideEffectGuard(): AsyncResumeSideEffectGuard {
+  return {
+    tool_ref: "",
+    idempotency_key_input: "",
+    delivery_semantics: "at_most_once",
+    ledger_scope: "session_state"
   };
 }
 
@@ -117,6 +154,8 @@ export function hasRuntimeContractEditorDraftChanges(
     OPERATION_BOOLEAN_FIELDS.some(([key]) => draft.operation[key] !== contract.operation[key]) ||
     draft.operation.operation_type !== contract.operation.operation_type ||
     draft.operation.side_effect_level !== contract.operation.side_effect_level ||
+    !sameOptionalRecord(draft.resume_policy, contract.resume_policy) ||
+    !sameOptionalRecord(draft.side_effect_guard, contract.side_effect_guard) ||
     !sameStringRecord(draft.graph_ir_annotations, contract.graph_ir_annotations)
   );
 }
@@ -136,4 +175,16 @@ function sameStringRecord(left: Record<string, string>, right: Record<string, st
   const leftKeys = Object.keys(left);
   if (leftKeys.length !== Object.keys(right).length) return false;
   return leftKeys.every((key) => left[key] === right[key]);
+}
+
+function sameOptionalRecord(
+  left: object | null | undefined,
+  right: object | null | undefined
+): boolean {
+  if (left == null || right == null) return left == null && right == null;
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  if (leftKeys.length !== Object.keys(rightRecord).length) return false;
+  return leftKeys.every((key) => leftRecord[key] === rightRecord[key]);
 }

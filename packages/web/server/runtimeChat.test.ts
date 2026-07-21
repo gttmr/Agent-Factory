@@ -314,20 +314,49 @@ async function writeRequiredMockScaffoldPlan(stubDir: string, mockServerId: stri
     join(stubDir, "scaffold-plan.json"),
     `${JSON.stringify(
       {
-        modules: [
+        contract_version: "2.0",
+        requirement_id: "req-runtime-chat-mock",
+        source: "approved_workbench_artifact",
+        raw_requirement_to_code: false,
+        output_mode: "runnable",
+        assets: [
           {
-            id: "mod-required-mock",
-            module_category: "adapter",
-            access_protocol: "mcp",
-            mcp_server: mockServerId,
-            mock_binding: {
-              provider: "mock_lab",
-              mock_server_id: mockServerId,
-              tool_name: "get_scenario_taxonomy",
-              status: "linked"
-            }
+            asset_id: "tool.required-mock",
+            source_requirement_id: "req-runtime-chat-mock",
+            catalog_entry_id: null,
+            name: "Required synthetic mock Tool",
+            asset_type: "tool",
+            domain_scope: "domain_neutral",
+            business_domains: [],
+            owner: "platform",
+            reuse_status: "project_only",
+            capability_tags: ["synthetic-mock"],
+            binding: { kind: "mcp", server_ref: mockServerId, tool_name: "get_scenario_taxonomy" },
+            connection: { transport: "stdio" },
+            workflow_profile: null,
+            exposure: null,
+            confidence: 1,
+            rationale: "Local synthetic runtime prerequisite.",
+            inputs: [],
+            outputs: [],
+            risk_level: "low",
+            risk_signals: [],
+            status: "approved",
+            missing_information: []
           }
-        ]
+        ],
+        runtime_contracts: [],
+        excluded_assets: [],
+        graph: {
+          graph_id: "graph-runtime-chat-mock",
+          source_requirement_id: "req-runtime-chat-mock",
+          workflow_ref: null,
+          nodes: [],
+          edges: [],
+          regions: []
+        },
+        manifest: { catalog_bound_assets: [], new_code_required: [] },
+        validation: { can_generate_source: true, blockers: [], warnings: [] }
       },
       null,
       2

@@ -1,9 +1,9 @@
-import type { A2AContract, ModuleCandidate } from "../analyzer/types";
+import type { A2AContract, AssetCandidate } from "../analyzer/types";
 import { SectionHeader } from "../ui/primitives";
 import { A2AContractEditor } from "./A2AContractEditor";
 
 interface A2AContractInspectorProps {
-  candidate: ModuleCandidate | null;
+  candidate: AssetCandidate | null;
   contract: A2AContract | null;
   saving: boolean;
   onSave: (next: A2AContract) => void;
@@ -15,8 +15,8 @@ export function A2AContractInspector({ candidate, contract, saving, onSave, onCa
     return (
       <SectionHeader
         eyebrow="선택 없음"
-        title="Remote A2A 계약 검토"
-        description="Remote A2A 후보가 있으면 좌측 표에서 후보를 선택해 Agent Card, lifecycle, auth, retry, fallback, audit, data policy 를 검토합니다."
+        title="A2A Agent 계약 검토"
+        description="A2A protocol boundary가 있는 Agent asset을 선택해 Agent Card와 runtime policy를 검토합니다."
       />
     );
   }
@@ -24,7 +24,7 @@ export function A2AContractInspector({ candidate, contract, saving, onSave, onCa
     return (
       <div className="af-a2a-inspector">
         <SectionHeader
-          eyebrow={`remote_a2a · ${candidate.id}`}
+          eyebrow={`A2A Agent · ${candidate.asset_id}`}
           title={candidate.name}
           description="이 후보와 매칭되는 a2aContracts 항목이 없습니다. 분석 결과를 다시 정규화하거나 a2aContracts 항목을 추가해야 합니다."
         />
@@ -34,7 +34,7 @@ export function A2AContractInspector({ candidate, contract, saving, onSave, onCa
   }
   return (
     <A2AContractEditor
-      key={`${candidate.id}:${contract.contract_id}`}
+      key={`${candidate.asset_id}:${contract.contract_id}`}
       candidate={candidate}
       contract={contract}
       saving={saving}

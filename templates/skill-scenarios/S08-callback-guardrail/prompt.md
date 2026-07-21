@@ -1,1 +1,1 @@
-승인된 계획을 바탕으로 도구 실행 전에 요청을 검사하는 로컬 프로토타입을 만들어줘. 허용되는 요청과 차단되는 요청을 모두 시험하고, 상태와 감사 기록이 어떻게 남는지도 확인할 수 있어야 해.
+context의 strict Target Contract v2 합성 artifact 세트를 검증해줘. runner-wide `before_tool` callback의 Continue, Override, fail-closed, state/audit 의미는 설계 검토됐지만 generic runnable generator에는 callback control lowerer가 없다. 이 blocker와 manifest 상태를 근거로 Scaffold `Not Ready`를 보고하고 source generation 전에 중단해줘. callback edge를 바꾸거나 smoke/local prototype으로 우회하지 말고 runnable 지원을 주장하지 마.

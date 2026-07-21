@@ -1,1 +1,1 @@
-승인된 실행 계획대로 외부 팀의 질의 Agent를 호출하는 로컬 프로토타입을 만들어줘. 실제 서비스 대신 제공된 합성 카드와 로컬 대역을 사용하고, 원격 장애 때 비교할 수 있는 대안도 handoff에 남겨줘.
+context의 완전한 합성 승인 artifact 세트를 검증한 뒤, 승인된 실행 계획대로 외부 팀의 질의 Agent를 호출하는 runnable 로컬 프로토타입을 `${SCENARIO_OUTPUT_ROOT}/runtime`에 만들어줘. 실제 서비스 대신 제공된 합성 카드와 localhost 대역만 사용하고, 원격 장애 때 수동 검토 또는 local Agent 대안을 조용히 대체하지 말고 handoff에 비교해 남겨줘.

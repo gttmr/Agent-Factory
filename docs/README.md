@@ -19,7 +19,7 @@
 7. [필요한 Stage 문서](./handbook/stages/)
    Index에서 고른 stage만 열어 입력·출력·분기·실패와 최신 source locator를 확인한다. 실제 구현 판단은 Stage 문서가 가리키는 현재 소스에서 다시 검증한다.
 8. Migration Status
-   [Taxonomy vNext](./migration/taxonomy-vnext-status.md)에서 Target Contract와 legacy Current Implementation 사이의 차이·영향·위험을 확인하고, [Skills vNext](./migration/skill-vnext-status.md)에서 canonical 5-skill 체계, Compatibility Layer, legacy shim, Product blocker와 forward-test 상태를 확인한다. 두 문서 모두 코드 migration 완료를 선언하지 않는다.
+   [Taxonomy vNext](./migration/taxonomy-vnext-status.md)에서 strict Target Contract 이행 상태와 영향·위험을 확인하고, [Skills vNext](./migration/skill-vnext-status.md)에서 canonical 5-skill 체계, retired shim, Product 연계와 forward-test 상태를 확인한다.
 9. 필요한 세부 reference
    - [분석 가이드](./workbench/analysis-guide.md)는 raw requirement에서 evidence, 정규화 요구사항, missing information, 자산 후보를 도출하는 순서를 설명한다.
    - [Workflow 판단 가이드](./workbench/workflow-decision-guide.md)는 Workflow 자산 여부와 representation·coordination 축을 구분하는 질문을 제공한다.
@@ -28,23 +28,21 @@
    - [Local MCP Mock Lab](./mock-lab/local-mcp-mock-lab.md)은 Tool의 MCP mock을 로컬 test double로 준비하고 검증하는 Current Implementation 흐름을 설명한다.
    - [시각화 Design System](./visualization/design-system.md)은 Workbench 화면과 Graph 표시의 시각·상호작용 규칙을 제공한다.
    - [Target Agent Architecture](./reference/target-agent-architecture/README.md)는 Agent·Workflow·Tool, Graph Node, 프로토콜, Resource/Dependency의 목표 아키텍처 위치를 요약한다.
+   - [Agent(Workflow) 개발 표준](./reference/agent-development-standard.md)은 자산 분류, Graph 조합, Scaffold gate, ADK source lowering과 `root_agent` server app 단위가 연결되는 기준을 설명한다.
+   - [ADK Agent 최소 참조 폴더 구조](./reference/adk-agent-folder-structure.md)는 ADK 단독 프로젝트의 필수 파일과 Agent runtime용 Custom Skill의 위치·연결 방법을 정리한다.
    - [Local Dev Security](./workbench/local-dev-security.md)는 로컬 개발 표면과 requirement·mock·runtime 입력의 민감도 경계를 설명한다.
    - [ADK Agent Execution Modes](./workbench/adk-agent-execution-modes.md)는 ADK 실행 모드를 Graph 및 Runtime Handoff 문맥에서 해석할 때 필요한 세부 기준을 제공한다.
 
 ## 보조 참조
 
 - [Decision Log](./decision-log.md)는 설계 결정의 날짜·근거·영향을 보존하는 이력이다. 현재 규칙은 각 canonical 문서에서 확인한다.
-- [Agent Factory DLC skills](../.agents/skills/AGENTS.md)는 read-only entrypoint `af-workflow`와 `af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime` 네 Work Skill로 구성된다. 구 `af-analyze-requirement`, `af-design-boundaries`, `af-build-runtime-stub`, `af-verify-feedback`는 compatibility shim이며, current artifact를 쓸 때는 Target 판단 뒤 Compatibility Layer로 legacy 직렬화를 생산한다. [Skills vNext Migration Status](./migration/skill-vnext-status.md)와 함께 읽는다.
+- [Agent Factory DLC skills](../.agents/skills/AGENTS.md)는 read-only entrypoint `af-workflow`와 `af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime` 네 Work Skill로 구성된다. 모든 skill은 strict Target Contract v2만 읽고 쓰며, 이전 stage ID는 제거됐다. [Skills vNext Migration Status](./migration/skill-vnext-status.md)와 함께 읽는다.
+- [vNext 통합 점검 완료 보고](./reviews/2026-07-20-vnext-audit.md)는 현재 통합 산출물의 감사 판정과 evidence를, [후속 작업 인계](./reviews/2026-07-21-vnext-remaining-work.md)는 open Blocker 0건 이후의 작업 순서와 완료 기준을 기록한다.
 
 ## Archive
 
 - [Archive](./archive/)는 과거 계획, 검토 기록, 스냅샷을 보존하며 활성 기준이 아니다. 현재 행동을 설명하기 위해 archive 문서를 수정하거나 규칙을 되살리지 않는다.
 - [Taxonomy vNext 2026-07 스냅샷](./archive/taxonomy-vnext-2026-07/)은 전면 개편 전 문서와 전환 근거를 보존한다. 현재 용어와 판단은 canonical 문서에서 다시 확인한다.
-
-## Compatibility pointers
-
-- [process-flow.md](./workbench/process-flow.md)는 기존 링크를 보존하는 Graph IR compatibility pointer다. 새 Graph 정의는 이 문서가 아니라 canonical `graph-ir.md`에서 확인한다.
-- [agent-factory-harness.md](./workbench/agent-factory-harness.md)는 기존 skill과 문서 링크를 보존하는 Operating Model compatibility pointer다. 현재 작업 단계와 gate는 canonical `operating-model.md`에서 확인한다.
 
 ## Canonical sources
 

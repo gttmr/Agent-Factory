@@ -1,45 +1,74 @@
 import assert from "node:assert/strict";
+import { parseCatalogIndexPayload, type CatalogIndex } from "./catalogIndex.ts";
 import { catalogIndexToScaffoldCatalog } from "./scaffoldCatalog.ts";
-import type { CatalogIndex } from "./catalogIndex.ts";
 
+const base = {
+  domain_scope: "domain_neutral" as const,
+  business_domains: [],
+  owner: "AI공통플랫폼팀",
+  reuse_status: "reuse_existing" as const,
+  capability_tags: [],
+  status: "published"
+};
 const index: CatalogIndex = {
-  agents: [],
-  workflows: [
-    {
-      id: "workflow:loan_review",
-      category: "workflow",
-      name: "loan_review",
-      version: 2,
-      workflow_kind: "graph",
-      owner_domain: "여신",
-      status: "published",
-      responsibility: "여신 workflow",
-      inputs: [{ name: "application", type: "object", required: true }],
-      outputs: [{ name: "decision", type: "object", required: true }],
-      composition: ["review"]
-    }
-  ],
-  adapters: [],
-  remoteA2A: [
-    {
-      id: "remote_a2a:partner",
-      category: "remote_a2a",
-      name: "partner",
-      remote_contract_kind: "a2a"
-    }
-  ],
-  domainOwners: null,
-  contracts: {},
-  riskGates: null
+  agents: [{
+    ...base,
+    asset_id: "agent.partner",
+    asset_type: "agent",
+    name: "Partner Agent",
+    binding: { kind: "a2a", contract_ref: "a2a.partner.v1" },
+    connection: { transport: "http" },
+    workflow_profile: null,
+    exposure: { protocol: "a2a", contract_ref: "a2a.partner.v1" }
+  }],
+  workflows: [{
+    ...base,
+    asset_id: "workflow.review",
+    asset_type: "workflow",
+    name: "Review Workflow",
+    binding: null,
+    connection: null,
+    workflow_profile: { representation: "graph", coordination: "explicit", template_ref: null },
+    exposure: null
+  }],
+  tools: [{
+    ...base,
+    asset_id: "tool.lookup",
+    asset_type: "tool",
+    name: "Lookup Tool",
+    binding: { kind: "mcp", server_ref: "lookup-mock", tool_name: "lookup" },
+    connection: { transport: "stdio" },
+    workflow_profile: null,
+    exposure: null
+  }]
 };
 
 const catalog = catalogIndexToScaffoldCatalog(index);
+assert.deepEqual(catalog.map((entry) => entry.asset_id), ["agent.partner", "workflow.review", "tool.lookup"]);
+assert.equal(catalog[0]?.binding?.kind, "a2a");
+assert.equal(catalog[2]?.binding?.kind, "mcp");
+assert.equal(catalog.every((entry) => entry.provenance === "seeded"), true);
 
-assert.equal(catalog.length, 2);
-assert.equal(catalog[0]?.module_category, "workflow");
-assert.equal(catalog[0]?.owner_domain, "여신");
-assert.deepEqual(catalog[0]?.composition, ["review"]);
-assert.equal(catalog[0]?.runtime_binding, "unresolved");
-assert.equal(catalog[1]?.module_category, "remote_a2a");
-assert.equal(catalog[1]?.remote_contract_kind, "a2a");
-assert.equal(catalog[1]?.runtime_binding, "remote_a2a");
+const payload = {
+  agents: { agents: index.agents },
+  workflows: { workflows: index.workflows },
+  tools: { tools: index.tools }
+};
+assert.deepEqual(parseCatalogIndexPayload(payload).tools[0]?.asset_id, "tool.lookup");
+assert.throws(() => parseCatalogIndexPayload({ ...payload, adapters: { adapters: [] } }), /세 bucket만/);
+assert.throws(
+  () => parseCatalogIndexPayload({ ...payload, tools: { tools: [{ ...payload.tools.tools[0], owner: undefined }] } }),
+  /owner/
+);
+assert.throws(
+  () => parseCatalogIndexPayload({
+    ...payload,
+    tools: {
+      tools: [{
+        ...payload.tools.tools[0],
+        binding: { kind: "mcp", server_ref: "lookup-mock", tool_name: "lookup", mcp_server: "legacy" }
+      }]
+    }
+  }),
+  /binding 필드 구성/
+);

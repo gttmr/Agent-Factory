@@ -1,0 +1,70 @@
+{
+  "graph_id": "graph-s07-a2a-consuming",
+  "source_requirement_id": "req-s07-a2a-consuming",
+  "workflow_ref": "workflow-s07-a2a-consuming",
+  "nodes": [
+    {
+      "id": "node-s07-input",
+      "label": "Synthetic policy question",
+      "node_kind": "input"
+    },
+    {
+      "id": "node-s07-local-coordinator",
+      "label": "Prepare delegated question",
+      "node_kind": "agent",
+      "agent_ref": "agent-s07-local-coordinator",
+      "available_tools": []
+    },
+    {
+      "id": "node-s07-remote-policy-qa",
+      "label": "Call synthetic remote policy QA Agent",
+      "node_kind": "agent",
+      "agent_ref": "agent-s07-remote-policy-qa",
+      "available_tools": []
+    },
+    {
+      "id": "node-s07-output",
+      "label": "Synthetic policy answer",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-s07-input-to-local",
+      "from": "node-s07-input",
+      "to": "node-s07-local-coordinator",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s07-local-to-remote",
+      "from": "node-s07-local-coordinator",
+      "to": "node-s07-remote-policy-qa",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s07-remote-to-output",
+      "from": "node-s07-remote-policy-qa",
+      "to": "node-s07-output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    }
+  ],
+  "regions": []
+}

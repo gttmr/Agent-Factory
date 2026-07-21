@@ -19,10 +19,10 @@ try {
       requirement_id: "req-json",
       output_mode: "runnable",
       drift: {
-        before: [{ path: "process-flow.json", status: "stale" }],
-        after: [{ path: "process-flow.json", status: "synced" }]
+        before: [{ path: "graph-ir.json", status: "stale" }],
+        after: [{ path: "graph-ir.json", status: "synced" }]
       },
-      artifacts_written: ["process-flow.json", "scaffold-plan.json"],
+      artifacts_written: ["graph-ir.json", "scaffold-plan.json"],
       validation: {
         ok: true,
         exit_code: 0,
@@ -52,7 +52,7 @@ try {
   });
   assert.equal(jsonModeResult.output_mode, "runnable");
   assert.equal(jsonModeResult.validation?.command_key, "validate_artifact_root");
-  assert.deepEqual(jsonModeResult.drift.before, [{ path: "process-flow.json", status: "stale" }]);
+  assert.deepEqual(jsonModeResult.drift.before, [{ path: "graph-ir.json", status: "stale" }]);
 
   // Given: a non-2xx artifact sync response that still carries the renderable result contract.
   globalThis.fetch = async (): Promise<Response> =>
@@ -62,8 +62,8 @@ try {
         requirement_id: "req-json",
         output_mode: "smoke",
         drift: {
-          before: [{ path: "module-candidates.json", status: "unchanged" }],
-          after: [{ path: "module-candidates.json", status: "unchanged" }]
+          before: [{ path: "asset-candidates.json", status: "unchanged" }],
+          after: [{ path: "asset-candidates.json", status: "unchanged" }]
         },
         artifacts_written: [],
         error: "validation 실패",

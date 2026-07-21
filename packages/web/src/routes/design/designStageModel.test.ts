@@ -121,6 +121,9 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
   const config = buildVerifyStageRunnerConfig({
     commandKey: "test_analyzer",
     runState,
+    buildComplete: true,
+    stubApproved: true,
+    runtimeStubFileCount: 4,
     reportExists: false,
     deltaExists: true
   });
@@ -131,6 +134,33 @@ import { buildDesignSteps } from "./designStageModelCore.ts";
   assert.equal(config.skillName, "af-verify-runtime");
   assert.equal(body.model, "gpt-5.5");
   assert.equal(body.verifyCommand, "test_analyzer");
+  assert.equal(config.disabledReason, null);
+}
+
+{
+  const runState = summarizeVerifyRunState(undefined);
+  const base = {
+    commandKey: "validate_artifact_root",
+    runState,
+    buildComplete: true,
+    stubApproved: true,
+    runtimeStubFileCount: 1,
+    reportExists: false,
+    deltaExists: false
+  };
+
+  assert.equal(
+    buildVerifyStageRunnerConfig({ ...base, buildComplete: false }).disabledReason,
+    "Build stage가 complete 상태여야 Verify를 실행할 수 있습니다."
+  );
+  assert.equal(
+    buildVerifyStageRunnerConfig({ ...base, stubApproved: false }).disabledReason,
+    "stub_ready_for_followup=true 승인 후 Verify를 실행할 수 있습니다."
+  );
+  assert.equal(
+    buildVerifyStageRunnerConfig({ ...base, runtimeStubFileCount: 0 }).disabledReason,
+    "검증할 runtime-stub 파일이 없습니다."
+  );
 }
 
 {

@@ -1,54 +1,63 @@
-import type { ScaffoldPlan, ScaffoldPlanModule } from "../analyzer/types";
+import type { AssetCandidate, ScaffoldPlan } from "../analyzer/types";
 
 export interface MockLabRouteInput {
-  adapterName?: string | null;
+  toolName?: string | null;
   reqId?: string | null;
 }
 
 export interface MockLabBindingSelection {
-  mcpServer: string;
-  mcpToolName: string;
-  mcpSchemaRef?: string | null;
+  serverRef: string;
+  toolName: string;
 }
+
+type McpBinding = Extract<NonNullable<AssetCandidate["binding"]>, { kind: "mcp" }>;
+type McpBoundTool = Pick<AssetCandidate, "asset_type" | "binding"> & {
+  asset_type: "tool";
+  binding: McpBinding;
+};
 
 export function buildMockLabRoute(input: MockLabRouteInput = {}): string {
   const params = new URLSearchParams();
-  if (input.adapterName) params.set("adapter", input.adapterName);
+  if (input.toolName) params.set("tool", input.toolName);
   if (input.reqId) params.set("req", input.reqId);
   const query = params.toString();
   return query ? `/mock-lab?${query}` : "/mock-lab";
 }
 
-export function isMcpBoundAdapter(module: Pick<ScaffoldPlanModule, "module_category" | "access_protocol" | "mcp_server" | "mcp_tool_name">): boolean {
-  return module.module_category === "adapter" && module.access_protocol === "mcp" && Boolean(module.mcp_server) && Boolean(module.mcp_tool_name);
+export function isMcpBoundTool(
+  asset: Pick<AssetCandidate, "asset_type" | "binding">
+): asset is McpBoundTool {
+  return (
+    asset.asset_type === "tool" &&
+    asset.binding?.kind === "mcp" &&
+    Boolean(asset.binding.server_ref) &&
+    Boolean(asset.binding.tool_name)
+  );
 }
 
-export function mockLabBindingTargets(plan: Pick<ScaffoldPlan, "modules">): ScaffoldPlanModule[] {
-  return plan.modules.filter((module) => module.module_category === "adapter");
+export function mockLabToolBindingTargets(plan: Pick<ScaffoldPlan, "assets">): AssetCandidate[] {
+  return plan.assets.filter((asset) => asset.asset_type === "tool");
 }
 
-export function hasMockLabBindingTargets(plan: Pick<ScaffoldPlan, "modules">): boolean {
-  return mockLabBindingTargets(plan).length > 0;
+export function hasMockLabBindingTargets(plan: Pick<ScaffoldPlan, "assets">): boolean {
+  return mockLabToolBindingTargets(plan).length > 0;
 }
 
 export function applyMockLabBinding(
   plan: ScaffoldPlan,
-  moduleId: string,
+  assetId: string,
   selection: MockLabBindingSelection
 ): ScaffoldPlan {
   return {
     ...plan,
-    modules: plan.modules.map((module) =>
-      module.id === moduleId
+    assets: plan.assets.map((asset) =>
+      asset.asset_id === assetId
         ? {
-            ...module,
-            access_protocol: "mcp",
-            mcp_server: selection.mcpServer,
-            mcp_tool_name: selection.mcpToolName,
-            mcp_schema_ref: selection.mcpSchemaRef ?? module.mcp_schema_ref ?? null,
-            runtime_binding: "mcp"
+            ...asset,
+            binding: { kind: "mcp", server_ref: selection.serverRef, tool_name: selection.toolName },
+            connection: { transport: "stdio" }
           }
-        : module
+        : asset
     )
   };
 }

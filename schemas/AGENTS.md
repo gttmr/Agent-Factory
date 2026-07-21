@@ -2,34 +2,49 @@
 
 ## Scope
 
-`schemas` contains JSON Schema contracts for Agent Factory artifacts. These are
-source-of-truth contracts for validator, analyzer, templates, and workbench UI.
+`schemas` contains the strict Target Contract v2 JSON Schemas used by the
+validator, analyzer, templates, and workbench UI. Current readers require
+`contract_version: "2.0"` and reject retired shapes instead of migrating,
+coercing, or backfilling them.
 
-Schema enums are Current Implementation (`legacy`) contracts; Target assets are defined by [Taxonomy](../docs/workbench/taxonomy.md), Target node meanings by [Graph IR](../docs/workbench/graph-ir.md), and the gap is tracked in `docs/migration/taxonomy-vnext-status.md`.
+Asset and Graph meanings are canonical in [Taxonomy](../docs/workbench/taxonomy.md)
+and [Graph IR](../docs/workbench/graph-ir.md).
 
 ## Structure
 
-- `analysis-result.schema.json`: canonical combined analysis artifact.
-- `analysis-draft.schema.json`: live analyzer compact draft schema.
+- `analysis-result.schema.json`: canonical aggregate analysis artifact.
+- `analysis-draft.schema.json`: strict analysis draft reference to the aggregate contract.
 - `normalized-requirement.schema.json`: normalized request shape.
-- `module-candidate.schema.json`: candidate taxonomy and review fields.
-- `process-flow.schema.json`: Graph IR nodes, containers, lanes, and edges.
-- `classification.schema.json` and `commonization-notes.schema.json`: supporting analysis outputs.
+- `asset-candidate.schema.json`: Agent, Workflow, and Tool candidate contract.
+- `graph.schema.json`: Graph IR nodes, edges, and regions.
+- `af-run-manifest.schema.json`: complete lifecycle stage, approval, and validation state.
+- `classification.schema.json`: supporting Asset classification output.
 - `scaffold-plan.schema.json`: approved Runtime Handoff input.
-- `a2a-contract.schema.json`: Remote A2A contract artifact.
+- `a2a-contract.schema.json`: A2A protocol contract for an Agent boundary.
+
+The derived analysis split is `asset-candidates.json` plus `graph-ir.json`.
+`analysis-result.json` remains the canonical aggregate source.
+Retired `module-candidates.json`, `process-flow.json`, and
+`commonization-notes.json` have no active schema; rejection tests prevent their
+return as supported artifact surfaces.
 
 ## Local Rules
 
-- Keep the Current Implementation (`legacy`) schema enums aligned with `packages/web/src/analyzer/types.ts`, `classificationRules.ts`, UI badges, templates, validator constants, and source generator assumptions. `scripts/validate-artifacts.test.mjs` machine-enforces analyzer/schema/validator enum alignment.
-- Tighten contracts only with matching migration/normalization and regression fixture updates.
-- `analysis-draft` can differ from final `analysis-result`, but server hydration must bridge them explicitly.
+- Keep `asset_type` limited to `agent`, `workflow`, and `tool`.
+- Keep Graph nodes limited to `input`, `agent`, `tool`, `function`, `human_input`, `subworkflow`, `join`, and `output`.
+- Graph edges separate `control` from the optional `channel`; regions are only `parallel` or `loop`.
+- Allow `graph.workflow_ref: null` for a standalone Agent or Tool solution.
+- Model A2A through Agent binding or exposure and its contract reference, never as an asset category.
+- Keep schemas aligned with `packages/web/src/analyzer/types.ts`, `targetContract.ts`, templates, and validator tests.
+- Tighten contracts only with matching source, fixture, and regression updates.
 - Preserve `raw_requirement_to_code=false` and approved-artifact posture in scaffold-plan contracts.
 
 ## Anti-Patterns
 
-- Do not add schema fields only because one scenario needs a hard-coded workaround.
-- Do not loosen `additionalProperties` without a concrete compatibility reason.
-- Do not add Remote A2A shortcuts that bypass required contract details.
+- Do not broaden strict read boundaries to accept retired artifact shapes or enum values.
+- Do not add schema fields for scenario-specific hard-coded workarounds.
+- Do not loosen `additionalProperties` without a reviewed contract change.
+- Do not model MCP or A2A as another top-level asset type.
 
 ## Verification
 

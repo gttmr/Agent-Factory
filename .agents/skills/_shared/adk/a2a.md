@@ -25,11 +25,13 @@ Require material boundary evidence such as independent owner, deployment lifecyc
 
 ## Agent Factory representation
 
-Represent an Agent asset plus A2A Binding/Connection for consumption or A2A Exposure for serving. Show a protocol boundary on the Agent Node/edge. Do not create a Remote A2A asset type in Target reasoning.
+Represent an Agent asset plus A2A Binding for consumption or A2A Exposure for serving. Show a protocol boundary on the Agent Node/edge. Do not create a Remote A2A asset type in Target reasoning.
 
 ## Compose Artifact
 
-Record owner, direction, Agent reference, Agent Card/discovery, auth reference, operation and task lifecycle, input/output modes, streaming, artifacts, timeout, retry, fallback, audit, data policy, version compatibility, local mock, and required approvals. Current canonical payloads retain the 1:1 embedded contract through the Compatibility Layer.
+Record owner, direction, Agent reference, Agent Card/discovery, auth reference, operation and task lifecycle, input/output modes, streaming, artifacts, timeout, retry, fallback, audit, data policy, version compatibility, local mock, and required approvals on the Agent binding or exposure.
+
+Keep security metadata consistent with `adk_runtime_policy.auth.mode`. For `none`, `security_schemes` and `security_requirements` may both be empty; do not invent credentials to satisfy readiness. For `bearer_env` or `metadata_env`, record the reviewed scheme and requirement entries and the matching `AF_A2A_*` environment reference.
 
 ## Scaffold Output
 
@@ -51,7 +53,7 @@ from google.adk.a2a.utils.agent_to_a2a import to_a2a
 
 `to_a2a(agent, *, host='localhost', port=8000, protocol='http', agent_card=None, ..., runner=None, ...)` returns a Starlette app. The package signature accepts `BaseAgent | Workflow`, but the checked official evidence did not directly establish Workflow exposure as a general Target rule. Do not generalize it without separate approval and official verification. `to_a2a` is not re-exported from `google.adk.a2a.utils`.
 
-Preserve valid current-generator knowledge during review: runnable consumption requires one matching approved embedded A2A contract, an Agent Card URL, and valid runtime policy. The current generator emits `RemoteA2aAgent` with `use_legacy=False`, can add request-interceptor auth for `bearer_env` or `metadata_env` only when the environment name matches `AF_A2A_*`, and leaves retry/fallback as handoff policy rather than emitted wrappers. Reverify the generator before changing those limits.
+Preserve valid current-generator knowledge during review: runnable consumption requires one approved A2A Agent binding, an Agent Card URL, and valid runtime policy. The current generator emits `RemoteA2aAgent` with `use_legacy=False`, can add request-interceptor auth for `bearer_env` or `metadata_env` only when the environment name matches `AF_A2A_*`, and leaves retry/fallback as handoff policy rather than emitted wrappers. Reverify the generator before changing those limits.
 
 ## Verification Scenarios
 
@@ -61,7 +63,7 @@ Preserve valid current-generator knowledge during review: runnable consumption r
 - streaming and artifact handling when approved;
 - auth missing/invalid, timeout, remote failure, cancellation, retry, and fallback;
 - local mock server and audit correlation;
-- contract-to-Agent 1:1 validation in current artifacts.
+- binding/exposure-to-Agent validation in strict v2 artifacts.
 
 ## Failure / Retry / Timeout
 

@@ -1,12 +1,26 @@
 workflows:
-  - name: 1-1 페이지 추천(필수) Workflow
-    workflow_kind: graph
-    owner_domain: 공통
+  - asset_id: workflow.page-recommendation.required-page-selection
+    asset_type: workflow
+    name: 1-1 페이지 추천(필수) Workflow
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - page-recommendation
+      - human-in-the-loop
+      - orchestration
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile:
+      representation: graph
+      coordination: explicit
+      template_ref: null
+    exposure: null
     contract_status: mock_ready
-    responsibility: 사용자 확인 Gate, Mock Lab adapter fan-out/fan-in, final handoff를 포함하는 Workflow graph owner다.
+    responsibility: 사용자 확인 Gate, Mock Lab Tool fan-out/fan-in, final handoff를 포함하는 Workflow graph owner다.
     inputs:
       - name: objective_text
         type: string
@@ -16,18 +30,17 @@ workflows:
         type: object
         required: true
     composition:
-      - 'adapter: 시나리오 목적 분류체계 조회 Adapter'
+      - 'tool: 시나리오 목적 분류체계 조회 Tool'
       - 'agent: 목적 분류 Agent'
       - 'human_input: 목적/시나리오 분류 확인'
-      - 'agent: Adapter Arguments 생성 Agent'
-      - 'adapter: Page Metadata RAG 조회 Adapter와 페이지×상품 매핑 조회 Adapter를 병렬 조회'
+      - 'agent: Tool Arguments 생성 Agent'
+      - 'tool: Page Metadata RAG 조회 Tool과 페이지×상품 매핑 조회 Tool을 병렬 조회'
       - 'agent: 1차 Page 선택 Agent'
       - 'human_input + router: run_analysis 또는 skip_analysis 분기'
-      - 'adapter fan-out: UserFlow 분석, 행동유형 기반 시나리오 추천, T2S 분석'
+      - 'tool fan-out: UserFlow 분석, 행동유형 기반 시나리오 추천, T2S 분석'
       - 'agent: 분석 결과 종합 Agent'
       - 'human_input: 사용자 최종 Page(다중) 선택'
-      - 'workflow_call: Workflow 1-2 전달 Placeholder'
-    scaffold_output: orchestration_shell_only
+      - 'subworkflow: Workflow 1-2 전달 Placeholder'
     risk_signals:
       - customer_impact
       - external_message
@@ -39,15 +52,28 @@ workflows:
           - NWMMH00040_003M
         source_workflow: req-page-recommendation-required
         synthetic: true
-    notes: 등록된 catalog 모듈을 조합해 설계하는 best-scenario 검증용 root workflow 계약이다.
-  - name: Workflow 1-2 전달 Placeholder
-    workflow_kind: graph
-    owner_domain: 공통
+    notes: 등록된 Catalog 자산을 조합해 설계하는 best-scenario 검증용 root Workflow 계약이다.
+  - asset_id: workflow.page-recommendation.workflow-1-2-placeholder
+    asset_type: workflow
+    name: Workflow 1-2 전달 Placeholder
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - handoff
+      - placeholder
     status: approved
-    component_source: stub
-    runtime_binding: unresolved
+    binding: null
+    connection: null
+    workflow_profile:
+      representation: graph
+      coordination: explicit
+      template_ref: null
+    exposure: null
     contract_status: mock_ready
-    responsibility: Workflow 1-2는 미확정이므로 broad handoff payload를 반환하는 placeholder workflow_call로만 표현한다.
+    responsibility: Workflow 1-2는 미확정이므로 broad handoff payload를 반환하는 placeholder Workflow 호출로만 표현한다.
     inputs:
       - name: broad_handoff_payload
         type: object
@@ -57,8 +83,7 @@ workflows:
         type: object
         required: true
     composition:
-      - 'workflow_call placeholder: Workflow 1-2 계약 확정 전 broad_handoff_payload를 synthetic으로 반환한다.'
-    scaffold_output: workflow_call_placeholder
+      - 'subworkflow placeholder: Workflow 1-2 계약 확정 전 broad_handoff_payload를 synthetic으로 반환한다.'
     risk_signals:
       - audit_required
     runtime_mock:
@@ -68,4 +93,4 @@ workflows:
         target_workflow: wf-1-2-placeholder
         unresolved_contract: true
         synthetic: true
-    notes: Workflow 1-2 미확정 상태를 보존하는 synthetic placeholder workflow 계약이다.
+    notes: Workflow 1-2 미확정 상태를 보존하는 synthetic placeholder Workflow 계약이다.

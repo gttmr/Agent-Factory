@@ -32,8 +32,8 @@ export function DesignRunStep({
   const stageRunnerConfig = buildDesignStageRunnerConfig({
     hasAnalysis: Boolean(analysis),
     analysisReviewed,
-    approvedCandidateCount: analysis?.moduleCandidates.filter((candidate) => candidate.status === "approved").length ?? 0,
-    totalCandidateCount: analysis?.moduleCandidates.length ?? 0,
+    approvedCandidateCount: analysis?.assetCandidates.filter((candidate) => candidate.status === "approved").length ?? 0,
+    totalCandidateCount: analysis?.assetCandidates.length ?? 0,
     allCandidatesApproved,
     graphNodeCount,
     errorCount,

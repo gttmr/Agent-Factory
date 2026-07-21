@@ -1,7 +1,7 @@
 import type { CatalogPrefillPayload, MockSpec } from "./types/mockSpec";
 
-export function resolveCatalogPrefillSpec(catalog: CatalogPrefillPayload, adapterName: string | null | undefined): MockSpec | null {
-  const name = adapterName?.trim();
+export function resolveCatalogPrefillSpec(catalog: CatalogPrefillPayload, toolName: string | null | undefined): MockSpec | null {
+  const name = toolName?.trim();
   if (!name) return null;
   const entry = catalog.entries.find((candidate) => candidate.name === name);
   return entry ? cloneMockSpec(entry.prefill) : null;

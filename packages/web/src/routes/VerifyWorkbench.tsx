@@ -5,6 +5,7 @@ import { EmptyState, Panel, SelectField } from "../ui/primitives";
 import { StageShell, useStageStep, type StageNextAction, type StageStep } from "../layout/StageShell";
 import { useArtifactRoot } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
+import { useRuntimeStub } from "../state/useScaffoldPlan";
 import { useSaveTextArtifact, useTextArtifact } from "../state/useTextArtifact";
 import { VERIFY_COMMANDS } from "../state/useVerify";
 import { buildVerifyStageRunnerConfig, summarizeVerifyRunState } from "./stageRunnerScreenConfig";
@@ -23,6 +24,7 @@ export default function VerifyWorkbench() {
 
   const mountedAtRef = useRef(Date.now());
   const { data: manifestData, isStale, dataUpdatedAt } = useArtifactRoot(reqId);
+  const { data: runtimeStub } = useRuntimeStub(reqId);
 
   const reportArtifact = useTextArtifact(reqId, "validation-report.md");
   const saveReport = useSaveTextArtifact(reqId, "validation-report.md");
@@ -48,6 +50,9 @@ export default function VerifyWorkbench() {
   const stageRunnerConfig = buildVerifyStageRunnerConfig({
     commandKey: stageRunnerCommand,
     runState: verifyRunState,
+    buildComplete: manifest?.stages.build.status === "complete",
+    stubApproved: manifest?.approvals.stub_ready_for_followup === true,
+    runtimeStubFileCount: runtimeStub?.files.length ?? 0,
     reportExists: Boolean(reportArtifact.data),
     deltaExists: Boolean(deltaArtifact.data)
   });

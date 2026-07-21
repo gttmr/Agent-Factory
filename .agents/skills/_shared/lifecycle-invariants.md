@@ -46,7 +46,7 @@ Before entering a phase, identify:
 
 - Discovery preserves evidence, assumptions, contradictions, and missing information separately.
 - Composition preserves explicit approve, defer, or reject decisions and Target rationale.
-- Stage Runner mode writes proposals only where [artifact-root-and-stage-runner.md](artifact-root-and-stage-runner.md) allows them.
+- Stage Runner mode writes proposals only where `_shared/artifact-root-and-stage-runner.md` allows them; open that reference when Stage Runner behavior is in scope.
 - Standalone mode writes only the named canonical files under one unambiguous artifact root.
 - Proposal presence, run completion, and validation output never substitute for approval.
 
@@ -90,4 +90,4 @@ Stop when:
 - Checked date: 2026-07-18
 - Official sources: Agent Factory active workbench documents
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Current Workbench stages retain Analyze, Design, Build, and Verify labels and approval fields as `legacy` Current Implementation contracts.
+- Contract note: Analyze, Design, Build, and Verify remain the canonical Workbench stage labels.

@@ -41,9 +41,8 @@ The standard canonical inventory is:
 - `af-run-manifest.json`
 - `analysis-result.json`
 - `normalized-requirement.json`
-- `module-candidates.json`
-- `process-flow.json`
-- `commonization-notes.json`
+- `asset-candidates.json`
+- `graph-ir.json`
 - `analysis-summary.md`
 - `boundary-design.md`
 - `scaffold-plan.json`
@@ -52,7 +51,7 @@ The standard canonical inventory is:
 - `validation-report.md`
 - `catalog-delta.yaml`
 
-Remote A2A contracts remain embedded in `analysis-result.json.a2aContracts[]`; do not invent a standard split `a2a-contracts.json`.
+A2A consumption and exposure contracts remain on their Agent candidate binding or exposure; do not invent an A2A asset file.
 
 ## Required evidence
 
@@ -67,6 +66,8 @@ For Stage Runner mode, require:
 
 Treat `stage_runs` as execution metadata only. It does not replace `manifest.approvals.*`.
 
+`af-run-manifest.json`은 required root/stage/approval/validation field를 모두 가져야 한다. Current parser와 generator는 누락·잘못된 enum을 기본값으로 보정하지 않는다.
+
 ## Artifact implications
 
 Use this exact proposal contract:
@@ -78,7 +79,7 @@ Use this exact proposal contract:
 | Build | server primitive | none | writes canonical `runtime-stub/`; apply unavailable |
 | Verify | server allow-list primitive | `validation-report.md`, `catalog-delta.yaml` | explicit preview/apply |
 
-Design must produce both registered files even though the current diff builder accepts a run when only one registered file exists. Preserve the stronger contract in skills and compatibility shims.
+Design must produce both registered files. The current diff builder fails the run and records diagnostics when either file is missing.
 
 Analyze and Design `analysis-result.json` proposals must parse and pass `validateAnalysisResult`. Verify templates currently have no semantic Markdown/YAML validator. A completed Verify run may still contain `validation.ok=false`; do not report it as passing.
 
@@ -88,7 +89,7 @@ Apply behavior:
 - reject a listed invalid proposal;
 - enforce ETag conflict checks before writing canonical files;
 - apply only registered files;
-- update run metadata, not approvals or stage gates.
+- update run metadata; Analyze/Design의 changed analysis apply는 stale downstream approval과 validation을 무효화하지만 approval을 true로 만들지 않는다.
 
 The current diff builder does not discover arbitrary extra files, and the SDK sandbox is broader than `proposed-artifacts/`. The skill's narrow write statement is therefore a safety control.
 
@@ -96,8 +97,9 @@ The current diff builder does not discover arbitrary extra files, and the SDK sa
 
 - Build is a server-owned primitive in current Stage Runner execution; its historical skill path is not read by the server.
 - The canonical artifact-sync flow reads an already-saved `analysis-result.json`, synchronizes split artifacts, derives `scaffold-plan.json`, optionally regenerates `runtime-stub/`, and may run artifact validation.
+- Every server Build entrypoint requires Analyze approval and both Design approvals. Approval PATCH cannot skip the Analyze → boundary → runtime-contract → handoff order; revoking an upstream gate clears downstream gates, and handoff approval requires a non-empty `runtime-stub/`. Verify additionally requires that handoff gate and Build `complete`.
 - Generation does not set approval booleans or complete stage gates.
-- Use [compatibility-current-schema.md](compatibility-current-schema.md) whenever a Stage Runner proposal writes current canonical JSON.
+- Use [target-contract-v2.md](target-contract-v2.md) whenever a Stage Runner proposal writes strict Target v2 JSON.
 
 ## Verification
 
@@ -133,7 +135,7 @@ Stop when:
 
 ## Checked date
 
-- Checked date: 2026-07-18
+- Checked date: 2026-07-20
 - Official sources: Agent Factory Operating Model and current Stage Runner source
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Current Design enforcement accepts either registered file even though the contract requires both; skills must enforce both until product code is corrected.
+- Current behavior: Design enforcement requires both registered files and fails incomplete proposals before apply.

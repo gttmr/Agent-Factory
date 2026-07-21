@@ -45,9 +45,9 @@ export interface RuntimeResumeFormView {
 }
 
 const REMOTE_INPUT_DETAIL =
-  "원격 Agent 가 input-required 상태로 사람 입력을 기다립니다. 현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다.";
+  "원격 A2A Agent가 input-required 상태로 사람 입력을 기다립니다. 현재 Workbench/ADK Web 텍스트 채팅은 같은 task의 resume 경로로 검증되지 않았습니다.";
 const REMOTE_RESUME_DETAIL =
-  "원격 Agent 가 input-required 상태로 사람 입력을 기다립니다. Workbench resume 은 같은 Remote A2A task 에 function_response DataPart 를 전송합니다.";
+  "원격 A2A Agent가 input-required 상태로 사람 입력을 기다립니다. Workbench resume은 같은 task에 function_response DataPart를 전송합니다.";
 
 export function remoteInputRequiredView(
   inputRequired: RuntimeChatRemoteInputRequired | RuntimeA2aStatus | null | undefined,
@@ -56,7 +56,7 @@ export function remoteInputRequiredView(
   if (isRuntimeChatRemoteInputRequired(inputRequired)) {
     return {
       visible: true,
-      title: "Remote A2A 입력 대기",
+      title: "A2A Agent 입력 대기",
       prompt: inputRequired.prompt,
       payload: inputRequired.payload ?? undefined,
       detail: inputRequired.resume_supported ? inputRequired.resume_note : REMOTE_INPUT_DETAIL,
@@ -82,8 +82,8 @@ export function remoteInputRequiredView(
   const resume = status.server.message_send_resume;
   return {
     visible: true,
-    title: "Remote A2A 입력 대기",
-    prompt: status.server.message ?? "Remote A2A provider 가 사람 입력을 기다립니다.",
+    title: "A2A Agent 입력 대기",
+    prompt: status.server.message ?? "원격 A2A Agent가 사람 입력을 기다립니다.",
     detail: resume ? REMOTE_RESUME_DETAIL : REMOTE_INPUT_DETAIL,
     taskState: status.server.message_send_task_state ?? undefined,
     resume: resume
@@ -94,7 +94,7 @@ export function remoteInputRequiredView(
           interruptId: resume.interrupt_id,
           functionName: resume.function_name,
           responseSchema: resume.response_schema,
-          note: "provider probe 가 생성한 Remote A2A task 를 Workbench resume 으로 이어갈 수 있습니다."
+          note: "provider probe가 생성한 원격 A2A task를 Workbench resume으로 이어갈 수 있습니다."
         }
       : {
           supported: false,
@@ -150,9 +150,9 @@ export function runtimeResumeFormView(
           response
         },
     warning: missingTarget
-      ? "provider artifact 를 확인한 뒤 Workbench resume 을 전송할 수 있습니다."
+      ? "provider artifact를 확인한 뒤 Workbench resume을 전송할 수 있습니다."
       : missingResumeMetadata
-        ? "resume task metadata 를 확인한 뒤 Workbench resume 을 전송할 수 있습니다."
+        ? "resume task metadata를 확인한 뒤 Workbench resume을 전송할 수 있습니다."
         : null
   };
 }
