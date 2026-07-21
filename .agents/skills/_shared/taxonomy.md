@@ -6,7 +6,7 @@ Route classification decisions to the canonical Agent Factory Taxonomy without d
 
 ## When to read
 
-Read when discovering or reviewing assets, separating assets from resources and dependencies, assigning business scope or ownership, evaluating reuse, or interpreting a current `legacy` module candidate.
+Read when discovering or reviewing assets, separating assets from resources and dependencies, assigning business scope or ownership, or evaluating reuse.
 
 ## Decision criteria
 
@@ -19,7 +19,7 @@ Use [the canonical Taxonomy](../../../docs/workbench/taxonomy.md) as the sole de
 | Tool use decision | [Invocation Control](../../../docs/workbench/taxonomy.md#invocation-control) | Use only Workflow or Agent. |
 | Connection axes | [Binding, Transport, Backend](../../../docs/workbench/taxonomy.md#binding-transport-backend-분리) | Do not create protocol-based asset types. |
 | Context and reuse | [Business Context](../../../docs/workbench/taxonomy.md#business-context와-ownership), [Reuse Governance](../../../docs/workbench/taxonomy.md#reuse-governance) | Keep domain, owner, and reuse status independent. |
-| Current payload | [Current Implementation mapping](../../../docs/workbench/taxonomy.md#current-implementation-대응legacy) | Apply only through the Compatibility Layer. |
+| Strict v2 payload | [Target Contract v2](target-contract-v2.md) | Write only Target fields and Agent/Workflow/Tool assets. |
 
 Do not reproduce canonical enum or subtype definitions in a skill reference. Reopen the linked section when exact values matter.
 
@@ -37,14 +37,14 @@ For each candidate, preserve:
 ## Artifact implications
 
 - Standalone design notes may use Target fields and vocabulary.
-- Current `analysis-result.json` writes must route through [compatibility-current-schema.md](compatibility-current-schema.md).
-- Preserve the Target classification in rationale or notes when compatibility output uses a `legacy` category.
-- Do not convert every current `legacy` adapter-shaped item into a Tool without reclassification evidence.
+- New `analysis-result.json` writes must include strict Target v2 fields from [target-contract-v2.md](target-contract-v2.md).
+- Preserve classification as structured fields; rationale explains evidence rather than carrying a hidden classification.
+- Do not convert a Resource or Dependency into a Tool without callable-contract evidence.
 
 ## Scaffold implications
 
 - Scaffold only approved assets and approved connection contracts.
-- Keep Function Node, Tool Node, and Function-bound Tool distinct by following [graph-ir.md](graph-ir.md).
+- Keep Function Node, Tool Node, and Function-bound Tool distinct by following `_shared/graph-ir.md` when Graph classification is in scope.
 - Runtime patterns such as MCP, A2A, callbacks, ambient entry, and event-loop behavior do not create new asset classes.
 
 ## Verification
@@ -52,11 +52,11 @@ For each candidate, preserve:
 - Confirm every top-level candidate is Agent, Workflow, or Tool in Target reasoning.
 - Confirm Invocation Control is Workflow or Agent only.
 - Confirm resources and dependencies were not promoted to assets.
-- Validate current payloads with `node scripts/validate-artifacts.mjs <path>`.
+- Validate strict v2 payloads with `node scripts/validate-artifacts.mjs <path>`.
 
 ## Stop conditions
 
-Stop when responsibility evidence is insufficient, a resource/dependency is being forced into an asset class, domain and owner are conflated, or Target intent cannot be represented safely in the current schema.
+Stop when responsibility evidence is insufficient, a resource/dependency is being forced into an asset class, domain and owner are conflated, or Target intent cannot be represented safely in strict v2.
 
 ## Official sources checked
 
@@ -70,4 +70,4 @@ Stop when responsibility evidence is insufficient, a resource/dependency is bein
 - Checked date: 2026-07-18
 - Official sources: Agent Factory Taxonomy and linked ADK official pages
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Current product schemas still require four `legacy` module categories; use the Compatibility Layer only for current writes.
+- Contract note: Strict v2 uses Agent, Workflow, and Tool as its only asset types.

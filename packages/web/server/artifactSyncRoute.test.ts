@@ -11,6 +11,7 @@ import {
   assertScaffoldGraphNodes,
   createRequester,
   createRoot,
+  fileExists,
   parseJsonBody,
   parseSse,
   readCommandLog,
@@ -29,30 +30,57 @@ const approvedGates = {
   stub_ready_for_followup: false
 } satisfies AfRunManifest["approvals"];
 
-async function assertArtifactSyncRepairsStaleSplitProcessFlow(request: ArtifactTestRequest, root: string): Promise<void> {
+async function assertArtifactSyncRejectsUnapprovedDesignWithoutWrites(
+  request: ArtifactTestRequest,
+  root: string
+): Promise<void> {
+  const reqId = "req-sync-unapproved";
+  await createRoot(request, reqId);
+  const rootDir = join(root, `artifacts/af/${reqId}`);
+  await writeJson(join(rootDir, "analysis-result.json"), driftAnalysisResult(reqId));
+  const logBefore = await readCommandLog(root);
+
+  const response = await postArtifactSync(request, reqId, {
+    outputMode: "smoke",
+    rebuildRuntimeStub: true,
+    runValidation: true
+  });
+
+  assert.equal(response.status, 409);
+  const error = parseJsonBody<{ readonly error: string }>(response).error;
+  assert.match(error, /boundaries_approved/);
+  assert.match(error, /runtime_contracts_approved/);
+  assert.equal(await fileExists(join(rootDir, "scaffold-plan.json")), false);
+  assert.equal(await fileExists(join(rootDir, "runtime-stub/agent.py")), false);
+  assert.deepEqual(await readCommandLog(root), logBefore);
+}
+
+async function assertArtifactSyncRepairsStaleSplitGraph(request: ArtifactTestRequest, root: string): Promise<void> {
   const reqId = "req-drift";
   await createRoot(request, reqId);
   assert.equal((await patchApprovals(request, reqId)).status, 200);
   const rootDir = join(root, `artifacts/af/${reqId}`);
   const analysis = driftAnalysisResult(reqId);
-  const staleProcessFlow = staleGraphVersion(reqId);
+  const staleGraph = staleGraphVersion(reqId);
   await writeJson(join(rootDir, "analysis-result.json"), analysis);
   await writeJson(join(rootDir, "normalized-requirement.json"), analysis.normalizedRequirement);
-  await writeJson(join(rootDir, "module-candidates.json"), analysis.moduleCandidates);
-  await writeJson(join(rootDir, "process-flow.json"), staleProcessFlow);
-  await writeJson(join(rootDir, "scaffold-plan.json"), staleScaffoldPlan(reqId, staleProcessFlow));
+  await writeJson(join(rootDir, "asset-candidates.json"), analysis.assetCandidates);
+  await writeJson(join(rootDir, "graph-ir.json"), staleGraph);
+  await writeJson(join(rootDir, "scaffold-plan.json"), staleScaffoldPlan(reqId, staleGraph));
   const approvalsBefore = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` })).approvals;
 
   const response = await postArtifactSync(request, reqId, { outputMode: "smoke", rebuildRuntimeStub: false, runValidation: false });
 
   const result = responseJson<ArtifactSyncResponse>(response);
   assert.equal(result.ok, true);
-  assertDriftStatus(result.drift.before, "process-flow.json", "stale");
-  assertDriftStatus(result.drift.after, "process-flow.json", "synced");
-  assert.ok(result.artifacts_written.includes("process-flow.json"));
+  assertDriftStatus(result.drift.before, "graph-ir.json", "stale");
+  assertDriftStatus(result.drift.after, "graph-ir.json", "synced");
+  assert.ok(result.artifacts_written.includes("graph-ir.json"));
   assert.ok(result.artifacts_written.includes("scaffold-plan.json"));
-  assert.deepEqual(await readJson(join(rootDir, "process-flow.json")), analysis.processFlow);
-  assertScaffoldGraphNodes(await readJson(join(rootDir, "scaffold-plan.json")), analysis.processFlow.nodes.map((node) => node.id));
+  assert.deepEqual(await readJson(join(rootDir, "graph-ir.json")), analysis.graph);
+  assertScaffoldGraphNodes(await readJson(join(rootDir, "scaffold-plan.json")), analysis.graph.nodes.map((node) => node.id));
+  assert.equal((await request({ url: `/${reqId}/module-candidates.json` })).status, 404);
+  assert.equal((await request({ url: `/${reqId}/process-flow.json` })).status, 404);
   const approvalsAfter = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` })).approvals;
   assert.deepEqual(approvalsAfter, approvalsBefore);
   assert.deepEqual(approvalsAfter, approvedGates);
@@ -68,8 +96,8 @@ async function assertArtifactSyncJsonComposesSyncGenerationAndValidation(request
 
   assert.equal(result.ok, true);
   assert.equal(result.output_mode, "smoke");
-  assertDriftStatus(result.drift.before, "process-flow.json", "stale");
-  assertDriftStatus(result.drift.after, "process-flow.json", "synced");
+  assertDriftStatus(result.drift.before, "graph-ir.json", "stale");
+  assertDriftStatus(result.drift.after, "graph-ir.json", "synced");
   assert.equal(result.generation?.command, `node scripts/generate-adk-source.mjs ${rootDir} ${stubDir}`);
   assert.equal(result.generation?.stdout, "build stdout line\n");
   assert.equal(result.generation?.stderr, "build stderr line\n");
@@ -106,11 +134,11 @@ async function assertArtifactSyncPreservesApprovalsAndSkipsValidation(request: A
   const reqId = "req-sync-no-validation";
   await writeSyncReadyRoot(request, repoRoot, reqId);
   assert.equal((await patchApprovals(request, reqId)).status, 200);
-  await request({
-    url: `/${reqId}/manifest/validation`,
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: { commands: ["previous validation command"], last_result: "failed" }
+  const manifestPath = join(repoRoot, `artifacts/af/${reqId}/af-run-manifest.json`);
+  const manifest = await readJson(manifestPath) as AfRunManifest;
+  await writeJson(manifestPath, {
+    ...manifest,
+    validation: { commands: ["previous validation command"], last_result: "failed" }
   });
   const before = responseJson<AfRunManifest>(await request({ url: `/${reqId}/manifest` }));
 
@@ -150,7 +178,14 @@ async function assertArtifactSyncFailureOrdering(request: ArtifactTestRequest, r
 async function assertSyncFailureStopsBeforeGeneration(request: ArtifactTestRequest, root: string): Promise<void> {
   const reqId = "req-sync-bad-analysis";
   await createRoot(request, reqId);
-  await writeJson(join(root, `artifacts/af/${reqId}/analysis-result.json`), { normalizedRequirement: { id: reqId }, evidence: {}, processFlow: {} });
+  assert.equal((await patchApprovals(request, reqId)).status, 200);
+  await writeJson(join(root, `artifacts/af/${reqId}/analysis-result.json`), {
+    contract_version: "2.0",
+    normalizedRequirement: { id: reqId },
+    evidence: {},
+    assetCandidates: [],
+    graph: {}
+  });
   const logBefore = await readCommandLog(root);
 
   const response = await postArtifactSync(request, reqId, { outputMode: "smoke", rebuildRuntimeStub: true, runValidation: true });
@@ -238,7 +273,8 @@ try {
   await writeFakeScripts(repoRoot);
   process.env.PATH = `${join(repoRoot, "bin")}:${originalPath}`;
   const request = createRequester(repoRoot);
-  await assertArtifactSyncRepairsStaleSplitProcessFlow(request, repoRoot);
+  await assertArtifactSyncRejectsUnapprovedDesignWithoutWrites(request, repoRoot);
+  await assertArtifactSyncRepairsStaleSplitGraph(request, repoRoot);
   await assertArtifactSyncJsonComposesSyncGenerationAndValidation(request, repoRoot);
   await assertArtifactSyncSseStreamsSyncAndProcesses(request, repoRoot);
   await assertArtifactSyncPreservesApprovalsAndSkipsValidation(request);

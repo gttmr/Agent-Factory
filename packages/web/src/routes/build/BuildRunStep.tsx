@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { StageRunnerPanel } from "../../components/StageRunnerPanel";
 import { Panel } from "../../ui/primitives";
 import { buildScaffoldPlan } from "../../analyzer/scaffoldPlan";
-import type { ScaffoldOutputMode, ScaffoldPlanModule } from "../../analyzer/types";
+import type { AssetCandidate, ScaffoldOutputMode } from "../../analyzer/types";
 import { catalogIndexToScaffoldCatalog } from "../../catalog/scaffoldCatalog";
-import { applyMockLabBinding, isMcpBoundAdapter, type MockLabBindingSelection } from "../../mock-lab/mockLabIntegration";
+import { applyMockLabBinding, isMcpBoundTool, type MockLabBindingSelection } from "../../mock-lab/mockLabIntegration";
 import { useAnalysisArtifact } from "../../state/useAnalysisArtifact";
 import { useArtifactSync } from "../../state/useArtifactSync";
 import { useCatalog } from "../../state/useCatalog";
@@ -49,11 +49,11 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
   const selectedOutputMode = outputModeExplicitlyChosen ? outputMode : savedMode ?? outputMode;
   const mockLabDiscovery = useMockLabDiscovery(selectedOutputMode === "runnable");
   const generatedPlan = useMemo(() => {
-    if (!analysis?.processFlow) return null;
+    if (!analysis?.graph) return null;
     return buildScaffoldPlan({
       normalizedRequirement: analysis.normalizedRequirement,
-      moduleCandidates: analysis.moduleCandidates,
-      processFlow: analysis.processFlow,
+      assetCandidates: analysis.assetCandidates,
+      graph: analysis.graph,
       catalogEntries,
       runtimeContracts: analysis.runtimeContracts ?? [],
       outputMode: selectedOutputMode
@@ -61,14 +61,13 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
   }, [analysis, catalogEntries, selectedOutputMode]);
 
   useEffect(() => {
-    if (!scaffoldPlan?.modules) return;
+    if (!scaffoldPlan?.assets) return;
     const next: Record<string, MockLabBindingSelection> = {};
-    for (const module of scaffoldPlan.modules) {
-      if (isMcpBoundAdapter(module) && module.mcp_server && module.mcp_tool_name) {
-        next[module.id] = {
-          mcpServer: module.mcp_server,
-          mcpToolName: module.mcp_tool_name,
-          mcpSchemaRef: module.mcp_schema_ref ?? null
+    for (const asset of scaffoldPlan.assets) {
+      if (isMcpBoundTool(asset) && asset.binding.kind === "mcp") {
+        next[asset.asset_id] = {
+          serverRef: asset.binding.server_ref,
+          toolName: asset.binding.tool_name
         };
       }
     }
@@ -85,16 +84,16 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
   const effectivePlan = useMemo(() => {
     if (!generatedPlan) return null;
     return Object.entries(bindingOverrides).reduce(
-      (plan, [moduleId, selection]) => applyMockLabBinding(plan, moduleId, selection),
+      (plan, [assetId, selection]) => applyMockLabBinding(plan, assetId, selection),
       generatedPlan
     );
   }, [bindingOverrides, generatedPlan]);
 
-  const adapterConnections = useMemo(() => {
-    const adapters = (effectivePlan?.modules ?? []).filter((module) => module.module_category === "adapter");
+  const toolConnections = useMemo(() => {
+    const tools = (effectivePlan?.assets ?? []).filter((asset) => asset.asset_type === "tool");
     return {
-      connected: adapters.filter(isMcpBoundAdapter),
-      unconnected: adapters.filter((module) => !isMcpBoundAdapter(module))
+      connected: tools.filter(isMcpBoundTool),
+      unconnected: tools.filter((asset) => !isMcpBoundTool(asset))
     };
   }, [effectivePlan]);
 
@@ -123,11 +122,11 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
     });
   }
 
-  function handleMockLabBinding(module: ScaffoldPlanModule, value: string) {
+  function handleMockLabBinding(asset: AssetCandidate, value: string) {
     if (!value) {
       setBindingOverrides((current) => {
         const next = { ...current };
-        delete next[module.id];
+        delete next[asset.asset_id];
         return next;
       });
       return;
@@ -136,10 +135,9 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
     if (!mockId || !toolName) return;
     setBindingOverrides((current) => ({
       ...current,
-      [module.id]: {
-        mcpServer: mockId,
-        mcpToolName: toolName,
-        mcpSchemaRef: module.mcp_schema_ref ?? null
+      [asset.asset_id]: {
+        serverRef: mockId,
+        toolName
       }
     }));
   }
@@ -216,7 +214,7 @@ export function BuildRunStep({ boundariesApproved, designGatesReady, reqId, runt
         showLog={processLog.owner === "artifact-sync"}
       />
       <ManualBuildControls
-        adapterConnections={adapterConnections}
+        toolConnections={toolConnections}
         adkGraphReadiness={buildAdkGraphReadiness(effectivePlan)}
         artifactSyncPending={artifactSync.isPending}
         blockers={blockers}

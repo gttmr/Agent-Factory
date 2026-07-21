@@ -15,35 +15,27 @@ import ReactFlow, {
   type XYPosition
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { mergeGraphIRValidation, validateGraphIRSoft } from "../analyzer/graphMigration";
 import type {
-  A2AContract,
-  EdgeKind,
-  ExecutionSemantics,
+  AssetCandidate,
   GraphEdge,
   GraphIR,
   GraphNode,
-  GraphValidationIssue,
-  LaneId,
-  ModuleCandidate
+  GraphRegion,
+  GraphRegionKind,
+  NodeKind
 } from "../analyzer/types";
-import { GRAPH_NODE_KINDS, type NodeKind } from "../analyzer/types";
-import { ContainerOverlay } from "./graph/containerOverlay";
-import { appendNodeToContainer, moveNodeToContainer, rootWorkflowContainerId } from "../graph/containerMembership";
-import { graphEdgeId, graphModuleSubtype } from "../graph/graphDisplay";
-import { edgeTypes } from "./graph/edgeTypes";
-import { freezeGraphLayout, layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
-import { nodeTypes } from "./graph/nodeTypes";
-import { ValidationBanner } from "./graph/validationBanner";
-import { GraphInspector } from "./GraphInspector";
+import { graphAssetSubtype, graphEdgeId } from "../graph/graphDisplay";
 import type { CommentRecord, HighlightRecord } from "../state/useCollaboration";
+import { GraphInspector } from "./GraphInspector";
+import { RegionOverlay } from "./graph/containerOverlay";
+import { edgeTypes } from "./graph/edgeTypes";
+import { layoutGraphIR, type GraphEdgeData, type GraphNodeData } from "./graph/layout";
+import { nodeTypes } from "./graph/nodeTypes";
+import { TARGET_NODE_KIND_OPTIONS, assetRefForNode, graphRegionLabel, isA2AProtocolBoundary } from "./graphElementEditorModel";
 
 interface GraphCanvasProps {
   graphIR: GraphIR;
-  moduleCandidates: ModuleCandidate[];
-  a2aContracts: A2AContract[];
-  catalogContracts?: Record<string, unknown>;
-  onNavigateToA2AContracts?: () => void;
+  assetCandidates: AssetCandidate[];
   onContinue?: () => void;
   continueLabel?: string;
   selection?: Selection;
@@ -62,58 +54,19 @@ export interface Selection {
   edgeId: string | null;
 }
 
-export type NodeFieldPatch = Partial<
-  Pick<
-    GraphNode,
-    | "label"
-    | "lane_id"
-    | "container_id"
-    | "execution_kind"
-    | "agent_execution_mode"
-    | "module_id"
-    | "review_status"
-    | "invoke_binding"
-    | "decision_owner"
-    | "call_control"
-    | "input_mapping"
-    | "output_mapping"
-    | "human_input_contract"
-  >
->;
-export type EdgeFieldPatch = Partial<
-  Pick<
-    GraphEdge,
-    | "edge_kind"
-    | "execution_semantics"
-    | "data_label"
-    | "route_condition"
-    | "route_aliases"
-    | "is_default_route"
-    | "state_key"
-    | "artifact_key"
-    | "schema_ref"
-    | "a2a_contract_id"
-    | "is_remote_boundary_crossing"
-    | "flow_kind"
-    | "call_control"
-  >
->;
-
 export interface GraphEditState {
   editModeActive: boolean;
   draft: GraphIR;
   selectedNode: GraphNode | null;
   selectedEdge: GraphEdge | null;
-  updateNodeFields: (nodeId: string, patch: NodeFieldPatch) => void;
-  updateEdgeFields: (edgeId: string, patch: EdgeFieldPatch) => void;
+  replaceNode: (node: GraphNode) => void;
+  replaceEdge: (edge: GraphEdge) => void;
+  replaceRegions: (regions: GraphRegion[]) => void;
 }
 
 export function GraphCanvas({
   graphIR,
-  moduleCandidates,
-  a2aContracts,
-  catalogContracts = {},
-  onNavigateToA2AContracts,
+  assetCandidates,
   onContinue,
   continueLabel,
   selection: selectionProp,
@@ -128,432 +81,273 @@ export function GraphCanvas({
 }: GraphCanvasProps) {
   const [internalSelection, setInternalSelection] = useState<Selection>({ nodeId: null, edgeId: null });
   const [editMode, setEditMode] = useState(false);
-  const [draftGraphIR, setDraftGraphIR] = useState<GraphIR | null>(null);
+  const [draft, setDraft] = useState<GraphIR | null>(null);
   const [dirty, setDirty] = useState(false);
   const [addKind, setAddKind] = useState<NodeKind>("agent");
   const [addLabel, setAddLabel] = useState("");
+  const [regionKind, setRegionKind] = useState<GraphRegionKind>("parallel");
   const [connectMode, setConnectMode] = useState(false);
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
-  const [editNotice, setEditNotice] = useState<string | null>(null);
-  const [flowPositions, setFlowPositions] = useState<Record<string, XYPosition>>({});
-  const pendingSaveRef = useRef(false);
-  const previousGraphIRRef = useRef(graphIR);
-  const edgeCreationGuardRef = useRef<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [presentationPositions, setPresentationPositions] = useState<Map<string, XYPosition>>(new Map());
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const isControlled = selectionProp !== undefined;
+  const edgeCreationGuardRef = useRef<string | null>(null);
   const selection = selectionProp ?? internalSelection;
-  const setSelection = (next: Selection) => {
-    if (!isControlled) setInternalSelection(next);
-    onSelectionChange?.(next);
-  };
-  const editModeActive = editable && editMode && draftGraphIR !== null;
-  const activeGraphIR = editModeActive && draftGraphIR ? draftGraphIR : graphIR;
-  const draftValidation = useMemo(
-    () => (editModeActive && draftGraphIR ? validateGraphIRSoft(draftGraphIR) : null),
-    [draftGraphIR, editModeActive]
-  );
+  const editModeActive = editable && editMode && draft !== null;
+  const activeGraph = editModeActive && draft ? draft : graphIR;
 
-  const updateDraft = useCallback((updater: (graph: GraphIR) => GraphIR) => {
-    setDraftGraphIR((current) => (current ? updater(current) : current));
+  const setSelection = useCallback((next: Selection) => {
+    if (selectionProp === undefined) setInternalSelection(next);
+    onSelectionChange?.(next);
+  }, [onSelectionChange, selectionProp]);
+
+  const updateDraft = useCallback((updater: (current: GraphIR) => GraphIR) => {
+    setDraft((current) => current ? updater(current) : current);
     setDirty(true);
-    pendingSaveRef.current = false;
   }, []);
 
-  const updateNodeFields = useCallback(
-    (nodeId: string, patch: NodeFieldPatch) => {
-      updateDraft((graph) => applyNodeFields(graph, nodeId, patch));
-    },
-    [updateDraft]
-  );
+  const replaceNode = useCallback((nextNode: GraphNode) => {
+    updateDraft((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === nextNode.id ? nextNode : node) }));
+  }, [updateDraft]);
 
-  const updateEdgeFields = useCallback(
-    (edgeId: string, patch: EdgeFieldPatch) => {
-      updateDraft((graph) => applyEdgeFields(graph, edgeId, patch));
-    },
-    [updateDraft]
-  );
+  const replaceEdge = useCallback((nextEdge: GraphEdge) => {
+    updateDraft((current) => ({ ...current, edges: current.edges.map((edge) => edge.id === nextEdge.id ? nextEdge : edge) }));
+  }, [updateDraft]);
+
+  const replaceRegions = useCallback((regions: GraphRegion[]) => {
+    updateDraft((current) => ({ ...current, regions }));
+  }, [updateDraft]);
 
   const cancelConnectMode = useCallback(() => {
     setConnectMode(false);
     setConnectSourceId(null);
   }, []);
 
-  const createDraftEdge = useCallback(
-    (sourceId: string, targetId: string) => {
-      if (!draftGraphIR) return;
-      const pairKey = `${sourceId}->${targetId}`;
-      if (edgeCreationGuardRef.current === pairKey) return;
-      edgeCreationGuardRef.current = pairKey;
-      window.setTimeout(() => {
-        if (edgeCreationGuardRef.current === pairKey) edgeCreationGuardRef.current = null;
-      }, 0);
-      const result = buildEditableEdge(draftGraphIR, sourceId, targetId);
-      if (!result.edge) {
-        setEditNotice(result.message);
-        return;
-      }
-      const edge = result.edge;
-      updateDraft((graph) => ({
-        ...graph,
-        edges: [...(graph.edges ?? []), edge]
-      }));
-      setEditNotice(result.message);
-      setSelection({ nodeId: null, edgeId: edge.id });
-      cancelConnectMode();
-    },
-    [cancelConnectMode, draftGraphIR, updateDraft]
-  );
-
-  const handleNodeInteraction = useCallback(
-    (nodeId: string) => {
-      if (editModeActive && connectMode) {
-        if (!connectSourceId) {
-          setConnectSourceId(nodeId);
-          setSelection({ nodeId, edgeId: null });
-          setEditNotice("대상 노드를 클릭하세요");
-          return;
-        }
-        createDraftEdge(connectSourceId, nodeId);
-        return;
-      }
-      setSelection({ nodeId, edgeId: null });
-    },
-    [connectMode, connectSourceId, createDraftEdge, editModeActive]
-  );
-
-  const handleEdgeInteraction = useCallback((edgeId: string) => {
-    if (editModeActive && connectMode) {
-      cancelConnectMode();
-    }
-    setSelection({ nodeId: null, edgeId });
-  }, [cancelConnectMode, connectMode, editModeActive]);
-
-  const selectRef = useRef<(kind: "node" | "edge", id: string) => void>(() => undefined);
-  selectRef.current = (kind, id) => {
-    if (kind === "node") handleNodeInteraction(id);
-    else handleEdgeInteraction(id);
-  };
-  const handleSelect = useCallback((kind: "node" | "edge", id: string) => {
-    selectRef.current(kind, id);
-  }, []);
-
   useEffect(() => {
     if (editable) return;
     setEditMode(false);
-    setDraftGraphIR(null);
+    setDraft(null);
     setDirty(false);
     cancelConnectMode();
   }, [cancelConnectMode, editable]);
 
-  useEffect(() => {
-    const graphChanged = previousGraphIRRef.current !== graphIR;
-    previousGraphIRRef.current = graphIR;
-    if (!graphChanged || !pendingSaveRef.current || !editMode) return;
-    pendingSaveRef.current = false;
-    setDraftGraphIR(cloneGraphIR(freezeGraphLayout(graphIR)));
-    setDirty(false);
-  }, [editMode, graphIR]);
-
-  useEffect(() => {
-    if (!editModeActive || !connectMode) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      cancelConnectMode();
-      setEditNotice("엣지 연결을 취소했습니다.");
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cancelConnectMode, connectMode, editModeActive]);
-
   const enterEditMode = useCallback(() => {
-    // Freeze all node positions on entry so dragging one node never re-lays the
-    // others (mixed finite/auto positions made dagre re-run + re-translate).
-    const draft = cloneGraphIR(freezeGraphLayout(graphIR));
-    setDraftGraphIR(draft);
+    const nextDraft = cloneGraph(graphIR);
+    const initial = layoutGraphIR(nextDraft, { nodeId: null, edgeId: null }, () => undefined);
+    setPresentationPositions(new Map(initial.nodes.map((node) => [node.id, { ...node.position }])));
+    setDraft(nextDraft);
     setDirty(false);
-    pendingSaveRef.current = false;
     setEditMode(true);
     setSelection({ nodeId: null, edgeId: null });
-    cancelConnectMode();
-    setEditNotice("편집 모드를 시작했습니다.");
-  }, [cancelConnectMode, graphIR]);
+    setNotice("편집 모드를 시작했습니다. 배치 좌표는 현재 화면에서만 유지됩니다.");
+  }, [graphIR, setSelection]);
 
   const cancelEditMode = useCallback(() => {
     setEditMode(false);
-    setDraftGraphIR(null);
+    setDraft(null);
     setDirty(false);
-    pendingSaveRef.current = false;
+    setPresentationPositions(new Map());
     cancelConnectMode();
-    setEditNotice(null);
     setSelection({ nodeId: null, edgeId: null });
-  }, [cancelConnectMode]);
+    setNotice(null);
+  }, [cancelConnectMode, setSelection]);
 
-  const toggleEditMode = useCallback(() => {
-    if (!editModeActive) enterEditMode();
-    else cancelEditMode();
-  }, [cancelEditMode, editModeActive, enterEditMode]);
+  const createEdge = useCallback((sourceId: string, targetId: string) => {
+    if (!draft) return;
+    const guardKey = `${sourceId}->${targetId}`;
+    if (edgeCreationGuardRef.current === guardKey) return;
+    edgeCreationGuardRef.current = guardKey;
+    window.setTimeout(() => { if (edgeCreationGuardRef.current === guardKey) edgeCreationGuardRef.current = null; }, 0);
+    const result = buildEditableEdge(draft, sourceId, targetId);
+    if (!result.edge) return setNotice(result.message);
+    updateDraft((current) => ({ ...current, edges: [...current.edges, result.edge!] }));
+    setSelection({ nodeId: null, edgeId: result.edge.id });
+    setNotice(result.message);
+    cancelConnectMode();
+  }, [cancelConnectMode, draft, setSelection, updateDraft]);
 
-  const addNode = useCallback(
-    (position: XYPosition | null) => {
-      if (!draftGraphIR) return;
-      const label = addLabel.trim();
-      if (!label) {
-        setEditNotice("노드 이름을 입력하세요.");
-        return;
+  const handleNodeInteraction = useCallback((nodeId: string) => {
+    if (editModeActive && connectMode) {
+      if (!connectSourceId) {
+        setConnectSourceId(nodeId);
+        setSelection({ nodeId, edgeId: null });
+        setNotice("대상 Node를 선택하세요.");
+      } else {
+        createEdge(connectSourceId, nodeId);
       }
-      const nextPosition = position ?? nextNodeFallbackPosition(draftGraphIR, flowPositions);
-      const containerId = addKind === "remote_a2a" || addKind === "remote_agent_call" ? null : rootWorkflowContainerId(draftGraphIR);
-      const node = buildEditableNode(draftGraphIR, addKind, label, nextPosition, containerId);
-      updateDraft((graph) => {
-        const containers = containerId
-          ? appendNodeToContainer(graph.containers ?? [], containerId, node.id)
-          : graph.containers ?? [];
-        return {
-          ...graph,
-          nodes: [...(graph.nodes ?? []), node],
-          containers
-        };
-      });
-      setAddLabel("");
-      setSelection({ nodeId: node.id, edgeId: null });
-      setEditNotice(`${node.id} 노드를 추가했습니다.`);
-    },
-    [addKind, addLabel, draftGraphIR, flowPositions, updateDraft]
-  );
+      return;
+    }
+    setSelection({ nodeId, edgeId: null });
+  }, [connectMode, connectSourceId, createEdge, editModeActive, setSelection]);
+
+  const handleEdgeInteraction = useCallback((edgeId: string) => {
+    if (connectMode) cancelConnectMode();
+    setSelection({ nodeId: null, edgeId });
+  }, [cancelConnectMode, connectMode, setSelection]);
+
+  const selectRef = useRef<(kind: "node" | "edge", id: string) => void>(() => undefined);
+  selectRef.current = (kind, id) => kind === "node" ? handleNodeInteraction(id) : handleEdgeInteraction(id);
+  const handleSelect = useCallback((kind: "node" | "edge", id: string) => selectRef.current(kind, id), []);
+
+  const addNode = useCallback((position: XYPosition | null) => {
+    if (!draft) return;
+    const label = addLabel.trim();
+    if (!label) return setNotice("Node label을 입력하세요.");
+    const result = buildEditableNode(draft, addKind, label, assetCandidates);
+    if (!result.node) return setNotice(result.message);
+    const node = result.node;
+    const nextPosition = position ?? nextNodePosition(presentationPositions);
+    setPresentationPositions((current) => new Map(current).set(node.id, nextPosition));
+    updateDraft((current) => ({ ...current, nodes: [...current.nodes, node] }));
+    setAddLabel("");
+    setSelection({ nodeId: node.id, edgeId: null });
+    setNotice(result.message);
+  }, [addKind, addLabel, assetCandidates, draft, presentationPositions, setSelection, updateDraft]);
+
+  const addRegion = useCallback(() => {
+    if (!draft || !selection.nodeId) return setNotice("실행 범위에 넣을 Node를 먼저 선택하세요.");
+    const region: GraphRegion = {
+      id: nextRegionId(draft, regionKind),
+      kind: regionKind,
+      node_ids: [selection.nodeId],
+      entry_node_ids: [selection.nodeId],
+      exit_node_ids: [selection.nodeId],
+      parent_region_id: null
+    };
+    updateDraft((current) => ({ ...current, regions: [...current.regions, region] }));
+    setNotice(`${region.id} ${graphRegionLabel(region.kind)}를 추가했습니다. Node 편집기에서 포함·진입·종료 Node를 조정하세요.`);
+  }, [draft, regionKind, selection.nodeId, updateDraft]);
 
   const deleteSelection = useCallback(() => {
-    if (!draftGraphIR) return;
-    if (!selection.nodeId && !selection.edgeId) {
-      setEditNotice("삭제할 노드 또는 엣지를 선택하세요.");
-      return;
+    if (!selection.nodeId && !selection.edgeId) return setNotice("삭제할 Node 또는 Edge를 선택하세요.");
+    updateDraft((current) => deleteFromGraph(current, selection));
+    if (selection.nodeId) {
+      setPresentationPositions((current) => { const next = new Map(current); next.delete(selection.nodeId!); return next; });
     }
-    updateDraft((graph) => deleteFromGraph(graph, selection));
     setSelection({ nodeId: null, edgeId: null });
-    cancelConnectMode();
-    setEditNotice("선택 항목을 삭제했습니다.");
-  }, [cancelConnectMode, draftGraphIR, selection, updateDraft]);
+    setNotice("선택 항목을 삭제했습니다.");
+  }, [selection, setSelection, updateDraft]);
 
-  const toggleConnectMode = useCallback(() => {
-    if (!editModeActive) return;
-    if (connectMode) {
-      cancelConnectMode();
-      setEditNotice("엣지 연결을 취소했습니다.");
-      return;
-    }
-    setConnectMode(true);
-    setConnectSourceId(null);
-    setSelection({ nodeId: null, edgeId: null });
-    setEditNotice("시작 노드를 클릭하세요");
-  }, [cancelConnectMode, connectMode, editModeActive]);
-
+  const validation = useMemo(() => editModeActive ? validateDraftGraph(activeGraph, assetCandidates) : [], [activeGraph, assetCandidates, editModeActive]);
   const saveDraft = useCallback(() => {
-    if (!draftGraphIR || !onSaveGraph) return;
-    const positioned = applyCurrentPositions(draftGraphIR, flowPositions);
-    const soft = validateGraphIRSoft(positioned);
-    const next = {
-      ...positioned,
-      validation: mergeGraphIRValidation(positioned.validation, soft)
-    };
-    pendingSaveRef.current = true;
-    setDraftGraphIR(next);
-    onSaveGraph(next);
-  }, [draftGraphIR, flowPositions, onSaveGraph]);
+    if (!draft || !onSaveGraph) return;
+    const errors = validateDraftGraph(draft, assetCandidates);
+    if (errors.length) return setNotice(`저장할 수 없습니다: ${errors[0]}`);
+    onSaveGraph(cloneGraph(draft));
+    setDirty(false);
+    setNotice("Graph IR 저장을 요청했습니다.");
+  }, [assetCandidates, draft, onSaveGraph]);
 
-  const updateNodePosition = useCallback(
-    (nodeId: string, position: XYPosition) => {
-      updateDraft((graph) => ({
-        ...graph,
-        nodes: (graph.nodes ?? []).map((node) =>
-          node.id === nodeId ? { ...node, position: { x: position.x, y: position.y } } : node
-        )
-      }));
-    },
-    [updateDraft]
-  );
-
-  const layoutNodeId = editModeActive ? null : selection.nodeId;
-  const layoutEdgeId = editModeActive ? null : selection.edgeId;
   const layout = useMemo(
-    () =>
-      layoutGraphIR(
-        activeGraphIR,
-        { nodeId: layoutNodeId, edgeId: layoutEdgeId },
-        handleSelect
-      ),
-    [activeGraphIR, handleSelect, layoutEdgeId, layoutNodeId]
+    () => layoutGraphIR(activeGraph, { nodeId: null, edgeId: null }, handleSelect, presentationPositions),
+    [activeGraph, handleSelect, presentationPositions]
   );
-  const collaborationMarks = useMemo(
-    () => buildCollaborationMarks(activeGraphIR, comments, highlights),
-    [activeGraphIR, comments, highlights]
-  );
-  const candidateByModuleId = useMemo(() => {
-    const map = new Map<string, ModuleCandidate>();
-    for (const c of moduleCandidates) map.set(c.id, c);
-    return map;
-  }, [moduleCandidates]);
+  const assetById = useMemo(() => new Map(assetCandidates.map((asset) => [asset.asset_id, asset])), [assetCandidates]);
+  const marks = useMemo(() => buildCollaborationMarks(activeGraph, comments, highlights), [activeGraph, comments, highlights]);
+  const baseNodes = useMemo<ReactFlowNode<GraphNodeData>[]>(() => layout.nodes.map((node) => {
+    const graphNode = node.data.graphNode;
+    const asset = assetById.get(assetRefForNode(graphNode) ?? "") ?? null;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        asset,
+        a2aBoundary: isA2AProtocolBoundary(graphNode, asset),
+        assetSubtype: graphAssetSubtype(asset),
+        commentCount: marks.nodeCommentCounts.get(node.id) ?? 0,
+        commentTooltip: marks.nodeCommentTooltips.get(node.id),
+        highlightCount: marks.nodeHighlightCounts.get(node.id) ?? 0
+      }
+    };
+  }), [assetById, layout.nodes, marks]);
+  const baseEdges = useMemo<ReactFlowEdge<GraphEdgeData>[]>(() => layout.edges.map((edge) => {
+    const data = edge.data as GraphEdgeData;
+    return {
+    ...edge,
+    data: {
+      ...data,
+      commentCount: marks.edgeCommentCounts.get(edge.id) ?? 0,
+      commentTooltip: marks.edgeCommentTooltips.get(edge.id),
+      highlightCount: marks.edgeHighlightCounts.get(edge.id) ?? 0,
+      highlightColor: marks.edgeHighlightColors.get(edge.id)
+    }
+  };}), [layout.edges, marks]);
 
-  const baseNodes = useMemo<ReactFlowNode<GraphNodeData>[]>(
-    () =>
-      layout.nodes.map((node) => {
-        const data = node.data as GraphNodeData;
-        const candidate = data.graphNode.module_id ? candidateByModuleId.get(data.graphNode.module_id) : null;
-        return {
-          ...node,
-          data: {
-            ...data,
-            selected: false,
-            commentCount: collaborationMarks.nodeCommentCounts.get(node.id) ?? 0,
-            commentTooltip: collaborationMarks.nodeCommentTooltips.get(node.id),
-            highlightCount: collaborationMarks.nodeHighlightCounts.get(node.id) ?? 0,
-            moduleSubtype: graphModuleSubtype(candidate)
-          }
-        };
-      }),
-    [layout.nodes, collaborationMarks, candidateByModuleId]
-  );
-  const baseEdges = useMemo<ReactFlowEdge<GraphEdgeData>[]>(
-    () =>
-      layout.edges.map((edge) => {
-        const data = edge.data as GraphEdgeData;
-        return {
-          ...edge,
-          zIndex:
-            (collaborationMarks.edgeHighlightCounts.get(edge.id) ?? 0) > 0
-              ? Math.max(edge.zIndex ?? 1, 18)
-              : edge.zIndex,
-          data: {
-            ...data,
-            selected: false,
-            commentCount: collaborationMarks.edgeCommentCounts.get(edge.id) ?? 0,
-            commentTooltip: collaborationMarks.edgeCommentTooltips.get(edge.id),
-            highlightCount: collaborationMarks.edgeHighlightCounts.get(edge.id) ?? 0,
-            highlightColor: collaborationMarks.edgeHighlightColors.get(edge.id)
-          }
-        };
-      }),
-    [layout.edges, collaborationMarks]
-  );
-
-  const nodeById = useMemo(() => new Map((activeGraphIR.nodes ?? []).map((n) => [n.id, n])), [activeGraphIR]);
-  const edgeById = useMemo(
-    () => new Map<string, GraphEdge>((activeGraphIR.edges ?? []).map((e, i) => [graphEdgeId(e, i), e])),
-    [activeGraphIR]
-  );
-
-  const selectedNode: GraphNode | null = selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null;
-  const selectedEdge: GraphEdge | null = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
-  const selectedCandidate: ModuleCandidate | null =
-    selectedNode && selectedNode.module_id ? candidateByModuleId.get(selectedNode.module_id) ?? null : null;
+  const nodeById = useMemo(() => new Map(activeGraph.nodes.map((node) => [node.id, node])), [activeGraph.nodes]);
+  const edgeById = useMemo(() => new Map(activeGraph.edges.map((edge) => [edge.id, edge])), [activeGraph.edges]);
+  const selectedNode = selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null;
+  const selectedEdge = selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null;
+  const selectedAsset = assetById.get(assetRefForNode(selectedNode) ?? "") ?? null;
 
   useEffect(() => {
-    if (!editModeActive || !draftGraphIR) {
-      onEditStateChange?.(null);
-      return;
-    }
-    onEditStateChange?.({
-      editModeActive,
-      draft: draftGraphIR,
-      selectedNode: selection.nodeId ? nodeById.get(selection.nodeId) ?? null : null,
-      selectedEdge: selection.edgeId ? edgeById.get(selection.edgeId) ?? null : null,
-      updateNodeFields,
-      updateEdgeFields
-    });
-  }, [draftGraphIR, editModeActive, onEditStateChange, selection, updateEdgeFields, updateNodeFields]);
-
-  const focusOn = (issue: GraphValidationIssue) => {
-    if (!issue.target_id) return;
-    if (issue.target_kind === "edge") {
-      setSelection({ nodeId: null, edgeId: issue.target_id });
-    } else if (issue.target_kind === "node") {
-      setSelection({ nodeId: issue.target_id, edgeId: null });
-    }
-  };
-
-  const nodeLabel = (id: string) => nodeById.get(id)?.label ?? id;
+    if (!editModeActive || !draft) return onEditStateChange?.(null);
+    onEditStateChange?.({ editModeActive, draft, selectedNode, selectedEdge, replaceNode, replaceEdge, replaceRegions });
+  }, [draft, editModeActive, onEditStateChange, replaceEdge, replaceNode, replaceRegions, selectedEdge, selectedNode]);
 
   return (
-    // hideInspector 일 때는 내부 inspector 열을 비우지 말고 grid 자체를 1열로 만들어
-    // 그래프 stage 가 전체 폭을 쓰게 한다(안 그러면 우측 inspector 열만큼 빈 공간이 남는다).
     <div className={`graph-canvas-root${hideInspector ? " graph-canvas-root--no-inspector" : ""}`}>
-      <section className="panel graph-canvas-panel">
+      <section className="ui-panel graph-canvas-panel">
         <div className="section-heading">
-          <div>
-            <p className="eyebrow">ADK Graph Workflow</p>
-            <h2>그래프 워크플로우 검토</h2>
-          </div>
-          <span className="graph-canvas-stats">
-            노드 {activeGraphIR.nodes?.length ?? 0} · 엣지 {activeGraphIR.edges?.length ?? 0} · 컨테이너 {activeGraphIR.containers?.length ?? 0}
-          </span>
+          <div><p className="eyebrow">Target Graph IR</p><h2>Workflow 실행 그래프</h2></div>
+          <span className="graph-canvas-stats">Node {activeGraph.nodes.length} · Edge {activeGraph.edges.length} · 실행 범위 {activeGraph.regions.length}</span>
         </div>
-
         <div className="graph-canvas-workspace">
           <ReactFlowProvider>
             {editable ? (
               <GraphEditToolbar
                 addKind={addKind}
                 addLabel={addLabel}
-                canSave={Boolean(onSaveGraph)}
+                regionKind={regionKind}
+                editModeActive={editModeActive}
+                dirty={dirty}
+                saving={saving}
+                canSave={Boolean(onSaveGraph) && validation.length === 0}
                 connectMode={connectMode}
                 connectSourceId={connectSourceId}
-                dirty={dirty}
-                editModeActive={editModeActive}
-                notice={editNotice}
-                saving={saving}
-                selection={selection}
+                hasSelection={Boolean(selection.nodeId || selection.edgeId)}
+                hasSelectedNode={Boolean(selection.nodeId)}
+                notice={notice}
+                validation={validation}
                 stageRef={stageRef}
-                validation={draftValidation}
                 onAddKindChange={setAddKind}
                 onAddLabelChange={setAddLabel}
+                onRegionKindChange={setRegionKind}
                 onAddNode={addNode}
-                onDeleteSelection={deleteSelection}
+                onAddRegion={addRegion}
+                onDelete={deleteSelection}
                 onSave={saveDraft}
-                onToggleConnectMode={toggleConnectMode}
-                onToggleEditMode={toggleEditMode}
+                onToggleConnect={() => {
+                  if (connectMode) { cancelConnectMode(); setNotice("Edge 연결을 취소했습니다."); }
+                  else { setConnectMode(true); setConnectSourceId(null); setNotice("시작 Node를 선택하세요."); }
+                }}
+                onToggleEdit={() => editModeActive ? cancelEditMode() : enterEditMode()}
               />
             ) : null}
             <div ref={stageRef} className="graph-canvas-stage">
               <GraphFlowStage
                 baseNodes={baseNodes}
                 baseEdges={baseEdges}
-                containerRects={layout.containerRects}
-                highlightedContainerIds={collaborationMarks.containerHighlightIds}
+                regionRects={layout.regionRects}
                 editModeActive={editModeActive}
                 selection={selection}
-                onConnect={createDraftEdge}
+                onConnect={createEdge}
                 onEdgeClick={handleEdgeInteraction}
                 onNodeClick={handleNodeInteraction}
-                onNodePositionCommit={updateNodePosition}
-                onPaneClick={() => {
-                  if (editModeActive && connectMode) return;
-                  setSelection({ nodeId: null, edgeId: null });
-                }}
-                onPositionsChange={setFlowPositions}
+                onPaneClick={() => { if (!connectMode) setSelection({ nodeId: null, edgeId: null }); }}
+                onPositionCommit={(nodeId, position) => setPresentationPositions((current) => new Map(current).set(nodeId, position))}
               />
             </div>
           </ReactFlowProvider>
         </div>
-
-        <ValidationBanner validation={activeGraphIR.validation} onFocus={focusOn} />
-
-        {onContinue ? (
-          <div className="actions align-end graph-canvas-actions">
-            <button type="button" className="primary" onClick={onContinue}>
-              {continueLabel ?? "다음 단계"}
-            </button>
-          </div>
-        ) : null}
+        {onContinue ? <div className="actions align-end graph-canvas-actions"><button type="button" className="primary" onClick={onContinue}>{continueLabel ?? "다음 단계"}</button></div> : null}
       </section>
-
       {hideInspector ? null : (
         <GraphInspector
           selectedNode={selectedNode}
           selectedEdge={selectedEdge}
-          graphIR={activeGraphIR}
-          nodeLabel={nodeLabel}
-          candidate={selectedCandidate}
-          a2aContracts={a2aContracts}
-          catalogContracts={catalogContracts}
-          onNavigateToA2AContracts={onNavigateToA2AContracts}
+          graphIR={activeGraph}
+          nodeLabel={(id) => nodeById.get(id)?.label ?? id}
+          asset={selectedAsset}
           onClose={() => setSelection({ nodeId: null, edgeId: null })}
         />
       )}
@@ -561,660 +355,196 @@ export function GraphCanvas({
   );
 }
 
-interface GraphEditToolbarProps {
-  addKind: NodeKind;
-  addLabel: string;
-  canSave: boolean;
-  connectMode: boolean;
-  connectSourceId: string | null;
-  dirty: boolean;
-  editModeActive: boolean;
-  notice: string | null;
-  saving: boolean;
-  selection: Selection;
-  stageRef: RefObject<HTMLDivElement | null>;
-  validation: ReturnType<typeof validateGraphIRSoft> | null;
-  onAddKindChange: (kind: NodeKind) => void;
-  onAddLabelChange: (label: string) => void;
-  onAddNode: (position: XYPosition | null) => void;
-  onDeleteSelection: () => void;
-  onSave: () => void;
-  onToggleConnectMode: () => void;
-  onToggleEditMode: () => void;
-}
-
-const ADD_NODE_KINDS: NodeKind[] = [
-  "agent",
-  "adapter_call",
-  "router",
-  "human_input",
-  "join",
-  "loop_control",
-  "workflow_call",
-  "remote_agent_call",
-  "callback_wait"
-];
-const ADD_NODE_LABELS: Record<NodeKind, string> = {
-  input: "입력",
-  output: "출력",
-  agent: "판단",
-  function: "함수 노드",
-  tool: "도구 노드",
-  adapter: "Adapter",
-  adapter_call: "API/도구 호출",
-  human_input: "사람 입력/승인",
-  callback_wait: "대기/callback",
-  workflow: "Workflow",
-  workflow_call: "서브워크플로우 호출",
-  remote_a2a: "외부 Agent 호출",
-  remote_agent_call: "외부 Agent 호출",
-  join: "병합",
-  router: "조건 분기",
-  loop_control: "반복 제어"
-};
-
 function GraphEditToolbar({
-  addKind,
-  addLabel,
-  canSave,
-  connectMode,
-  connectSourceId,
-  dirty,
-  editModeActive,
-  notice,
-  saving,
-  selection,
-  stageRef,
-  validation,
-  onAddKindChange,
-  onAddLabelChange,
-  onAddNode,
-  onDeleteSelection,
-  onSave,
-  onToggleConnectMode,
-  onToggleEditMode
-}: GraphEditToolbarProps) {
+  addKind, addLabel, regionKind, editModeActive, dirty, saving, canSave, connectMode, connectSourceId,
+  hasSelection, hasSelectedNode, notice, validation, stageRef, onAddKindChange, onAddLabelChange,
+  onRegionKindChange, onAddNode, onAddRegion, onDelete, onSave, onToggleConnect, onToggleEdit
+}: {
+  addKind: NodeKind; addLabel: string; regionKind: GraphRegionKind; editModeActive: boolean; dirty: boolean;
+  saving: boolean; canSave: boolean; connectMode: boolean; connectSourceId: string | null; hasSelection: boolean;
+  hasSelectedNode: boolean; notice: string | null; validation: string[]; stageRef: RefObject<HTMLDivElement | null>;
+  onAddKindChange: (kind: NodeKind) => void; onAddLabelChange: (label: string) => void;
+  onRegionKindChange: (kind: GraphRegionKind) => void; onAddNode: (position: XYPosition | null) => void;
+  onAddRegion: () => void; onDelete: () => void; onSave: () => void; onToggleConnect: () => void; onToggleEdit: () => void;
+}) {
   const reactFlow = useReactFlow();
-  const connectHint = connectMode
-    ? connectSourceId
-      ? "대상 노드를 클릭하세요"
-      : "시작 노드를 클릭하세요"
-    : null;
-  const hasSelection = Boolean(selection.nodeId || selection.edgeId);
-
   return (
     <div className="graph-edit-toolbar" aria-label="Graph IR 편집 도구">
-      <label className="graph-edit-toggle">
-        <input type="checkbox" checked={editModeActive} onChange={onToggleEditMode} />
-        <span>편집 모드</span>
-      </label>
-
+      <label className="graph-edit-toggle"><input type="checkbox" checked={editModeActive} onChange={onToggleEdit} /><span>편집 모드</span></label>
       {editModeActive ? (
         <>
-          <span className={`graph-edit-chip${dirty ? " is-dirty" : ""}`}>
-            {dirty ? "변경 있음" : "변경 없음"}
-          </span>
-          {validation ? (
-            <span className={`graph-edit-chip${validation.errors.length ? " has-errors" : validation.warnings.length ? " has-warnings" : ""}`}>
-              오류 {validation.errors.length} · 경고 {validation.warnings.length}
-            </span>
-          ) : null}
-
-          <div className="graph-edit-group" aria-label="노드 추가">
-            <select
-              aria-label="노드 종류"
-              value={addKind}
-              onChange={(event) => onAddKindChange(event.target.value as NodeKind)}
-            >
-              {ADD_NODE_KINDS.filter((kind) => GRAPH_NODE_KINDS.includes(kind)).map((kind) => (
-                <option key={kind} value={kind}>
-                  {ADD_NODE_LABELS[kind]}
-                </option>
-              ))}
+          <span className={`graph-edit-chip${dirty ? " is-dirty" : ""}`}>{dirty ? "변경 있음" : "변경 없음"}</span>
+          <span className={`graph-edit-chip${validation.length ? " has-errors" : ""}`}>오류 {validation.length}</span>
+          <div className="graph-edit-group" aria-label="Node 추가">
+            <select aria-label="Node kind" value={addKind} onChange={(event) => onAddKindChange(event.target.value as NodeKind)}>
+              {TARGET_NODE_KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-            <input
-              aria-label="노드 라벨"
-              value={addLabel}
-              onChange={(event) => onAddLabelChange(event.target.value)}
-              placeholder="노드 라벨"
-            />
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => onAddNode(projectStageCenter(reactFlow, stageRef.current))}
-              disabled={!addLabel.trim()}
-            >
-              추가
-            </button>
+            <input aria-label="Node label" value={addLabel} onChange={(event) => onAddLabelChange(event.target.value)} placeholder="Node label" />
+            <button type="button" className="secondary" disabled={!addLabel.trim()} onClick={() => onAddNode(projectStageCenter(reactFlow, stageRef.current))}>추가</button>
           </div>
-
-          <div className="graph-edit-group" aria-label="엣지 편집">
-            <button
-              type="button"
-              className={connectMode ? "secondary is-active" : "secondary"}
-              onClick={onToggleConnectMode}
-            >
-              {connectMode ? "엣지 연결 취소" : "엣지 추가"}
-            </button>
-            <button type="button" className="secondary" onClick={onDeleteSelection} disabled={!hasSelection}>
-              선택 항목 삭제
-            </button>
+          <div className="graph-edit-group" aria-label="Edge와 실행 범위 편집">
+            <button type="button" className={connectMode ? "secondary is-active" : "secondary"} onClick={onToggleConnect}>{connectMode ? "Edge 취소" : "Edge 추가"}</button>
+            <select aria-label="실행 범위 종류" title="Graph 구조 표시이며 Workflow 실행 방식은 Workflow Profile에서 결정합니다." value={regionKind} onChange={(event) => onRegionKindChange(event.target.value as GraphRegionKind)}><option value="parallel">병렬 실행 범위</option><option value="loop">반복 실행 범위</option></select>
+            <button type="button" className="secondary" onClick={onAddRegion} disabled={!hasSelectedNode}>실행 범위 추가</button>
+            <button type="button" className="secondary" onClick={onDelete} disabled={!hasSelection}>선택 삭제</button>
           </div>
-
-          <div className="graph-edit-group graph-edit-save" aria-label="저장">
-            <button type="button" className="primary" onClick={onSave} disabled={!dirty || saving || !canSave}>
-              {saving ? "저장 중..." : "저장"}
-            </button>
-            <button type="button" className="secondary" onClick={onToggleEditMode} disabled={saving}>
-              취소
-            </button>
-          </div>
+          <div className="graph-edit-group graph-edit-save"><button type="button" className="primary" onClick={onSave} disabled={!dirty || saving || !canSave}>{saving ? "저장 중..." : "저장"}</button><button type="button" className="secondary" onClick={onToggleEdit} disabled={saving}>취소</button></div>
         </>
       ) : null}
-
-      {connectHint ? <span className="graph-edit-hint">{connectHint}</span> : null}
+      {connectMode ? <span className="graph-edit-hint">{connectSourceId ? "대상 Node를 선택하세요" : "시작 Node를 선택하세요"}</span> : null}
       {notice ? <span className="graph-edit-notice">{notice}</span> : null}
+      {validation.length ? <span className="graph-edit-notice" title={validation.join("\n")}>{validation[0]}</span> : null}
     </div>
   );
 }
 
-interface GraphFlowStageProps {
-  baseNodes: ReactFlowNode<GraphNodeData>[];
-  baseEdges: ReactFlowEdge<GraphEdgeData>[];
-  containerRects: ReturnType<typeof layoutGraphIR>["containerRects"];
-  highlightedContainerIds: Set<string>;
-  editModeActive: boolean;
-  selection: Selection;
-  onConnect: (sourceId: string, targetId: string) => void;
-  onEdgeClick: (edgeId: string) => void;
-  onNodeClick: (nodeId: string) => void;
-  onNodePositionCommit: (nodeId: string, position: XYPosition) => void;
-  onPaneClick: () => void;
-  onPositionsChange: (positions: Record<string, XYPosition>) => void;
-}
-
-function GraphFlowStage({
-  baseNodes,
-  baseEdges,
-  containerRects,
-  highlightedContainerIds,
-  editModeActive,
-  selection,
-  onConnect,
-  onEdgeClick,
-  onNodeClick,
-  onNodePositionCommit,
-  onPaneClick,
-  onPositionsChange
-}: GraphFlowStageProps) {
+function GraphFlowStage({ baseNodes, baseEdges, regionRects, editModeActive, selection, onConnect, onEdgeClick, onNodeClick, onPaneClick, onPositionCommit }: {
+  baseNodes: ReactFlowNode<GraphNodeData>[]; baseEdges: ReactFlowEdge<GraphEdgeData>[];
+  regionRects: ReturnType<typeof layoutGraphIR>["regionRects"]; editModeActive: boolean; selection: Selection;
+  onConnect: (source: string, target: string) => void; onEdgeClick: (id: string) => void; onNodeClick: (id: string) => void;
+  onPaneClick: () => void; onPositionCommit: (nodeId: string, position: XYPosition) => void;
+}) {
   const [nodes, setNodes, onNodesChange] = useNodesState<GraphNodeData>(baseNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdgeData>(baseEdges);
-  const dragPositionNodeIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    setNodes(baseNodes);
-  }, [baseNodes, setNodes]);
-
-  useEffect(() => {
-    setEdges(baseEdges);
-  }, [baseEdges, setEdges]);
-
-  useEffect(() => {
-    const next: Record<string, XYPosition> = {};
-    for (const node of nodes) {
-      next[node.id] = { x: node.position.x, y: node.position.y };
-    }
-    onPositionsChange(next);
-  }, [nodes, onPositionsChange]);
-
-  const renderedNodes = useMemo(
-    () =>
-      nodes.map((node) => ({
-        ...node,
-        draggable: editModeActive,
-        data: {
-          ...node.data,
-          selected: selection.nodeId === node.id
-        }
-      })),
-    [editModeActive, nodes, selection.nodeId]
-  );
-
-  const renderedEdges = useMemo(
-    () =>
-      edges.map((edge) => ({
-        ...edge,
-        zIndex: selection.edgeId === edge.id ? 20 : edge.zIndex,
-        data: {
-          ...edge.data,
-          selected: selection.edgeId === edge.id
-        }
-      })),
-    [edges, selection.edgeId]
-  );
-
-  const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      if (!editModeActive) return;
-      onNodesChange(changes);
-      for (const change of changes) {
-        if (change.type !== "position" || !change.position) continue;
-        if (change.dragging === true) {
-          dragPositionNodeIdsRef.current.add(change.id);
-          continue;
-        }
-        if (change.dragging !== false) continue;
-        if (dragPositionNodeIdsRef.current.delete(change.id)) continue;
-        onNodePositionCommit(change.id, change.position);
-      }
-    },
-    [editModeActive, onNodePositionCommit, onNodesChange]
-  );
-
-  const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      if (editModeActive) onEdgesChange(changes);
-    },
-    [editModeActive, onEdgesChange]
-  );
-
-  const handleConnect = useCallback(
-    (connection: Connection) => {
-      if (!connection.source || !connection.target) return;
-      onConnect(connection.source, connection.target);
-    },
-    [onConnect]
-  );
-
+  useEffect(() => setNodes(baseNodes), [baseNodes, setNodes]);
+  useEffect(() => setEdges(baseEdges), [baseEdges, setEdges]);
+  const renderedNodes = useMemo(() => nodes.map((node) => ({ ...node, draggable: editModeActive, data: { ...node.data, selected: selection.nodeId === node.id } })), [editModeActive, nodes, selection.nodeId]);
+  const renderedEdges = useMemo(() => edges.map((edge) => ({ ...edge, zIndex: selection.edgeId === edge.id ? 20 : edge.zIndex, data: { ...edge.data, selected: selection.edgeId === edge.id } })), [edges, selection.edgeId]);
+  const handleNodesChange = useCallback((changes: NodeChange[]) => { if (editModeActive) onNodesChange(changes); }, [editModeActive, onNodesChange]);
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => { if (editModeActive) onEdgesChange(changes); }, [editModeActive, onEdgesChange]);
+  const handleConnect = useCallback((connection: Connection) => { if (connection.source && connection.target) onConnect(connection.source, connection.target); }, [onConnect]);
   return (
     <ReactFlow
-      nodes={renderedNodes}
-      edges={renderedEdges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      fitView
-      nodesDraggable={editModeActive}
-      nodesConnectable={editModeActive}
-      elementsSelectable
-      proOptions={{ hideAttribution: true }}
-      onConnect={handleConnect}
-      onEdgesChange={handleEdgesChange}
-      onNodesChange={handleNodesChange}
-      onPaneClick={onPaneClick}
-      onNodeClick={(_, node) => onNodeClick(node.id)}
-      onEdgeClick={(_, edge) => onEdgeClick(edge.id)}
-      onNodeDragStop={(_, node) => {
-        if (editModeActive) onNodePositionCommit(node.id, node.position);
-      }}
+      nodes={renderedNodes} edges={renderedEdges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView
+      nodesDraggable={editModeActive} nodesConnectable={editModeActive} elementsSelectable proOptions={{ hideAttribution: true }}
+      onConnect={handleConnect} onEdgesChange={handleEdgesChange} onNodesChange={handleNodesChange} onPaneClick={onPaneClick}
+      onNodeClick={(_, node) => onNodeClick(node.id)} onEdgeClick={(_, edge) => onEdgeClick(edge.id)}
+      onNodeDragStop={(_, node) => { if (editModeActive) onPositionCommit(node.id, node.position); }}
     >
-      <Background gap={18} size={1} />
-      <MiniMap pannable zoomable />
-      <Controls showInteractive={false} />
-      <ContainerOverlay rects={containerRects} highlightedIds={highlightedContainerIds} />
+      <Background gap={18} size={1} /><MiniMap pannable zoomable /><Controls showInteractive={false} />
+      <RegionOverlay rects={regionRects} />
     </ReactFlow>
   );
 }
 
-function cloneGraphIR(graphIR: GraphIR): GraphIR {
-  return JSON.parse(JSON.stringify(graphIR)) as GraphIR;
+function buildEditableNode(graph: GraphIR, kind: NodeKind, label: string, assets: AssetCandidate[]): { node: GraphNode | null; message: string } {
+  const id = nextNodeId(graph, kind);
+  if (kind === "input" || kind === "join" || kind === "output") return { node: { id, label, node_kind: kind }, message: `${id} Node를 추가했습니다.` };
+  if (kind === "function") return { node: { id, label, node_kind: "function", role: "transform" }, message: `${id} Node를 추가했습니다.` };
+  if (kind === "human_input") return { node: { id, label, node_kind: "human_input", human_input_contract: { message: label, payload_schema_ref: null, response_schema_ref: null, response_mapping: null, choice_options: null, accepted_aliases: null, default_choice: null } }, message: `${id} Node를 추가했습니다.` };
+  const assetType = kind === "subworkflow" ? "workflow" : kind;
+  const asset = assets.find((candidate) => candidate.asset_type === assetType);
+  if (!asset) return { node: null, message: `${assetType} asset이 없어 ${kind} Node를 추가할 수 없습니다.` };
+  if (kind === "agent") return { node: { id, label, node_kind: "agent", agent_ref: asset.asset_id, available_tools: [] }, message: `${id} Node를 추가했습니다.` };
+  if (kind === "tool") return { node: { id, label, node_kind: "tool", tool_ref: asset.asset_id, invocation_control: "workflow" }, message: `${id} Node를 추가했습니다.` };
+  return { node: { id, label, node_kind: "subworkflow", workflow_ref: asset.asset_id }, message: `${id} Node를 추가했습니다.` };
 }
+
+function buildEditableEdge(graph: GraphIR, sourceId: string, targetId: string): { edge: GraphEdge | null; message: string } {
+  if (sourceId === targetId) return { edge: null, message: "자기 자신으로 연결할 수 없습니다." };
+  if (graph.edges.some((edge) => edge.from === sourceId && edge.to === targetId)) return { edge: null, message: "이미 같은 방향의 Edge가 있습니다." };
+  const source = graph.nodes.find((node) => node.id === sourceId);
+  const target = graph.nodes.find((node) => node.id === targetId);
+  if (!source || !target) return { edge: null, message: "Node를 찾을 수 없습니다." };
+  const isRoute = source.node_kind === "function" && source.role === "route";
+  const edge: GraphEdge = {
+    id: nextEdgeId(graph), from: sourceId, to: targetId,
+    control: { kind: isRoute ? "condition" : "next", condition: null, accepted_aliases: [], default: false },
+    channel: isRoute ? null : "event"
+  };
+  return { edge, message: `${edge.id} Edge를 추가했습니다.` };
+}
+
+function deleteFromGraph(graph: GraphIR, selection: Selection): GraphIR {
+  if (selection.nodeId) {
+    const nodeId = selection.nodeId;
+    return {
+      ...graph,
+      nodes: graph.nodes.filter((node) => node.id !== nodeId),
+      edges: graph.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
+      regions: graph.regions.map((region) => ({ ...region, node_ids: region.node_ids.filter((id) => id !== nodeId), entry_node_ids: region.entry_node_ids.filter((id) => id !== nodeId), exit_node_ids: region.exit_node_ids.filter((id) => id !== nodeId) })).filter((region) => region.node_ids.length)
+    };
+  }
+  return selection.edgeId ? { ...graph, edges: graph.edges.filter((edge) => edge.id !== selection.edgeId) } : graph;
+}
+
+function validateDraftGraph(graph: GraphIR, assets: AssetCandidate[]): string[] {
+  const errors: string[] = [];
+  const nodeIds = new Set<string>();
+  const assetById = new Map(assets.map((asset) => [asset.asset_id, asset]));
+  for (const node of graph.nodes) {
+    if (!node.id.trim() || nodeIds.has(node.id)) errors.push(`Node id가 비어 있거나 중복됩니다: ${node.id || "(empty)"}`);
+    nodeIds.add(node.id);
+    const ref = assetRefForNode(node);
+    const expected = node.node_kind === "subworkflow" ? "workflow" : node.node_kind === "agent" || node.node_kind === "tool" ? node.node_kind : null;
+    if (expected && assetById.get(ref ?? "")?.asset_type !== expected) errors.push(`${node.id}의 typed ref가 ${expected} asset을 가리키지 않습니다.`);
+    if (node.node_kind === "agent" && node.available_tools.some((tool) => tool.invocation_control !== "agent" || assetById.get(tool.tool_ref)?.asset_type !== "tool")) errors.push(`${node.id}.available_tools가 Tool asset과 agent invocation control을 사용해야 합니다.`);
+  }
+  const edgeIds = new Set<string>();
+  for (const edge of graph.edges) {
+    if (!edge.id.trim() || edgeIds.has(edge.id)) errors.push(`Edge id가 비어 있거나 중복됩니다: ${edge.id || "(empty)"}`);
+    edgeIds.add(edge.id);
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) errors.push(`${edge.id}가 존재하지 않는 Node를 가리킵니다.`);
+    if (edge.control.kind === "condition" && !edge.control.condition?.trim()) errors.push(`${edge.id}.control.condition이 필요합니다.`);
+  }
+  for (const region of graph.regions) {
+    if (!region.node_ids.length || region.node_ids.some((id) => !nodeIds.has(id))) errors.push(`${region.id} Region membership이 유효하지 않습니다.`);
+    if (region.entry_node_ids.some((id) => !region.node_ids.includes(id)) || region.exit_node_ids.some((id) => !region.node_ids.includes(id))) errors.push(`${region.id} entry/exit는 Region member여야 합니다.`);
+  }
+  return errors;
+}
+
+function nextNodeId(graph: GraphIR, kind: NodeKind): string { return nextId(new Set(graph.nodes.map((node) => node.id)), `node-${kind}`); }
+function nextEdgeId(graph: GraphIR): string { return nextId(new Set(graph.edges.map((edge) => edge.id)), "edge"); }
+function nextRegionId(graph: GraphIR, kind: GraphRegionKind): string { return nextId(new Set(graph.regions.map((region) => region.id)), `region-${kind}`); }
+function nextId(used: Set<string>, prefix: string): string { let index = 1; while (used.has(`${prefix}-${index}`)) index += 1; return `${prefix}-${index}`; }
+function cloneGraph(graph: GraphIR): GraphIR { return JSON.parse(JSON.stringify(graph)) as GraphIR; }
+function nextNodePosition(positions: ReadonlyMap<string, XYPosition>): XYPosition { const values = [...positions.values()]; return values.length ? { x: Math.max(...values.map((point) => point.x)) + 64, y: Math.max(...values.map((point) => point.y)) + 64 } : { x: 72, y: 96 }; }
 
 function projectStageCenter(reactFlow: unknown, stage: HTMLDivElement | null): XYPosition | null {
   if (!stage) return null;
   const rect = stage.getBoundingClientRect();
-  const screenPoint = {
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2
-  };
-  const flow = reactFlow as {
-    screenToFlowPosition?: (point: XYPosition) => XYPosition;
-    getViewport?: () => { x: number; y: number; zoom: number };
-  };
-  if (flow.screenToFlowPosition) return flow.screenToFlowPosition(screenPoint);
-  const viewport = flow.getViewport?.();
-  if (!viewport || !Number.isFinite(viewport.zoom) || viewport.zoom === 0) return null;
-  return {
-    x: (rect.width / 2 - viewport.x) / viewport.zoom,
-    y: (rect.height / 2 - viewport.y) / viewport.zoom
-  };
-}
-
-function buildEditableNode(
-  graphIR: GraphIR,
-  kind: NodeKind,
-  label: string,
-  position: XYPosition,
-  containerId: string | null
-): GraphNode {
-  return {
-    id: nextNodeId(graphIR, kind),
-    label,
-    module_id: null,
-    node_kind: kind,
-    execution_kind: null,
-    agent_execution_mode: kind === "agent" ? "single_turn" : null,
-    adk_node_role: null,
-    owner_scope: kind === "remote_a2a" || kind === "remote_agent_call" ? "remote" : "local",
-    container_id: containerId,
-    lane_id: laneForNodeKind(kind),
-    input_ports: [],
-    output_ports: [],
-    schema_refs: [],
-    review_status: "n/a",
-    position: { x: position.x, y: position.y },
-    ...(kind === "human_input"
-      ? {
-          human_input_contract: {
-            message: label,
-            payload_schema_ref: null,
-            response_schema_ref: "str",
-            response_mapping: null
-          }
-        }
-      : {}),
-    ...defaultNodeControlMetadata(kind)
-  };
-}
-
-function laneForNodeKind(kind: NodeKind): LaneId {
-  if (kind === "input") return "input";
-  if (kind === "output") return "output";
-  if (kind === "human_input") return "human_input";
-  if (kind === "tool" || kind === "adapter" || kind === "adapter_call") return "adapter";
-  if (kind === "remote_a2a" || kind === "remote_agent_call") return "remote_boundary";
-  return "local_graph";
-}
-
-function defaultNodeControlMetadata(
-  kind: NodeKind
-): Pick<GraphNode, "invoke_binding" | "decision_owner" | "call_control"> {
-  if (kind === "callback_wait") {
-    return {
-      invoke_binding: "callback_wait",
-      decision_owner: "workflow_code",
-      call_control: "event_callback"
-    };
-  }
-  return {
-    invoke_binding: null,
-    decision_owner: null,
-    call_control: null
-  };
-}
-
-function nextNodeId(graphIR: GraphIR, kind: NodeKind): string {
-  const used = new Set((graphIR.nodes ?? []).map((node) => node.id));
-  let index = 1;
-  while (used.has(`node-${kind}-${index}`)) index += 1;
-  return `node-${kind}-${index}`;
-}
-
-function nextEdgeId(graphIR: GraphIR): string {
-  const used = new Set((graphIR.edges ?? []).map((edge) => edge.id));
-  let index = 1;
-  while (used.has(`edge-${index}`)) index += 1;
-  return `edge-${index}`;
-}
-
-function buildEditableEdge(
-  graphIR: GraphIR,
-  sourceId: string,
-  targetId: string
-): { edge: GraphEdge | null; message: string } {
-  if (sourceId === targetId) {
-    return { edge: null, message: "자기 자신으로 연결할 수 없습니다." };
-  }
-  if ((graphIR.edges ?? []).some((edge) => edge.from === sourceId && edge.to === targetId)) {
-    return { edge: null, message: "이미 같은 방향의 엣지가 있습니다." };
-  }
-  const source = (graphIR.nodes ?? []).find((node) => node.id === sourceId);
-  const target = (graphIR.nodes ?? []).find((node) => node.id === targetId);
-  if (!source || !target) {
-    return { edge: null, message: "노드를 찾을 수 없어 엣지를 만들 수 없습니다." };
-  }
-
-  const sourceRemote = isRemoteAgentNodeKind(source.node_kind);
-  const targetRemote = isRemoteAgentNodeKind(target.node_kind);
-  const edgeKind: EdgeKind =
-    sourceRemote || targetRemote ? "remote_a2a" : source.node_kind === "router" ? "route" : "event_output";
-  const executionSemantics: ExecutionSemantics =
-    source.node_kind === "router" ? "conditional" : "normal_transition";
-  const edge: GraphEdge = {
-    id: nextEdgeId(graphIR),
-    from: sourceId,
-    to: targetId,
-    from_port: null,
-    to_port: null,
-    edge_kind: edgeKind,
-    execution_semantics: executionSemantics,
-    data_label: "",
-    schema_ref: null,
-    route_condition: null,
-    route_aliases: [],
-    is_default_route: false,
-    state_key: null,
-    artifact_key: null,
-    a2a_contract_id: null,
-    is_remote_boundary_crossing: edgeKind === "remote_a2a"
-  };
-  return { edge, message: `${edge.id} 엣지를 추가했습니다.` };
-}
-
-function isRemoteAgentNodeKind(kind: NodeKind): boolean {
-  return kind === "remote_a2a" || kind === "remote_agent_call";
-}
-
-function deleteFromGraph(graphIR: GraphIR, selection: Selection): GraphIR {
-  if (selection.nodeId) {
-    const nodeId = selection.nodeId;
-    return {
-      ...graphIR,
-      nodes: (graphIR.nodes ?? []).filter((node) => node.id !== nodeId),
-      edges: (graphIR.edges ?? []).filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
-      containers: (graphIR.containers ?? []).map((container) => ({
-        ...container,
-        contains_node_ids: container.contains_node_ids.filter((id) => id !== nodeId),
-        entry_node_ids: container.entry_node_ids.filter((id) => id !== nodeId),
-        exit_node_ids: container.exit_node_ids.filter((id) => id !== nodeId)
-      }))
-    };
-  }
-  if (selection.edgeId) {
-    return {
-      ...graphIR,
-      edges: (graphIR.edges ?? []).filter((edge, index) => graphEdgeId(edge, index) !== selection.edgeId)
-    };
-  }
-  return graphIR;
-}
-
-function applyNodeFields(graphIR: GraphIR, nodeId: string, patch: NodeFieldPatch): GraphIR {
-  const current = (graphIR.nodes ?? []).find((node) => node.id === nodeId);
-  if (!current) return graphIR;
-
-  const hasContainerPatch = Object.prototype.hasOwnProperty.call(patch, "container_id");
-  const nextContainerId = hasContainerPatch ? patch.container_id ?? null : current.container_id;
-  const containerChanged = hasContainerPatch && current.container_id !== nextContainerId;
-  const nodes = (graphIR.nodes ?? []).map((node) =>
-    node.id === nodeId
-      ? {
-          ...node,
-          ...patch,
-          container_id: nextContainerId
-        }
-      : node
-  );
-
-  if (!containerChanged) {
-    return { ...graphIR, nodes };
-  }
-
-  return {
-    ...graphIR,
-    nodes,
-    containers: moveNodeToContainer(graphIR.containers ?? [], nodeId, nextContainerId)
-  };
-}
-
-function applyEdgeFields(graphIR: GraphIR, edgeId: string, patch: EdgeFieldPatch): GraphIR {
-  return {
-    ...graphIR,
-    edges: (graphIR.edges ?? []).map((edge, index) => {
-      if (graphEdgeId(edge, index) !== edgeId) return edge;
-      const next = { ...edge, ...patch };
-      if (next.edge_kind === "remote_a2a") {
-        return { ...next, is_remote_boundary_crossing: true };
-      }
-      return { ...next, is_remote_boundary_crossing: false, a2a_contract_id: null };
-    })
-  };
-}
-
-
-function applyCurrentPositions(graphIR: GraphIR, positions: Record<string, XYPosition>): GraphIR {
-  return {
-    ...graphIR,
-    nodes: (graphIR.nodes ?? []).map((node) => {
-      const position = positions[node.id];
-      if (position) return { ...node, position: { x: position.x, y: position.y } };
-      if (hasFiniteNodePosition(node)) return { ...node, position: { x: node.position.x, y: node.position.y } };
-      return { ...node, position: null };
-    })
-  };
-}
-
-function nextNodeFallbackPosition(graphIR: GraphIR, positions: Record<string, XYPosition>): XYPosition {
-  const points = Object.values(positions).filter(isFinitePoint);
-  if (points.length) {
-    const maxX = Math.max(...points.map((point) => point.x));
-    const maxY = Math.max(...points.map((point) => point.y));
-    return { x: maxX + 64, y: maxY + 64 };
-  }
-  const persisted = (graphIR.nodes ?? [])
-    .filter(hasFiniteNodePosition)
-    .map((node) => node.position);
-  if (persisted.length) {
-    const maxX = Math.max(...persisted.map((point) => point.x));
-    const maxY = Math.max(...persisted.map((point) => point.y));
-    return { x: maxX + 64, y: maxY + 64 };
-  }
-  return { x: 72, y: 96 };
-}
-
-function hasFiniteNodePosition(node: GraphNode): node is GraphNode & { position: XYPosition } {
-  return isFinitePoint(node.position);
-}
-
-function isFinitePoint(value: unknown): value is XYPosition {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "x" in value &&
-    "y" in value &&
-    typeof (value as XYPosition).x === "number" &&
-    Number.isFinite((value as XYPosition).x) &&
-    typeof (value as XYPosition).y === "number" &&
-    Number.isFinite((value as XYPosition).y)
-  );
+  const flow = reactFlow as { screenToFlowPosition?: (point: XYPosition) => XYPosition };
+  return flow.screenToFlowPosition?.({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }) ?? null;
 }
 
 interface CollaborationMarks {
-  nodeCommentCounts: Map<string, number>;
-  edgeCommentCounts: Map<string, number>;
-  nodeCommentTooltips: Map<string, string>;
-  edgeCommentTooltips: Map<string, string>;
-  nodeHighlightCounts: Map<string, number>;
-  edgeHighlightCounts: Map<string, number>;
-  edgeHighlightColors: Map<string, string>;
-  containerHighlightIds: Set<string>;
+  nodeCommentCounts: Map<string, number>; edgeCommentCounts: Map<string, number>;
+  nodeCommentTooltips: Map<string, string>; edgeCommentTooltips: Map<string, string>;
+  nodeHighlightCounts: Map<string, number>; edgeHighlightCounts: Map<string, number>; edgeHighlightColors: Map<string, string>;
 }
 
-const HIGHLIGHT_COLORS: Record<HighlightRecord["color_token"], string> = {
+const HIGHLIGHT_COLORS: Partial<Record<HighlightRecord["color_token"], string>> = {
   agent: "var(--cat-agent-line)",
   workflow: "var(--cat-workflow-line)",
-  adapter: "var(--cat-adapter-line)",
-  remote: "var(--cat-remote-line)",
+  tool: "var(--cat-tool-line)",
+  a2a: "var(--protocol-a2a-line)",
   neutral: "var(--line-strong)"
 };
 
-function buildCollaborationMarks(
-  graphIR: GraphIR,
-  comments: CommentRecord[],
-  highlights: HighlightRecord[]
-): CollaborationMarks {
-  const marks: CollaborationMarks = {
-    nodeCommentCounts: new Map(),
-    edgeCommentCounts: new Map(),
-    nodeCommentTooltips: new Map(),
-    edgeCommentTooltips: new Map(),
-    nodeHighlightCounts: new Map(),
-    edgeHighlightCounts: new Map(),
-    edgeHighlightColors: new Map(),
-    containerHighlightIds: new Set()
-  };
-  const edgeIdByPair = new Map((graphIR.edges ?? []).map((edge, index) => [`${edge.from}->${edge.to}`, graphEdgeId(edge, index)]));
-
-  const inc = (map: Map<string, number>, id: string | undefined) => {
-    if (!id) return;
-    map.set(id, (map.get(id) ?? 0) + 1);
-  };
-  const addComment = (countMap: Map<string, number>, tooltipMap: Map<string, string>, id: string | undefined, comment: CommentRecord) => {
-    if (!id) return;
-    inc(countMap, id);
-    const summary = summarizeComment(comment);
-    tooltipMap.set(id, tooltipMap.has(id) ? `${tooltipMap.get(id)}\n${summary}` : summary);
-  };
-  const pathEdgeIds = (nodePath: string[] | undefined) => {
-    const result: string[] = [];
-    if (!nodePath) return result;
-    for (let index = 0; index < nodePath.length - 1; index += 1) {
-      const edgeId = edgeIdByPair.get(`${nodePath[index]}->${nodePath[index + 1]}`);
-      if (edgeId) result.push(edgeId);
-    }
-    return result;
-  };
-
+function buildCollaborationMarks(graph: GraphIR, comments: CommentRecord[], highlights: HighlightRecord[]): CollaborationMarks {
+  const marks: CollaborationMarks = { nodeCommentCounts: new Map(), edgeCommentCounts: new Map(), nodeCommentTooltips: new Map(), edgeCommentTooltips: new Map(), nodeHighlightCounts: new Map(), edgeHighlightCounts: new Map(), edgeHighlightColors: new Map() };
+  const edgeByPair = new Map(graph.edges.map((edge) => [`${edge.from}->${edge.to}`, graphEdgeId(edge, 0)]));
+  const increment = (map: Map<string, number>, id: string | undefined) => { if (id) map.set(id, (map.get(id) ?? 0) + 1); };
+  const pathEdges = (path: string[] | undefined) => (path ?? []).slice(0, -1).map((from, index) => edgeByPair.get(`${from}->${path![index + 1]}`)).filter((id): id is string => Boolean(id));
   for (const comment of comments) {
     const anchor = comment.anchor;
-    if (anchor.kind === "node") addComment(marks.nodeCommentCounts, marks.nodeCommentTooltips, anchor.node_id, comment);
-    if (anchor.kind === "edge") addComment(marks.edgeCommentCounts, marks.edgeCommentTooltips, anchor.edge_id, comment);
-    if (anchor.kind === "path") {
-      for (const nodeId of anchor.node_path ?? []) {
-        addComment(marks.nodeCommentCounts, marks.nodeCommentTooltips, nodeId, comment);
-      }
-      for (const edgeId of pathEdgeIds(anchor.node_path)) {
-        addComment(marks.edgeCommentCounts, marks.edgeCommentTooltips, edgeId, comment);
-      }
-    }
-  }
-
-  for (const highlight of highlights) {
-    const color = HIGHLIGHT_COLORS[highlight.color_token] ?? HIGHLIGHT_COLORS.neutral;
-    const markEdge = (edgeId: string | undefined) => {
-      if (!edgeId) return;
-      inc(marks.edgeHighlightCounts, edgeId);
-      marks.edgeHighlightColors.set(edgeId, color);
+    const add = (kind: "node" | "edge", id: string | undefined) => {
+      if (!id) return;
+      const counts = kind === "node" ? marks.nodeCommentCounts : marks.edgeCommentCounts;
+      const tips = kind === "node" ? marks.nodeCommentTooltips : marks.edgeCommentTooltips;
+      increment(counts, id); tips.set(id, `${comment.author}: ${comment.body_md.replace(/\s+/g, " ").slice(0, 96)}`);
     };
-    if (highlight.kind === "path") {
-      for (const nodeId of highlight.target.node_path ?? []) inc(marks.nodeHighlightCounts, nodeId);
-      for (const edgeId of pathEdgeIds(highlight.target.node_path)) markEdge(edgeId);
-    }
-    if (highlight.kind === "node_group") {
-      for (const nodeId of highlight.target.node_ids ?? []) inc(marks.nodeHighlightCounts, nodeId);
-    }
-    if (highlight.kind === "edge_group") {
-      for (const edgeId of highlight.target.edge_ids ?? []) markEdge(edgeId);
-    }
-    if (highlight.kind === "container_focus" && highlight.target.container_id) {
-      marks.containerHighlightIds.add(highlight.target.container_id);
-    }
+    if (anchor.kind === "node") add("node", anchor.node_id);
+    if (anchor.kind === "edge") add("edge", anchor.edge_id);
+    if (anchor.kind === "path") { for (const id of anchor.node_path ?? []) add("node", id); for (const id of pathEdges(anchor.node_path)) add("edge", id); }
   }
-
+  for (const highlight of highlights) {
+    const color = HIGHLIGHT_COLORS[highlight.color_token] ?? "var(--line-strong)";
+    const markEdge = (id: string) => { increment(marks.edgeHighlightCounts, id); marks.edgeHighlightColors.set(id, color); };
+    if (highlight.kind === "path") { for (const id of highlight.target.node_path ?? []) increment(marks.nodeHighlightCounts, id); for (const id of pathEdges(highlight.target.node_path)) markEdge(id); }
+    if (highlight.kind === "node_group") for (const id of highlight.target.node_ids ?? []) increment(marks.nodeHighlightCounts, id);
+    if (highlight.kind === "edge_group") for (const id of highlight.target.edge_ids ?? []) markEdge(id);
+  }
   return marks;
-}
-
-function summarizeComment(comment: CommentRecord): string {
-  const body = comment.body_md.replace(/\s+/g, " ").trim();
-  const snippet = body.length > 96 ? `${body.slice(0, 96)}...` : body;
-  return `${comment.author} · ${new Date(comment.created_at).toLocaleString()}: ${snippet}`;
 }

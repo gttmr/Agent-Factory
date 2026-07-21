@@ -17,7 +17,7 @@ export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: 
     const needle = query.trim().toLowerCase();
     if (!needle) return workflows;
     return workflows.filter((entry) =>
-      [entry.name, entry.owner_domain, entry.status, entry.responsibility]
+      [entry.name, entry.owner, entry.status, entry.responsibility]
         .filter((value): value is string => typeof value === "string")
         .some((value) => value.toLowerCase().includes(needle))
     );
@@ -48,20 +48,16 @@ export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: 
           {filtered.length > 0 ? (
             <ul className="af-catalog-workflow-list">
               {filtered.map((entry) => {
-                const remoteA2A = isRemoteA2AWorkflowEntry(entry);
-                const providerReqId = entry.a2a_provider_req_id?.trim() ?? "";
                 return (
-                  <li key={entry.id} className="af-catalog-workflow-row">
+                  <li key={entry.asset_id} className="af-catalog-workflow-row">
                     <div className="af-catalog-workflow-main">
                       <div className="af-catalog-workflow-title">
                         <strong>{entry.name}</strong>
                         {typeof entry.version === "number" ? <span>v{entry.version}</span> : null}
                         {entry.status ? <span>{entry.status}</span> : null}
-                        {remoteA2A ? <span>Remote A2A</span> : null}
                       </div>
                       <small>
-                        {entry.owner_domain ?? "owner_domain 미지정"}
-                        {remoteA2A ? ` · provider ${providerReqId || "미지정"}` : ""}
+                        {entry.owner}
                       </small>
                       <p>{entry.responsibility ?? "responsibility 미지정"}</p>
                     </div>
@@ -82,8 +78,4 @@ export function CatalogWorkflowPicker({ inserting = false, onClose, onInsert }: 
       </div>
     </div>
   );
-}
-
-function isRemoteA2AWorkflowEntry(entry: CatalogHubEntry): boolean {
-  return entry.runtime_binding === "remote_a2a" || entry.component_source === "remote_a2a";
 }

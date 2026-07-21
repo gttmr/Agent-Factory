@@ -5,7 +5,7 @@
    edge-kind states keep their dedicated literals. @layer features.
 
    When adding a Graph marker, update the Graph IR meaning in
-   docs/workbench/process-flow.md and the renderers together (layout.ts,
+   docs/workbench/graph-ir.md and the renderers together (layout.ts,
    nodeTypes.tsx, edgeTypes.tsx, containerOverlay.tsx) plus the CSS here.
    ===================================================================== */
 
@@ -186,33 +186,12 @@
 .graph-container-overlay-eyebrow { color: inherit; }
 .graph-container-overlay-label { color: var(--text-strong); font-weight: var(--fw-bold); }
 
-.graph-container-overlay.kind-graph_workflow {
-  border: 1.5px solid var(--cat-workflow-line);
-  background: rgba(255, 255, 255, 0.22);
-}
-.graph-container-overlay.kind-dynamic_workflow {
-  border: 2px dashed var(--cat-workflow-line);
-  background: rgba(255, 255, 255, 0.22);
-}
-.graph-container-overlay.kind-parallel_region {
+.graph-container-overlay.region-parallel {
   border: 1px solid var(--cat-workflow-line);
   background: color-mix(in srgb, var(--cat-workflow-soft, #eef7f3) 58%, transparent);
 }
-.graph-container-overlay.kind-loop_region {
+.graph-container-overlay.region-loop {
   border: 1px dashed var(--cat-workflow-line);
-}
-.graph-container-overlay.kind-human_review_region {
-  border: 1px solid var(--cat-input-line, #c9b787);
-  background: color-mix(in srgb, var(--cat-input-soft, #fff8e8) 62%, transparent);
-}
-.graph-container-overlay.kind-remote_boundary {
-  border: 1px solid var(--cat-remote-line);
-  background: color-mix(in srgb, var(--cat-remote-soft, #feeceb) 62%, transparent);
-}
-.graph-container-overlay.kind-remote_boundary > .graph-container-overlay-head {
-  border-color: var(--cat-remote-line);
-  color: var(--cat-remote);
-  background: var(--surface);
 }
 .graph-container-overlay.is-highlighted {
   border-width: 2px;
@@ -279,11 +258,7 @@
 
 .graph-node-card.cat-agent { border-color: var(--cat-agent-line); }
 .graph-node-card.cat-workflow { border-color: var(--cat-workflow-line); }
-.graph-node-card.cat-adapter { border-color: var(--cat-adapter-line); }
-.graph-node-card.cat-remote_a2a {
-  border-color: var(--cat-remote-line);
-  background: var(--cat-remote-soft);
-}
+.graph-node-card.cat-tool { border-color: var(--cat-tool-line); }
 
 .graph-node-head {
   display: flex;
@@ -601,16 +576,16 @@
   height: 16px;
   font-size: var(--fs-2xs);
 }
-.graph-edge-route-label  { color: var(--accent-strong, #1e7a4d); }
-.graph-edge-control-label { color: var(--red, #c0432c); }
-.graph-edge-event_message-label { color: var(--amber, #c08a2c); }
-.graph-edge-state-label  { color: var(--blue, #2c6ec0); }
-.graph-edge-artifact-label { color: var(--cat-input, #6b8e7f); }
-.graph-edge-remote-label {
-  color: var(--cat-remote);
-  border-color: var(--cat-remote-line);
-  background: var(--cat-remote-soft);
-}
+.graph-edge-condition-label { color: var(--accent-strong, #1e7a4d); }
+.graph-edge-retry-label,
+.graph-edge-fallback-label,
+.graph-edge-error-label,
+.graph-edge-cancel-label,
+.graph-edge-timeout-label { color: var(--danger-text); }
+.graph-edge-loop_back-label,
+.graph-edge-loop_exit-label { color: var(--warning-text); }
+.graph-edge-callback-label,
+.graph-edge-resume-label { color: var(--blue, #2c6ec0); }
 
 /* Graph inspector */
 .graph-inspector {

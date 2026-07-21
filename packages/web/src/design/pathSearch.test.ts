@@ -3,25 +3,26 @@ import { findSimplePaths } from "./pathSearch.ts";
 import type { GraphIR } from "../analyzer/types.ts";
 
 const graph = {
-  version: 1,
+  graph_id: "graph-paths",
+  source_requirement_id: "req-paths",
+  workflow_ref: "asset-root",
   nodes: [
-    { id: "start", label: "Start", node_kind: "input", lane_id: "input" },
-    { id: "a", label: "A", node_kind: "agent", lane_id: "local_graph", module_id: "mod-a" },
-    { id: "b", label: "B", node_kind: "workflow", lane_id: "local_graph", module_id: "mod-b" },
-    { id: "c", label: "C", node_kind: "adapter", lane_id: "adapter", module_id: "mod-c" },
-    { id: "end", label: "End", node_kind: "output", lane_id: "output" }
+    { id: "start", label: "Start", node_kind: "input" },
+    { id: "a", label: "A", node_kind: "agent", agent_ref: "asset-a", available_tools: [] },
+    { id: "b", label: "B", node_kind: "subworkflow", workflow_ref: "asset-b" },
+    { id: "c", label: "C", node_kind: "tool", tool_ref: "asset-c", invocation_control: "workflow" },
+    { id: "end", label: "End", node_kind: "output" }
   ],
   edges: [
-    { id: "e-start-a", from: "start", to: "a", edge_kind: "event_output", execution_semantics: "sync" },
-    { id: "e-a-b", from: "a", to: "b", edge_kind: "event_output", execution_semantics: "sync" },
-    { id: "e-b-end", from: "b", to: "end", edge_kind: "event_output", execution_semantics: "sync" },
-    { id: "e-a-c", from: "a", to: "c", edge_kind: "event_output", execution_semantics: "sync" },
-    { id: "e-c-end", from: "c", to: "end", edge_kind: "event_output", execution_semantics: "sync" },
-    { id: "e-b-a", from: "b", to: "a", edge_kind: "control", execution_semantics: "async" }
+    { id: "e-start-a", from: "start", to: "a", control: { kind: "next", condition: null, accepted_aliases: [], default: false }, channel: "event" },
+    { id: "e-a-b", from: "a", to: "b", control: { kind: "next", condition: null, accepted_aliases: [], default: false }, channel: "event" },
+    { id: "e-b-end", from: "b", to: "end", control: { kind: "next", condition: null, accepted_aliases: [], default: false }, channel: "event" },
+    { id: "e-a-c", from: "a", to: "c", control: { kind: "fan_out", condition: null, accepted_aliases: [], default: false }, channel: "event" },
+    { id: "e-c-end", from: "c", to: "end", control: { kind: "fan_in", condition: null, accepted_aliases: [], default: false }, channel: "event" },
+    { id: "e-b-a", from: "b", to: "a", control: { kind: "loop_back", condition: null, accepted_aliases: [], default: false }, channel: null }
   ],
-  containers: [],
-  validation: { errors: [], warnings: [] }
-} as unknown as GraphIR;
+  regions: []
+} satisfies GraphIR;
 
 const paths = findSimplePaths(graph, "start", "end", 5);
 assert.deepEqual(paths.map((path) => path.nodeIds), [

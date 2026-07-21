@@ -12,7 +12,7 @@ Read whenever requirement evidence is incomplete, a candidate responsibility or 
 
 Use two layers:
 
-| Layer | Current artifact location | Gate behavior |
+| Layer | Strict v2 artifact location | Gate behavior |
 | --- | --- | --- |
 | Requirement evidence | `evidence.missing_information` | soft gate; analysis may continue with explicit assumptions, but review/acceptance is required for approval |
 | Candidate or contract | candidate `missing_information`, `status: "needs_info"`, or contract status | hard gate; blocks candidate approval and Runtime Handoff |
@@ -31,7 +31,7 @@ Each missing-information record should identify:
 - reviewer answer, rationale, and artifact fields to update;
 - verification required after resolution.
 
-Current candidate closure may use `missing_information_resolution`, `resolved_missing_information`, `resolution_draft`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec`. Reopen the current schema before writing exact nested shapes.
+Candidate closure may use `missing_information_resolution`, `resolved_missing_information`, `resolution_draft`, `resolution_applied_at`, `schema_review_state`, and `smoke_spec`. Reopen the strict v2 schema before writing exact nested shapes.
 
 ## Artifact implications
 
@@ -62,11 +62,11 @@ Stop when a hard-gate item remains, a reviewer answer has not been applied to th
 
 - [Operating Model approval gates](../../../docs/workbench/operating-model.md#3-승인-게이트-모델)
 - [Taxonomy unresolved decisions](../../../docs/workbench/taxonomy.md#workflow-profile)
-- Current schema and validator: `schemas/analysis-result.schema.json`, `scripts/validate-artifacts.mjs`
+- Strict v2 schema and validator: `schemas/analysis-result.schema.json`, `scripts/validate-artifacts.mjs`
 
 ## Checked date
 
 - Checked date: 2026-07-18
-- Official sources: Agent Factory Operating Model, Taxonomy, and current schema
+- Official sources: Agent Factory Operating Model, Taxonomy, and strict v2 schema
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Current soft-gate acceptance and candidate resolution fields are `legacy` product contracts; they do not replace Target review rationale.
+- Contract note: Soft-gate acceptance and candidate resolution fields do not replace review rationale.

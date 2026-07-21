@@ -1,6 +1,0 @@
-- explicit legacy ID를 shim으로 인식하고 해당 파일을 읽는다.
-- shim 지시에 따라 canonical discovery skill을 즉시 다시 읽는다.
-- discovery procedure와 사용자 응답을 한 번만 수행한다.
-- read-only boundary와 canonical stop conditions를 유지한다.
-- legacy ID를 새 trigger 경쟁자로 확장하지 않는다.
-- handoff와 중복 실행 부재를 evidence로 남긴다.

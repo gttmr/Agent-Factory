@@ -1,79 +1,35 @@
-import type {
-  AccessProtocol,
-  AdapterKind,
-  AgentKind,
-  ModuleCandidate,
-  ModuleCategory,
-  RemoteContractKind,
-  RuntimeContractKind,
-  WorkflowKind
-} from "./types";
+import type { AssetCandidate, AssetType, DomainScope, ReuseStatus, RuntimeContractKind } from "./types";
 
-export const moduleCategoryLabels: Record<ModuleCategory, string> = {
+export const assetTypeLabels: Record<AssetType, string> = {
   agent: "Agent",
   workflow: "Workflow",
-  adapter: "Adapter",
-  remote_a2a: "Remote A2A"
+  tool: "Tool"
 };
 
-export const adapterKindLabels: Record<AdapterKind, string> = {
-  legacy_api: "Legacy API",
-  retrieval: "Retrieval",
-  rule_registry: "Rule Registry",
-  data_query: "Data Query",
-  template: "Template",
-  computation: "Computation",
-  external_service: "External Service",
-  unknown: "Unknown"
+export const domainScopeLabels: Record<DomainScope, string> = {
+  domain_specific: "Domain-specific",
+  cross_domain: "Cross-domain",
+  domain_neutral: "Domain-neutral"
 };
 
-export const agentKindLabels: Record<AgentKind, string> = {
-  specialist: "Specialist",
-  shared: "Shared"
-};
-
-export const workflowKindLabels: Record<WorkflowKind, string> = {
-  orchestration: "Orchestration",
-  graph: "Graph",
-  dynamic: "Dynamic",
-  unknown: "Unknown"
-};
-
-export const remoteContractKindLabels: Record<RemoteContractKind, string> = {
-  a2a: "A2A",
-  unknown: "Unknown"
-};
-
-export const accessProtocolLabels: Record<AccessProtocol, string> = {
-  local: "Local",
-  http_rest: "HTTP REST",
-  mcp: "MCP",
-  grpc: "gRPC",
-  message_queue: "Message Queue",
-  unknown: "Unknown"
+export const reuseStatusLabels: Record<ReuseStatus, string> = {
+  not_reviewed: "미검토",
+  reuse_existing: "기존 자산 재사용",
+  publish_candidate: "Catalog 등록 후보",
+  project_only: "프로젝트 전용",
+  excluded: "재사용 제외"
 };
 
 export const runtimeContractKindLabels: Record<RuntimeContractKind, string> = {
-  mcp_legacy_adapter: "MCP Legacy Adapter",
-  eai_legacy_adapter: "EAI Legacy Adapter",
+  mcp_connection: "MCP 연결",
+  external_connection: "외부 연결",
   context_manager: "Context Manager",
   callback_broker: "Callback Broker",
   adk_callback: "ADK Callback",
-  async_resume: "Async Resume"
+  async_resume: "비동기 재개"
 };
 
-export function getCandidateSubtype(candidate: ModuleCandidate): string | null {
-  if (candidate.module_category === "adapter" && candidate.adapter_kind) {
-    return adapterKindLabels[candidate.adapter_kind];
-  }
-  if (candidate.module_category === "agent" && candidate.agent_kind) {
-    return agentKindLabels[candidate.agent_kind];
-  }
-  if (candidate.module_category === "workflow" && candidate.workflow_kind) {
-    return workflowKindLabels[candidate.workflow_kind];
-  }
-  if (candidate.module_category === "remote_a2a" && candidate.remote_contract_kind) {
-    return remoteContractKindLabels[candidate.remote_contract_kind];
-  }
-  return null;
+export function getCandidateDescriptor(candidate: AssetCandidate): string {
+  const binding = candidate.binding?.kind === "mcp" ? "MCP" : candidate.binding?.kind === "a2a" ? "A2A" : candidate.binding?.kind ?? "no binding";
+  return `${assetTypeLabels[candidate.asset_type]} · ${binding}`;
 }

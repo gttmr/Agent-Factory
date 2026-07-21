@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/asset-candidate.schema.json",
+  "title": "Asset Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "asset_id",
+    "source_requirement_id",
+    "catalog_entry_id",
+    "name",
+    "asset_type",
+    "domain_scope",
+    "business_domains",
+    "owner",
+    "reuse_status",
+    "capability_tags",
+    "binding",
+    "connection",
+    "workflow_profile",
+    "exposure",
+    "confidence",
+    "rationale",
+    "inputs",
+    "outputs",
+    "risk_level",
+    "risk_signals",
+    "status",
+    "missing_information"
+  ],
+  "properties": {
+    "asset_id": { "type": "string", "minLength": 1 },
+    "source_requirement_id": { "type": "string", "minLength": 1 },
+    "catalog_entry_id": { "$ref": "#/$defs/nullableString" },
+    "name": { "type": "string", "minLength": 1 },
+    "asset_type": { "type": "string", "enum": ["agent", "workflow", "tool"] },
+    "domain_scope": { "type": "string", "enum": ["domain_specific", "cross_domain", "domain_neutral"] },
+    "business_domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "owner": { "type": "string", "minLength": 1 },
+    "reuse_status": { "type": "string", "enum": ["not_reviewed", "reuse_existing", "publish_candidate", "project_only", "excluded"] },
+    "capability_tags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "binding": { "oneOf": [{ "$ref": "#/$defs/binding" }, { "type": "null" }] },
+    "connection": { "oneOf": [{ "$ref": "#/$defs/connection" }, { "type": "null" }] },
+    "workflow_profile": { "oneOf": [{ "$ref": "#/$defs/workflowProfile" }, { "type": "null" }] },
+    "exposure": { "oneOf": [{ "$ref": "#/$defs/exposure" }, { "type": "null" }] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "rationale": { "type": "string", "minLength": 1 },
+    "adk_hints": { "$ref": "#/$defs/adkHints" },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "outputs": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
+    "risk_signals": { "type": "array", "items": { "$ref": "#/$defs/riskSignal" } },
+    "status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected"] },
+    "missing_information": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "missing_information_resolution": { "type": "string" },
+    "resolved_missing_information": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "resolution_draft": { "oneOf": [{ "$ref": "#/$defs/resolutionDraft" }, { "type": "null" }] },
+    "resolution_applied_at": { "$ref": "#/$defs/nullableString" },
+    "schema_review_state": { "type": "string", "enum": ["not_started", "drafted", "applied"] },
+    "smoke_spec": { "oneOf": [{ "$ref": "#/$defs/smokeSpec" }, { "type": "null" }] },
+    "side_effect": { "type": "string", "enum": ["none", "read", "write", "read_write", "unknown"] },
+    "auth_required": { "type": "boolean" },
+    "audit_required": { "type": "boolean" },
+    "citation_required": { "type": "boolean" },
+    "grounding_required": { "type": "boolean" },
+    "source_acl_required": { "type": "boolean" },
+    "versioned": { "type": "boolean" },
+    "effective_date_required": { "type": "boolean" },
+    "developer_todos": { "type": "array", "items": { "type": "string" } }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "asset_type": { "const": "workflow" } }, "required": ["asset_type"] },
+      "then": { "properties": { "binding": { "type": "null" }, "connection": { "type": "null" }, "workflow_profile": { "$ref": "#/$defs/workflowProfile" }, "exposure": { "type": "null" } } },
+      "else": { "properties": { "workflow_profile": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "asset_type": { "const": "agent" } }, "required": ["asset_type"] },
+      "then": {
+        "properties": { "binding": { "oneOf": [{ "$ref": "#/$defs/a2aBinding" }, { "type": "null" }] } },
+        "allOf": [
+          {
+            "if": { "properties": { "binding": { "type": "null" } }, "required": ["binding"] },
+            "then": { "properties": { "connection": { "type": "null" } } }
+          },
+          {
+            "if": { "properties": { "binding": { "$ref": "#/$defs/a2aBinding" } }, "required": ["binding"] },
+            "then": { "properties": { "connection": { "$ref": "#/$defs/httpConnection" } } }
+          }
+        ]
+      },
+      "else": { "properties": { "exposure": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "asset_type": { "const": "tool" } }, "required": ["asset_type"] },
+      "then": { "properties": { "binding": { "$ref": "#/$defs/toolBinding" }, "connection": { "$ref": "#/$defs/connection" } } }
+    }
+  ],
+  "$defs": {
+    "nullableString": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "type": "string", "enum": ["function", "built_in", "unresolved"] } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "server_ref", "tool_name"],
+          "properties": {
+            "kind": { "const": "mcp" },
+            "server_ref": { "type": "string", "minLength": 1 },
+            "tool_name": { "type": "string", "minLength": 1 }
+          }
+        },
+        { "$ref": "#/$defs/a2aBinding" }
+      ]
+    },
+    "toolBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "type": "string", "enum": ["function", "built_in", "unresolved"] } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "server_ref", "tool_name"],
+          "properties": {
+            "kind": { "const": "mcp" },
+            "server_ref": { "type": "string", "minLength": 1 },
+            "tool_name": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "a2aBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "contract_ref"],
+      "properties": {
+        "kind": { "const": "a2a" },
+        "contract_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport"],
+      "properties": { "transport": { "type": "string", "enum": ["in_process", "stdio", "http", "unknown"] } }
+    },
+    "httpConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transport"],
+      "properties": { "transport": { "const": "http" } }
+    },
+    "workflowProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["representation", "coordination", "template_ref"],
+      "properties": {
+        "representation": { "type": "string", "enum": ["graph", "dynamic", "unresolved"] },
+        "coordination": { "type": "string", "enum": ["explicit", "agent_delegation", "mixed"] },
+        "template_ref": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "contract_ref"],
+      "properties": {
+        "protocol": { "const": "a2a" },
+        "contract_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "schema": { "type": "object" }
+      }
+    },
+    "adkHints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state_memory": { "type": "string" },
+        "callbacks": { "type": "string" },
+        "artifacts_events": { "type": "string" },
+        "mcp_a2a": { "type": "string" },
+        "streaming_grounding": { "type": "string" }
+      }
+    },
+    "resolutionDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "generated_at", "summary", "answers", "input_schema", "output_schema", "developer_todos", "graph_patch_notes", "smoke_spec", "reviewer_note"],
+      "properties": {
+        "asset_id": { "type": "string", "minLength": 1 },
+        "generated_at": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "answers": { "type": "array", "items": { "$ref": "#/$defs/resolutionAnswer" } },
+        "input_schema": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "output_schema": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "developer_todos": { "type": "array", "items": { "type": "string" } },
+        "graph_patch_notes": { "type": "array", "items": { "type": "string" } },
+        "smoke_spec": { "$ref": "#/$defs/smokeSpec" },
+        "reviewer_note": { "type": "string" }
+      }
+    },
+    "resolutionAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing_item", "resolved_value", "rationale", "confidence", "target_artifacts", "status"],
+      "properties": {
+        "missing_item": { "type": "string", "minLength": 1 },
+        "resolved_value": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "target_artifacts": { "type": "array", "items": { "type": "string", "enum": ["inputs", "outputs", "runtime_config", "catalog_test_double", "graph", "chat_smoke", "developer_todos"] } },
+        "status": { "type": "string", "enum": ["draft", "applied", "rejected"] }
+      }
+    },
+    "smokeSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_user_message", "synthetic_inputs", "expected_output_shape", "expected_event_markers", "mock_sources", "ready"],
+      "properties": {
+        "sample_user_message": { "type": "string" },
+        "synthetic_inputs": { "type": "object" },
+        "expected_output_shape": { "type": "object" },
+        "expected_event_markers": { "type": "array", "items": { "type": "string" } },
+        "mock_sources": { "type": "array", "items": { "type": "string" } },
+        "ready": { "type": "boolean" }
+      }
+    },
+    "riskSignal": {
+      "type": "string",
+      "enum": ["personal_data", "financial_data", "credit_decision_support", "customer_impact", "external_message", "transaction_write", "human_approval_required", "audit_required"]
+    }
+  }
+}

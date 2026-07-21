@@ -12,22 +12,33 @@ const testRoot = await mkdtemp(join(tmpdir(), "af-mock-lab-"));
 const repoRoot = join(testRoot, "repo");
 await mkdir(join(repoRoot, "catalog"), { recursive: true });
 await writeFile(
-  join(repoRoot, "catalog", "adapters.yaml"),
+  join(repoRoot, "catalog", "tools.yaml"),
   [
-    "adapters:",
-    "  - name: bank_document_ocr_mock_adapter",
-    "    adapter_kind: external_service",
-    "    owner_domain: 공통",
-    "    access_protocol: local",
-    "    component_source: stub",
+    "tools:",
+    "  - asset_id: tool.document.ocr",
+    "    asset_type: tool",
+    "    name: 문서 OCR Tool",
+    "    version: 1",
+    "    status: published",
+    "    domain_scope: cross_domain",
+    "    business_domains: [문서처리]",
+    "    owner: platform_team",
+    "    reuse_status: reuse_existing",
+    "    capability_tags:",
+    "      - external_service",
+    "    binding:",
+    "      kind: mcp",
+    "      server_ref: synthetic-ocr",
+    "      tool_name: target_ocr",
+    "    connection:",
+    "      transport: stdio",
+    "    workflow_profile: null",
+    "    exposure: null",
     "    contract_status: mock_ready",
     "    inputs:",
     "      - name: document_uri",
     "        type: string",
     "        required: true",
-    "      - name: document_type_hint",
-    "        type: string",
-    "        required: false",
     "    outputs:",
     "      - name: ocr_text",
     "        type: text",
@@ -36,32 +47,45 @@ await writeFile(
     "    risk_signals:",
     "      - audit_required",
     "    runtime_mock:",
-    "      ocr_text: '[SYNTHETIC] sample OCR text'",
-    "      confidence: 0.91",
-    "    notes: synthetic OCR adapter",
-    "  - name: production_only_adapter",
-    "    adapter_kind: legacy_api",
-    "    owner_domain: 공통",
-    "    access_protocol: http_rest",
-    "    component_source: mcp",
-    "    contract_status: approved",
-    "    inputs: []",
-    "    outputs: []"
+    "      ocr_text: '[SYNTHETIC] Target Tool OCR text'",
+    "      confidence: 0.95",
+    "    notes: Target Tool synthetic OCR"
   ].join("\n"),
   "utf8"
 );
 
 const catalog = await loadCatalogPrefill(repoRoot);
 assert.equal(catalog.entries.length, 1);
-assert.equal(catalog.entries[0].name, "bank_document_ocr_mock_adapter");
+assert.equal(catalog.source_file, "catalog/tools.yaml");
+assert.equal(catalog.entries[0].asset_id, "tool.document.ocr");
+assert.equal(catalog.entries[0].name, "문서 OCR Tool");
+assert.equal(catalog.entries[0].asset_type, "tool");
+assert.deepEqual(catalog.entries[0].capability_tags, ["external_service"]);
+assert.equal(catalog.entries[0].owner, "platform_team");
+assert.equal(catalog.entries[0].binding.kind, "mcp");
 assert.equal(catalog.entries[0].has_runtime_mock, true);
-assert.equal(catalog.entries[0].prefill.server_name, "bank_document_ocr_mock_adapter-mcp");
-assert.equal(catalog.entries[0].prefill.tools[0].name, "bank_document_ocr_mock_adapter");
+assert.equal(catalog.entries[0].prefill.server_name, "synthetic-ocr");
+assert.equal(catalog.entries[0].prefill.tools[0].name, "target_ocr");
+assert.equal(catalog.entries[0].prefill.source?.catalog_file, "catalog/tools.yaml");
+assert.equal(catalog.entries[0].prefill.source?.catalog_asset_id, "tool.document.ocr");
 assert.deepEqual(catalog.entries[0].prefill.tools[0].inputSchema.required, ["document_uri"]);
 assert.deepEqual(catalog.entries[0].prefill.tools[0].successResponse, {
-  ocr_text: "[SYNTHETIC] sample OCR text",
-  confidence: 0.91
+  ocr_text: "[SYNTHETIC] Target Tool OCR text",
+  confidence: 0.95
 });
+
+const missingCatalogRoot = join(testRoot, "missing-catalog");
+await mkdir(missingCatalogRoot, { recursive: true });
+await assert.rejects(() => loadCatalogPrefill(missingCatalogRoot), /tools\.yaml|ENOENT/);
+
+const malformedCatalogRoot = join(testRoot, "malformed-catalog");
+await mkdir(join(malformedCatalogRoot, "catalog"), { recursive: true });
+await writeFile(
+  join(malformedCatalogRoot, "catalog", "tools.yaml"),
+  "tools:\n  - asset_id: adapter.legacy\n    asset_type: adapter\n    name: Legacy Adapter\n",
+  "utf8"
+);
+await assert.rejects(() => loadCatalogPrefill(malformedCatalogRoot), /asset_type.*tool/);
 
 const validSpec = catalog.entries[0].prefill;
 const specValidation = validateMockSpec(validSpec);
@@ -111,7 +135,7 @@ await assert.rejects(
 );
 await store.writeSpec(validSpec.mock_id, validSpec);
 const saved = await store.readSpec(validSpec.mock_id);
-assert.equal(saved.server_name, "bank_document_ocr_mock_adapter-mcp");
+assert.equal(saved.server_name, "synthetic-ocr");
 await store.writeSpec("delete_me_mock", {
   ...validSpec,
   mock_id: "delete_me_mock",
@@ -134,7 +158,7 @@ const draftRegistry = new MockDraftRegistry({
           "```json\n" +
           JSON.stringify(
             {
-              mock_id: "bank_document_ocr_mock_adapter",
+              mock_id: validSpec.mock_id,
               server_name: "drafted-ocr-mcp",
               protocol: "mcp_stdio",
               description: "Drafted OCR spec",
@@ -225,15 +249,15 @@ assert.equal(status.status, "running");
 assert.match(status.command ?? "", /saved mock spec runtime/);
 await assert.rejects(() => registry.start(validSpec.mock_id), /already running/);
 const listed = await registry.sendJsonRpc(validSpec.mock_id, "tools/list", {});
-assert.equal(listed.result.tools[0].name, "bank_document_ocr_mock_adapter");
+assert.equal(listed.result.tools[0].name, validSpec.tools[0].name);
 const called = await registry.sendJsonRpc(validSpec.mock_id, "tools/call", {
-  name: "bank_document_ocr_mock_adapter",
+  name: validSpec.tools[0].name,
   arguments: { document_uri: "synthetic://document/1" }
 });
 assert.deepEqual(called.result.structuredContent, validSpec.tools[0].successResponse);
 assert.match(called.result.content[0].text, /agent-factory-mock-lab/);
 const invalidCall = await registry.sendJsonRpc(validSpec.mock_id, "tools/call", {
-  name: "bank_document_ocr_mock_adapter",
+  name: validSpec.tools[0].name,
   arguments: {}
 });
 assert.equal(invalidCall.error?.code, -32602);
@@ -246,11 +270,11 @@ assert.equal(stopped.status, "stopped");
 const generatedDraftId = createDraftId(new Date("2026-05-29T01:02:03Z"), "abcdef");
 assert.equal(generatedDraftId, "20260529T010203Z-draft-abcdef");
 const prompt = buildDraftSpecPrompt({
-  mockId: "bank_document_ocr_mock_adapter",
+  mockId: "document_ocr_tool",
   userPrompt: "Create an OCR mock spec."
 });
 assert.match(prompt, /Return only one valid MockSpec JSON object/);
-assert.match(prompt, /Required server_name: bank_document_ocr_mock_adapter-mcp/);
+assert.match(prompt, /Required server_name: document_ocr_tool-mcp/);
 assert.match(prompt, /errorCode/);
 assert.match(prompt, /when must be a JSON object/);
 assert.match(prompt, /Create an OCR mock spec/);

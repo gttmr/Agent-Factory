@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -58,10 +59,8 @@ const WRITE_WHITELIST: RegExp[] = [
   /^af-run-manifest\.json$/,
   /^analysis-result\.json$/,
   /^normalized-requirement\.json$/,
-  /^module-candidates\.json$/,
-  /^process-flow\.json$/,
-  /^commonization-notes\.json$/,
-  /^a2a-contracts\.json$/,
+  /^asset-candidates\.json$/,
+  /^graph-ir\.json$/,
   /^scaffold-plan\.json$/,
   /^analysis-summary\.md$/,
   /^boundary-design\.md$/,
@@ -75,6 +74,28 @@ const READ_WHITELIST: RegExp[] = [
   ...WRITE_WHITELIST,
   /^runtime-stub\/[A-Za-z0-9_.\/-]+$/
 ];
+
+// Store instances created by different middleware modules still share this queue.
+const canonicalWriteLocks = new Map<string, Promise<void>>();
+const heldCanonicalWriteLocks = new AsyncLocalStorage<ReadonlyMap<ArtifactRootStore, ReadonlySet<string>>>();
+
+async function runWithCanonicalWriteLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = canonicalWriteLocks.get(key) ?? Promise.resolve();
+  const ready = previous.catch(() => undefined);
+  let release!: () => void;
+  const gate = new Promise<void>((resolveGate) => {
+    release = resolveGate;
+  });
+  const tail = ready.then(() => gate);
+  canonicalWriteLocks.set(key, tail);
+  await ready;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (canonicalWriteLocks.get(key) === tail) canonicalWriteLocks.delete(key);
+  }
+}
 
 export class ArtifactRootStore {
   private readonly artifactsRoot: string;
@@ -149,34 +170,35 @@ export class ArtifactRootStore {
   }
 
   async createRoot(reqId: string): Promise<{ requirement_id: string; artifact_root: string }> {
-    this.assertReqId(reqId);
-    const rootDir = this.resolveRootDir(reqId);
-    const manifestPath = join(rootDir, "af-run-manifest.json");
-    const existing = await stat(manifestPath).catch(() => null);
-    if (existing) {
-      throw new ArtifactValidationError(409, `이미 존재하는 requirement_id 입니다: ${reqId}`);
-    }
-    await mkdir(rootDir, { recursive: true });
-    const manifest: AfRunManifest = {
-      requirement_id: reqId,
-      artifact_root: `artifacts/af/${reqId}`,
-      current_stage: "analyze",
-      stages: {
-        analyze: { status: "pending", outputs: [] },
-        design: { status: "pending", outputs: [] },
-        build: { status: "pending", outputs: [] },
-        verify: { status: "pending", outputs: [] }
-      },
-      approvals: {
-        analysis_reviewed: false,
-        boundaries_approved: false,
-        runtime_contracts_approved: false,
-        stub_ready_for_followup: false
-      },
-      validation: { commands: [], last_result: "not_run" }
-    };
-    await writeFile(manifestPath, serializeAfRunManifest(manifest), "utf8");
-    return { requirement_id: reqId, artifact_root: manifest.artifact_root };
+    return await this.withCanonicalWriteLock(reqId, async () => {
+      const rootDir = this.resolveRootDir(reqId);
+      const manifestPath = join(rootDir, "af-run-manifest.json");
+      const existing = await stat(manifestPath).catch(() => null);
+      if (existing) {
+        throw new ArtifactValidationError(409, `이미 존재하는 requirement_id 입니다: ${reqId}`);
+      }
+      await mkdir(rootDir, { recursive: true });
+      const manifest: AfRunManifest = {
+        requirement_id: reqId,
+        artifact_root: `artifacts/af/${reqId}`,
+        current_stage: "analyze",
+        stages: {
+          analyze: { status: "pending", outputs: [] },
+          design: { status: "pending", outputs: [] },
+          build: { status: "pending", outputs: [] },
+          verify: { status: "pending", outputs: [] }
+        },
+        approvals: {
+          analysis_reviewed: false,
+          boundaries_approved: false,
+          runtime_contracts_approved: false,
+          stub_ready_for_followup: false
+        },
+        validation: { commands: [], last_result: "not_run" }
+      };
+      await writeFile(manifestPath, serializeAfRunManifest(manifest), "utf8");
+      return { requirement_id: reqId, artifact_root: manifest.artifact_root };
+    });
   }
 
   async readArtifact(reqId: string, relative: string): Promise<ArtifactReadResult> {
@@ -196,29 +218,63 @@ export class ArtifactRootStore {
     content: string,
     ifMatch?: string | null
   ): Promise<ArtifactWriteResult> {
-    const abs = this.resolveArtifactPath(reqId, relative, "write");
-    if (ifMatch) {
-      const current = await readFile(abs, "utf8").catch((error) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-        throw error;
-      });
-      if (current !== null) {
-        const currentEtag = computeEtag(current);
-        if (currentEtag !== ifMatch) {
-          throw new ArtifactConflictError(ifMatch, currentEtag);
+    return await this.withCanonicalWriteLock(reqId, async () => {
+      const abs = this.resolveArtifactPath(reqId, relative, "write");
+      if (ifMatch) {
+        const current = await readFile(abs, "utf8").catch((error) => {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+          throw error;
+        });
+        if (current !== null) {
+          const currentEtag = computeEtag(current);
+          if (currentEtag !== ifMatch) {
+            throw new ArtifactConflictError(ifMatch, currentEtag);
+          }
+        } else if (ifMatch !== "0") {
+          throw new ArtifactConflictError(ifMatch, "0");
         }
-      } else if (ifMatch !== "0") {
-        throw new ArtifactConflictError(ifMatch, "0");
       }
-    }
-    await mkdir(abs.substring(0, abs.lastIndexOf(sep)), { recursive: true });
-    await writeFile(abs, content, "utf8");
-    return { etag: computeEtag(content), bytes: Buffer.byteLength(content, "utf8") };
+      await mkdir(abs.substring(0, abs.lastIndexOf(sep)), { recursive: true });
+      await writeFile(abs, content, "utf8");
+      return { etag: computeEtag(content), bytes: Buffer.byteLength(content, "utf8") };
+    });
+  }
+
+  async withCanonicalWriteLock<T>(reqId: string, operation: () => Promise<T>): Promise<T> {
+    const key = this.resolveRootDir(reqId);
+    const heldLocks = heldCanonicalWriteLocks.getStore();
+    // Preserve overridden writeArtifact methods without re-acquiring the batch owner's lock.
+    if (heldLocks?.get(this)?.has(key)) return await operation();
+
+    return await runWithCanonicalWriteLock(key, async () => {
+      const nextHeldLocks = new Map(heldLocks);
+      nextHeldLocks.set(this, new Set([...(heldLocks?.get(this) ?? []), key]));
+      return await heldCanonicalWriteLocks.run(nextHeldLocks, operation);
+    });
   }
 
   async readManifest(reqId: string): Promise<{ manifest: AfRunManifest; etag: string }> {
     const result = await this.readArtifact(reqId, "af-run-manifest.json");
-    const manifest = parseAfRunManifest(result.content);
+    let manifest: AfRunManifest;
+    try {
+      manifest = parseAfRunManifest(result.content);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ArtifactValidationError(422, `af-run-manifest.json 검증 실패: ${detail}`);
+    }
+    if (manifest.requirement_id !== reqId) {
+      throw new ArtifactValidationError(
+        422,
+        `af-run-manifest.json requirement_id가 artifact root와 일치하지 않습니다: ${manifest.requirement_id} != ${reqId}`
+      );
+    }
+    const expectedRoot = `artifacts/af/${reqId}`;
+    if (manifest.artifact_root !== expectedRoot) {
+      throw new ArtifactValidationError(
+        422,
+        `af-run-manifest.json artifact_root가 canonical 경로와 일치하지 않습니다: ${manifest.artifact_root} != ${expectedRoot}`
+      );
+    }
     return { manifest, etag: result.etag };
   }
 

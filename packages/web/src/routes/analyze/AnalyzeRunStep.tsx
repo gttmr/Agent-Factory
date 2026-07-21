@@ -14,7 +14,7 @@ interface AnalyzeRunStepProps {
   analyzeRawText: string;
   analyzeDomain: string;
   catalog: AnalyzeCatalogEntry[];
-  catalogCounts: Record<AnalyzeCatalogEntry["module_category"], number>;
+  catalogCounts: Record<AnalyzeCatalogEntry["asset_type"], number>;
   currentCandidateCount: number | null;
   onRequirementTextChange: (value: string) => void;
   onDomainDraftChange: (value: string) => void;

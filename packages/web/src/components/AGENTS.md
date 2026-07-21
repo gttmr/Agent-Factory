@@ -2,32 +2,39 @@
 
 ## Scope
 
-Shared React components for artifact review, Graph IR visualization, category
-badges, Stage Runner controls, and graph element editing.
+Shared React components for strict Target v2 artifact review, Graph IR
+visualization and editing, asset and protocol badges, and Stage Runner controls.
 
-Target asset and node meanings come from [Taxonomy](../../../../docs/workbench/taxonomy.md) and [Graph IR](../../../../docs/workbench/graph-ir.md); category/subtype components currently render the Current Implementation (`legacy`) enums.
+Asset and node meanings come from [Taxonomy](../../../../docs/workbench/taxonomy.md)
+and [Graph IR](../../../../docs/workbench/graph-ir.md).
 
 ## Structure
 
-- `CategoryBadge.tsx`: category/subtype visual single source of truth.
-- `GraphCanvas.tsx`: ReactFlow canvas wrapper and edit-mode shell.
-- `graph/*`: render-layer layout, nodes, edges, containers, and validation banner.
-- `GraphInspector.tsx`: read-only node/edge detail.
-- `GraphElementEditor.tsx` and model test: field-level Graph IR edits.
-- `StageRunnerPanel.tsx`: shared Analyze/Design/Build/Verify run surface.
+- `AnalysisResult.tsx`: aggregate analysis summary and review evidence.
+- `CategoryBadge.tsx`: Agent, Workflow, and Tool category badges plus MCP/A2A protocol badges.
+- `GraphCanvas.tsx`: ReactFlow canvas and explicit edit-mode shell.
+- `graph/*`: layout, node, edge, region-overlay, and validation rendering.
+- `GraphInspector.tsx`: read-only node and edge detail.
+- `GraphElementEditor.tsx` and `graphElementEditorModel.ts`: field-level Graph IR edits.
+- `StageRunnerPanel.tsx`: shared Analyze, Design, Build, and Verify run surface.
 
 ## Local Rules
 
-- Use `CategoryBadge` and `SubtypeBadge` for category display; do not hand-roll raw spans.
-- Graph render changes usually require updates across `layout.ts`, `nodeTypes.tsx`, `edgeTypes.tsx`, `containerOverlay.tsx`, CSS, and docs.
-- Keep GraphCanvas read-only by default; edit controls appear only through explicit editable props.
-- Saving graph edit mode updates `analysis-result.json.processFlow`; it must not toggle manifest approvals.
+- Use `CategoryBadge` for the three asset categories and `ProtocolBadge` for MCP or A2A; do not merge those concepts.
+- Render all eight Graph node kinds and keep asset references specific to Agent, Tool, and Subworkflow nodes.
+- Render edge `control` separately from optional `channel`, and render `parallel` and `loop` as regions.
+- Keep `GraphCanvas` read-only by default; edit controls appear only through explicit editable props.
+- Node positions are presentation state and are not serialized into strict Graph IR.
+- Saving Graph edit mode updates `analysis-result.json.graph`; artifact sync derives `graph-ir.json`.
+- A root Graph may use `workflow_ref: null` for a standalone Agent or Tool.
 
 ## Anti-Patterns
 
-- Do not let container overlays obscure node/edge readability.
-- Do not make synthetic nodes bind to module candidates unless the analyzer contract allows it.
-- Do not add marker semantics only in the renderer; define them in Graph IR docs and validation.
+- Do not render A2A as an asset category; it is a protocol badge on an Agent boundary.
+- Do not add retired node, edge, or category aliases to the renderer.
+- Do not let region overlays obscure node or edge readability.
+- Do not make structural nodes bind to asset candidates.
+- Do not add Graph semantics only in the renderer; update contract validation and tests too.
 
 ## Verification
 
@@ -37,4 +44,4 @@ npm run test:analyzer
 npm run build
 ```
 
-Visual component changes require screenshot/browser verification.
+Visual component changes require screenshot and browser verification.

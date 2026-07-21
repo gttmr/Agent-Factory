@@ -9,6 +9,8 @@ import {
   RUNTIME_SUPPORT_FIELDS,
   SIDE_EFFECT_LEVEL_OPTIONS,
   applyRuntimeContractEditorDraft,
+  createDefaultAsyncResumePolicy,
+  createDefaultAsyncResumeSideEffectGuard,
   createRuntimeContractEditorDraft,
   hasRuntimeContractEditorDraftChanges,
   runtimeContractGraphAnnotationKeys,
@@ -54,6 +56,26 @@ export function RuntimeContractEditor({ contract, saving, onSave, onCancel }: Ru
     setDraft((prev) => ({ ...prev, operation: { ...prev.operation, [key]: value } }));
   }
 
+  function updateResumePolicy<Key extends keyof NonNullable<RuntimeContract["resume_policy"]>>(
+    key: Key,
+    value: NonNullable<RuntimeContract["resume_policy"]>[Key]
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      resume_policy: { ...(prev.resume_policy ?? createDefaultAsyncResumePolicy(contract)), [key]: value }
+    }));
+  }
+
+  function updateSideEffectGuard<Key extends keyof NonNullable<RuntimeContract["side_effect_guard"]>>(
+    key: Key,
+    value: NonNullable<RuntimeContract["side_effect_guard"]>[Key]
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      side_effect_guard: { ...(prev.side_effect_guard ?? createDefaultAsyncResumeSideEffectGuard()), [key]: value }
+    }));
+  }
+
   function updateGraphAnnotation(key: string, value: string) {
     setDraft((prev) => ({
       ...prev,
@@ -81,8 +103,8 @@ export function RuntimeContractEditor({ contract, saving, onSave, onCancel }: Ru
 
       <dl className="af-runtime-meta">
         <div>
-          <dt>module_id</dt>
-          <dd>{contract.module_id ?? "—"}</dd>
+          <dt>asset_id</dt>
+          <dd>{contract.asset_id ?? "—"}</dd>
         </div>
         <div>
           <dt>operation</dt>
@@ -184,6 +206,126 @@ export function RuntimeContractEditor({ contract, saving, onSave, onCancel }: Ru
           </Field>
         ))}
       </fieldset>
+
+      {contract.contract_kind === "async_resume" ? (
+        <>
+          <fieldset className="af-runtime-policies">
+            <legend>Async resume policy</legend>
+            {draft.resume_policy ? (
+              <>
+                <Field label="resume_policy.interrupt_id" hint="동일 invocation의 RequestInput / FunctionResponse correlation ID">
+                  <input
+                    type="text"
+                    value={draft.resume_policy.interrupt_id}
+                    onChange={(event) => updateResumePolicy("interrupt_id", event.target.value)}
+                  />
+                </Field>
+                <Field label="resume_policy.timeout_seconds" hint="늦게 도착한 응답은 side effect 없이 만료됩니다.">
+                  <input
+                    type="number"
+                    min={1}
+                    value={draft.resume_policy.timeout_seconds}
+                    onChange={(event) => updateResumePolicy("timeout_seconds", Number(event.target.value))}
+                  />
+                </Field>
+                <SelectField
+                  label="resume_policy.correlation_scope"
+                  value={draft.resume_policy.correlation_scope}
+                  onChange={(event) => updateResumePolicy("correlation_scope", event.target.value as "invocation")}
+                >
+                  <option value="invocation">invocation</option>
+                </SelectField>
+                <SelectField
+                  label="resume_policy.on_timeout"
+                  value={draft.resume_policy.on_timeout}
+                  onChange={(event) => updateResumePolicy("on_timeout", event.target.value as "expire_without_side_effect")}
+                >
+                  <option value="expire_without_side_effect">expire_without_side_effect</option>
+                </SelectField>
+                <SelectField
+                  label="resume_policy.duplicate_response"
+                  value={draft.resume_policy.duplicate_response}
+                  onChange={(event) => updateResumePolicy("duplicate_response", event.target.value as "return_recorded_result")}
+                >
+                  <option value="return_recorded_result">return_recorded_result</option>
+                </SelectField>
+                <SelectField
+                  label="resume_policy.conflicting_response"
+                  value={draft.resume_policy.conflicting_response}
+                  onChange={(event) => updateResumePolicy("conflicting_response", event.target.value as "reject")}
+                >
+                  <option value="reject">reject</option>
+                </SelectField>
+                <SelectField
+                  label="resume_policy.restart_policy"
+                  value={draft.resume_policy.restart_policy}
+                  onChange={(event) => updateResumePolicy("restart_policy", event.target.value as "resume_incomplete_replay_completed")}
+                >
+                  <option value="resume_incomplete_replay_completed">resume_incomplete_replay_completed</option>
+                </SelectField>
+              </>
+            ) : (
+              <>
+                <p className="af-design-empty">stable correlation, timeout, duplicate/restart 정책이 아직 구조화되지 않았습니다.</p>
+                <Button
+                  type="button"
+                  onClick={() => updateDraft("resume_policy", createDefaultAsyncResumePolicy(contract))}
+                >
+                  Resume 정책 구조화
+                </Button>
+              </>
+            )}
+          </fieldset>
+
+          {draft.runtime_support.idempotency_required || draft.side_effect_guard ? (
+            <fieldset className="af-runtime-policies">
+              <legend>Side-effect guard</legend>
+              {draft.side_effect_guard ? (
+                <>
+                  <Field label="side_effect_guard.tool_ref" hint="Graph IR side_effect_tool_node_id의 Tool asset">
+                    <input
+                      type="text"
+                      value={draft.side_effect_guard.tool_ref}
+                      onChange={(event) => updateSideEffectGuard("tool_ref", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="side_effect_guard.idempotency_key_input" hint="선택한 Tool inputs의 필드명">
+                    <input
+                      type="text"
+                      value={draft.side_effect_guard.idempotency_key_input}
+                      onChange={(event) => updateSideEffectGuard("idempotency_key_input", event.target.value)}
+                    />
+                  </Field>
+                  <SelectField
+                    label="side_effect_guard.delivery_semantics"
+                    value={draft.side_effect_guard.delivery_semantics}
+                    onChange={(event) => updateSideEffectGuard("delivery_semantics", event.target.value as "at_most_once")}
+                  >
+                    <option value="at_most_once">at_most_once</option>
+                  </SelectField>
+                  <SelectField
+                    label="side_effect_guard.ledger_scope"
+                    value={draft.side_effect_guard.ledger_scope}
+                    onChange={(event) => updateSideEffectGuard("ledger_scope", event.target.value as "session_state")}
+                  >
+                    <option value="session_state">session_state</option>
+                  </SelectField>
+                </>
+              ) : (
+                <>
+                  <p className="af-design-empty">승인 응답 뒤의 Tool side effect를 보호할 ledger 계약이 없습니다.</p>
+                  <Button
+                    type="button"
+                    onClick={() => updateDraft("side_effect_guard", createDefaultAsyncResumeSideEffectGuard())}
+                  >
+                    Side-effect guard 구조화
+                  </Button>
+                </>
+              )}
+            </fieldset>
+          ) : null}
+        </>
+      ) : null}
 
       <fieldset className="af-runtime-policies">
         <legend>Graph IR annotations</legend>

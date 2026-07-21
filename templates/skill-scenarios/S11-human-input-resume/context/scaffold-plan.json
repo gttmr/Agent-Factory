@@ -1,0 +1,364 @@
+{
+  "contract_version": "2.0",
+  "requirement_id": "req-s11-human-input-resume",
+  "package_name": "s11_human_input_resume_runtime",
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_mode": "runnable",
+  "assets": [
+    {
+      "asset_id": "workflow-s11-human-input-resume",
+      "source_requirement_id": "req-s11-human-input-resume",
+      "catalog_entry_id": null,
+      "name": "Synthetic Human Input Resume Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "human-input",
+        "api-resume",
+        "idempotency"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The approved graph must pause, correlate a later response to the same invocation, route the decision, and preserve at-most-once synthetic change behavior.",
+      "inputs": [
+        {
+          "name": "synthetic_change_request",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "change_outcome",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "transaction_write",
+        "human_approval_required",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "tool-s11-apply-synthetic-change",
+      "source_requirement_id": "req-s11-human-input-resume",
+      "catalog_entry_id": null,
+      "name": "Apply Synthetic Change Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "synthetic-write",
+        "idempotent"
+      ],
+      "binding": {
+        "kind": "function"
+      },
+      "connection": {
+        "transport": "in_process"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "A dedicated Tool makes the reviewed side-effect boundary and duplicate-protection requirement observable in tests.",
+      "inputs": [
+        {
+          "name": "change_id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "decision",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "applied",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "transaction_write",
+        "human_approval_required",
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "write",
+      "audit_required": true
+    }
+  ],
+  "runtime_contracts": [
+    {
+      "contract_id": "rtc-s11-async-resume",
+      "contract_kind": "async_resume",
+      "asset_id": "workflow-s11-human-input-resume",
+      "title": "Synthetic Human Input and same-invocation resume",
+      "contract_status": "approved",
+      "summary": "Pause at the reviewed Human Input Node, accept one correlated API response, and apply the approved synthetic change at most once.",
+      "required_review_fields": [],
+      "reviewer_notes": "Approved for the isolated S11 runnable prototype only.",
+      "runtime_support": {
+        "context_manager_required": true,
+        "callback_broker_required": false,
+        "human_approval_required": true,
+        "idempotency_required": true,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "approval",
+        "side_effect_level": "write",
+        "callback_expected": false,
+        "async_resume_required": true
+      },
+      "identifiers": [
+        "synthetic-approval-001",
+        "synthetic-change-001",
+        "synthetic-invocation-001",
+        "synthetic-session-001"
+      ],
+      "policies": {
+        "auth_policy": "Accept only the synthetic test responder for the matching invocation; production identity is out of scope.",
+        "timeout_policy": "Expire the pending synthetic request after 60 seconds and do not apply the change.",
+        "retry_policy": "A duplicate response returns the prior result and never repeats the Tool side effect.",
+        "fallback_policy": "Reject, cancel, timeout, wrong ID, and abandoned request paths end without applying the change.",
+        "masking_policy": "Record only synthetic IDs and the normalized decision in audit evidence.",
+        "data_policy": "Fixed synthetic payloads only; no actor or customer data."
+      },
+      "resume_policy": {
+        "interrupt_id": "synthetic-approval-001",
+        "correlation_scope": "invocation",
+        "timeout_seconds": 60,
+        "on_timeout": "expire_without_side_effect",
+        "duplicate_response": "return_recorded_result",
+        "conflicting_response": "reject",
+        "restart_policy": "resume_incomplete_replay_completed"
+      },
+      "side_effect_guard": {
+        "tool_ref": "tool-s11-apply-synthetic-change",
+        "idempotency_key_input": "change_id",
+        "delivery_semantics": "at_most_once",
+        "ledger_scope": "session_state"
+      },
+      "graph_ir_annotations": {
+        "human_input_node_id": "node-s11-human-approval",
+        "resume_entry_node_id": "node-s11-route-decision",
+        "side_effect_tool_node_id": "node-s11-apply-change",
+        "rerun_policy": "re-enter the Human Input function node; restore completed preparation"
+      },
+      "synthetic_examples": [
+        {
+          "interrupt_id": "synthetic-approval-001",
+          "change_id": "synthetic-change-001",
+          "response": "approve",
+          "expected_apply_count": 1
+        },
+        {
+          "interrupt_id": "synthetic-approval-001",
+          "change_id": "synthetic-change-001",
+          "response": "reject",
+          "expected_apply_count": 0
+        }
+      ],
+      "developer_todos": []
+    }
+  ],
+  "excluded_assets": [],
+  "graph": {
+    "graph_id": "graph-s11-human-input-resume",
+    "source_requirement_id": "req-s11-human-input-resume",
+    "workflow_ref": "workflow-s11-human-input-resume",
+    "nodes": [
+      {
+        "id": "node-s11-input",
+        "label": "Synthetic change request",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s11-prepare",
+        "label": "Prepare synthetic approval payload",
+        "node_kind": "function",
+        "role": "prepare_input"
+      },
+      {
+        "id": "node-s11-human-approval",
+        "label": "Request synthetic change approval",
+        "node_kind": "human_input",
+        "human_input_contract": {
+          "message": "합성 변경을 적용할까요? approve 또는 reject로 답하세요.",
+          "payload_schema_ref": "schema://synthetic/change-request",
+          "response_schema_ref": "str",
+          "response_mapping": {
+            "approve": "apply",
+            "reject": "cancel"
+          },
+          "choice_options": [
+            "approve",
+            "reject"
+          ],
+          "accepted_aliases": {
+            "approve": [
+              "yes",
+              "apply"
+            ],
+            "reject": [
+              "no",
+              "cancel"
+            ]
+          },
+          "default_choice": "reject"
+        }
+      },
+      {
+        "id": "node-s11-route-decision",
+        "label": "Route reviewed human decision",
+        "node_kind": "function",
+        "role": "route"
+      },
+      {
+        "id": "node-s11-apply-change",
+        "label": "Apply synthetic change once",
+        "node_kind": "tool",
+        "tool_ref": "tool-s11-apply-synthetic-change",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "node-s11-applied-output",
+        "label": "Synthetic change applied",
+        "node_kind": "output"
+      },
+      {
+        "id": "node-s11-canceled-output",
+        "label": "Synthetic change canceled",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s11-input-to-prepare",
+        "from": "node-s11-input",
+        "to": "node-s11-prepare",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s11-prepare-to-human",
+        "from": "node-s11-prepare",
+        "to": "node-s11-human-approval",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "state"
+      },
+      {
+        "id": "edge-s11-human-to-route",
+        "from": "node-s11-human-approval",
+        "to": "node-s11-route-decision",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "state"
+      },
+      {
+        "id": "edge-s11-route-apply",
+        "from": "node-s11-route-decision",
+        "to": "node-s11-apply-change",
+        "control": {
+          "kind": "condition",
+          "condition": "decision == apply",
+          "accepted_aliases": [
+            "approve",
+            "yes"
+          ],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s11-route-cancel",
+        "from": "node-s11-route-decision",
+        "to": "node-s11-canceled-output",
+        "control": {
+          "kind": "condition",
+          "condition": "decision == cancel",
+          "accepted_aliases": [
+            "reject",
+            "no"
+          ],
+          "default": true
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s11-apply-to-output",
+        "from": "node-s11-apply-change",
+        "to": "node-s11-applied-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  },
+  "manifest": {
+    "catalog_bound_assets": [],
+    "new_code_required": [
+      {
+        "asset_id": "workflow-s11-human-input-resume",
+        "asset_name": "Synthetic Human Input Resume Workflow",
+        "reason": "Generate the approved pause, API resume, route, and audit orchestration.",
+        "developer_todos": []
+      },
+      {
+        "asset_id": "tool-s11-apply-synthetic-change",
+        "asset_name": "Apply Synthetic Change Tool",
+        "reason": "Generate the approved local synthetic write boundary and duplicate-protection tests.",
+        "developer_todos": []
+      }
+    ]
+  },
+  "validation": {
+    "can_generate_source": true,
+    "blockers": [],
+    "warnings": [
+      "This approval covers an API-based synthetic prototype only; Web UI and CLI resume are not approved paths."
+    ]
+  }
+}

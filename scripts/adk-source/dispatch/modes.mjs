@@ -60,7 +60,7 @@ export function assembleSmokeGraphWorkflowEdges(context, collection, lowerEdge) 
     rows.push([from, to]);
   };
 
-  const edges = Array.isArray(context.processFlow.edges) ? context.processFlow.edges : [];
+  const edges = Array.isArray(context.graph.edges) ? context.graph.edges : [];
   for (const [index, edge] of edges.entries()) {
     const record = lowerEdge(edge, index);
     push(record.from, record.to);
@@ -68,14 +68,14 @@ export function assembleSmokeGraphWorkflowEdges(context, collection, lowerEdge) 
 
   const incoming = new Set(rows.map(([, to]) => to));
   const outgoing = new Set(rows.map(([from]) => from));
-  for (const spec of collection.moduleSpecsInDeclarationOrder) {
+  for (const spec of collection.assetSpecsInDeclarationOrder) {
     const fn = nodeFunctionName(spec);
     if (!incoming.has(fn)) push("START", fn);
     if (!outgoing.has(fn)) push(fn, "emit_workflow_result");
   }
 
   if (rows.length === 0) {
-    throw new Error("processFlow does not provide any usable Graph IR edges for runtime stub generation.");
+    throw new Error("Graph IR does not provide any usable edges for runtime stub generation.");
   }
   return rows;
 }

@@ -1,0 +1,156 @@
+{
+  "contract_version": "2.0",
+  "requirement_id": "req-scenario-k",
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_mode": "runnable",
+  "assets": [
+    {
+      "asset_id": "tool.reused",
+      "source_requirement_id": "req-scenario-k",
+      "catalog_entry_id": "tool.reused",
+      "name": "Reused Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "platform",
+      "reuse_status": "reuse_existing",
+      "capability_tags": [],
+      "binding": {
+        "kind": "function"
+      },
+      "connection": {
+        "transport": "in_process"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 0.9,
+      "rationale": "Reviewed tool responsibility for Reused Tool",
+      "inputs": [],
+      "outputs": [],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "developer_todos": []
+    }
+  ],
+  "runtime_contracts": [],
+  "excluded_assets": [],
+  "graph": {
+    "graph_id": "graph.scenario-k",
+    "source_requirement_id": "req-scenario-k",
+    "workflow_ref": null,
+    "nodes": [
+      {
+        "id": "input",
+        "label": "Input",
+        "node_kind": "input"
+      },
+      {
+        "id": "tool-a",
+        "label": "Reused Tool",
+        "node_kind": "tool",
+        "tool_ref": "tool.reused",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "tool-b",
+        "label": "Reused Tool",
+        "node_kind": "tool",
+        "tool_ref": "tool.reused",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "output",
+        "label": "Output",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge.input.a",
+        "from": "input",
+        "to": "tool-a",
+        "control": {
+          "kind": "fan_out",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
+      },
+      {
+        "id": "edge.input.b",
+        "from": "input",
+        "to": "tool-b",
+        "control": {
+          "kind": "fan_out",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
+      },
+      {
+        "id": "edge.a.output",
+        "from": "tool-a",
+        "to": "output",
+        "control": {
+          "kind": "fan_in",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
+      },
+      {
+        "id": "edge.b.output",
+        "from": "tool-b",
+        "to": "output",
+        "control": {
+          "kind": "fan_in",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
+      }
+    ],
+    "regions": [
+      {
+        "id": "parallel.tools",
+        "kind": "parallel",
+        "node_ids": [
+          "tool-a",
+          "tool-b"
+        ],
+        "entry_node_ids": [
+          "tool-a",
+          "tool-b"
+        ],
+        "exit_node_ids": [
+          "tool-a",
+          "tool-b"
+        ],
+        "parent_region_id": null
+      }
+    ]
+  },
+  "manifest": {
+    "catalog_bound_assets": [
+      {
+        "asset_id": "tool.reused",
+        "asset_name": "Reused Tool",
+        "catalog_id": "tool.reused",
+        "catalog_name": "Reused Tool"
+      }
+    ],
+    "new_code_required": []
+  },
+  "validation": {
+    "can_generate_source": true,
+    "blockers": [],
+    "warnings": []
+  }
+}

@@ -1,5 +1,5 @@
 import { assertDataChannelsSupported, usesArtifactChannels } from "./channels.mjs";
-import { hasAgentOwnedToolsets } from "./adapters.mjs";
+import { hasAgentOwnedTools } from "./tools.mjs";
 import { collectGenerationNodes } from "./graph/collector.mjs";
 import { assertNoSymbolCollisions } from "./graph/guards.mjs";
 import {
@@ -8,35 +8,41 @@ import {
 } from "./graph/dynamic.mjs";
 import { toPyStr, toPythonLiteral, truncate } from "./python-literals.mjs";
 import { assertRemoteA2aSupported, usesRemoteA2a, usesRemoteA2aAuthInterceptor } from "./remote-a2a.mjs";
+import {
+  assertAsyncResumeSupported,
+  asyncResumeRootClass,
+  buildAsyncResumeWorkflowSupport,
+  usesAsyncResumeRuntime
+} from "./resume-contracts.mjs";
 import { componentContracts } from "./agent-contracts.mjs";
 import { emitRunnableNodeBlocks } from "./emitters/node-registry.mjs";
 import { buildRuntimeHelperSection } from "./emitters/runtime-helpers.mjs";
 
-const MAX_DYNAMIC_LOOP_ITERATIONS = 3;
-
 export function buildDynamicRunnableAgentPy(context) {
-  const { analysisResult, connectedAdapters, graphContext, modules, normalizedRequirement, packageName } = context;
+  const { analysisResult, assets, connectedTools, graphContext, normalizedRequirement, packageName } = context;
+  assertDynamicLoopsHaveApprovedBounds(graphContext);
   const collection = collectGenerationNodes(graphContext, { mode: "dynamic" });
   const dynamicPlan = assertDynamicRunnableGraphSupported(graphContext, { collection });
   assertDataChannelsSupported(graphContext);
-  assertRemoteA2aSupported({ analysisResult, modules });
+  assertRemoteA2aSupported({ analysisResult, assets });
+  assertAsyncResumeSupported(context);
 
   const {
     collisionTargets,
+    functionNodes,
     humanInputNodes,
-    loopControlNodes,
-    moduleSpecsInDeclarationOrder: orderedNodeSpecs,
-    routerNodes,
+    assetSpecsInDeclarationOrder: orderedNodeSpecs,
+    routeNodes,
     terminalOutputNodes
   } = collection;
   assertNoSymbolCollisions(collisionTargets);
-  const { nodeBlocks, funcBlocks, loopControlBlocks } = emitRunnableNodeBlocks(context, {
+  const { nodeBlocks, funcBlocks } = emitRunnableNodeBlocks(context, {
     mode: "dynamic",
     orderedNodeSpecs,
+    functionNodes,
     humanInputNodes,
-    routerNodes,
-    terminalOutputNodes,
-    loopControlNodes
+    routeNodes,
+    terminalOutputNodes
   });
 
   const description = `검토된 workbench artifact에서 생성한 ADK 2.3 dynamic workflow wiring입니다: ${truncate(
@@ -44,16 +50,18 @@ export function buildDynamicRunnableAgentPy(context) {
   )}.`;
   const usesArtifacts = usesArtifactChannels(graphContext);
   const usesTerminalOutputs = collection.featureFlags.has("terminal_outputs");
-  const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, modules });
-  const jsonStdlibImport = usesArtifacts || connectedAdapters.length > 0 ? "import json\n" : "";
+  const usesAsyncResume = usesAsyncResumeRuntime(context);
+  const usesRemoteAuth = usesRemoteA2aAuthInterceptor({ analysisResult, assets });
+  const jsonStdlibImport = usesArtifacts || connectedTools.length > 0 || usesAsyncResume ? "import json\n" : "";
+  const timeStdlibImport = usesAsyncResume ? "import time\n" : "";
   const artifactGenaiImport = usesArtifacts || usesTerminalOutputs ? "from google.genai import types\n" : "";
-  const remoteImport = usesRemoteA2a(modules)
+  const remoteImport = usesRemoteA2a(assets)
     ? "from google.adk.agents.remote_a2a_agent import RemoteA2aAgent\n"
     : "";
   const remoteConfigImport = usesRemoteAuth
     ? "from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor\n"
     : "";
-  const mcpToolsetImport = hasAgentOwnedToolsets(graphContext)
+  const mcpToolsetImport = hasAgentOwnedTools(graphContext)
     ? "from google.adk.tools import McpToolset\nfrom google.adk.tools.mcp_tool import StreamableHTTPConnectionParams\n"
     : "";
   const eventImport = usesRemoteAuth || usesTerminalOutputs ? "Event, RequestInput" : "RequestInput";
@@ -62,7 +70,7 @@ export function buildDynamicRunnableAgentPy(context) {
   return `from __future__ import annotations
 
 import os
-${jsonStdlibImport}from pathlib import Path
+${jsonStdlibImport}${timeStdlibImport}from pathlib import Path
 from typing import Any
 
 import yaml
@@ -74,20 +82,31 @@ ${remoteImport}${mcpToolsetImport}from google.adk.events import ${eventImport}
 from google.adk.workflow import FunctionNode, START, Workflow, node
 ${artifactGenaiImport}
 
-${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)), modules })}
+${buildRuntimeHelperSection({ componentContractLiteral: toPythonLiteral(componentContracts(context)), assets })}
+${buildAsyncResumeWorkflowSupport(context)}
 
-${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}${dynamicHelpers()}
+${funcBlocks.join("\n\n")}${funcBlocks.length ? "\n\n\n" : ""}
 
 ${nodeBlocks.join("\n\n")}
-${loopControlBlocks.length ? `\n${loopControlBlocks.join("\n\n")}\n` : ""}
 ${dynamicWorkflow}
 
-root_agent = Workflow(
+root_agent = ${asyncResumeRootClass(context)}(
     name=${toPyStr(packageName)},
     description=${toPyStr(description)},
     edges=[(START, dynamic_workflow)],
 )
 `;
+}
+
+function assertDynamicLoopsHaveApprovedBounds({ graph }) {
+  const loopEdges = (graph.edges ?? []).filter(
+    (edge) => edge?.control?.kind === "loop_back" || edge?.control?.kind === "loop_exit"
+  );
+  const loopRegions = (graph.regions ?? []).filter((region) => region?.kind === "loop");
+  if (!loopEdges.length && !loopRegions.length) return;
+  throw new Error(
+    "dynamic runnable mode cannot lower loops: Target Graph IR has no approved loop bound or exhaustion contract fields."
+  );
 }
 
 function emitDynamicWorkflow(plan) {
@@ -110,39 +129,7 @@ function renderStep(step, indent) {
     return renderRunStep(step, indent, null);
   }
   if (step.kind === "join") return renderJoinStep(step, indent, null);
-  const body = step.bodySteps.map((bodyStep) => {
-    if (bodyStep.kind === "join") return renderJoinStep(bodyStep, `${indent}    `, "iterationResults");
-    return renderRunStep(bodyStep, `${indent}    `, step);
-  });
-  const controlInput = renderInputExpression(step.controlInputRefs, "iterationResults");
-  const controlRunId = loopRunId(step, step.controlNodeId);
-  return [
-    `${indent}_loop_iteration = 0`,
-    `${indent}_loop_feedback = None`,
-    `${indent}while True:`,
-    `${indent}    iterationResults = {}`,
-    `${indent}    iterationBarriers = {}`,
-    ...body,
-    `${indent}    iterationResults[${toPyStr(step.controlNodeId)}] = await ctx.run_node(`,
-    `${indent}        ${step.controlSymbol},`,
-    `${indent}        ${controlInput},`,
-    `${indent}        run_id=${controlRunId},`,
-    `${indent}    )`,
-    `${indent}    _loop_decision = iterationResults[${toPyStr(step.controlNodeId)}]`,
-    `${indent}    ctx.state[${toPyStr(`af_dynamic_loop:${step.controlNodeId}`)}] = {`,
-    `${indent}        "iteration": _loop_iteration,`,
-    `${indent}        "decision": _loop_decision,`,
-    `${indent}    }`,
-    `${indent}    if not _dynamic_should_continue(_loop_decision, ${inlineList(step.backAliases)}, ${inlineList(step.exitAliases)}, ${toPyStr(step.defaultAction)}):`,
-    `${indent}        results[${toPyStr(step.controlNodeId)}] = _loop_decision`,
-    `${indent}        break`,
-    `${indent}    _loop_iteration += 1`,
-    `${indent}    if _loop_iteration >= _MAX_DYNAMIC_LOOP_ITERATIONS:`,
-    `${indent}        ctx.state[${toPyStr(`af_dynamic_loop:${step.controlNodeId}:max_iterations_reached`)}] = True`,
-    `${indent}        results[${toPyStr(step.controlNodeId)}] = _loop_decision`,
-    `${indent}        break`,
-    `${indent}    _loop_feedback = _loop_decision`
-  ].join("\n");
+  throw new Error(`dynamic runnable emitter cannot render unsupported step kind ${step.kind}.`);
 }
 
 function renderRunStep(step, indent, loopStep) {
@@ -195,35 +182,4 @@ function renderResultRef(ref, loopResultsName) {
 
 function loopRunId(loopStep, nodeId) {
   return `f${toPyStr(`run-loop-${dynamicRunIdComponent(loopStep.regionId)}-iteration-{_loop_iteration}-${dynamicRunIdComponent(nodeId)}`)}`;
-}
-
-function dynamicHelpers() {
-  return `_MAX_DYNAMIC_LOOP_ITERATIONS = ${MAX_DYNAMIC_LOOP_ITERATIONS}
-
-
-def _dynamic_decision_text(value: Any) -> str:
-    if isinstance(value, dict):
-        for key in ("decision", "response", "choice", "value", "status"):
-            item = value.get(key)
-            if item is not None:
-                return str(item).strip().lower()
-    return str(value or "").strip().lower()
-
-
-def _dynamic_matches(value: Any, aliases: list[str]) -> bool:
-    text = _dynamic_decision_text(value)
-    return any(alias and alias == text for alias in aliases)
-
-
-def _dynamic_should_continue(value: Any, back_aliases: list[str], exit_aliases: list[str], default_action: str) -> bool:
-    if _dynamic_matches(value, exit_aliases):
-        return False
-    if _dynamic_matches(value, back_aliases):
-        return True
-    return default_action == "loop_back"
-`;
-}
-
-function inlineList(values) {
-  return `[${values.map((value) => toPyStr(value)).join(", ")}]`;
 }

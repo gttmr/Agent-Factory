@@ -51,7 +51,7 @@
   --tint-sky: #dcecfa;
   --tint-yellow: #fef7d6;
 
-  /* ---- category colors — Process Flow, Module Review, Reuse, Domain Map.
+  /* ---- category colors — Graph IR, Asset Review, Reuse, Domain Map.
      Always add base + soft + line together for a new category.
      agent moved off purple (#5b46c2) to magenta to stay distinct from
      chrome primary. ---- */
@@ -61,12 +61,14 @@
   --cat-workflow: #b35900;
   --cat-workflow-soft: #fbecd5;
   --cat-workflow-line: #efc785;
-  --cat-adapter: #0c6b58;
-  --cat-adapter-soft: #d9ecdf;
-  --cat-adapter-line: #a9d6bc;
-  --cat-remote: #b42318;
-  --cat-remote-soft: #fde2dd;
-  --cat-remote-line: #f0aaa4;
+  --cat-tool: #0c6b58;
+  --cat-tool-soft: #d9ecdf;
+  --cat-tool-line: #a9d6bc;
+
+  /* Protocol accents are intentionally separate from asset categories. */
+  --protocol-a2a: #b42318;
+  --protocol-a2a-soft: #fde2dd;
+  --protocol-a2a-line: #f0aaa4;
 
   --cat-input: #2858a5;
   --cat-input-soft: #dee9f7;

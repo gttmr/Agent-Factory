@@ -39,7 +39,7 @@ export function RuntimeContractSidebar({ contracts, selectedContractId, onSelect
   if (!rows.length) {
     return (
       <p className="af-design-empty">
-        Runtime 계약 후보가 없습니다. 분석에 callback/legacy/async resume 경계가 없으면 비어있을 수 있습니다.
+        Runtime 계약 후보가 없습니다. 분석에 callback 또는 async resume 경계가 없으면 비어있을 수 있습니다.
       </p>
     );
   }
@@ -58,7 +58,7 @@ export function RuntimeContractSidebar({ contracts, selectedContractId, onSelect
               </span>
               <strong>{contract.title}</strong>
               <small className="af-runtime-item-meta">
-                {contract.module_id ? `module: ${contract.module_id}` : "module: —"}
+                {contract.asset_id ? `asset: ${contract.asset_id}` : "asset: —"}
               </small>
               {reviewable ? (
                 <span className={`af-runtime-readiness${issues.length === 0 ? " af-runtime-readiness-ready" : " af-runtime-readiness-pending"}`}>

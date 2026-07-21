@@ -1,37 +1,25 @@
 import { useMemo } from "react";
+import { validateTargetAnalysisResult } from "../analyzer/targetContract";
 import type { AnalysisResult, GraphIR } from "../analyzer/types";
-import { mergeGraphIRValidation, normalizeGraphIRForRuntime, validateGraphIRSoft } from "../analyzer/graphMigration";
 
 export interface GraphIRDerivation {
   graphIR: GraphIR | null;
   errorCount: number;
   warningCount: number;
-  normalizationError?: string;
+  validationError?: string;
 }
 
 export function deriveGraphIRForAnalysis(analysis: AnalysisResult | null | undefined): GraphIRDerivation {
-  if (!analysis?.processFlow) {
-    return { graphIR: null, errorCount: 0, warningCount: 0 };
+  if (!analysis) return { graphIR: null, errorCount: 0, warningCount: 0 };
+
+  const errors = validateTargetAnalysisResult(analysis);
+  if (errors.length > 0) {
+    const message = `Graph IR contract validation failed: ${errors.join(" ")}`;
+    console.warn("[useGraphIR] validation failed:", message);
+    return { graphIR: null, errorCount: 1, warningCount: 0, validationError: message };
   }
-  try {
-    const reqId = analysis.normalizedRequirement?.id ?? "req-001";
-    const migrated = normalizeGraphIRForRuntime(analysis.processFlow, reqId) as GraphIR;
-    const soft = validateGraphIRSoft(migrated);
-    const validation = mergeGraphIRValidation(migrated.validation, soft);
-    return {
-      graphIR: { ...migrated, validation },
-      errorCount: validation.errors?.length ?? 0,
-      warningCount: validation.warnings?.length ?? 0
-    };
-  } catch (error) {
-    console.warn("[useGraphIR] migration failed:", error);
-    return {
-      graphIR: null,
-      errorCount: 1,
-      warningCount: 0,
-      normalizationError: error instanceof Error ? error.message : "Graph IR normalization failed."
-    };
-  }
+
+  return { graphIR: analysis.graph, errorCount: 0, warningCount: 0 };
 }
 
 export function useGraphIR(analysis: AnalysisResult | null | undefined): GraphIRDerivation {

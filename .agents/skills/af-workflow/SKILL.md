@@ -196,7 +196,7 @@ context compaction 이후 이전 Skill 내용이 남아 있다고 가정하지 �
 
 | 조건 | 읽을 Reference | 결과 |
 | --- | --- | --- |
-| 모든 routing | [Source of Truth](../_shared/source-of-truth.md) | Target/Current/Compatibility/Blocker 구분 |
+| 모든 routing | [Source of Truth](../_shared/source-of-truth.md) | Target/Current/Blocker 구분 |
 | 모든 lifecycle | [Lifecycle Invariants](../_shared/lifecycle-invariants.md) | stage 순서와 approval 불변 |
 | Stage Runner context | [Artifact Root and Stage Runner](../_shared/artifact-root-and-stage-runner.md) | run/root/mode와 proposal 계약 |
 | open unknown/gate | [Missing Information](../_shared/missing-information.md) | soft/hard gate와 stop 판정 |
@@ -272,7 +272,7 @@ artifact 또는 runtime success를 이 routing check로 주장하지 않는다.
 
 - `af-discover-assets`: raw requirement 또는 candidate discovery가 필요함
 - `af-compose-solution`: reviewed candidates가 있고 execution design이 필요함
-- `af-scaffold-runtime`: approved design/scaffold plan이 있고 code handoff가 필요함
+- `af-scaffold-runtime`: approved design과 Design approval gate가 있고 Workbench artifact-sync로 plan을 파생하거나, Standalone용 approved scaffold plan이 있으며 code handoff가 필요함
 - `af-verify-runtime`: 검증 대상과 claim이 구체적임
 
 handoff에는 repository/artifact/run paths, mode, current evidence, approvals, Missing Information, user goal, expected output을 포함한다.

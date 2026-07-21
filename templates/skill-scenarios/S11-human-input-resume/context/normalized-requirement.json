@@ -1,0 +1,46 @@
+{
+  "id": "req-s11-human-input-resume",
+  "title": "Synthetic human approval and resume prototype",
+  "raw_text": "Build a local runnable prototype that pauses before one synthetic state change, accepts an API response for the same invocation, and prevents duplicate application after resume or restart.",
+  "domain": "synthetic-change-control",
+  "requester": {
+    "team": "scenario-fixture-team",
+    "role": "reviewer"
+  },
+  "business_goal": "Verify approved Human Input pause, API resume, response mapping, and idempotent synthetic change behavior.",
+  "current_process": [
+    "Prepare a synthetic change request",
+    "Pause and request approve or reject",
+    "Resume the same invocation with the correlated response",
+    "Apply the synthetic change at most once when approved",
+    "Return the completed or canceled outcome"
+  ],
+  "inputs": [
+    {
+      "name": "synthetic_change_request",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "change_outcome",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "systems": [
+    {
+      "name": "synthetic_local_state_store",
+      "access": "write"
+    }
+  ],
+  "risk_signals": [
+    "transaction_write",
+    "human_approval_required",
+    "audit_required"
+  ],
+  "missing_information": [],
+  "contradictions": [],
+  "status": "approved"
+}

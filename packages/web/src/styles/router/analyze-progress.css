@@ -197,12 +197,12 @@
 }
 
 .af-analyze-event-completed {
-  background: var(--cat-adapter-soft, var(--cat-adapter-soft));
+  background: var(--success-soft);
 }
 
 .af-analyze-event-failed,
 .af-analyze-event-timeout {
-  background: var(--cat-remote-soft, var(--cat-remote-soft));
+  background: var(--danger-soft);
 }
 
 .af-analyze-event-meta {

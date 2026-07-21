@@ -46,6 +46,7 @@ export interface MockSpecGuardrails {
 
 export interface MockSpecSource {
   prefill_from_catalog?: boolean;
+  catalog_asset_id?: string | null;
   catalog_entry_name?: string | null;
   catalog_file?: string | null;
 }
@@ -61,12 +62,20 @@ export interface MockSpec {
 }
 
 export interface CatalogPrefillEntry {
+  asset_id: string;
   name: string;
-  adapter_kind: string;
-  owner_domain: string;
-  access_protocol: string;
+  asset_type: "tool";
+  capability_tags: string[];
+  owner: string;
+  binding: {
+    kind: "mcp";
+    server_ref: string;
+    tool_name: string;
+  };
+  connection: {
+    transport: "stdio" | "http";
+  };
   contract_status: string;
-  component_source: string;
   inputs: Array<Record<string, unknown>>;
   outputs: Array<Record<string, unknown>>;
   risk_signals: string[];

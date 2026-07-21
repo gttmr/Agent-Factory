@@ -1,0 +1,50 @@
+[
+  {
+    "asset_id": "workflow-s10-event-processing",
+    "source_requirement_id": "req-s10-event-processing",
+    "catalog_entry_id": null,
+    "name": "Synthetic Event Processing Workflow",
+    "asset_type": "workflow",
+    "domain_scope": "domain_neutral",
+    "business_domains": [],
+    "owner": "Scenario Fixture Team",
+    "reuse_status": "project_only",
+    "capability_tags": [
+      "event-normalization",
+      "delivery-idempotency",
+      "failure-handoff"
+    ],
+    "binding": null,
+    "connection": null,
+    "workflow_profile": {
+      "representation": "graph",
+      "coordination": "explicit",
+      "template_ref": null
+    },
+    "exposure": null,
+    "confidence": 1,
+    "rationale": "The Workflow owns validation, normalization, processing, and reviewed failure routing; the external event source remains outside the Asset taxonomy and Graph Node set.",
+    "inputs": [
+      {
+        "name": "synthetic_delivery",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "outputs": [
+      {
+        "name": "processing_outcome",
+        "type": "object",
+        "required": true
+      }
+    ],
+    "risk_level": "medium",
+    "risk_signals": [
+      "external_message",
+      "audit_required"
+    ],
+    "status": "approved",
+    "missing_information": [],
+    "audit_required": true
+  }
+]

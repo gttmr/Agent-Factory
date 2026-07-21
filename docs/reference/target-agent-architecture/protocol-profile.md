@@ -1,44 +1,98 @@
-> **Target Contract** — 자산 정의는 [Taxonomy](../../workbench/taxonomy.md), Workflow 실행 표현은 [Graph IR](../../workbench/graph-ir.md)가 기준이다. 이 문서는 Function·MCP·A2A의 연결 위치를 설명하며 Current Implementation의 `legacy` 직렬화를 Target 값으로 선언하지 않는다.
+# A2A 프로토콜 프로파일
 
-# 프로토콜 프로파일
+> 자산 정의는 [Taxonomy](../../workbench/taxonomy.md), Workflow 실행 표현은 [Graph IR](../../workbench/graph-ir.md)가 기준이다. 이 문서는 Agent와 A2A Binding·Exposure의 Current Implementation 연결만 설명한다.
 
-## 프로파일 원칙
+## 계약 경계
 
-프로토콜과 실행 경계는 자산 유형, Binding, Transport를 분리해 기록한다. Agent/Workflow/Tool의 책임은 어디서 실행되는지가 아니라 [Taxonomy](../../workbench/taxonomy.md)의 판단 기준으로 정하고, 연결 위치는 아래 프로파일로 보완한다.
+A2A는 Agent가 다른 Agent를 호출하거나 자신의 Agent interface를 노출하는 프로토콜 경계다. A2A 자체는 자산 category가 아니며 Agent·Workflow·Tool 외의 별도 Catalog 자산을 만들지 않는다.
 
-| 사례 | 자산 또는 Graph 위치 | Binding·프로토콜 위치 | 대표 Transport | 경계 해석 |
-| --- | --- | --- | --- | --- |
-| Workflow 내부 결정적 함수 | Function Node | 부모 Workflow 내부 구현 | `in_process` | Workflow 안의 로컬 실행 단계이며 독립 Catalog 자산이 아니다. |
-| Function Tool | Tool 자산 | `function` Binding | `in_process` | 구조화된 Tool 계약을 로컬 함수에 연결한다. |
-| 로컬 MCP Tool | Tool 자산 | `mcp` Binding | `stdio` | 로컬 MCP server process를 통해 Tool을 소비한다. |
-| 원격 MCP Tool | Tool 자산 | `mcp` Binding | `http` | 원격 MCP server를 통해 Tool을 소비한다. |
-| 원격 A2A Agent | Agent 자산 | `a2a` Binding 또는 Exposure | 원격 HTTP 경계 | Agent Card로 발견되는 독립 Agent 경계를 호출하거나 노출한다. |
-
-Function Node와 Function Tool은 같은 개념이 아니다. Function Node는 한 Workflow의 내부 실행 단계이고, Function Tool은 Tool 자산에 Function Binding을 적용한 경우다. 자세한 구분은 [Graph IR의 Function Node, Tool Node, Function Tool](../../workbench/graph-ir.md#function-node-tool-node-function-tool-구분)을 따른다.
-
-## Binding과 Transport 분리
-
-| 축 | 답하는 질문 | 이 프로파일의 예 |
+| 방향 | Agent 필드 | 의미 |
 | --- | --- | --- |
-| Binding | 자산 계약을 어떤 방식으로 연결하는가? | Function, MCP, A2A |
-| Transport | 호출이 실제로 어디에서 실행되거나 어떤 경로로 이동하는가? | in-process, stdio, HTTP |
+| 원격 Agent 소비 | `binding: { kind: "a2a", contract_ref }` | 이 Agent 자산을 Agent Card로 발견되는 원격 Agent에 연결한다. |
+| Agent 제공자 노출 | `exposure: { protocol: "a2a", contract_ref }` | 이 Agent 자산을 A2A provider로 노출한다. |
 
-Binding이 같아도 Transport는 달라질 수 있다. MCP Tool은 로컬 `stdio` 또는 원격 `http`로 연결할 수 있으므로 “Local Tool”과 “MCP Tool”을 반대 유형으로 두지 않는다. 반대로 `http`만으로 Tool인지 Agent인지 결정할 수 없으며, 자산 책임과 프로토콜 계약을 함께 확인해야 한다.
+`contract_ref`는 `a2aContracts[].contract_id`를 가리키며 해당 계약의 `agent_ref`는 같은 Agent 자산을 가리켜야 한다. Agent 외 자산에는 A2A Exposure를 허용하지 않고 Workflow에는 Binding이나 Exposure를 두지 않는다.
 
-Binding과 Transport의 Target 값과 Backend/Dependency 분리 원칙은 [Taxonomy의 Binding, Transport, Backend 분리](../../workbench/taxonomy.md#binding-transport-backend-분리)가 소유한다. 이 문서의 표는 대표 조합을 설명할 뿐 별도 enum을 정의하지 않는다.
+```json
+{
+  "asset_id": "agent.remote-reviewer",
+  "asset_type": "agent",
+  "binding": {
+    "kind": "a2a",
+    "contract_ref": "a2a-001"
+  },
+  "connection": {
+    "transport": "http"
+  },
+  "workflow_profile": null,
+  "exposure": null
+}
+```
 
-## Local ADK 실행 경계
+Provider Agent는 `binding`이 `null`이어도 A2A `exposure`를 가질 수 있다. 한 Agent가 소비와 노출을 모두 담당하면 두 필드가 같은 검토 계약을 참조할 수 있지만, 호출 방향과 노출 방향의 의미는 섞지 않는다.
 
-Local ADK 경계는 검토·승인된 artifact를 같은 runtime 안에서 실행하고 smoke 검증하는 경계다. Workflow 내부 Function Node와 Function Tool은 `in_process`, 로컬 MCP server는 `stdio`로 연결할 수 있다. 이 실행 위치만으로 새 자산 유형이나 원격 계약이 생기지 않는다.
+## Graph 위치
 
-여러 단계, 분기, 병렬 실행, Join, Human Input, callback wait가 있다는 사실도 그 자체로 A2A 경계를 만들지 않는다. 이 동작은 [Graph IR](../../workbench/graph-ir.md)의 Workflow 실행 의미로 먼저 표현한다.
+A2A Agent는 Graph에서 `node_kind: agent`와 `agent_ref`로 표시한다. Node가 참조한 Agent 자산의 `binding.kind: a2a` 또는 `exposure.protocol: a2a`가 A2A 경계 여부를 결정한다.
 
-## 원격 A2A 경계
+- A2A 전용 Node kind를 추가하지 않는다.
+- Edge `control.kind`나 `channel`에 A2A 값을 넣지 않는다.
+- Agent Node의 자산 badge와 A2A protocol badge를 분리해 표시한다.
+- 여러 단계·분기·병렬·반복이 있다는 이유만으로 Workflow를 A2A Agent로 취급하지 않는다.
 
-2026-07-18에 확인한 ADK 공식 문서는 A2A 지원을 **Experimental**로 표시한다. 기존 ADK Agent를 A2A server로 노출할 수 있고, 소비 측에서는 `RemoteA2aAgent`가 Agent Card URL을 사용해 원격 Agent의 proxy 역할을 한다. 확인한 공식 문서 범위에서는 Workflow 자체의 A2A 노출을 직접 일반화할 근거를 찾지 못했으므로 Agent 경계를 넘어 추론하지 않는다.
+자세한 Node와 경계 표현은 [Graph IR의 A2A 경계](../../workbench/graph-ir.md#a2a-경계)를 따른다.
 
-원격 A2A 경계는 로컬 ADK 구성보다 독립 소유·발견·lifecycle·auth·timeout·audit 계약이 필요한 Agent 상호운용 경계다. 따라서 A2A를 MCP Tool 호출과 혼합하지 않고, Graph에서는 Agent Node와 protocol boundary로 표현한다. 공식 근거와 확인 날짜는 [Public Source Links](source-links.md)에 정리한다.
+## A2A 계약
 
-## Current Implementation(`legacy`)
+`A2AContract`는 다음 원격 경계 정보를 소유한다.
 
-현재 구현은 `module_category: remote_a2a`를 최상위 `legacy` category로 직렬화한다. 이 값은 현행 schema·analyzer·validator·UI 계약을 읽을 때 보존하지만, Target Contract에서는 Agent 자산과 A2A Binding/Exposure 또는 protocol boundary로 해석한다. 구체적인 영향 영역과 migration gap은 `docs/migration/taxonomy-vnext-status.md`가 기록한다.
+- Agent Card discovery와 `agent_card_url`
+- supported interface, protocol version, input/output mode
+- security scheme과 requirement
+- message part와 role
+- task lifecycle, terminal state, input/auth-required follow-up
+- streaming, operation, HTTP path
+- timeout, auth, retry handoff, fallback handoff, cancellation
+- audit와 data policy
+
+Design의 A2A 계약 검토와 validator는 Binding·Exposure의 `contract_ref`와 `A2AContract.agent_ref`를 함께 확인한다. 승인된 계약과 유효한 Agent Card URL이 없는 원격 Agent는 runnable lowering 대상이 아니다.
+
+## 원격 Agent 소비
+
+generator는 `asset_type: agent`와 `binding.kind: a2a`를 모두 만족하는 자산만 원격 A2A 소비 대상으로 수집한다. 승인된 A2A 계약의 `agent_card.agent_card_url`과 runtime policy를 읽어 실제 ADK `RemoteA2aAgent`를 생성한다.
+
+```python
+remote_agent = RemoteA2aAgent(
+    name="remote_agent",
+    description="Remote review Agent",
+    agent_card="https://example.invalid/.well-known/agent-card.json",
+    use_legacy=False,
+)
+```
+
+`use_legacy=False`는 현재 generator가 사용하는 upstream `RemoteA2aAgent` API 인자다. 이름에 포함된 문자열은 제거된 artifact 입력이나 projection을 다시 지원한다는 뜻이 아니다. 계약에 timeout이나 auth policy가 있으면 `timeout`과 `A2aRemoteAgentConfig` request interceptor를 추가한다.
+
+## Agent 제공자 노출
+
+생성된 A2A launcher는 ADK `get_fast_api_app(..., a2a=True, ...)`로 검토된 Agent app을 provider로 노출한다. Workbench runtime은 provider process와 Agent Card readiness를 관리하고, 명시적인 `message/send` probe로 semantic readiness를 확인한다.
+
+Agent Card, RPC URL, task ID는 runtime 경계의 값이다. provider 노출이 Workflow 자산의 A2A Exposure를 만들거나 별도 자산 category를 추가하지 않는다.
+
+## 지원하지 않는 역사 입력
+
+legacy `module_category: remote_a2a`와 별도 원격 A2A 자산 root는 strict v2 입력이 아니다. 현재 reader와 generator는 이를 Agent + A2A Binding·Exposure로 projection하지 않으며, 현재 Analyze·Design 경로에서 Target v2 artifact를 다시 생성해야 한다.
+
+## Current source locators
+
+| 행동 | Path | Stable anchor |
+| --- | --- | --- |
+| Agent Binding·Exposure shape | [types.ts](../../../packages/web/src/analyzer/types.ts) | `AssetBinding`, `AssetExposure`, `AssetCandidate`, `A2AContract` |
+| Agent 전용 A2A validation | [targetContract.ts](../../../packages/web/src/analyzer/targetContract.ts) | `validateBindingAndConnection`, `validateExposure`, `validateA2AReferences` |
+| A2A 계약 생성 | [a2aContracts.ts](../../../packages/web/src/analyzer/a2aContracts.ts) | `createA2AContractForCandidate`, `buildContract` |
+| Graph A2A 경계 판정 | [graphElementEditorModel.ts](../../../packages/web/src/components/graphElementEditorModel.ts) | `isA2AProtocolBoundary` |
+| 승인·계약 drift generation gate | [context.mjs](../../../scripts/adk-source/context.mjs) | `validateRunInputs` |
+| 원격 Agent runnable 생성 | [remote-a2a.mjs](../../../scripts/adk-source/remote-a2a.mjs) | `usesRemoteA2a`, `emitRemoteA2aNode`, `assertRemoteA2aSupported` |
+| A2A provider launcher | [a2a-launcher.mjs](../../../scripts/adk-source/support/a2a-launcher.mjs) | `buildA2aLauncherPy` |
+| generator 행동 검증 | [target-behavior-matrix.test.mjs](../../../scripts/adk-source-test/target-behavior-matrix.test.mjs) | `Target A2A Agent binding emits the actual ADK RemoteA2aAgent runtime` |
+
+외부 ADK 근거와 확인 날짜는 [Public Source Links](source-links.md)에 기록한다. 저장소 행동은 위 current source locator를 최종 권위로 사용한다.

@@ -1,6 +1,6 @@
 # STATUS — Agent Factory Workbench
 
-Last updated: 2026-07-18 (KST).
+Last updated: 2026-07-19 (KST).
 
 This file is a branch-neutral status entrypoint. It is not a live cleanliness or PR tracker. For the current checkout, always run:
 
@@ -10,13 +10,14 @@ git rev-parse --abbrev-ref HEAD
 git rev-parse --short HEAD
 ```
 
-## Documentation vNext Status
+## Target Product Migration Status
 
-- The documentation vNext rewrite is complete at the Target Contract layer. The canonical Taxonomy, Graph IR, and Operating Model are established, and the source-backed Handbook has been introduced.
+- The canonical Taxonomy, Graph IR, Operating Model, and source-backed Handbook remain the Target Contract and behavior-navigation sources.
 - The Handbook source survey is based on commit `7deea452e73f63828fc14402b7e16dcf40e753ac`, checked on 2026-07-18. Handbook locators must still be re-verified against the current checkout before use.
-- Code migration was not performed. Code, schemas, validators, Catalog files, and `.agents/skills` continue to use `legacy` taxonomy identifiers, including `module_category`, `adapter_kind`, `agent_kind`, `remote_a2a`, and `selected_by_llm`.
-- The documentation Target Contract must not be described as current code support. The gap and affected areas are tracked in [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md).
-- Any code alignment is a separate follow-up stage. This status file does not design or plan that work.
+- Product code uses strict `contract_version: "2.0"` analysis output, Target asset/binding/profile/reuse fields, graph asset refs, and Invocation Control. Legacy-only roots and fields are unsupported.
+- Reuse Hub and publish UX use exactly Agent, Workflow, and Tool. Catalog storage is `agents.yaml`, `workflows.yaml`, and `tools.yaml`.
+- The generator consumes Target candidates and canonical Graph IR directly; no legacy selector projection is retained.
+- The strict cutover result and intentionally unsupported old inputs are recorded in [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md) and [docs/migration/skill-vnext-status.md](docs/migration/skill-vnext-status.md).
 
 ## Source Of Truth
 
@@ -35,7 +36,7 @@ git rev-parse --short HEAD
 
 - Agent Factory remains a local-first, artifact-root-first workbench for reviewed planning artifacts and review-gated Runtime Handoff.
 - Raw requirements do not directly generate code; Runtime Handoff consumes approved artifacts.
-- Current `legacy` `output_mode` values `smoke` and `runnable` support local review and verification only. They are not production business logic or deployment readiness.
+- Current `output_mode` values `smoke` and `runnable` support local review and verification only. They are not production business logic or deployment readiness.
 - Catalog publication follows the approval-gated operating path documented by the Operating Model; ad hoc application paths must not edit `catalog/*.yaml`.
 
 ## Local Safety

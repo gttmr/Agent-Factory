@@ -30,11 +30,11 @@ Lower an approved Workflow into a static Graph or a dynamic runtime-selected sha
 
 ## Agent Factory representation
 
-Use canonical Graph IR for Agent, Tool, Function, Human Input, Subworkflow, Join, Input, and Output nodes. Represent route and loop through nodes/edges/containers and execution semantics. Keep Invocation Control Workflow or Agent.
+Use canonical Graph IR for Agent, Tool, Function, Human Input, Subworkflow, Join, Input, and Output nodes. Represent route and loop through `control`, `channel`, and `regions`. Keep Invocation Control Workflow or Agent.
 
 ## Compose Artifact
 
-Record standalone-versus-Workflow decision; representation and coordination; root Workflow; nodes, edges, containers, and asset references; route/default rules; fan-in; loop region, bound, back/exit conditions; channel schemas; Human Input/resume; failure paths; and validation results.
+Record standalone-versus-Workflow decision; representation and coordination; root Workflow; nodes, edges, typed asset references, control, channel, and regions; route/default rules; fan-in; loop bound and exit conditions; channel schemas; Human Input/resume; failure paths; and validation results.
 
 ## Scaffold Output
 
@@ -63,7 +63,7 @@ Context.run_node(node, node_input=None, *, use_as_output=False, run_id=None,
 
 Await `ctx.run_node(...)` directly. Installed runtime enforces `rerun_on_resume=True` on the calling dynamic node.
 
-Preserve valid lowering knowledge from the current generator: static routes use reviewed route dictionaries; explicit or synthesized `JoinNode` handles fan-in; static runnable graphs must be reachable and acyclic; loop/back-edge shapes route to dynamic lowering. Dynamic selection is signaled by an approved dynamic Workflow, loop-control node, loop back/exit edge, or dynamic/loop container. A loop region needs one loop-control node, a lowerable body, back and exit edges, decision metadata, and a bounded counter. Reverify current generator source before changing these limits.
+Preserve valid lowering knowledge from the current generator: static routes use reviewed route dictionaries; explicit or synthesized `JoinNode` handles fan-in; static runnable graphs must be reachable and acyclic; loop/back-edge shapes route to dynamic lowering. Dynamic selection is signaled by an approved dynamic Workflow or dynamic/loop region. A loop region needs a lowerable body, explicit control with back and exit decisions, and a bounded counter. Reverify current generator source before changing these limits.
 
 ## Verification Scenarios
 

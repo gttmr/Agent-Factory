@@ -1,692 +1,153 @@
-import {
-  RUNTIME_CONTRACT_KINDS,
-  RUNTIME_CONTRACT_STATUSES,
-  type AnalysisResult,
-  type ModuleCandidate,
-  type NormalizedRequirement,
-  type RuntimeContract,
-  type RuntimeContractKind,
-  type RuntimeContractStatus
-} from "./types";
+import type { AnalysisResult, AssetCandidate, NormalizedRequirement, RuntimeContract, RuntimeContractKind } from "./types";
 
-interface RuntimeContractBuildInput {
+export interface BuildRuntimeContractsInput {
   normalizedRequirement: NormalizedRequirement;
-  moduleCandidates: ModuleCandidate[];
+  assetCandidates: AssetCandidate[];
   existingContracts?: RuntimeContract[];
-  /**
-   * When true, catalog-bound candidates without any existing contract get a
-   * full default set seeded so reviewers see something concrete to edit
-   * instead of an empty page. Used by analyzer-result hydration and saved-
-   * analysis backfill — NOT by Module Review save, otherwise clearing a
-   * contract via "기본값으로 되돌리기" would silently regenerate it.
-   */
-  autofillCatalogDefaults?: boolean;
 }
 
+export interface RequiredRuntimeContractKey {
+  asset_id: string;
+  contract_kind: RuntimeContractKind;
+}
+
+/** Strict reads do not synthesize persisted contracts. */
 export function ensureRuntimeContracts(result: AnalysisResult): AnalysisResult {
-  if (!result || typeof result !== "object") return result;
-  const hasRuntimeContracts = Array.isArray((result as { runtimeContracts?: unknown }).runtimeContracts);
-  return {
-    ...result,
-    runtimeContracts: buildRuntimeContracts({
-      normalizedRequirement: result.normalizedRequirement,
-      moduleCandidates: result.moduleCandidates,
-      existingContracts: hasRuntimeContracts ? result.runtimeContracts : [],
-      autofillCatalogDefaults: !hasRuntimeContracts
-    })
-  };
+  return result;
 }
 
 export function buildRuntimeContracts({
   normalizedRequirement,
-  moduleCandidates,
-  existingContracts = [],
-  autofillCatalogDefaults = false
-}: RuntimeContractBuildInput): RuntimeContract[] {
-  const normalizedExistingContracts = existingContracts.flatMap(normalizeRuntimeContractInput);
-  const existingById = new Map(normalizedExistingContracts.map((contract) => [contract.contract_id, contract]));
-  const candidateById = new Map(moduleCandidates.map((candidate) => [candidate.id, candidate]));
-  const next: RuntimeContract[] = [];
-  const usedIds = new Set<string>();
-
-  const addContract = (base: RuntimeContract) => {
-    const previous = existingById.get(base.contract_id);
-    const merged = hydrateRuntimeContractFromCandidate(
-      previous ? mergeRuntimeContract(previous, base) : base,
-      candidateById.get(previous?.module_id ?? base.module_id ?? "")
-    );
-    usedIds.add(merged.contract_id);
-    next.push(merged);
-  };
-
-  for (const candidate of moduleCandidates) {
-    // Catalog-bound candidates use the catalog's own runtime defaults.
-    // The reviewer opts into per-analysis overrides via the Runtime 계약 screen
-    // ("수정 시작"), which writes contracts through the existingContracts pass below.
-    if (candidate.catalog_entry_id) continue;
-    if (!needsLegacyContract(candidate, normalizedRequirement)) continue;
-    addContract(buildLegacyAdapterContract(candidate, normalizedRequirement));
-
-    if (needsAdkCallbackContract(candidate, normalizedRequirement)) {
-      addContract(buildAdkCallbackContract(candidate, normalizedRequirement));
-    }
-
-    if (needsAsyncRuntimeSupport(candidate, normalizedRequirement)) {
-      addContract(buildContextManagerContract(candidate, normalizedRequirement));
-      addContract(buildCallbackBrokerContract(candidate, normalizedRequirement));
-      addContract(buildAsyncResumeContract(candidate, normalizedRequirement));
+  assetCandidates,
+  existingContracts = []
+}: BuildRuntimeContractsInput): RuntimeContract[] {
+  const existingByKey = new Map(existingContracts.map((contract) => [`${contract.asset_id ?? "global"}:${contract.contract_kind}`, contract]));
+  const generated: RuntimeContract[] = [];
+  for (const candidate of assetCandidates) {
+    for (const kind of runtimeKinds(candidate, normalizedRequirement)) {
+      const existing = existingByKey.get(`${candidate.asset_id}:${kind}`);
+      generated.push(existing ?? createRuntimeContract(candidate, kind));
     }
   }
-
-  if (autofillCatalogDefaults) {
-    const existingModuleIds = new Set(
-      normalizedExistingContracts.filter((contract) => contract.module_id).map((contract) => contract.module_id as string)
-    );
-    for (const candidate of moduleCandidates) {
-      if (!candidate.catalog_entry_id) continue;
-      if (existingModuleIds.has(candidate.id)) continue;
-      for (const contract of buildRuntimeContractsForCandidate(candidate, normalizedRequirement)) {
-        addContract(contract);
-      }
-    }
-  }
-
-  for (const existing of normalizedExistingContracts) {
-    if (!usedIds.has(existing.contract_id) && existing.contract_status !== "rejected") {
-      next.push(hydrateRuntimeContractFromCandidate(existing, candidateById.get(existing.module_id ?? "")));
-    }
-  }
-
-  return next;
+  return generated;
 }
 
-/**
- * Used when the reviewer explicitly opts a catalog-bound candidate into runtime
- * contract editing on the Runtime 계약 screen. Returns at least one contract so
- * the override is observable; if every category-gated heuristic says skip, an
- * ADK Callback baseline is emitted as the editable starting point.
- */
-function buildRuntimeContractsForCandidate(
-  candidate: ModuleCandidate,
-  requirement: NormalizedRequirement
-): RuntimeContract[] {
-  const contracts: RuntimeContract[] = [];
-  if (needsLegacyContract(candidate, requirement)) {
-    contracts.push(buildLegacyAdapterContract(candidate, requirement));
-  }
-  if (needsAdkCallbackContract(candidate, requirement)) {
-    contracts.push(buildAdkCallbackContract(candidate, requirement));
-  }
-  if (needsAsyncRuntimeSupport(candidate, requirement)) {
-    contracts.push(buildContextManagerContract(candidate, requirement));
-    contracts.push(buildCallbackBrokerContract(candidate, requirement));
-    contracts.push(buildAsyncResumeContract(candidate, requirement));
-  }
-  if (contracts.length === 0) {
-    contracts.push(buildAdkCallbackContract(candidate, requirement));
-  }
-  return contracts;
+export function requiredRuntimeContractKeys({
+  normalizedRequirement,
+  assetCandidates
+}: Pick<BuildRuntimeContractsInput, "normalizedRequirement" | "assetCandidates">): RequiredRuntimeContractKey[] {
+  return assetCandidates
+    .filter((candidate) => candidate.status === "approved")
+    .slice()
+    .sort((left, right) => left.asset_id < right.asset_id ? -1 : left.asset_id > right.asset_id ? 1 : 0)
+    .flatMap((candidate) => runtimeKinds(candidate, normalizedRequirement).map((contract_kind) => ({
+      asset_id: candidate.asset_id,
+      contract_kind
+    })));
 }
 
 export function runtimeContractReadinessIssues(contract: RuntimeContract): string[] {
-  const issues: string[] = [];
-  if (contract.contract_status !== "approved") {
-    issues.push("ADK Runtime Handoff 전에 contract_status가 approved여야 합니다");
-  }
-  for (const field of contract.required_review_fields) {
-    const value = readRuntimeContractField(contract, field);
-    if (value === null || value === undefined || value === "" || value === "needs_info") {
-      issues.push(`${field} 값이 아직 needs_info입니다`);
+  const issues = contract.required_review_fields.filter((path) => !reviewFieldResolved(contract, path));
+  if (contract.contract_status !== "approved") issues.push(`${contract.contract_id} contract_status가 approved가 아닙니다.`);
+  if (!contract.summary.trim()) issues.push(`${contract.contract_id} summary가 비어 있습니다.`);
+  if (contract.contract_kind === "async_resume") {
+    if (!contract.resume_policy) issues.push(`${contract.contract_id} resume_policy가 구조화되지 않았습니다.`);
+    else {
+      if (!contract.resume_policy.interrupt_id.trim()) issues.push(`${contract.contract_id} resume_policy.interrupt_id가 비어 있습니다.`);
+      if (!Number.isFinite(contract.resume_policy.timeout_seconds) || contract.resume_policy.timeout_seconds <= 0) {
+        issues.push(`${contract.contract_id} resume_policy.timeout_seconds는 양수여야 합니다.`);
+      }
+    }
+    if (contract.runtime_support.idempotency_required && !contract.side_effect_guard) {
+      issues.push(`${contract.contract_id} side_effect_guard가 구조화되지 않았습니다.`);
+    } else if (contract.side_effect_guard) {
+      if (!contract.side_effect_guard.tool_ref.trim()) issues.push(`${contract.contract_id} side_effect_guard.tool_ref가 비어 있습니다.`);
+      if (!contract.side_effect_guard.idempotency_key_input.trim()) {
+        issues.push(`${contract.contract_id} side_effect_guard.idempotency_key_input이 비어 있습니다.`);
+      }
     }
   }
-  if (contract.operation.callback_expected && !contract.runtime_support.callback_broker_required) {
-    issues.push("callback_expected에는 callback_broker_required가 필요합니다");
+  return [...new Set(issues)];
+}
+
+function reviewFieldResolved(contract: RuntimeContract, path: string): boolean {
+  let current: unknown = contract;
+  for (const segment of path.split(".")) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) return false;
+    current = (current as Record<string, unknown>)[segment];
   }
-  if (contract.operation.async_resume_required && !contract.runtime_support.context_manager_required) {
-    issues.push("async_resume_required에는 context_manager_required가 필요합니다");
+  if (typeof current === "string") return current.trim().length > 0 && current !== "needs_info";
+  if (Array.isArray(current)) return current.length > 0;
+  return current !== null && current !== undefined;
+}
+
+function runtimeKinds(candidate: AssetCandidate, requirement: NormalizedRequirement): RuntimeContractKind[] {
+  const kinds = new Set<RuntimeContractKind>();
+  if (candidate.binding?.kind === "mcp") kinds.add("mcp_connection");
+  if (
+    (candidate.connection?.transport === "http" && candidate.binding?.kind !== "a2a") ||
+    candidate.binding?.kind === "a2a" ||
+    candidate.exposure?.protocol === "a2a"
+  ) {
+    kinds.add("external_connection");
   }
-  if (contract.runtime_support.human_approval_required && !contract.runtime_support.idempotency_required) {
-    issues.push("승인 게이트가 있는 작업에는 idempotency가 필요합니다");
+  if (candidate.risk_signals.includes("human_approval_required") || requirement.risk_signals.includes("human_approval_required")) kinds.add("context_manager");
+  if (candidate.side_effect === "write" || candidate.side_effect === "read_write") kinds.add("adk_callback");
+  if (candidate.risk_signals.includes("external_message")) {
+    kinds.add("callback_broker");
+    kinds.add("async_resume");
   }
-  return issues;
+  return [...kinds];
 }
 
-function mergeRuntimeContract(previous: RuntimeContract, base: RuntimeContract): RuntimeContract {
+function createRuntimeContract(candidate: AssetCandidate, kind: RuntimeContractKind): RuntimeContract {
+  const callback = kind === "callback_broker" || kind === "async_resume";
+  const write = candidate.side_effect === "write" || candidate.side_effect === "read_write";
   return {
-    ...base,
-    contract_status: previous.contract_status ?? base.contract_status,
-    reviewer_notes: previous.reviewer_notes ?? base.reviewer_notes,
-    summary: previous.summary || base.summary,
-    required_review_fields: previous.required_review_fields?.length
-      ? normalizeRequiredReviewFields(previous.required_review_fields)
-      : base.required_review_fields,
-    runtime_support: { ...base.runtime_support, ...previous.runtime_support },
-    operation: { ...base.operation, ...previous.operation },
-    identifiers: previous.identifiers?.length ? previous.identifiers : base.identifiers,
-    policies: { ...base.policies, ...previous.policies },
-    graph_ir_annotations: { ...base.graph_ir_annotations, ...previous.graph_ir_annotations },
-    synthetic_examples: previous.synthetic_examples?.length ? previous.synthetic_examples : base.synthetic_examples,
-    developer_todos: previous.developer_todos?.length ? previous.developer_todos : base.developer_todos
-  };
-}
-
-function normalizeRuntimeContractInput(value: unknown): RuntimeContract[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const record = value as Partial<RuntimeContract>;
-  if (typeof record.contract_id !== "string" || !record.contract_id.trim()) return [];
-  const contractKind: RuntimeContractKind = RUNTIME_CONTRACT_KINDS.includes(record.contract_kind as RuntimeContractKind)
-    ? (record.contract_kind as RuntimeContractKind)
-    : "adk_callback";
-  const contractStatus: RuntimeContractStatus = RUNTIME_CONTRACT_STATUSES.includes(record.contract_status as RuntimeContractStatus)
-    ? (record.contract_status as RuntimeContractStatus)
-    : "needs_info";
-  return [
-    {
-      contract_id: record.contract_id,
-      contract_kind: contractKind,
-      module_id: typeof record.module_id === "string" ? record.module_id : null,
-      title: typeof record.title === "string" && record.title.trim() ? record.title : record.contract_id,
-      contract_status: contractStatus,
-      summary: typeof record.summary === "string" ? record.summary : "",
-      required_review_fields: Array.isArray(record.required_review_fields)
-        ? normalizeRequiredReviewFields(record.required_review_fields.filter((item): item is string => typeof item === "string"))
-        : [],
-      reviewer_notes: typeof record.reviewer_notes === "string" ? record.reviewer_notes : "",
-      runtime_support: normalizeRuntimeSupport(record.runtime_support),
-      operation: normalizeOperation(record.operation),
-      identifiers: Array.isArray(record.identifiers)
-        ? record.identifiers.filter((item): item is string => typeof item === "string")
-        : [],
-      policies: { ...defaultPolicies(), ...objectValue(record.policies) },
-      graph_ir_annotations: stringRecord(record.graph_ir_annotations),
-      synthetic_examples: Array.isArray(record.synthetic_examples)
-        ? record.synthetic_examples.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
-        : [],
-      developer_todos: Array.isArray(record.developer_todos)
-        ? record.developer_todos.filter((item): item is string => typeof item === "string")
-        : []
-    }
-  ];
-}
-
-function hydrateRuntimeContractFromCandidate(contract: RuntimeContract, candidate: ModuleCandidate | undefined): RuntimeContract {
-  if (!candidate) return contract;
-  const graphIrAnnotations = { ...contract.graph_ir_annotations };
-  copyCandidateString(graphIrAnnotations, "mock_server_id", candidate.mcp_server);
-  copyCandidateString(graphIrAnnotations, "tool_name", candidate.mcp_tool_name);
-  copyCandidateString(graphIrAnnotations, "input_schema", candidate.mcp_schema_ref);
-  return { ...contract, graph_ir_annotations: graphIrAnnotations };
-}
-
-function copyCandidateString(target: Record<string, string>, key: string, value: unknown): void {
-  if (target[key]) return;
-  if (typeof value === "string" && value.trim()) target[key] = value.trim();
-}
-
-function normalizeRequiredReviewFields(fields: string[]): string[] {
-  const normalized: string[] = [];
-  const seen = new Set<string>();
-  for (const field of fields) {
-    const path = runtimeContractReviewFieldPath(field);
-    if (!path) continue;
-    if (seen.has(path)) continue;
-    seen.add(path);
-    normalized.push(path);
-  }
-  return normalized;
-}
-
-function runtimeContractReviewFieldPath(field: string): string {
-  const trimmed = field.trim();
-  if (!trimmed) return trimmed;
-  if (trimmed.includes(".")) return trimmed;
-  if (isRuntimeSupportField(trimmed)) return `runtime_support.${trimmed}`;
-  if (isOperationField(trimmed)) return `operation.${trimmed}`;
-  const policyPath = policyFieldPath(trimmed);
-  if (policyPath) return policyPath;
-  if (isGraphIrAnnotationField(trimmed)) return `graph_ir_annotations.${trimmed}`;
-  return trimmed;
-}
-
-function isRuntimeSupportField(field: string): field is keyof RuntimeContract["runtime_support"] {
-  return (
-    field === "context_manager_required" ||
-    field === "callback_broker_required" ||
-    field === "human_approval_required" ||
-    field === "idempotency_required" ||
-    field === "audit_required" ||
-    field === "compensation_required"
-  );
-}
-
-function isOperationField(field: string): field is keyof RuntimeContract["operation"] {
-  return (
-    field === "operation_type" ||
-    field === "side_effect_level" ||
-    field === "callback_expected" ||
-    field === "async_resume_required"
-  );
-}
-
-function policyFieldPath(field: string): string | null {
-  if (field.endsWith("_policy") || field === "data_policy") return `policies.${field}`;
-  if (field === "auth") return "policies.auth_policy";
-  if (field === "timeout") return "policies.timeout_policy";
-  if (field === "retry") return "policies.retry_policy";
-  if (field === "fallback") return "policies.fallback_policy";
-  if (field === "masking") return "policies.masking_policy";
-  return null;
-}
-
-function isGraphIrAnnotationField(field: string): boolean {
-  return (
-    field === "mock_server_id" ||
-    field === "tool_name" ||
-    field === "input_schema" ||
-    field === "output_schema" ||
-    field === "sample_response_ref" ||
-    field === "mock_binding_status" ||
-    field.startsWith("human_input_contract") ||
-    field.includes("state_key")
-  );
-}
-
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
-
-function stringRecord(value: unknown): Record<string, string> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string")
-  );
-}
-
-function normalizeRuntimeSupport(value: unknown): RuntimeContract["runtime_support"] {
-  const record = objectValue(value);
-  return {
-    context_manager_required: record.context_manager_required === true,
-    callback_broker_required: record.callback_broker_required === true,
-    human_approval_required: record.human_approval_required === true,
-    idempotency_required: record.idempotency_required === true,
-    audit_required: record.audit_required === true,
-    compensation_required: record.compensation_required === true
-  };
-}
-
-function normalizeOperation(value: unknown): RuntimeContract["operation"] {
-  const record = objectValue(value);
-  return {
-    operation_type: isOperationType(record.operation_type) ? record.operation_type : "unknown",
-    side_effect_level: isSideEffectLevel(record.side_effect_level) ? record.side_effect_level : "unknown",
-    callback_expected: record.callback_expected === true,
-    async_resume_required: record.async_resume_required === true
-  };
-}
-
-function isOperationType(value: unknown): value is RuntimeContract["operation"]["operation_type"] {
-  return (
-    value === "read" ||
-    value === "write" ||
-    value === "approval" ||
-    value === "batch" ||
-    value === "notification" ||
-    value === "unknown"
-  );
-}
-
-function isSideEffectLevel(value: unknown): value is RuntimeContract["operation"]["side_effect_level"] {
-  return (
-    value === "none" ||
-    value === "read_only" ||
-    value === "write" ||
-    value === "financial_write" ||
-    value === "customer_notification" ||
-    value === "unknown"
-  );
-}
-
-function needsLegacyContract(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
-  // Legacy/MCP adapter contracts apply only to adapter candidates. Agent and
-  // workflow candidates that merely orchestrate adapters do not get their own
-  // legacy contract — that lives on the adapter they call.
-  if (candidate.module_category !== "adapter") return false;
-  return (
-    candidate.adapter_kind === "legacy_api" ||
-    candidate.access_protocol === "mcp" ||
-    includesLegacySignal(candidate, requirement)
-  );
-}
-
-function needsAdkCallbackContract(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
-  // ADK callback contract is meaningful for local agent/workflow/adapter only.
-  // Remote A2A boundaries are reviewed in their own A2A contract review.
-  if (candidate.module_category === "remote_a2a") return false;
-  return (
-    needsLegacyContract(candidate, requirement) ||
-    Boolean(candidate.adk_hints?.callbacks?.trim()) ||
-    candidate.risk_signals.includes("human_approval_required") ||
-    candidate.risk_signals.includes("customer_impact")
-  );
-}
-
-function needsAsyncRuntimeSupport(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
-  // Async runtime support (Context Manager / Callback Broker / Async Resume)
-  // is tied to the adapter that actually performs the async call. Workflows
-  // can still describe wait/resume behavior in Graph IR; they do not get a
-  // duplicate set of runtime contracts here.
-  if (candidate.module_category !== "adapter") return false;
-  const text = evidenceText(candidate, requirement);
-  return (
-    /callback|콜백|async|비동기|job[_ -]?id|resume|재개|대기/i.test(text) ||
-    candidate.risk_signals.includes("transaction_write") ||
-    candidate.risk_signals.includes("customer_impact")
-  );
-}
-
-function buildLegacyAdapterContract(candidate: ModuleCandidate, requirement: NormalizedRequirement): RuntimeContract {
-  const mcp = candidate.access_protocol === "mcp" || Boolean(candidate.mcp_tool_name);
-  const write = isWriteLike(candidate, requirement);
-  const async = needsAsyncRuntimeSupport(candidate, requirement);
-  return {
-    contract_id: runtimeContractId(candidate.id, mcp ? "mcp-legacy" : "eai-legacy"),
-    contract_kind: mcp ? "mcp_legacy_adapter" : "eai_legacy_adapter",
-    module_id: candidate.id,
-    title: `${candidate.name} ${mcp ? "MCP Legacy Adapter 런타임 계약" : "EAI Legacy Adapter 런타임 계약"}`,
+    contract_id: `runtime-${slug(candidate.asset_id)}-${kind.replace(/_/g, "-")}`,
+    contract_kind: kind,
+    asset_id: candidate.asset_id,
+    title: `${candidate.name} ${kind}`,
     contract_status: "needs_info",
-    summary: `${candidate.name} 런타임 계약 초안입니다. 실제 endpoint나 credential 없이 reviewed adapter boundary만 기록합니다.`,
+    summary: `${candidate.name}의 ${kind} 실행 경계`,
     required_review_fields: [
       "policies.auth_policy",
       "policies.timeout_policy",
       "policies.retry_policy",
-      "policies.fallback_policy",
-      "policies.masking_policy",
-      "policies.data_policy"
+      ...(kind === "async_resume" ? ["resume_policy"] : []),
+      ...(kind === "async_resume" && write ? ["side_effect_guard"] : [])
     ],
     reviewer_notes: "",
     runtime_support: {
-      context_manager_required: async,
-      callback_broker_required: async,
-      human_approval_required: write,
+      context_manager_required: kind === "context_manager" || callback,
+      callback_broker_required: kind === "callback_broker",
+      human_approval_required: candidate.risk_signals.includes("human_approval_required"),
       idempotency_required: write,
-      audit_required: true,
+      audit_required: candidate.audit_required === true || write,
       compensation_required: write
     },
     operation: {
       operation_type: write ? "write" : "read",
-      side_effect_level: write ? "financial_write" : "read_only",
-      callback_expected: async,
-      async_resume_required: async
+      side_effect_level: write ? "write" : candidate.side_effect === "read" ? "read_only" : "none",
+      callback_expected: callback,
+      async_resume_required: kind === "async_resume"
     },
-    identifiers: ["work_item_id", "correlation_id", "idempotency_key", "eai_job_id", "legacy_tx_id"],
-    policies: defaultPolicies(),
-    graph_ir_annotations: async
-      ? {
-          legacy_submit: "SUBMITTED_TO_EAI",
-          callback_wait: "WAITING_LEGACY_CALLBACK",
-          resume_condition: "CALLBACK_RECEIVED"
-        }
-      : {},
-    synthetic_examples: [
-      {
-        input_ref: "synthetic-reviewed-input",
-        output_ref: async ? "synthetic-eai-job-id" : "synthetic-safe-summary",
-        private_endpoint: false
-      }
-    ],
-    developer_todos: [
-      "TODO: 승인된 MCP 또는 adapter 계약을 통해서만 EAI client를 구현하세요.",
-      "TODO: raw legacy payload는 LLM context 밖에 두세요.",
-      "TODO: runtime chat smoke를 켜기 전에 synthetic smoke 계약을 추가하세요."
-    ]
+    identifiers: [],
+    policies: {
+      auth_policy: "needs_info",
+      timeout_policy: "needs_info",
+      retry_policy: "needs_info",
+      fallback_policy: "needs_info",
+      masking_policy: "needs_info",
+      data_policy: "needs_info"
+    },
+    ...(kind === "async_resume" ? { resume_policy: null, side_effect_guard: null } : {}),
+    graph_ir_annotations: {},
+    synthetic_examples: [],
+    developer_todos: []
   };
 }
 
-function buildContextManagerContract(candidate: ModuleCandidate, _requirement: NormalizedRequirement): RuntimeContract {
-  return {
-    contract_id: runtimeContractId(candidate.id, "context-manager"),
-    contract_kind: "context_manager",
-    module_id: candidate.id,
-    title: `${candidate.name} Context Manager 런타임 계약`,
-    contract_status: "needs_info",
-    summary: "WorkItem 상태, correlation, callback, approval, retry, timeout, audit 상태를 durable contract로 관리한다.",
-    required_review_fields: [
-      "policies.auth_policy",
-      "policies.timeout_policy",
-      "policies.retry_policy",
-      "policies.data_policy"
-    ],
-    reviewer_notes: "",
-    runtime_support: {
-      context_manager_required: true,
-      callback_broker_required: true,
-      human_approval_required: true,
-      idempotency_required: true,
-      audit_required: true,
-      compensation_required: true
-    },
-    operation: {
-      operation_type: "approval",
-      side_effect_level: "write",
-      callback_expected: true,
-      async_resume_required: true
-    },
-    identifiers: ["work_item_id", "agent_session_id", "agent_run_id", "correlation_id", "idempotency_key", "eai_job_id", "legacy_tx_id"],
-    policies: defaultPolicies(),
-    graph_ir_annotations: {
-      approval_wait: "APPROVAL_PENDING",
-      callback_wait: "WAITING_LEGACY_CALLBACK",
-      resume_requested: "RESUME_REQUESTED",
-      manual_review: "MANUAL_REVIEW_REQUIRED",
-      compensation: "COMPENSATION_REQUIRED"
-    },
-    synthetic_examples: [
-      {
-        work_item_id: "WI-SYNTH-000001",
-        status: "WAITING_LEGACY_CALLBACK",
-        llm_exposure: "safe_summary_only"
-      }
-    ],
-    developer_todos: [
-      "TODO: 승인된 런타임 endpoint가 제공된 뒤 Context Manager client를 구현하세요.",
-      "TODO: masked/tokenized reference만 저장하세요.",
-      "TODO: ADK workflow를 재개하기 전에 callback과 approval state를 매핑하세요."
-    ]
-  };
-}
-
-function buildCallbackBrokerContract(candidate: ModuleCandidate, _requirement: NormalizedRequirement): RuntimeContract {
-  return {
-    contract_id: runtimeContractId(candidate.id, "callback-broker"),
-    contract_kind: "callback_broker",
-    module_id: candidate.id,
-    title: `${candidate.name} Callback Broker 런타임 계약`,
-    contract_status: "needs_info",
-    summary: "EAI/Legacy callback을 agent가 직접 받지 않고 검증, 중복 제거, 상태 전이 요청만 수행한다.",
-    required_review_fields: [
-      "policies.auth_policy",
-      "policies.timeout_policy",
-      "policies.fallback_policy",
-      "policies.masking_policy",
-      "policies.data_policy"
-    ],
-    reviewer_notes: "",
-    runtime_support: {
-      context_manager_required: true,
-      callback_broker_required: true,
-      human_approval_required: false,
-      idempotency_required: true,
-      audit_required: true,
-      compensation_required: true
-    },
-    operation: {
-      operation_type: "notification",
-      side_effect_level: "write",
-      callback_expected: true,
-      async_resume_required: true
-    },
-    identifiers: ["callback_id", "correlation_id", "work_item_id", "eai_job_id", "legacy_tx_id"],
-    policies: defaultPolicies(),
-    graph_ir_annotations: {
-      callback_received: "CALLBACK_RECEIVED",
-      resume_requested: "RESUME_REQUESTED"
-    },
-    synthetic_examples: [
-      {
-        callback_id: "cb-synthetic-uuid",
-        correlation_id: "corr-synthetic-uuid",
-        status: "SUCCESS",
-        signature: "synthetic-hmac-or-jwt"
-      }
-    ],
-    developer_todos: [
-      "TODO: 상태 전이 전에 callback signature를 검증하고 replay를 거부하세요.",
-      "TODO: callback_id와 correlation_id를 중복 제거하세요.",
-      "TODO: raw callback payload를 LLM으로 전달하지 마세요."
-    ]
-  };
-}
-
-function buildAdkCallbackContract(candidate: ModuleCandidate, _requirement: NormalizedRequirement): RuntimeContract {
-  const requiresAsyncRuntimeSupport = needsAsyncRuntimeSupport(candidate, _requirement);
-  const hasWriteSideEffect = isWriteLike(candidate, _requirement);
-  return {
-    contract_id: runtimeContractId(candidate.id, "adk-callback"),
-    contract_kind: "adk_callback",
-    module_id: candidate.id,
-    title: `${candidate.name} ADK Callback 런타임 계약`,
-    contract_status: "needs_info",
-    summary: "ADK before/after callback에서 tool 입력 검증, 승인 확인, masking, audit summary, safe resume를 담당한다.",
-    required_review_fields: ["policies.masking_policy", "policies.data_policy"],
-    reviewer_notes: "",
-    runtime_support: {
-      context_manager_required: requiresAsyncRuntimeSupport,
-      callback_broker_required: false,
-      human_approval_required: hasWriteSideEffect,
-      idempotency_required: hasWriteSideEffect,
-      audit_required: true,
-      compensation_required: hasWriteSideEffect
-    },
-    operation: {
-      operation_type: hasWriteSideEffect ? "approval" : "read",
-      side_effect_level: "none",
-      callback_expected: false,
-      async_resume_required: requiresAsyncRuntimeSupport
-    },
-    identifiers: ["work_item_id", "correlation_id", "idempotency_key"],
-    policies: defaultPolicies(),
-    graph_ir_annotations: {
-      before_tool_callback: "validate args, approval, idempotency",
-      after_tool_callback: "mask response and persist safe state",
-      after_agent_callback: "safe summary only"
-    },
-    synthetic_examples: [
-      {
-        callback: "before_tool_callback",
-        action: "block write when approval token is missing"
-      }
-    ],
-    developer_todos: [
-      "TODO: 선택한 ADK version의 정확한 callback parameter 이름을 사용하세요.",
-      "TODO: 런타임 endpoint와 approval 계약이 검토될 때까지 skeleton은 TODO-only로 유지하세요."
-    ]
-  };
-}
-
-function buildAsyncResumeContract(candidate: ModuleCandidate, _requirement: NormalizedRequirement): RuntimeContract {
-  return {
-    contract_id: runtimeContractId(candidate.id, "async-resume"),
-    contract_kind: "async_resume",
-    module_id: candidate.id,
-    title: `${candidate.name} Async Resume 런타임 계약`,
-    contract_status: "needs_info",
-    summary: "EAI job_id 이후 callback 수신과 RESUME_REQUESTED 상태를 ADK Runtime Handoff가 읽도록 하는 계약이다.",
-    required_review_fields: ["policies.timeout_policy", "policies.retry_policy", "policies.fallback_policy"],
-    reviewer_notes: "",
-    runtime_support: {
-      context_manager_required: true,
-      callback_broker_required: true,
-      human_approval_required: isWriteLike(candidate, _requirement),
-      idempotency_required: true,
-      audit_required: true,
-      compensation_required: isWriteLike(candidate, _requirement)
-    },
-    operation: {
-      operation_type: "batch",
-      side_effect_level: isWriteLike(candidate, _requirement) ? "financial_write" : "read_only",
-      callback_expected: true,
-      async_resume_required: true
-    },
-    identifiers: ["work_item_id", "correlation_id", "eai_job_id", "legacy_tx_id"],
-    policies: defaultPolicies(),
-    graph_ir_annotations: {
-      legacy_submit_node: "SUBMITTED_TO_EAI",
-      callback_wait_node: "WAITING_LEGACY_CALLBACK",
-      resume_requested_node: "RESUME_REQUESTED"
-    },
-    synthetic_examples: [
-      {
-        graph_node: "wait_legacy_callback",
-        context_manager_status: "WAITING_LEGACY_CALLBACK",
-        resume_condition: "CALLBACK_RECEIVED"
-      }
-    ],
-    developer_todos: [
-      "TODO: 초기 agent run은 pending safe summary와 함께 멈추세요.",
-      "TODO: Context Manager가 CALLBACK_RECEIVED 또는 RESUME_REQUESTED를 기록한 뒤에만 재개하세요."
-    ]
-  };
-}
-
-function defaultPolicies(): RuntimeContract["policies"] {
-  return {
-    auth_policy: "needs_info",
-    timeout_policy: "needs_info",
-    retry_policy: "needs_info",
-    fallback_policy: "needs_info",
-    masking_policy: "safe_summary_only",
-    data_policy: "synthetic_or_masked_only"
-  };
-}
-
-function readRuntimeContractField(contract: RuntimeContract, path: string): unknown {
-  return path.split(".").reduce<unknown>((current, key) => {
-    if (!current || typeof current !== "object") return undefined;
-    return (current as Record<string, unknown>)[key];
-  }, contract);
-}
-
-function includesLegacySignal(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
-  return /eai|legacy|레거시|계정계|코어|core banking|loan legacy|customer legacy|card legacy/i.test(
-    evidenceText(candidate, requirement)
-  );
-}
-
-function isWriteLike(candidate: ModuleCandidate, requirement: NormalizedRequirement): boolean {
-  const text = evidenceText(candidate, requirement);
-  return (
-    /write|change|submit|update|한도 변경|변경|신청|접수|승인|transaction/i.test(text) ||
-    candidate.side_effect === "write" ||
-    candidate.side_effect === "read_write" ||
-    candidate.risk_signals.includes("transaction_write") ||
-    candidate.risk_signals.includes("customer_impact") ||
-    candidate.risk_signals.includes("human_approval_required")
-  );
-}
-
-function evidenceText(candidate: ModuleCandidate, requirement: NormalizedRequirement): string {
-  return [
-    requirement.raw_text,
-    requirement.business_goal,
-    ...requirement.systems.map((system) => system.name),
-    candidate.name,
-    candidate.rationale,
-    candidate.adk_hints?.callbacks ?? "",
-    candidate.adk_hints?.mcp_a2a ?? "",
-    ...candidate.missing_information
-  ].join(" ");
-}
-
-function runtimeContractId(moduleId: string, suffix: string): string {
-  return `rtc-${moduleId.replace(/^mod-/, "")}-${suffix}`.replace(/[^a-z0-9-]/g, "-");
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "asset";
 }

@@ -3,36 +3,39 @@ import { resolveCatalogPrefillSpec } from "./catalogPrefillSelection.ts";
 import type { CatalogPrefillPayload } from "./types/mockSpec.ts";
 
 const payload: CatalogPrefillPayload = {
-  loaded_at: "2026-06-04T00:00:00.000Z",
-  source_file: "catalog/adapters.yaml",
+  loaded_at: "2026-07-19T00:00:00.000Z",
+  source_file: "catalog/tools.yaml",
   entries: [
     {
-      name: "customer_account_snapshot_mock_adapter",
-      adapter_kind: "data_query",
-      owner_domain: "customer",
-      access_protocol: "local",
+      asset_id: "tool.customer.account-snapshot",
+      name: "고객 계좌 Snapshot Tool",
+      asset_type: "tool",
+      capability_tags: ["data-query"],
+      owner: "AI공통플랫폼팀",
+      binding: { kind: "mcp", server_ref: "customer-mock", tool_name: "account_snapshot" },
+      connection: { transport: "stdio" },
       contract_status: "mock_ready",
-      component_source: "stub",
       inputs: [],
       outputs: [],
       risk_signals: [],
       has_runtime_mock: true,
       notes: null,
       prefill: {
-        mock_id: "customer_account_snapshot_mock_adapter",
-        server_name: "customer_account_snapshot_mock_adapter-mcp",
+        mock_id: "tool-customer-account-snapshot",
+        server_name: "customer-mock",
         protocol: "mcp_stdio",
         description: "synthetic",
         source: {
           prefill_from_catalog: true,
-          catalog_entry_name: "customer_account_snapshot_mock_adapter",
-          catalog_file: "catalog/adapters.yaml"
+          catalog_asset_id: "tool.customer.account-snapshot",
+          catalog_entry_name: "고객 계좌 Snapshot Tool",
+          catalog_file: "catalog/tools.yaml"
         },
         tools: [
           {
-            name: "customer_account_snapshot_mock_adapter",
-            title: "customer_account_snapshot_mock_adapter",
-            description: "synthetic tool",
+            name: "account_snapshot",
+            title: "고객 계좌 Snapshot Tool",
+            description: "synthetic Tool",
             inputSchema: { type: "object", properties: {}, required: [] },
             outputSchema: { type: "object", properties: {}, required: [] },
             successResponse: {},
@@ -54,10 +57,9 @@ const payload: CatalogPrefillPayload = {
   ]
 };
 
-const spec = resolveCatalogPrefillSpec(payload, "customer_account_snapshot_mock_adapter");
-assert.equal(spec?.mock_id, "customer_account_snapshot_mock_adapter");
+const spec = resolveCatalogPrefillSpec(payload, "고객 계좌 Snapshot Tool");
+assert.equal(spec?.mock_id, "tool-customer-account-snapshot");
 assert.notEqual(spec, payload.entries[0].prefill);
-
 spec!.mock_id = "changed";
-assert.equal(payload.entries[0].prefill.mock_id, "customer_account_snapshot_mock_adapter");
+assert.equal(payload.entries[0].prefill.mock_id, "tool-customer-account-snapshot");
 assert.equal(resolveCatalogPrefillSpec(payload, "missing"), null);

@@ -11,19 +11,30 @@ const CANONICAL_SKILLS = [
   "af-verify-runtime",
 ];
 
-const LEGACY_SHIMS = new Map([
-  ["af-analyze-requirement", "af-discover-assets"],
-  ["af-design-boundaries", "af-compose-solution"],
-  ["af-build-runtime-stub", "af-scaffold-runtime"],
-  ["af-verify-feedback", "af-verify-runtime"],
-]);
+const RETIRED_SKILL_IDS = [
+  "af-analyze-requirement",
+  "af-design-boundaries",
+  "af-build-runtime-stub",
+  "af-verify-feedback",
+];
 
-const FORBIDDEN_LEGACY_TERMS = [
-  ["module_category: adapter", /module_category\s*:\s*["'`]?adapter\b/i],
+const FORBIDDEN_RETIRED_TERMS = [
+  ["moduleCandidates", /\bmoduleCandidates\b/],
+  ["module-candidates.json", /\bmodule-candidates\.json\b/i],
+  ["processFlow", /\bprocessFlow\b/],
+  ["process-flow.json", /\bprocess-flow\.json\b/i],
+  ["commonization-notes.json", /\bcommonization-notes\.json\b/i],
+  ["module_category", /\bmodule_category\b/i],
   ["adapter_kind", /\badapter_kind\b/i],
   ["agent_kind", /\bagent_kind\b/i],
+  ["workflow_kind", /\bworkflow_kind\b/i],
+  ["remote_contract_kind", /\bremote_contract_kind\b/i],
+  ["runtime_binding", /\bruntime_binding\b/i],
   ["selected_by_llm", /\bselected_by_llm\b/i],
-  ["decision_owner: llm", /decision_owner\s*:\s*["'`]?llm\b/i],
+  ["decision_owner", /\bdecision_owner\b/i],
+  ["call_control", /\bcall_control\b/i],
+  ["retired node_kind", /\bnode_kind\s*:\s*["'`]?(?:adapter|adapter_call|workflow|workflow_call|router|loop_control|callback_wait|remote_a2a|remote_agent_call)\b/i],
+  ["retired skill ID", new RegExp(`\\b(?:${RETIRED_SKILL_IDS.join("|")})\\b`)],
   ["specialist agent", /\bspecialist\s+agent\b/i],
   ["shared agent", /\bshared\s+agent\b/i],
   ["domain agent", /\bdomain\s+agent\b/i],
@@ -244,6 +255,13 @@ if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
       addError(skillFile, "canonical-skill-file", `missing ${skillName}/SKILL.md`);
     }
   }
+
+  for (const retiredId of RETIRED_SKILL_IDS) {
+    const retiredDirectory = path.join(root, retiredId);
+    if (fs.existsSync(retiredDirectory)) {
+      addError(retiredDirectory, "retired-skill-directory", `retired skill directory must be absent: '${retiredId}'`);
+    }
+  }
 }
 
 const allFiles = walkFiles(root);
@@ -318,6 +336,12 @@ for (const [name, files] of names.entries()) {
   }
 }
 
+for (const [skillFile, metadata] of skillMetadata.entries()) {
+  if (typeof metadata.name === "string" && !CANONICAL_SKILLS.includes(metadata.name)) {
+    addError(skillFile, "unexpected-skill", `only canonical skill IDs are allowed; found '${metadata.name}'`);
+  }
+}
+
 for (const markdownFile of markdownFiles) {
   const text = fileText.get(markdownFile) ?? "";
   const links = extractMarkdownLinks(text, markdownFile);
@@ -351,37 +375,6 @@ for (const skillFile of skillFiles) {
   }
 }
 
-const stagingMode = fs.existsSync(path.join(root, "legacy-shims")) || /staging/i.test(path.basename(root));
-const shimRoot = stagingMode ? path.join(root, "legacy-shims") : root;
-const shimFiles = new Set();
-
-for (const [legacyName, canonicalName] of LEGACY_SHIMS.entries()) {
-  const shimDirectory = path.join(shimRoot, legacyName);
-  const shimFile = path.join(shimDirectory, "SKILL.md");
-  shimFiles.add(path.resolve(shimFile));
-
-  if (!fs.existsSync(shimFile) || !fs.statSync(shimFile).isFile()) {
-    addError(shimFile, "legacy-shim", `missing legacy shim '${legacyName}'${stagingMode ? " under legacy-shims/" : ""}`);
-    continue;
-  }
-
-  const text = fileText.get(shimFile) ?? fs.readFileSync(shimFile, "utf8").replace(/^\uFEFF/, "");
-  const lineCount = countLines(text);
-  if (lineCount > 15) {
-    addError(shimFile, "legacy-shim-lines", `legacy shim has ${lineCount} lines; maximum is 15`);
-  }
-
-  const referencesDirectory = path.join(shimDirectory, "references");
-  if (fs.existsSync(referencesDirectory)) {
-    addError(referencesDirectory, "legacy-shim-references", "legacy shim must not contain a references/ directory");
-  }
-
-  const canonicalPathPattern = new RegExp(`(?:^|[/.])${canonicalName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/SKILL\\.md`);
-  if (!canonicalPathPattern.test(text)) {
-    addError(shimFile, "legacy-shim-handoff", `legacy shim must point to ${canonicalName}/SKILL.md`);
-  }
-}
-
 const sharedRoot = path.join(root, "_shared");
 for (const sharedFile of markdownFiles.filter((file) => isWithin(sharedRoot, file))) {
   const text = fileText.get(sharedFile) ?? "";
@@ -405,17 +398,44 @@ for (const markdownFile of markdownFiles) {
   }
 }
 
-const compatibilityFile = path.resolve(root, "_shared/compatibility-current-schema.md");
 for (const markdownFile of markdownFiles) {
-  if (shimFiles.has(path.resolve(markdownFile)) || path.resolve(markdownFile) === compatibilityFile) continue;
   const lines = (fileText.get(markdownFile) ?? "").split(/\r\n|\n|\r/);
   lines.forEach((line, index) => {
-    if (/\blegacy\b/i.test(line)) return;
-    const matches = FORBIDDEN_LEGACY_TERMS.filter(([, pattern]) => pattern.test(line)).map(([label]) => label);
+    const matches = FORBIDDEN_RETIRED_TERMS.filter(([, pattern]) => pattern.test(line)).map(([label]) => label);
     if (matches.length > 0) {
-      addError(markdownFile, "forbidden-legacy-vocabulary", `forbidden active vocabulary: ${matches.join(", ")}`, index + 1);
+      addError(markdownFile, "forbidden-retired-vocabulary", `forbidden active vocabulary: ${matches.join(", ")}`, index + 1);
     }
   });
+}
+
+const targetContractFile = path.join(sharedRoot, "target-contract-v2.md");
+const targetContractText = fileText.get(targetContractFile) ?? "";
+for (const requiredSnippet of [
+  'contract_version: "2.0"',
+  "assetCandidates",
+  "a2aContracts",
+  "runtimeContracts",
+  "asset-candidates.json",
+  "graph",
+  "graph-ir.json",
+  "input",
+  "agent",
+  "tool",
+  "function",
+  "human_input",
+  "subworkflow",
+  "join",
+  "output",
+  "agent_ref",
+  "tool_ref",
+  "workflow_ref",
+  "control",
+  "channel",
+  "regions",
+]) {
+  if (!targetContractText.includes(requiredSnippet)) {
+    addError(targetContractFile, "target-contract-v2", `missing required strict v2 term: ${requiredSnippet}`);
+  }
 }
 
 const graph = new Map(markdownFiles.map((file) => [path.resolve(file), []]));
@@ -493,7 +513,7 @@ issues.sort((left, right) => {
     || left.message.localeCompare(right.message);
 });
 
-console.log(`Skill root: ${displayPath(root)}${stagingMode ? " (staging mode)" : ""}`);
+console.log(`Skill root: ${displayPath(root)}`);
 let lastFile = null;
 for (const issue of issues) {
   const currentFile = displayPath(issue.file);

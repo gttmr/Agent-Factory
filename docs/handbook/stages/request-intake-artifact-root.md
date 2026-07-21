@@ -39,6 +39,7 @@ requirement identity를 정하고 검토 가능한 canonical artifact root를 �
 
 - 잘못된 ID는 400, 이미 존재하는 ID는 409다.
 - import JSON이 현재 analysis shape를 만족하지 않거나 requirement ID가 없으면 저장하지 않는다.
+- 기존 manifest는 requirement/root identity, 네 stage/status, 네 approval과 validation이 모두 있어야 한다. 누락값이나 잘못된 enum을 읽을 때 보정하지 않고 422로 거부한다.
 - root list는 읽을 수 없는 manifest를 전체 목록 실패로 전파하지 않고 해당 entry를 건너뛴다.
 - artifact root 삭제·복원 API는 확인되지 않았다.
 
@@ -114,9 +115,9 @@ requirement identity를 정하고 검토 가능한 canonical artifact root를 �
 - State/artifact reads: `reg.artifact-root`, `reg.run-manifest`
 - State/artifact writes: `reg.artifact-root`, `reg.run-manifest`; import 시 `reg.analysis-result`
 - Important callers: `createAfArtifactsMiddleware`
-- Important callees: `ArtifactRootStore`, `validateAnalysisResult`, HTTP body/response helpers
+- Important callees: `ArtifactRootStore`, `validateAnalysisResult`, `validateScaffoldPlanWrite`, HTTP body/response helpers
 - External boundaries: HTTP, local filesystem through store
-- Failure/edge behavior: invalid analysis는 422, ETag mismatch는 상위 middleware에서 409로 변환된다.
+- Failure/edge behavior: invalid analysis·scaffold plan은 422, Build approval 없는 scaffold save와 ETag mismatch는 409다. derived split PUT은 405다.
 - Related registers: `reg.artifact-root`, `reg.run-manifest`, `reg.analysis-result`
 - Verified at commit: `7deea45`
 - Locator status: `active`
@@ -133,7 +134,7 @@ requirement identity를 정하고 검토 가능한 canonical artifact root를 �
 - Important callers: artifact CRUD, Stage Runner, Build·Verify·Runtime middleware
 - Important callees: Node filesystem, `parseAfRunManifest`, `serializeAfRunManifest`
 - External boundaries: local filesystem
-- Failure/edge behavior: path traversal·allowlist 위반을 거부하고 기존 manifest가 있으면 create를 409로 막는다.
+- Failure/edge behavior: path traversal·allowlist 위반을 거부하고 기존 manifest가 있으면 create를 409로 막는다. manifest parse는 complete shape와 canonical requirement/root identity를 요구한다.
 - Related registers: `reg.artifact-root`, `reg.run-manifest`, `reg.approvals`, `reg.stage-status`
 - Verified at commit: `7deea45`
 - Locator status: `active`

@@ -11,7 +11,6 @@ description: >-
 파일 존재가 아니라 **주장한 동작이 fresh evidence로 확인됐는지** 검증한다. 구조, artifact contract, code correctness, runtime smoke, behavior evaluation의 다섯 계층을 분리하고 실패 원인, 재실행 결과, residual uncertainty를 durable report로 남긴다.
 
 Verify는 prior-stage artifact나 approval을 새로 만들지 않는다.
-
 ## 2. 선행 조건
 
 ### Preconditions
@@ -23,17 +22,20 @@ Verify는 prior-stage artifact나 approval을 새로 만들지 않는다.
 3. 검증할 revision/commit과 environment를 기록할 수 있다.
 4. 필요한 dependency와 local mock의 상태를 확인했다.
 5. 허용 command와 write boundary를 식별했다.
+6. Workbench mode에서는 `stub_ready_for_followup=true`, Build stage `complete`, non-empty `runtime-stub/`을 확인했다.
 
 대상, claim, environment 중 하나라도 모호하면 실행 전에 질문하거나 중단한다.
-
 ### Inputs
 
 - canonical/proposed artifacts와 generated `runtime-stub/` 또는 explicit output root
 - Stage Runner run ledger/result, 해당하는 경우
 - approved design/scaffold handoff와 selected Runtime Pattern scenarios
+- Workbench mode의 complete `af-run-manifest.json`과 Build handoff gate evidence
 - baseline evidence, 비교가 필요한 경우
 
 ### Read Set
+
+먼저 [Source of Truth](../_shared/source-of-truth.md)와 [Lifecycle Invariants](../_shared/lifecycle-invariants.md)를 읽는다.
 
 항상 [Testing Contract](../_shared/testing-contract.md)과 [Verification Report](references/verification-report.md)를 읽는다.
 
@@ -43,22 +45,23 @@ runtime output이 있을 때만 [Runtime Validation Checks](references/runtime-v
 
 Catalog feedback이 필요할 때만 [Catalog Delta Proposal](references/catalog-delta-proposal.md)을 읽는다.
 
-current `legacy` artifact의 의미를 판정해야 할 때 [Compatibility Layer](../_shared/compatibility-current-schema.md)를 읽는다.
-
+v2 artifact 계약을 판정할 때 [Target Contract v2](../_shared/target-contract-v2.md)를 읽는다.
 ## 3. 핵심 Workflow
 
 ### Decision Procedure
 
 #### 1단계: operating mode와 output path를 고정한다
 
-Stage Runner mode에서 허용되는 proposal은 정확히 다음 두 파일이다.
+Stage Runner mode에서 server allow-list primitive가 생성하는 proposal은 정확히 다음 두 파일이다.
 
 ```text
 <run-dir>/proposed-artifacts/validation-report.md
 <run-dir>/proposed-artifacts/catalog-delta.yaml
 ```
 
-Current Verify execution은 server allow-list primitive가 소유하며, run status가 `completed`여도 `validation.ok=false`이면 passing이 아니다.
+Current Verify execution과 두 proposal write는 server allow-list primitive가 소유한다. 이 Skill의 Stage Runner mode write allow-list는 빈 집합이다. Server는 Catalog feedback이 없어도 빈 `catalog-delta.yaml` template을 항상 만들며, run status가 `completed`여도 `validation.ok=false`이면 passing이 아니다.
+
+Workbench server는 Build handoff gate와 실제 runtime-stub 파일을 확인한 뒤 command를 시작한다. command key별 최신 결과를 manifest ledger에 누적하고, `validate_artifact_root`와 `validate_generated_runtime`이 모두 통과하며 실패 evidence가 없을 때만 Verify stage를 `complete`로 기록한다. required evidence가 덜 모이면 `pending`, 하나라도 실패하면 `blocked`이며 prior approval을 새로 만들지는 않는다.
 
 Standalone mode에서는 사용자가 지정한 report directory 또는 artifact root만 쓴다. Canonical report write는 사용자와 active document gate가 허용할 때만 수행한다.
 
@@ -76,9 +79,9 @@ Standalone mode에서는 사용자가 지정한 report directory 또는 artifact
 
 - JSON/YAML parse와 schema
 - gate와 Missing Information
-- Target 판단과 current Compatibility Output의 분리
+- Target 판단과 Current Implementation evidence의 분리
 - allowed writes와 proposal inventory
-- approvals, A2A/runtime contract pairing
+- approvals, A2A Agent binding/exposure와 runtime contract pairing
 
 ### Level 3: Code Correctness
 
@@ -108,7 +111,6 @@ Standalone mode에서는 사용자가 지정한 report directory 또는 artifact
 - multi-turn 또는 event-driven scenario
 
 낮은 계층 통과가 높은 계층 통과를 의미하지 않는다.
-
 #### 3단계: deterministic test와 behavior eval을 구분한다
 
 Deterministic test로 검증할 항목:
@@ -132,11 +134,9 @@ test agent에게 expected answer, suspected defect, intended fix, rubric을 노�
 
 #### 4단계: 최소 충분한 command를 선택한다
 
-Workbench current allow-list는 다음 세 key뿐이다.
+Workbench current allow-list는 `validate_artifact_root`, `validate_generated_runtime`, `build_web`, `test_analyzer` 네 key뿐이다.
 
-- `validate_artifact_root`
-- `build_web`
-- `test_analyzer`
+앞의 두 key는 aggregate Verify completion에 필수다. 나머지 둘은 claim이 요구할 때 추가하지만 필수 runtime handoff evidence를 대체하지 않는다.
 
 [Validation Allow-list](references/validation-allowlist.md)에서 exact argv와 증명 범위를 확인한다.
 
@@ -187,8 +187,7 @@ Run
 Catalog reusable feedback이 실제로 있으면 [Catalog Delta Proposal](references/catalog-delta-proposal.md)을 따른다.
 
 `catalog/*.yaml`은 직접 수정하지 않는다.
-
-current artifact의 Target/current 해석 불일치나 매핑 불가를 발견하면 `docs/migration/skill-vnext-status.md` Blocker로 기록하도록 보고한다.
+strict v2 artifact와 Current Implementation 소비 동작의 불일치나 지원 불가를 발견하면 Blocker로 보고한다.
 
 #### 9단계: completion claim을 판정한다
 
@@ -205,7 +204,7 @@ non-zero exit, stale evidence, wrong environment, skipped required check, hidden
 | generated/runtime output | [Runtime Validation Checks](references/runtime-validation-checks.md) | pattern별 smoke/negative tests |
 | report 작성 | [Verification Report](references/verification-report.md) | durable evidence format |
 | reuse feedback 존재 | [Catalog Delta Proposal](references/catalog-delta-proposal.md) | proposal-only Catalog feedback |
-| current schema 해석 | [Compatibility Layer](../_shared/compatibility-current-schema.md) | Target/current 분리와 Blocker |
+| v2 artifact 해석 | [Target Contract v2](../_shared/target-contract-v2.md) | strict shape, typed refs, Blocker |
 
 ## 5. 허용 Write
 
@@ -214,8 +213,7 @@ non-zero exit, stale evidence, wrong environment, skipped required check, hidden
 Stage Runner mode:
 
 ```text
-<run-dir>/proposed-artifacts/validation-report.md
-<run-dir>/proposed-artifacts/catalog-delta.yaml
+none (server primitive owns validation-report.md and catalog-delta.yaml)
 ```
 
 Standalone mode:
@@ -225,7 +223,7 @@ Standalone mode:
 <explicit-report-output>/catalog-delta.yaml
 ```
 
-Catalog delta는 feedback이 있을 때만 작성한다.
+Standalone mode의 Catalog delta는 feedback이 있을 때만 작성한다. Stage Runner mode에서는 server가 빈 template을 포함해 두 proposal을 항상 생성한다.
 
 ### Forbidden Writes
 
@@ -244,6 +242,7 @@ fresh evidence, Level별 result, failure classification, residual uncertainty, o
 ## 6. Stop Conditions
 
 - 대상 root/run/revision/claim이 모호함
+- Workbench mode에서 Build handoff approval 또는 runtime-stub 파일이 없음
 - required command를 실행할 수 없음
 - Stage Runner proposal path 밖 write가 필요함
 - command key가 allow-list 밖임
@@ -251,7 +250,7 @@ fresh evidence, Level별 result, failure classification, residual uncertainty, o
 - fresh output이 없음
 - dependency absence나 sandbox issue를 pass로 바꿔야 함
 - test agent가 expected outcome을 봄
-- current mapping이 Target 판단을 오해하게 만듦
+- Current Implementation 소비 동작이 Target 판단을 오해하게 만듦
 - private data, credential, production endpoint가 필요함
 - report가 failure 또는 residual uncertainty를 누락함
 
@@ -275,7 +274,7 @@ npm run test:analyzer --prefix packages/web
 Generated Python:
 
 ```bash
-python3 -m compileall <runtime-output-root>
+node scripts/validate-generated-runtime.mjs <artifact-root>
 ```
 
 Stage Runner proposal inventory:

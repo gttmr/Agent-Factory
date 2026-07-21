@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { appendCatalogDeltaProposal } from "../catalog/catalogDelta";
+import type { DomainScope } from "../analyzer/types";
 import { useCatalogDelta, useSaveCatalogDelta } from "../state/useCatalogDelta";
 import { Button } from "../ui/primitives";
 
@@ -9,16 +10,24 @@ interface RegisterProposalDrawerProps {
   onSaved: (message: string) => void;
 }
 
-const CATEGORY_OPTIONS = ["agent", "workflow", "adapter", "remote_a2a"] as const;
+const CATEGORY_OPTIONS = ["agent", "workflow", "tool"] as const;
+const CATEGORY_LABELS: Record<(typeof CATEGORY_OPTIONS)[number], string> = {
+  agent: "Agent",
+  workflow: "Workflow",
+  tool: "Tool"
+};
 
 export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProposalDrawerProps) {
   const catalogDelta = useCatalogDelta(reqId);
   const saveCatalogDelta = useSaveCatalogDelta(reqId);
   const [error, setError] = useState<string | null>(null);
 
-  const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]>("adapter");
+  const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]>("tool");
+  const [assetId, setAssetId] = useState("");
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("");
+  const [domainScope, setDomainScope] = useState<DomainScope>("domain_neutral");
+  const [businessDomains, setBusinessDomains] = useState("");
   const [responsibility, setResponsibility] = useState("");
   const [rationale, setRationale] = useState("");
   const existing = catalogDelta.data ?? null;
@@ -30,17 +39,45 @@ export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProp
   const isPending = saveCatalogDelta.isPending;
 
   async function handleSave() {
+    if (!assetId.trim()) {
+      setError("asset_id 는 필수입니다.");
+      return;
+    }
     if (!name.trim()) {
       setError("name 은 필수입니다.");
+      return;
+    }
+    if (!owner.trim()) {
+      setError("owner 는 필수입니다.");
+      return;
+    }
+    const domainValues = businessDomains
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (domainScope !== "domain_neutral" && domainValues.length === 0) {
+      setError(`${domainScope} 자산에는 business domains가 하나 이상 필요합니다.`);
       return;
     }
     if (!existing) return;
     setError(null);
     try {
       const proposal = {
-        category,
+        asset_id: assetId.trim(),
+        asset_type: category,
+        domain_scope: domainScope,
+        business_domains: domainScope === "domain_neutral" ? [] : domainValues,
+        owner: owner.trim(),
+        reuse_status: "publish_candidate",
+        capability_tags: [],
+        binding: category === "tool" ? { kind: "unresolved" } : null,
+        connection: category === "tool" ? { transport: "unknown" } : null,
+        workflow_profile:
+          category === "workflow"
+            ? { representation: "unresolved", coordination: "explicit", template_ref: null }
+            : null,
+        exposure: null,
         name: name.trim(),
-        ...(owner.trim() ? { owner_domain: owner.trim() } : {}),
         ...(responsibility.trim() ? { responsibility: responsibility.trim() } : {}),
         ...(rationale.trim() ? { rationale: rationale.trim() } : {}),
         proposed_by: "reuse_hub",
@@ -70,25 +107,47 @@ export function RegisterProposalDrawer({ reqId, onClose, onSaved }: RegisterProp
         </p>
         {error || loadError ? <p className="af-landing-error">{error ?? loadError}</p> : null}
         <label className="ui-field">
-          <span>category</span>
+          <span>asset type</span>
           <select
             value={category}
             onChange={(event) => setCategory(event.target.value as (typeof CATEGORY_OPTIONS)[number])}
           >
             {CATEGORY_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {CATEGORY_LABELS[option]}
               </option>
             ))}
           </select>
         </label>
         <label className="ui-field">
-          <span>name (catalog id 로 사용 권장)</span>
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="예: loan_doc_review_agent" />
+          <span>asset_id</span>
+          <input type="text" value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="예: agent.loan.document-review" />
         </label>
         <label className="ui-field">
-          <span>owner_domain</span>
-          <input type="text" value={owner} onChange={(event) => setOwner(event.target.value)} placeholder="예: 여신" />
+          <span>display name</span>
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 여신 문서 검토 Agent" />
+        </label>
+        <label className="ui-field">
+          <span>owner</span>
+          <input type="text" value={owner} onChange={(event) => setOwner(event.target.value)} placeholder="예: 여신AI팀" />
+        </label>
+        <label className="ui-field">
+          <span>domain scope</span>
+          <select value={domainScope} onChange={(event) => setDomainScope(event.target.value as DomainScope)}>
+            <option value="domain_neutral">domain_neutral</option>
+            <option value="domain_specific">domain_specific</option>
+            <option value="cross_domain">cross_domain</option>
+          </select>
+        </label>
+        <label className="ui-field">
+          <span>business domains (쉼표로 구분)</span>
+          <input
+            type="text"
+            value={businessDomains}
+            onChange={(event) => setBusinessDomains(event.target.value)}
+            placeholder={domainScope === "domain_neutral" ? "domain_neutral에서는 비워 둡니다" : "예: 여신, 리스크"}
+            disabled={domainScope === "domain_neutral"}
+          />
         </label>
         <label className="ui-field">
           <span>responsibility</span>

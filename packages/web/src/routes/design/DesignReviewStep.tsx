@@ -6,8 +6,7 @@ import type {
   GraphEdge,
   GraphIR,
   GraphNode,
-  ModuleCandidate,
-  ModuleStatus,
+  AssetCandidate,
   RuntimeContract
 } from "../../analyzer/types";
 import type { buildA2AReviewRows } from "../../design/A2AContractPanel";
@@ -19,7 +18,6 @@ import type {
   HighlightRecord
 } from "../../state/useCollaboration";
 import type { AuthorRole } from "../../state/useAuthor";
-import { useCatalog } from "../../state/useCatalog";
 import { DesignBottomPanel } from "./DesignBottomPanel";
 import { DesignGraphPanel } from "./DesignGraphPanel";
 import type { SidebarTab } from "./designStageModel";
@@ -29,8 +27,8 @@ type A2AReviewRow = ReturnType<typeof buildA2AReviewRows>[number];
 interface DesignReviewSelectionState {
   node: GraphNode | null;
   edge: GraphEdge | null;
-  candidate: ModuleCandidate | null;
-  reviewCandidate: ModuleCandidate | null;
+  asset: AssetCandidate | null;
+  reviewAsset: AssetCandidate | null;
 }
 
 interface DesignReviewContractState {
@@ -58,11 +56,11 @@ export interface DesignReviewHandlers {
   onOpenCatalogWorkflowPicker: () => void;
   onSaveRuntimeContract: (contract: RuntimeContract) => void;
   onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
-  onSelectReviewModule: (moduleId: string) => void;
-  onSaveCandidate: (candidateId: string, candidate: ModuleCandidate, syncStatus?: ModuleStatus) => void;
+  onSelectReviewAsset: (assetId: string) => void;
+  onSaveAsset: (assetId: string, asset: AssetCandidate) => void;
   onSelectContract: (contractId: string) => void;
-  onSelectA2AModule: (moduleId: string) => void;
-  onCreateA2AContract: (candidate: ModuleCandidate) => void;
+  onSelectA2AAsset: (assetId: string) => void;
+  onCreateA2AContract: (candidate: AssetCandidate) => void;
   onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
   onAuthorNameChange: (value: string) => void;
   onAuthorRoleChange: (value: AuthorRole) => void;
@@ -79,7 +77,7 @@ interface DesignReviewStepProps {
   setActiveTab: Dispatch<SetStateAction<SidebarTab>>;
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
-  normalizationError?: string;
+  validationError?: string;
   errorCount: number;
   selection: Selection;
   graphEditState: GraphEditState | null;
@@ -97,7 +95,7 @@ export function DesignReviewStep({
   setActiveTab,
   analysis,
   graphIR,
-  normalizationError,
+  validationError,
   errorCount,
   selection,
   graphEditState,
@@ -108,23 +106,18 @@ export function DesignReviewStep({
   nodeLabel,
   handlers
 }: DesignReviewStepProps) {
-  const catalog = useCatalog();
-  const catalogContracts = catalog.data?.contracts ?? {};
-
   return (
     <div className="af-design-split">
       <DesignGraphPanel
         analysis={analysis}
         graphIR={graphIR}
-        normalizationError={normalizationError}
+        validationError={validationError}
         errorCount={errorCount}
         selection={selection}
         graphEditState={graphEditState}
         selectedNode={selected.node}
         selectedEdge={selected.edge}
-        selectedCandidate={selected.candidate}
-        a2aContracts={contracts.a2aContracts}
-        catalogContracts={catalogContracts}
+        selectedAsset={selected.asset}
         comments={collaboration.comments}
         highlights={collaboration.highlights}
         saving={saving}
@@ -133,7 +126,6 @@ export function DesignReviewStep({
         onEditStateChange={handlers.onEditStateChange}
         onSaveGraphIR={handlers.onSaveGraphIR}
         onOpenCatalogWorkflowPicker={handlers.onOpenCatalogWorkflowPicker}
-        onSetActiveTab={setActiveTab}
       />
       <DesignBottomPanel
         reqId={reqId}
@@ -141,7 +133,7 @@ export function DesignReviewStep({
         setActiveTab={setActiveTab}
         analysis={analysis}
         graphIR={graphIR}
-        selectedReviewCandidate={selected.reviewCandidate}
+        selectedReviewAsset={selected.reviewAsset}
         selectedContract={contracts.selectedContract}
         selectedContractId={contracts.selectedContractId}
         selectedA2ARow={contracts.selectedA2ARow}
@@ -155,12 +147,12 @@ export function DesignReviewStep({
         saving={saving}
         commentPending={collaboration.commentPending}
         highlightPending={collaboration.highlightPending}
-        onSelectReviewModule={handlers.onSelectReviewModule}
+        onSelectReviewAsset={handlers.onSelectReviewAsset}
         onSelectionChange={handlers.onSelectionChange}
-        onSaveCandidate={handlers.onSaveCandidate}
+        onSaveAsset={handlers.onSaveAsset}
         onSelectContract={handlers.onSelectContract}
         onSaveRuntimeContract={handlers.onSaveRuntimeContract}
-        onSelectA2AModule={handlers.onSelectA2AModule}
+        onSelectA2AAsset={handlers.onSelectA2AAsset}
         onCreateA2AContract={handlers.onCreateA2AContract}
         onImportLocalA2AProvider={handlers.onImportLocalA2AProvider}
         onSaveA2AContract={handlers.onSaveA2AContract}

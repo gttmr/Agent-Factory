@@ -46,7 +46,9 @@ Agent Factory는 raw requirement를 즉시 코드로 바꾸는 생성기가 아�
 - 승인 gate는 사람이 명시적으로 결정한다. proposal 생성, artifact 저장, validation 성공은 gate를 자동으로 만들지 않는다.
 - raw requirement에서 code로 직접 건너뛰지 않는다. Runtime Handoff는 검토·승인된 artifact와 scaffold plan을 소비한다.
 - 로컬 우선(local-first) 검토·검증을 사용하며 Runtime Handoff나 Mock Lab 성공을 production deployment로 해석하지 않는다.
-- Target Contract와 Current Implementation을 분리한다. 현재 소스의 legacy `module_category`, legacy `adapter`, legacy `remote_a2a`, legacy `processFlow`는 Target 정의가 이미 구현되었다는 뜻이 아니다.
+- Target Contract는 `contract_version: "2.0"`만 지원한다. aggregate는 `assetCandidates`와 `graph`, derived split artifact는 `asset-candidates.json`과 `graph-ir.json`을 사용하며 제거된 root/field를 읽기 시 변환하지 않는다.
+- Catalog asset category는 Agent·Workflow·Tool뿐이다. A2A는 Agent의 실제 protocol Binding/Exposure이며 별도 category가 아니다.
+- Graph IR의 top-level `workflow_ref`는 standalone Agent/Tool graph에서 `null`일 수 있다. `subworkflow` node reference와 혼동하지 않는다.
 
 ## 진입·종료 조건
 
@@ -57,8 +59,8 @@ Agent Factory는 raw requirement를 즉시 코드로 바꾸는 생성기가 아�
 ## Source snapshot
 
 - Repository: `gttmr/Agent-Factory`
-- Snapshot commits: docs `0ee7784` → skills `b3911fd` → code `a4f55a0`
-- Checked date: `2026-07-18~19`
+- Baseline commit: `0cdcb82`
+- Checked date: `2026-07-19` current worktree
 - Leaf mode: file-as-leaf + stable symbol/section anchors (line ranges are snapshot hints only)
-- Coverage scope: `packages/web` (`src` + `server`), `packages/mock-lab`, `scripts`, `schemas`/`catalog`/`templates` as contract surfaces, stage-facing `.agents/skills` shim→canonical locators
-- Known exclusions: stage-facing shim→canonical locator를 제외한 `.agents/skills` 내부 구현, `generated/**`, `artifacts/**`, `docs/archive/**`, `docs/handoff/**`
+- Coverage scope: `packages/web` (`src` + `server`), `packages/mock-lab`, `scripts`, `schemas`/`catalog`/`templates` as contract surfaces, Stage Runner가 표시하는 canonical `.agents/skills` 이름
+- Known exclusions: `.agents/skills` 내부 authoring 절차, `generated/**`, `artifacts/**`, `docs/archive/**`, `docs/handoff/**`

@@ -2,34 +2,44 @@
 
 ## Scope
 
-This directory contains DesignWorkbench support panels and pure helpers for path
-search, review notes, bottom tabs, runtime contracts, and Remote A2A editing.
+This directory contains Design Workbench support panels and pure helpers for
+asset review, path search, review notes, runtime contracts, A2A Agent protocol
+contracts, and reusable Workflow insertion.
 
-Target asset and protocol-boundary meanings are canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md) and [Graph IR](../../../../docs/workbench/graph-ir.md); `Remote A2A` candidate, tab, and contract names below describe Current Implementation (`legacy`) UI surfaces.
+Asset and protocol-boundary meanings are canonical in
+[Taxonomy](../../../../docs/workbench/taxonomy.md) and
+[Graph IR](../../../../docs/workbench/graph-ir.md).
 
 ## Where To Look
 
 | Task | Files |
 | --- | --- |
-| Runtime contract readiness UI | `RuntimeContractPanel.tsx` |
-| Remote A2A contract UI/validation | `A2AContractPanel.tsx` (re-export façade — keep importing from it), `A2AContractSidebar.tsx`, `A2AContractInspector.tsx`, `A2AContractEditor.tsx` (+ `A2AContractEditorFields.tsx`, `A2AContractCoreSections.tsx`, `A2AContractCapabilitySections.tsx`), `A2AContractPanelModel.ts`, `a2aContractValidator.ts` |
-| Review notes/comments model | `ReviewNotesPanel.tsx`, `reviewNotesModel.ts` |
-| Path highlighting/search | `PathTracePanel.tsx`, `pathSearch.ts` |
+| Runtime contract readiness UI | `RuntimeContractPanel.tsx`, `RuntimeContractEditor.tsx` |
+| A2A Agent contract UI and validation | `A2AContractPanel.tsx`, `A2AContractSidebar.tsx`, `A2AContractInspector.tsx`, `A2AContractEditor.tsx`, `A2AContractPanelModel.ts`, `a2aContractValidator.ts` |
+| Local A2A Agent provider import | `LocalA2AProviderImport.tsx` |
+| Review notes and comments | `ReviewNotesPanel.tsx`, `reviewNotesModel.ts`, `CommentThread.tsx` |
+| Path highlighting and search | `PathTracePanel.tsx`, `pathSearch.ts` |
 | Bottom tab rules | `designWorkbenchTabs.ts` |
-| Reusable workflow insertion | `CatalogWorkflowPicker.tsx` |
+| Reusable Workflow insertion | `CatalogWorkflowPicker.tsx` |
+
+`A2AContractPanel.tsx` is the stable re-export facade for A2A review components.
 
 ## Local Rules
 
-- Design bottom tabs are `modules`, `runtime contracts`, `Remote A2A`, and `review notes`; path highlights live inside review notes.
-- Right Inspector contract editing is parked; active contract editing is in bottom panels.
-- Remote A2A placeholders may be created only for selected remote candidates and must link candidate plus contract coherently.
-- Comments are graph item anchored and persisted through collaboration APIs.
+- Design bottom tabs are `assets`, `runtime`, `a2a`, and `reviewNotes`.
+- The A2A tab lists Agent assets whose binding or exposure references an A2A contract.
+- Creating or importing an A2A provider must create or update an Agent asset and a coherent A2A contract reference.
+- A2A is a real protocol boundary, never an asset category or Tool binding.
+- Reusable Workflow insertion adds a Workflow asset and a `subworkflow` node with `workflow_ref`.
+- Active contract editing stays in bottom panels; the right Inspector remains read-only.
+- Comments are Graph-item anchored and persisted through collaboration APIs.
 
 ## Anti-Patterns
 
 - Do not make Stage Runner output auto-approve boundaries or runtime contracts.
+- Do not introduce A2A candidate categories or accept A2A contracts for non-Agent assets.
 - Do not reintroduce the old three-pane inspector as an incidental dependency.
-- Do not approve candidates with unresolved candidate-level missing information.
+- Do not approve assets with unresolved candidate-level missing information.
 
 ## Verification
 

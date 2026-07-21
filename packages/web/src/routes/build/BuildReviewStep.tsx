@@ -50,7 +50,7 @@ export function BuildReviewStep({ reqId }: BuildReviewStepProps) {
     <>
       {actionMessage ? <ReviewNotice message={actionMessage} /> : null}
       <Panel>
-        <SectionHeader title="Runtime stub 파일" description="생성된 stub 파일을 열어 ADK Workflow·어댑터·테스트 구성을 확인하세요." />
+        <SectionHeader title="Runtime stub 파일" description="생성된 stub 파일을 열어 ADK Workflow·Tool 연결·테스트 구성을 확인하세요." />
         {!stubReady ? (
           <EmptyState title="아직 runtime-stub 이 없습니다" description="‘1. 실행’에서 scaffold-plan 저장 후 stub 을 생성하세요." />
         ) : (

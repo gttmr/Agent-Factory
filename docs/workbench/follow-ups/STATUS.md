@@ -38,8 +38,8 @@
 
 - Stage Runner와 direct analyzer, Mock Lab draft는 repo 코드에서 외부 Codex CLI 프로세스를 직접 spawn하지 않는다. 서버는 `@openai/codex-sdk` TypeScript SDK를 사용한다.
 - Agent Factory taxonomy and runnable handoff target the ADK 2.3 baseline. Historical smoke-version notes are archived with the briefs that produced them.
-- Workflow catalog reuse remains local by default. Only the Reuse Hub `A2A 가능하게 변경` proposal plus `등록 승인` publish path creates an A2A-capable workflow version.
-- A2A-capable workflow rows stay `module_category: workflow` and carry provider metadata: `component_source: remote_a2a`, `runtime_binding: remote_a2a`, `a2a_provider_req_id`, and A2A-ready `contract_status`.
+- Workflow catalog reuse remains local. Reuse Hub는 A2A 변환 액션을 제공하지 않으며, A2A를 Agent의 Binding/Exposure로 모델링한다.
+- A2A publication은 strict Target v2 Agent entry만 받는다. 이전 Workflow 기반 입력이나 별도 원격 자산 category는 읽거나 변환하지 않는다.
 - Agent Card `HTTP 200`은 provider process/card health일 뿐이며 chat-ready로 보지 않는다. semantic `message/send` probe가 별도 readiness source다.
 - local Mock Lab prerequisite가 빠져 있으면 `server.status: running` 뒤에 숨기지 않고 prerequisite/blocked 상태와 시작 action으로 노출한다.
 

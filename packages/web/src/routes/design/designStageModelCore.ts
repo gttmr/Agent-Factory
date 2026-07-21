@@ -30,7 +30,7 @@ export function buildDesignSteps({
     {
       id: "review",
       label: "2. 검토",
-      hint: "모듈·그래프·계약",
+      hint: "Assets·Graph IR·계약",
       available: hasGraph,
       status: !hasGraph ? "todo" : boundariesApproved ? "done" : activeStep === "review" ? "current" : "blocked"
     },
@@ -81,7 +81,7 @@ export function buildDesignNextAction({
       onClick: () => onAdvance("review"),
       disabled: !hasGraph,
       hint: hasGraph
-        ? "경계·Graph IR 제안이 준비됐습니다. ‘2. 검토’에서 모듈·그래프·계약을 확인하세요."
+        ? "경계·Graph IR 제안이 준비됐습니다. ‘2. 검토’에서 Assets·Graph IR·계약을 확인하세요."
         : !hasAnalysis
           ? "Analyze 단계에서 분석 결과를 먼저 만들어야 Design 을 실행할 수 있습니다."
           : !analysisReviewed
@@ -104,7 +104,7 @@ export function buildDesignNextAction({
       onClick: () => onAdvance("approve"),
       disabled: !hasGraph,
       hint: reviewReady
-        ? "모든 모듈 approved · Graph IR 오류 0 · Runtime/A2A 계약 준비 완료. ‘3. 승인’에서 게이트를 토글하세요."
+        ? "모든 Asset approved · Graph IR 오류 0 · Runtime/A2A 계약 준비 완료. ‘3. 승인’에서 게이트를 토글하세요."
         : unmetConditions.join(" · ")
     };
   }
@@ -137,7 +137,7 @@ function buildReviewUnmetConditions({
 }): string[] {
   const unmet: string[] = [];
   if (!hasGraph) unmet.push("Graph IR 없음 — Design 실행 필요");
-  if (unapprovedCandidateCount > 0) unmet.push(`미승인 모듈 ${unapprovedCandidateCount}개 — 하단 모듈 탭에서 승인`);
+  if (unapprovedCandidateCount > 0) unmet.push(`미승인 Asset ${unapprovedCandidateCount}개 — 하단 Assets 탭에서 승인`);
   if (errorCount > 0) unmet.push(`Graph IR 오류 ${errorCount}개 — 그래프 편집으로 해소`);
   if (runtimeContractCount + a2aContractCount > 0) {
     if (!runtimeContractsReady) unmet.push("Runtime 계약 준비 필요");

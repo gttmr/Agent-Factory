@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "contract_id",
-    "remote_module_id",
+    "agent_ref",
     "target_agent_name",
     "target_agent_purpose",
     "contract_status",
@@ -41,13 +41,13 @@
   "properties": {
     "contract_id": {
       "type": "string",
-      "pattern": "^a2a-\\d{3,}$",
-      "examples": ["a2a-001"]
+      "pattern": "^a2a(?:-\\d{3,}|\\.[a-z0-9]+(?:[.-][a-z0-9]+)*)$",
+      "examples": ["a2a.document-review", "a2a-001"]
     },
-    "remote_module_id": {
+    "agent_ref": {
       "type": "string",
-      "pattern": "^mod-[a-z0-9-]+$",
-      "description": "Must reference an existing remote_a2a ModuleCandidate id."
+      "minLength": 1,
+      "description": "Must reference an existing Agent asset_id."
     },
     "target_agent_name": { "type": "string", "minLength": 1 },
     "target_agent_purpose": { "type": "string", "minLength": 1 },

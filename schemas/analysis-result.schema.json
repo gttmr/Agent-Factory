@@ -1,1215 +1,136 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/analysis-result.schema.json",
+  "title": "Strict Target Analysis Result v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["normalizedRequirement", "evidence", "moduleCandidates", "a2aContracts", "runtimeContracts", "processFlow"],
+  "required": ["contract_version", "normalizedRequirement", "evidence", "assetCandidates", "a2aContracts", "runtimeContracts", "graph"],
   "properties": {
-    "normalizedRequirement": {
-      "$ref": "#/$defs/normalizedRequirement"
-    },
-    "evidence": {
-      "$ref": "#/$defs/evidence"
-    },
-    "moduleCandidates": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/moduleCandidate"
-      }
-    },
-    "a2aContracts": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/a2aContract"
-      }
-    },
-    "runtimeContracts": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/runtimeContract"
-      }
-    },
-    "processFlow": {
-      "$ref": "#/$defs/processFlow"
-    }
+    "contract_version": { "const": "2.0" },
+    "normalizedRequirement": { "$ref": "./normalized-requirement.schema.json" },
+    "evidence": { "$ref": "#/$defs/evidence" },
+    "assetCandidates": { "type": "array", "items": { "$ref": "./asset-candidate.schema.json" } },
+    "a2aContracts": { "type": "array", "items": { "$ref": "./a2a-contract.schema.json" } },
+    "runtimeContracts": { "type": "array", "items": { "$ref": "#/$defs/runtimeContract" } },
+    "graph": { "$ref": "./graph.schema.json" }
   },
   "$defs": {
-    "nullableString": {
-      "anyOf": [{ "type": "string" }, { "type": "null" }]
-    },
-    "agentExecutionMode": {
-      "anyOf": [{ "type": "string", "enum": ["single_turn", "chat"] }, { "type": "null" }]
-    },
-    "nullableBoolean": {
-      "anyOf": [{ "type": "boolean" }, { "type": "null" }]
-    },
-    "runtimeContractKind": {
-      "type": "string",
-      "enum": [
-        "mcp_legacy_adapter",
-        "eai_legacy_adapter",
-        "context_manager",
-        "callback_broker",
-        "adk_callback",
-        "async_resume"
-      ]
-    },
-    "runtimeContractStatus": {
-      "type": "string",
-      "enum": ["draft", "needs_info", "approved", "rejected"]
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested_goal", "business_domain_hint", "user_role", "input_data", "output_data", "systems_mentioned", "decisions_implied", "risk_signals", "missing_information", "contradictions", "assumptions"],
+      "properties": {
+        "requested_goal": { "type": "string", "minLength": 1 },
+        "business_domain_hint": { "type": "string", "minLength": 1 },
+        "user_role": { "type": "string", "minLength": 1 },
+        "input_data": { "$ref": "#/$defs/stringArray" },
+        "output_data": { "$ref": "#/$defs/stringArray" },
+        "systems_mentioned": { "$ref": "#/$defs/stringArray" },
+        "decisions_implied": { "$ref": "#/$defs/stringArray" },
+        "risk_signals": { "type": "array", "items": { "$ref": "#/$defs/riskSignal" } },
+        "missing_information": { "$ref": "#/$defs/stringArray" },
+        "contradictions": { "$ref": "#/$defs/stringArray" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "accepted_missing_information": { "$ref": "#/$defs/stringArray" }
+      }
     },
     "runtimeContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "contract_id",
-        "contract_kind",
-        "module_id",
-        "title",
-        "contract_status",
-        "summary",
-        "required_review_fields",
-        "reviewer_notes",
-        "runtime_support",
-        "operation",
-        "identifiers",
-        "policies",
-        "graph_ir_annotations",
-        "synthetic_examples",
-        "developer_todos"
-      ],
+      "required": ["contract_id", "contract_kind", "asset_id", "title", "contract_status", "summary", "required_review_fields", "reviewer_notes", "runtime_support", "operation", "identifiers", "policies", "graph_ir_annotations", "synthetic_examples", "developer_todos"],
       "properties": {
-        "contract_id": { "type": "string", "pattern": "^rtc-[a-z0-9-]+$" },
-        "contract_kind": { "$ref": "#/$defs/runtimeContractKind" },
-        "module_id": { "$ref": "#/$defs/nullableString" },
-        "title": { "type": "string" },
-        "contract_status": { "$ref": "#/$defs/runtimeContractStatus" },
-        "summary": { "type": "string" },
-        "required_review_fields": { "type": "array", "items": { "type": "string" } },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "contract_kind": { "type": "string", "enum": ["mcp_connection", "external_connection", "context_manager", "callback_broker", "adk_callback", "async_resume"] },
+        "asset_id": { "$ref": "#/$defs/nullableString" },
+        "title": { "type": "string", "minLength": 1 },
+        "contract_status": { "type": "string", "enum": ["draft", "needs_info", "approved", "rejected"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "required_review_fields": { "$ref": "#/$defs/stringArray" },
         "reviewer_notes": { "type": "string" },
-        "runtime_support": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "context_manager_required",
-            "callback_broker_required",
-            "human_approval_required",
-            "idempotency_required",
-            "audit_required",
-            "compensation_required"
-          ],
-          "properties": {
-            "context_manager_required": { "type": "boolean" },
-            "callback_broker_required": { "type": "boolean" },
-            "human_approval_required": { "type": "boolean" },
-            "idempotency_required": { "type": "boolean" },
-            "audit_required": { "type": "boolean" },
-            "compensation_required": { "type": "boolean" }
-          }
-        },
-        "operation": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["operation_type", "side_effect_level", "callback_expected", "async_resume_required"],
-          "properties": {
-            "operation_type": { "type": "string", "enum": ["read", "write", "approval", "batch", "notification", "unknown"] },
-            "side_effect_level": {
-              "type": "string",
-              "enum": ["none", "read_only", "write", "financial_write", "customer_notification", "unknown"]
-            },
-            "callback_expected": { "type": "boolean" },
-            "async_resume_required": { "type": "boolean" }
-          }
-        },
-        "identifiers": { "type": "array", "items": { "type": "string" } },
-        "policies": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["auth_policy", "timeout_policy", "retry_policy", "fallback_policy", "masking_policy", "data_policy"],
-          "properties": {
-            "auth_policy": { "type": "string" },
-            "timeout_policy": { "type": "string" },
-            "retry_policy": { "type": "string" },
-            "fallback_policy": { "type": "string" },
-            "masking_policy": { "type": "string" },
-            "data_policy": { "type": "string" }
-          }
-        },
+        "runtime_support": { "$ref": "#/$defs/runtimeSupport" },
+        "operation": { "$ref": "#/$defs/runtimeOperation" },
+        "identifiers": { "$ref": "#/$defs/stringArray" },
+        "policies": { "$ref": "#/$defs/runtimePolicies" },
+        "resume_policy": { "oneOf": [{ "$ref": "#/$defs/asyncResumePolicy" }, { "type": "null" }] },
+        "side_effect_guard": { "oneOf": [{ "$ref": "#/$defs/asyncResumeSideEffectGuard" }, { "type": "null" }] },
         "graph_ir_annotations": { "type": "object", "additionalProperties": { "type": "string" } },
-        "synthetic_examples": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-        "developer_todos": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "field": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "type", "required"],
-      "properties": {
-        "name": { "type": "string" },
-        "type": { "type": "string" },
-        "required": { "type": "boolean" },
-        "schema": { "$ref": "#/$defs/jsonSchema" }
-      }
-    },
-    "jsonSchema": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "smokeSpec": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "sample_user_message",
-        "synthetic_inputs",
-        "expected_output_shape",
-        "expected_event_markers",
-        "mock_sources",
-        "ready"
-      ],
-      "properties": {
-        "sample_user_message": { "type": "string" },
-        "synthetic_inputs": { "type": "object", "additionalProperties": true },
-        "expected_output_shape": { "$ref": "#/$defs/jsonSchema" },
-        "expected_event_markers": { "type": "array", "items": { "type": "string" } },
-        "mock_sources": { "type": "array", "items": { "type": "string" } },
-        "ready": { "type": "boolean" }
-      }
-    },
-    "resolutionDraft": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "system": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "access"],
-      "properties": {
-        "name": { "type": "string" },
-        "access": {
-          "type": "string",
-          "enum": ["unknown", "read", "write", "read_write", "not_required"]
+        "synthetic_examples": { "type": "array", "items": { "type": "object" } },
+        "developer_todos": { "$ref": "#/$defs/stringArray" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "contract_kind": { "const": "async_resume" } }, "required": ["contract_kind"] },
+          "then": { "required": ["resume_policy", "side_effect_guard"] }
         }
-      }
+      ]
     },
-    "adkHints": {
+    "runtimeSupport": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "state_memory",
-        "callbacks",
-        "artifacts_events",
-        "mcp_a2a",
-        "streaming_grounding"
-      ],
+      "required": ["context_manager_required", "callback_broker_required", "human_approval_required", "idempotency_required", "audit_required", "compensation_required"],
       "properties": {
-        "state_memory": { "$ref": "#/$defs/nullableString" },
-        "callbacks": { "$ref": "#/$defs/nullableString" },
-        "artifacts_events": { "$ref": "#/$defs/nullableString" },
-        "mcp_a2a": { "$ref": "#/$defs/nullableString" },
-        "streaming_grounding": { "$ref": "#/$defs/nullableString" }
+        "context_manager_required": { "type": "boolean" },
+        "callback_broker_required": { "type": "boolean" },
+        "human_approval_required": { "type": "boolean" },
+        "idempotency_required": { "type": "boolean" },
+        "audit_required": { "type": "boolean" },
+        "compensation_required": { "type": "boolean" }
+      }
+    },
+    "runtimeOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_type", "side_effect_level", "callback_expected", "async_resume_required"],
+      "properties": {
+        "operation_type": { "type": "string", "enum": ["read", "write", "approval", "batch", "notification", "unknown"] },
+        "side_effect_level": { "type": "string", "enum": ["none", "read_only", "write", "financial_write", "customer_notification", "unknown"] },
+        "callback_expected": { "type": "boolean" },
+        "async_resume_required": { "type": "boolean" }
+      }
+    },
+    "runtimePolicies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["auth_policy", "timeout_policy", "retry_policy", "fallback_policy", "masking_policy", "data_policy"],
+      "properties": {
+        "auth_policy": { "type": "string" },
+        "timeout_policy": { "type": "string" },
+        "retry_policy": { "type": "string" },
+        "fallback_policy": { "type": "string" },
+        "masking_policy": { "type": "string" },
+        "data_policy": { "type": "string" }
+      }
+    },
+    "asyncResumePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interrupt_id", "correlation_scope", "timeout_seconds", "on_timeout", "duplicate_response", "conflicting_response", "restart_policy"],
+      "properties": {
+        "interrupt_id": { "type": "string", "minLength": 1 },
+        "correlation_scope": { "const": "invocation" },
+        "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "on_timeout": { "const": "expire_without_side_effect" },
+        "duplicate_response": { "const": "return_recorded_result" },
+        "conflicting_response": { "const": "reject" },
+        "restart_policy": { "const": "resume_incomplete_replay_completed" }
+      }
+    },
+    "asyncResumeSideEffectGuard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_ref", "idempotency_key_input", "delivery_semantics", "ledger_scope"],
+      "properties": {
+        "tool_ref": { "type": "string", "minLength": 1 },
+        "idempotency_key_input": { "type": "string", "minLength": 1 },
+        "delivery_semantics": { "const": "at_most_once" },
+        "ledger_scope": { "const": "session_state" }
       }
     },
     "riskSignal": {
       "type": "string",
-      "enum": [
-        "personal_data",
-        "financial_data",
-        "credit_decision_support",
-        "customer_impact",
-        "external_message",
-        "transaction_write",
-        "human_approval_required",
-        "audit_required"
-      ]
+      "enum": ["personal_data", "financial_data", "credit_decision_support", "customer_impact", "external_message", "transaction_write", "human_approval_required", "audit_required"]
     },
-    "normalizedRequirement": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "title",
-        "raw_text",
-        "domain",
-        "requester",
-        "business_goal",
-        "current_process",
-        "inputs",
-        "outputs",
-        "systems",
-        "risk_signals",
-        "missing_information",
-        "contradictions",
-        "status"
-      ],
-      "properties": {
-        "id": { "type": "string", "pattern": "^req-[a-z0-9-]+$" },
-        "title": { "type": "string" },
-        "raw_text": { "type": "string" },
-        "domain": { "type": "string" },
-        "requester": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["team", "role"],
-          "properties": {
-            "team": { "type": "string" },
-            "role": { "type": "string" }
-          }
-        },
-        "business_goal": { "type": "string" },
-        "current_process": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "inputs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/field" }
-        },
-        "outputs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/field" }
-        },
-        "systems": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/system" }
-        },
-        "risk_signals": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/riskSignal" }
-        },
-        "missing_information": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "contradictions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "status": {
-          "type": "string",
-          "enum": ["draft", "reviewed", "approved", "rejected"]
-        }
-      }
-    },
-    "evidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "requested_goal",
-        "business_domain_hint",
-        "user_role",
-        "input_data",
-        "output_data",
-        "systems_mentioned",
-        "decisions_implied",
-        "risk_signals",
-        "missing_information",
-        "contradictions",
-        "assumptions"
-      ],
-      "properties": {
-        "requested_goal": { "type": "string" },
-        "business_domain_hint": { "type": "string" },
-        "user_role": { "type": "string" },
-        "input_data": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "output_data": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "systems_mentioned": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "decisions_implied": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "risk_signals": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/riskSignal" }
-        },
-        "missing_information": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "contradictions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "assumptions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "accepted_missing_information": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
-      }
-    },
-    "moduleCandidate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "source_requirement_id",
-        "name",
-        "module_category",
-        "agent_kind",
-        "workflow_kind",
-        "adapter_kind",
-        "remote_contract_kind",
-        "legacy_recommended_type",
-        "confidence",
-        "rationale",
-        "adk_hints",
-        "inputs",
-        "outputs",
-        "reuse_candidate",
-        "risk_level",
-        "risk_signals",
-        "status",
-        "missing_information",
-        "side_effect",
-        "auth_required",
-        "audit_required",
-        "citation_required",
-        "grounding_required",
-        "source_acl_required",
-        "versioned",
-        "effective_date_required",
-        "owner_domain",
-        "owner",
-        "agent_card",
-        "auth",
-        "task_lifecycle",
-        "timeout",
-        "retry",
-        "fallback",
-        "audit",
-        "data_policy",
-        "a2a_contract_id"
-      ],
-      "properties": {
-        "id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
-        "source_requirement_id": { "type": "string", "pattern": "^req-[a-z0-9-]+$" },
-        "catalog_entry_id": { "$ref": "#/$defs/nullableString" },
-        "name": { "type": "string" },
-        "module_category": {
-          "type": "string",
-          "enum": ["agent", "workflow", "adapter", "remote_a2a"]
-        },
-        "agent_kind": {
-          "anyOf": [{ "type": "string", "enum": ["specialist", "shared"] }, { "type": "null" }]
-        },
-        "workflow_kind": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["orchestration", "graph", "dynamic", "unknown"]
-            },
-            { "type": "null" }
-          ]
-        },
-        "adapter_kind": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": [
-                "legacy_api",
-                "retrieval",
-                "rule_registry",
-                "data_query",
-                "template",
-                "computation",
-                "external_service",
-                "unknown"
-              ]
-            },
-            { "type": "null" }
-          ]
-        },
-        "remote_contract_kind": {
-          "anyOf": [{ "type": "string", "enum": ["a2a", "unknown"] }, { "type": "null" }]
-        },
-        "legacy_recommended_type": { "$ref": "#/$defs/nullableString" },
-        "confidence": { "type": "number" },
-        "rationale": { "type": "string" },
-        "adk_hints": {
-          "anyOf": [{ "$ref": "#/$defs/adkHints" }, { "type": "null" }]
-        },
-        "inputs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/field" }
-        },
-        "outputs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/field" }
-        },
-        "reuse_candidate": { "type": "boolean" },
-        "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
-        "risk_signals": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/riskSignal" }
-        },
-        "status": {
-          "type": "string",
-          "enum": ["needs_info", "approved", "deferred", "rejected"]
-        },
-        "missing_information": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "missing_information_resolution": { "type": "string" },
-        "resolved_missing_information": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "resolution_draft": {
-          "anyOf": [{ "$ref": "#/$defs/resolutionDraft" }, { "type": "null" }]
-        },
-        "resolution_applied_at": {
-          "anyOf": [{ "type": "string" }, { "type": "null" }]
-        },
-        "schema_review_state": {
-          "type": "string",
-          "enum": ["not_started", "drafted", "applied"]
-        },
-        "smoke_spec": {
-          "anyOf": [{ "$ref": "#/$defs/smokeSpec" }, { "type": "null" }]
-        },
-        "side_effect": {
-          "anyOf": [
-            { "type": "string", "enum": ["none", "read", "write", "read_write", "unknown"] },
-            { "type": "null" }
-          ]
-        },
-        "auth_required": { "$ref": "#/$defs/nullableBoolean" },
-        "audit_required": { "$ref": "#/$defs/nullableBoolean" },
-        "citation_required": { "$ref": "#/$defs/nullableBoolean" },
-        "grounding_required": { "$ref": "#/$defs/nullableBoolean" },
-        "source_acl_required": { "$ref": "#/$defs/nullableBoolean" },
-        "versioned": { "$ref": "#/$defs/nullableBoolean" },
-        "effective_date_required": { "$ref": "#/$defs/nullableBoolean" },
-        "owner_domain": { "$ref": "#/$defs/nullableString" },
-        "owner": { "$ref": "#/$defs/nullableString" },
-        "agent_card": { "$ref": "#/$defs/nullableString" },
-        "auth": { "$ref": "#/$defs/nullableString" },
-        "task_lifecycle": { "$ref": "#/$defs/nullableString" },
-        "timeout": { "$ref": "#/$defs/nullableString" },
-        "retry": { "$ref": "#/$defs/nullableString" },
-        "fallback": { "$ref": "#/$defs/nullableString" },
-        "audit": { "$ref": "#/$defs/nullableString" },
-        "data_policy": { "$ref": "#/$defs/nullableString" },
-        "a2a_contract_id": {
-          "anyOf": [{ "type": "string", "pattern": "^a2a-\\d{3,}$" }, { "type": "null" }]
-        }
-      }
-    },
-    "a2aContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "contract_id",
-        "remote_module_id",
-        "target_agent_name",
-        "target_agent_purpose",
-        "contract_status",
-        "agent_card",
-        "supported_interfaces",
-        "input_modes",
-        "output_modes",
-        "security_schemes",
-        "security_requirements",
-        "skills",
-        "extensions",
-        "message_contract",
-        "task_lifecycle",
-        "streaming",
-        "operations",
-        "http_paths",
-        "artifact_contract",
-        "adk_host_mapping",
-        "adk_runtime_policy",
-        "timeout",
-        "retry",
-        "fallback",
-        "cancellation",
-        "unsupported_operation",
-        "get_task_fallback",
-        "push_notification_policy",
-        "auth",
-        "token_handling",
-        "audit",
-        "data_policy"
-      ],
-      "properties": {
-        "contract_id": { "type": "string", "pattern": "^a2a-\\d{3,}$" },
-        "remote_module_id": { "type": "string", "pattern": "^mod-[a-z0-9-]+$" },
-        "target_agent_name": { "type": "string", "minLength": 1 },
-        "target_agent_purpose": { "type": "string", "minLength": 1 },
-        "contract_status": {
-          "type": "string",
-          "enum": ["draft", "needs_info", "approved"]
-        },
-        "agent_card": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["discovery_method", "agent_card_url", "version", "notes"],
-          "properties": {
-            "discovery_method": { "type": "string", "minLength": 1 },
-            "agent_card_url": { "type": "string", "minLength": 1 },
-            "version": { "type": "string", "minLength": 1 },
-            "notes": { "type": "string", "minLength": 1 }
-          }
-        },
-        "supported_interfaces": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["url", "protocol_binding", "protocol_version", "tenant_policy"],
-            "properties": {
-              "url": { "type": "string", "minLength": 1 },
-              "protocol_binding": { "type": "string", "minLength": 1 },
-              "protocol_version": { "type": "string", "minLength": 1 },
-              "tenant_policy": { "type": "string", "minLength": 1 }
-            }
-          }
-        },
-        "input_modes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "output_modes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "security_schemes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["name", "scheme"],
-            "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "scheme": { "type": "string", "minLength": 1 }
-            }
-          }
-        },
-        "security_requirements": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["scheme_name", "scopes"],
-            "properties": {
-              "scheme_name": { "type": "string", "minLength": 1 },
-              "scopes": { "type": "array", "items": { "type": "string", "minLength": 1 } }
-            }
-          }
-        },
-        "skills": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "extensions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-        "message_contract": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["allowed_part_fields", "allowed_roles"],
-          "properties": {
-            "allowed_part_fields": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/a2aPartField" }
-            },
-            "allowed_roles": {
-              "type": "array",
-              "items": { "$ref": "#/$defs/a2aRole" }
-            }
-          }
-        },
-        "task_lifecycle": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "states",
-            "allowed_transitions",
-            "terminal_states",
-            "input_required_followup",
-            "auth_required_followup"
-          ],
-          "properties": {
-            "states": { "type": "array", "items": { "$ref": "#/$defs/a2aTaskState" } },
-            "allowed_transitions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["from", "to"],
-                "properties": {
-                  "from": { "$ref": "#/$defs/a2aTaskState" },
-                  "to": { "$ref": "#/$defs/a2aTaskState" }
-                }
-              }
-            },
-            "terminal_states": { "type": "array", "items": { "$ref": "#/$defs/a2aTaskState" } },
-            "input_required_followup": { "type": "string", "minLength": 1 },
-            "auth_required_followup": { "type": "string", "minLength": 1 }
-          }
-        },
-        "streaming": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["supported", "wrappers", "non_streaming_fallback"],
-          "properties": {
-            "supported": { "type": "boolean" },
-            "wrappers": { "type": "array", "items": { "$ref": "#/$defs/a2aStreamWrapper" } },
-            "non_streaming_fallback": { "type": "string", "minLength": 1 }
-          }
-        },
-        "operations": { "type": "array", "items": { "$ref": "#/$defs/a2aOperationName" } },
-        "http_paths": { "type": "array", "items": { "$ref": "#/$defs/a2aHttpPath" } },
-        "artifact_contract": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["mutation_rules", "chunking_policy"],
-          "properties": {
-            "mutation_rules": { "type": "string", "minLength": 1 },
-            "chunking_policy": { "type": "string", "minLength": 1 }
-          }
-        },
-        "adk_host_mapping": { "type": "string", "minLength": 1 },
-        "adk_runtime_policy": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["timeout_seconds", "auth", "retry_handoff", "fallback_handoff"],
-          "properties": {
-            "timeout_seconds": {
-              "anyOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "null" }]
-            },
-            "auth": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "env_var", "metadata_key"],
-              "properties": {
-                "mode": { "type": "string", "enum": ["none", "bearer_env", "metadata_env"] },
-                "env_var": {
-                  "anyOf": [{ "type": "string", "minLength": 1, "pattern": "^AF_A2A_[A-Z0-9_]+$" }, { "type": "null" }]
-                },
-                "metadata_key": {
-                  "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
-                }
-              }
-            },
-            "retry_handoff": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["max_attempts", "backoff_seconds", "retry_on"],
-              "properties": {
-                "max_attempts": {
-                  "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
-                },
-                "backoff_seconds": {
-                  "anyOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "null" }]
-                },
-                "retry_on": {
-                  "type": "array",
-                  "items": { "type": "string", "minLength": 1 }
-                }
-              }
-            },
-            "fallback_handoff": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["mode", "message"],
-              "properties": {
-                "mode": { "type": "string", "enum": ["none", "manual_review", "local_event"] },
-                "message": {
-                  "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
-                }
-              }
-            }
-          }
-        },
-        "timeout": { "type": "string", "minLength": 1 },
-        "retry": { "type": "string", "minLength": 1 },
-        "fallback": { "type": "string", "minLength": 1 },
-        "cancellation": { "type": "string", "minLength": 1 },
-        "unsupported_operation": { "type": "string", "minLength": 1 },
-        "get_task_fallback": { "type": "string", "minLength": 1 },
-        "push_notification_policy": {
-          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
-        },
-        "auth": { "type": "string", "minLength": 1 },
-        "token_handling": { "type": "string", "minLength": 1 },
-        "audit": { "type": "string", "minLength": 1 },
-        "data_policy": { "type": "string", "minLength": 1 }
-      }
-    },
-    "a2aOperationName": {
-      "type": "string",
-      "enum": [
-        "SendMessage",
-        "SendStreamingMessage",
-        "GetTask",
-        "SubscribeToTask",
-        "CancelTask",
-        "ListTasks"
-      ]
-    },
-    "a2aHttpPath": {
-      "type": "string",
-      "enum": [
-        "/message:send",
-        "/message:stream",
-        "/tasks/{id}",
-        "/tasks/{id}:subscribe",
-        "/tasks/{id}:cancel"
-      ]
-    },
-    "a2aTaskState": {
-      "type": "string",
-      "enum": [
-        "TASK_STATE_SUBMITTED",
-        "TASK_STATE_WORKING",
-        "TASK_STATE_INPUT_REQUIRED",
-        "TASK_STATE_AUTH_REQUIRED",
-        "TASK_STATE_COMPLETED",
-        "TASK_STATE_FAILED",
-        "TASK_STATE_CANCELED",
-        "TASK_STATE_REJECTED"
-      ]
-    },
-    "a2aPartField": {
-      "type": "string",
-      "enum": ["text", "raw", "url", "data"]
-    },
-    "a2aRole": {
-      "type": "string",
-      "enum": ["ROLE_USER", "ROLE_AGENT"]
-    },
-    "a2aStreamWrapper": {
-      "type": "string",
-      "enum": ["task", "message", "taskStatusUpdate", "taskArtifactUpdate"]
-    },
-    "processFlow": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "requirement_id",
-        "graph_id",
-        "root_workflow_module_id",
-        "nodes",
-        "edges",
-        "containers",
-        "lanes",
-        "validation"
-      ],
-      "properties": {
-        "requirement_id": { "type": "string", "pattern": "^req-[a-z0-9-]+$" },
-        "graph_id": { "type": "string", "pattern": "^graph-[0-9]+$" },
-        "root_workflow_module_id": {
-          "anyOf": [{ "type": "string" }, { "type": "null" }]
-        },
-        "nodes": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/graphNode" }
-        },
-        "edges": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/graphEdge" }
-        },
-        "containers": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/graphContainer" }
-        },
-        "lanes": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/graphLane" }
-        },
-        "validation": { "$ref": "#/$defs/graphValidation" }
-      }
-    },
-    "graphNode": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "module_id",
-        "label",
-        "node_kind",
-        "execution_kind",
-        "adk_node_role",
-        "owner_scope",
-        "container_id",
-        "lane_id",
-        "input_ports",
-        "output_ports",
-        "schema_refs",
-        "review_status"
-      ],
-      "properties": {
-        "id": { "type": "string" },
-        "module_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
-        "label": { "type": "string" },
-        "node_kind": {
-          "type": "string",
-          "enum": [
-            "input",
-            "output",
-            "agent",
-            "function",
-            "tool",
-            "adapter",
-            "adapter_call",
-            "human_input",
-            "callback_wait",
-            "workflow",
-            "workflow_call",
-            "remote_a2a",
-            "remote_agent_call",
-            "join",
-            "router",
-            "loop_control"
-          ]
-        },
-        "execution_kind": { "$ref": "#/$defs/nullableString" },
-        "agent_execution_mode": { "$ref": "#/$defs/agentExecutionMode" },
-        "adk_node_role": {
-          "anyOf": [
-            { "type": "string", "enum": ["workflow_node", "container_root", "boundary", "synthetic"] },
-            { "type": "null" }
-          ]
-        },
-        "owner_scope": { "type": "string", "enum": ["local", "remote", "external"] },
-        "container_id": {
-          "anyOf": [{ "type": "string", "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
-        },
-        "lane_id": {
-          "type": "string",
-          "enum": ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"]
-        },
-        "input_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
-        "output_ports": { "type": "array", "items": { "$ref": "#/$defs/graphPort" } },
-        "schema_refs": { "type": "array", "items": { "type": "string" } },
-        "review_status": { "type": "string", "enum": ["needs_info", "approved", "deferred", "rejected", "n/a"] },
-        "position": {
-          "anyOf": [{ "$ref": "#/$defs/graphPosition" }, { "type": "null" }]
-        },
-        "workflow_ref": { "anyOf": [{ "$ref": "#/$defs/graphWorkflowRef" }, { "type": "null" }] },
-        "input_schema": { "$ref": "#/$defs/nullableString" },
-        "output_schema": { "$ref": "#/$defs/nullableString" },
-        "input_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
-        "output_mapping": { "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }] },
-        "human_input_contract": { "anyOf": [{ "$ref": "#/$defs/humanInputContract" }, { "type": "null" }] },
-        "runtime_binding": {
-          "anyOf": [
-            { "type": "string", "enum": ["unresolved", "direct_api", "mcp", "mcp_tool", "local_function", "remote_a2a", "workflow_call", "ui_input"] },
-            { "type": "null" }
-          ]
-        },
-        "invoke_binding": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": [
-                "unresolved",
-                "local_python",
-                "direct_api",
-                "mcp_tool",
-                "mcp_toolset",
-                "local_function",
-                "internal_workflow",
-                "ui_input",
-                "remote_a2a",
-                "callback_wait",
-                "unknown"
-              ]
-            },
-            { "type": "null" }
-          ]
-        },
-        "decision_owner": {
-          "anyOf": [
-            { "type": "string", "enum": ["workflow_code", "llm", "human", "remote_agent", "system", "unknown"] },
-            { "type": "null" }
-          ]
-        },
-        "call_control": {
-          "anyOf": [
-            { "type": "string", "enum": ["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"] },
-            { "type": "null" }
-          ]
-        },
-        "side_effect": {
-          "anyOf": [
-            { "type": "string", "enum": ["none", "read", "write", "external_message", "transaction", "unknown"] },
-            { "type": "null" }
-          ]
-        },
-        "policy": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": [
-                "none",
-                "auth_required",
-                "approval_required",
-                "audit_required",
-                "idempotency_required",
-                "timeout_retry_required",
-                "data_policy_required",
-                "manual_fallback_required",
-                "callback_resume_required",
-                "compensation_required",
-                "unknown"
-              ]
-            },
-            { "type": "null" }
-          ]
-        },
-        "mock_binding": { "anyOf": [{ "$ref": "#/$defs/graphMockBinding" }, { "type": "null" }] },
-        "adk_skeleton_contract": { "anyOf": [{ "$ref": "#/$defs/adkSkeletonContract" }, { "type": "null" }] }
-      }
-    },
-    "graphWorkflowRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "version", "source", "display_name"],
-      "properties": {
-        "id": { "type": "string" },
-        "version": { "$ref": "#/$defs/nullableString" },
-        "source": { "type": "string", "enum": ["catalog", "artifact", "placeholder"] },
-        "display_name": { "type": "string" }
-      }
-    },
-    "stringMapping": {
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "stringArrayMapping": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string", "minLength": 1 }
-      }
-    },
-    "humanInputContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
-      "properties": {
-        "message": { "type": "string", "minLength": 1 },
-        "payload_schema_ref": { "$ref": "#/$defs/nullableString" },
-        "response_schema_ref": { "$ref": "#/$defs/nullableString" },
-        "response_mapping": {
-          "anyOf": [{ "$ref": "#/$defs/stringMapping" }, { "type": "null" }]
-        },
-        "choice_options": {
-          "anyOf": [{ "type": "array", "items": { "type": "string", "minLength": 1 } }, { "type": "null" }]
-        },
-        "accepted_aliases": {
-          "anyOf": [{ "$ref": "#/$defs/stringArrayMapping" }, { "type": "null" }]
-        },
-        "default_choice": { "$ref": "#/$defs/nullableString" }
-      }
-    },
-    "graphMockBinding": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["provider", "package_path", "mock_server_id", "tool_name", "input_schema", "output_schema", "sample_response_ref", "status"],
-      "properties": {
-        "provider": { "type": "string", "const": "mock_lab" },
-        "package_path": { "type": "string", "const": "packages/mock-lab" },
-        "mock_server_id": { "$ref": "#/$defs/nullableString" },
-        "tool_name": { "$ref": "#/$defs/nullableString" },
-        "input_schema": { "$ref": "#/$defs/nullableString" },
-        "output_schema": { "$ref": "#/$defs/nullableString" },
-        "sample_response_ref": { "$ref": "#/$defs/nullableString" },
-        "status": { "type": "string", "enum": ["linked", "missing", "invalid"] }
-      }
-    },
-    "adkSkeletonContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["scaffold_level", "implementation_template", "manual_completion_required", "developer_todos"],
-      "properties": {
-        "scaffold_level": { "type": "string", "enum": ["none", "handoff", "mock_testable_skeleton", "manual_required"] },
-        "target_runtime": { "type": "string", "enum": ["adk_python_2_x"] },
-        "entrypoint": { "type": "string", "enum": ["root_agent"] },
-        "generation_mode": { "type": "string", "enum": ["deterministic_template", "llm_assisted_patch", "manual"] },
-        "implementation_template": { "type": "string" },
-        "manual_completion_required": { "type": "boolean" },
-        "developer_todos": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "graphPosition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["x", "y"],
-      "properties": {
-        "x": { "type": "number" },
-        "y": { "type": "number" }
-      }
-    },
-    "graphEdge": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "from",
-        "to",
-        "from_port",
-        "to_port",
-        "edge_kind",
-        "execution_semantics",
-        "data_label",
-        "schema_ref",
-        "route_condition",
-        "state_key",
-        "artifact_key",
-        "a2a_contract_id",
-        "is_remote_boundary_crossing"
-      ],
-      "properties": {
-        "id": { "type": "string", "pattern": "^edge-[0-9]+$" },
-        "from": { "type": "string" },
-        "to": { "type": "string" },
-        "from_port": { "$ref": "#/$defs/nullableString" },
-        "to_port": { "$ref": "#/$defs/nullableString" },
-        "edge_kind": {
-          "type": "string",
-          "enum": [
-            "event_output",
-            "event_message",
-            "session_state",
-            "temp_state",
-            "user_state",
-            "app_state",
-            "artifact",
-            "route",
-            "control",
-            "remote_a2a"
-          ]
-        },
-        "execution_semantics": {
-          "type": "string",
-          "enum": [
-            "normal_transition",
-            "fan_out",
-            "fan_in",
-            "loop_back",
-            "loop_exit",
-            "conditional",
-            "boundary_crossing"
-          ]
-        },
-        "data_label": { "type": "string" },
-        "schema_ref": { "$ref": "#/$defs/nullableString" },
-        "route_condition": { "$ref": "#/$defs/nullableString" },
-        "route_aliases": {
-          "anyOf": [
-            { "type": "array", "items": { "type": "string", "minLength": 1 } },
-            { "type": "null" }
-          ]
-        },
-        "is_default_route": {
-          "anyOf": [{ "type": "boolean" }, { "type": "null" }]
-        },
-        "state_key": { "$ref": "#/$defs/nullableString" },
-        "artifact_key": { "$ref": "#/$defs/nullableString" },
-        "a2a_contract_id": { "$ref": "#/$defs/nullableString" },
-        "is_remote_boundary_crossing": { "type": "boolean" },
-        "flow_kind": {
-          "anyOf": [
-            { "type": "string", "enum": ["sequence", "route", "fan_out", "fan_in", "loop_back", "loop_exit", "fallback", "error", "resume", "callback", "unknown"] },
-            { "type": "null" }
-          ]
-        },
-        "call_control": {
-          "anyOf": [
-            { "type": "string", "enum": ["none", "fixed_by_workflow", "selected_by_llm", "selected_by_human", "event_callback", "resume", "unknown"] },
-            { "type": "null" }
-          ]
-        }
-      }
-    },
-    "graphContainer": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "module_id",
-        "label",
-        "container_kind",
-        "adk_mapping",
-        "contains_node_ids",
-        "entry_node_ids",
-        "exit_node_ids",
-        "layout_policy",
-        "parent_container_id"
-      ],
-      "properties": {
-        "id": { "type": "string", "pattern": "^container-[a-z0-9-]+$" },
-        "module_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
-        "label": { "type": "string" },
-        "container_kind": {
-          "type": "string",
-          "enum": [
-            "graph_workflow",
-            "dynamic_workflow",
-            "parallel_region",
-            "loop_region",
-            "human_review_region",
-            "remote_boundary"
-          ]
-        },
-        "adk_mapping": { "$ref": "#/$defs/nullableString" },
-        "contains_node_ids": { "type": "array", "items": { "type": "string" } },
-        "entry_node_ids": { "type": "array", "items": { "type": "string" } },
-        "exit_node_ids": { "type": "array", "items": { "type": "string" } },
-        "layout_policy": {
-          "type": "string",
-          "enum": ["dag_with_routes", "fan_out_fan_in", "loop", "linear", "free"]
-        },
-        "parent_container_id": {
-          "anyOf": [{ "type": "string", "pattern": "^container-[a-z0-9-]+$" }, { "type": "null" }]
-        }
-      }
-    },
-    "graphLane": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "label"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "enum": ["input", "local_graph", "adapter", "human_input", "output", "remote_boundary"]
-        },
-        "label": { "type": "string" }
-      }
-    },
-    "graphPort": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "label", "schema_ref"],
-      "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "schema_ref": { "$ref": "#/$defs/nullableString" }
-      }
-    },
-    "graphValidationIssue": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["code", "message", "target_kind", "target_id"],
-      "properties": {
-        "code": { "type": "string" },
-        "message": { "type": "string" },
-        "target_kind": { "type": "string", "enum": ["node", "edge", "container", "graph"] },
-        "target_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
-      }
-    },
-    "graphValidation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["ok", "errors", "warnings"],
-      "properties": {
-        "ok": { "type": "boolean" },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/graphValidationIssue" } },
-        "warnings": { "type": "array", "items": { "$ref": "#/$defs/graphValidationIssue" } }
-      }
-    }
+    "stringArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "nullableString": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
   }
 }

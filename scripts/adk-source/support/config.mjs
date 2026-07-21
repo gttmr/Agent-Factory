@@ -3,7 +3,7 @@ import { pyNodeName } from "../naming.mjs";
 import { toPyStr, toPythonLiteral, yamlScalar } from "../python-literals.mjs";
 import { remoteA2aEnvVars } from "../remote-a2a.mjs";
 
-export function buildAgentsConfig({ modules, agentNodeTargets = [], defaultAgentInstruction, adapterConnection }) {
+export function buildAgentsConfig({ assets, agentNodeTargets = [], defaultAgentInstruction, toolConnection }) {
   const lines = [];
   lines.push("# agents.config.yaml — runnable ADK bundle의 노드별 override 파일입니다.");
   lines.push("# 한글 우선 instruction을 여기에서 검토/수정하세요. model / instruction / mcp_url 변경은");
@@ -18,62 +18,64 @@ export function buildAgentsConfig({ modules, agentNodeTargets = [], defaultAgent
   lines.push("  model_env: AF_VLLM_MODEL");
   lines.push("  api_key_env: AF_VLLM_API_KEY");
 
-  const agents = agentConfigEntries({ modules, agentNodeTargets });
+  const agents = agentConfigEntries({ assets, agentNodeTargets });
   lines.push("agents:");
   if (!agents.length) lines.push("  []");
   for (const agent of agents) {
     lines.push(`  - id: ${agent.id}`);
-    if (agent.moduleId) lines.push(`    module_id: ${agent.moduleId}`);
+    if (agent.assetRef) lines.push(`    asset_ref: ${agent.assetRef}`);
     lines.push(`    name: ${pyNodeName(agent.target)}`);
-    lines.push(`    model: ${agent.module.model || DEFAULT_MODEL}`);
+    lines.push(`    model: ${DEFAULT_MODEL}`);
     lines.push("    instruction: |");
     const instruction = defaultAgentInstruction(agent.target);
     for (const line of String(instruction).split("\n")) lines.push(`      ${line}`);
   }
 
-  const adapters = modules.filter((module) => module.module_category === "adapter");
-  lines.push("adapters:");
-  if (!adapters.length) lines.push("  []");
-  for (const module of adapters) {
-    const connected = adapterConnection(module) === "mcp_connected";
-    lines.push(`  - id: ${module.id}`);
+  const tools = assets.filter((asset) => asset.asset_type === "tool");
+  lines.push("tools:");
+  if (!tools.length) lines.push("  []");
+  for (const asset of tools) {
+    const connected = toolConnection(asset) === "mcp_connected";
+    lines.push(`  - asset_id: ${asset.asset_id}`);
     lines.push(`    connection: ${connected ? "mcp_connected" : "unconnected"}`);
-    lines.push(`    mcp_server: ${module.mcp_server ? module.mcp_server : "null"}`);
-    lines.push(`    mcp_tool: ${module.mcp_tool_name ? module.mcp_tool_name : "null"}`);
+    lines.push("    binding:");
+    lines.push(`      kind: ${asset.binding?.kind ?? "unresolved"}`);
+    lines.push(`      server_ref: ${asset.binding?.server_ref ?? "null"}`);
+    lines.push(`      tool_name: ${asset.binding?.tool_name ?? "null"}`);
     if (connected) {
       lines.push(`    runtime_mcp_label: ${RUNTIME_MCP_LABEL}`);
       lines.push(`    runtime_mcp_note: ${RUNTIME_MCP_NOTE}`);
     }
-    lines.push("    mcp_url: null  # 기본값: $AF_MOCK_LAB_MCP_URL/<mcp_server>");
+    lines.push("    url: null  # 기본값: $AF_MOCK_LAB_MCP_URL/<server_ref>");
     if (connected) {
       lines.push("    input_map: {}  # 선택: {tool_input_name: state_or_upstream_output_key}");
     }
   }
 
-  const workflows = modules.filter((module) => module.module_category === "workflow");
+  const workflows = assets.filter((asset) => asset.asset_type === "workflow");
   if (workflows.length) {
     lines.push("workflows:");
-    for (const module of workflows) {
-      lines.push(`  - id: ${module.id}`);
+    for (const asset of workflows) {
+      lines.push(`  - asset_id: ${asset.asset_id}`);
       lines.push("    note: 검토된 결정적 조정자 자리표시자입니다. 후속 작업에서 하위 그래프로 확장하세요.");
     }
   }
   return `${lines.join("\n")}\n`;
 }
 
-function agentConfigEntries({ modules, agentNodeTargets }) {
-  const entries = modules.filter(isAgentModule).map((module) => ({
-    id: module.id,
-    moduleId: null,
-    module,
-    target: module
+function agentConfigEntries({ assets, agentNodeTargets }) {
+  const entries = assets.filter(isLocalAgent).map((asset) => ({
+    id: asset.asset_id,
+    assetRef: null,
+    asset,
+    target: asset
   }));
   for (const target of agentNodeTargets) {
-    if (!isAgentModule(target.module) || target.node.id === target.module.id) continue;
+    if (!isLocalAgent(target.asset) || target.node.id === target.asset.asset_id) continue;
     entries.push({
       id: target.node.id,
-      moduleId: target.module.id,
-      module: target.module,
+      assetRef: target.asset.asset_id,
+      asset: target.asset,
       target
     });
   }
@@ -94,23 +96,19 @@ __all__ = ["root_agent"]
 `;
 }
 
-export function buildSchemasPy({ modules, adapterConnection }) {
+export function buildSchemasPy({ assets, toolConnection }) {
   return `"""Reviewed input/output schema names for the generated skeleton."""
 
-MODULE_SCHEMAS = ${toPythonLiteral(
+ASSET_SCHEMAS = ${toPythonLiteral(
     Object.fromEntries(
-      modules.map((module) => [
-        module.id,
+      assets.map((asset) => [
+        asset.asset_id,
         {
-          inputs: module.inputs ?? [],
-          outputs: module.outputs ?? [],
-          invoke_binding: module.invoke_binding ?? null,
-          decision_owner: module.decision_owner ?? null,
-          call_control: module.call_control ?? null,
-          side_effect: module.side_effect ?? null,
-          policy: module.policy ?? null,
-          workflow_ref: module.workflow_ref ?? null,
-          mock_binding: module.module_category === "adapter" ? mockBindingFromModule(module, { adapterConnection }) : null,
+          inputs: asset.inputs ?? [],
+          outputs: asset.outputs ?? [],
+          binding: asset.binding ?? null,
+          connection: asset.connection ?? null,
+          tool_config: asset.asset_type === "tool" ? toolConfigFromAsset(asset, { toolConnection }) : null,
         },
       ])
     )
@@ -121,10 +119,10 @@ MODULE_SCHEMAS = ${toPythonLiteral(
 export function buildNodeHelperPy(kind) {
   const note = {
     agents: "Agent node instructions are emitted in agent.py as LlmAgent declarations.",
-    adapters: "Adapter stubs call the synthetic MCP provider only when mock_binding is linked; replace with real EAI/API clients manually.",
-    gates: "User confirmation gates are modeled with RequestInput nodes and reviewed router route edges.",
+    tools: "Tool stubs call the synthetic MCP provider only when the reviewed binding is connected; replace test doubles manually.",
+    gates: "User confirmation gates are modeled with RequestInput nodes and reviewed condition edges.",
     human_inputs: "Human input nodes are RequestInput placeholders for ADK development UI smoke tests.",
-    routers: "Reviewed router nodes lower route edges into ADK Workflow route functions.",
+    functions: "Reviewed Function nodes lower route and data-processing roles into ADK Workflow functions.",
   }[kind];
   return `"""${note}"""
 
@@ -132,34 +130,27 @@ DEVELOPER_NOTE = ${toPyStr(note)}
 `;
 }
 
-export function buildWorkflowCallsPy({ modules }) {
-  const workflowCalls = modules.filter((module) => module.module_category === "workflow");
-  const rows = workflowCalls.map((module) => ({
-    module_id: module.id,
-    module_name: module.name,
-    workflow_ref: module.workflow_ref ?? {
-      id: module.id,
-      version: null,
-      source: "placeholder",
-      display_name: module.name,
-    },
-    input_mapping: module.input_mapping ?? {},
-    output_mapping: module.output_mapping ?? {},
-    developer_todos: module.developer_todos ?? [],
+export function buildSubworkflowsPy({ assets }) {
+  const workflowAssets = assets.filter((asset) => asset.asset_type === "workflow");
+  const rows = workflowAssets.map((asset) => ({
+    asset_id: asset.asset_id,
+    asset_name: asset.name,
+    workflow_ref: asset.asset_id,
+    developer_todos: asset.developer_todos ?? [],
   }));
-  return `"""workflow_call placeholders for existing/sub-workflow calls.
+  return `"""Subworkflow placeholders for reviewed Workflow asset calls.
 
 These functions intentionally do not implement target workflow business logic.
 Developers should replace the placeholder return with an import/call to the
 reviewed target Workflow skeleton after confirming the contract.
 """
 
-WORKFLOW_CALLS = ${toPythonLiteral(rows)}
+SUBWORKFLOWS = ${toPythonLiteral(rows)}
 
 
 async def call_existing_workflow(ctx, input_data, workflow_ref):
     return {
-        "status": "workflow_call_placeholder",
+        "status": "subworkflow_placeholder",
         "manual_completion_required": True,
         "target_workflow": workflow_ref,
         "input": input_data,
@@ -167,14 +158,14 @@ async def call_existing_workflow(ctx, input_data, workflow_ref):
 `;
 }
 
-export function buildMockConfigYaml({ modules, adapterConnection }) {
-  const adapters = modules.filter((module) => module.module_category === "adapter");
-  const lines = ["provider: mock_lab", "package_path: packages/mock-lab", "adapters:"];
-  if (!adapters.length) lines.push("  []");
-  for (const module of adapters) {
-    const binding = mockBindingFromModule(module, { adapterConnection });
-    lines.push(`  - module_id: ${yamlScalar(module.id)}`);
-    lines.push(`    module_name: ${yamlScalar(module.name)}`);
+export function buildMockConfigYaml({ assets, toolConnection }) {
+  const tools = assets.filter((asset) => asset.asset_type === "tool");
+  const lines = ["provider: mock_lab", "package_path: packages/mock-lab", "tools:"];
+  if (!tools.length) lines.push("  []");
+  for (const asset of tools) {
+    const binding = toolConfigFromAsset(asset, { toolConnection });
+    lines.push(`  - asset_id: ${yamlScalar(asset.asset_id)}`);
+    lines.push(`    asset_name: ${yamlScalar(asset.name)}`);
     lines.push(`    status: ${yamlScalar(binding.status)}`);
     lines.push(`    provider: ${yamlScalar(binding.provider)}`);
     lines.push(`    package_path: ${yamlScalar(binding.package_path)}`);
@@ -187,8 +178,8 @@ export function buildMockConfigYaml({ modules, adapterConnection }) {
   return `${lines.join("\n")}\n`;
 }
 
-export function buildEnvExample({ analysisResult, modules }) {
-  const remoteEnvLines = remoteA2aEnvVars({ analysisResult, modules }).map((envVar) => `# ${envVar}=...`);
+export function buildEnvExample({ analysisResult, assets }) {
+  const remoteEnvLines = remoteA2aEnvVars({ analysisResult, assets }).map((envVar) => `# ${envVar}=...`);
   return `# Workbench 공유 runtime env template입니다.
 # 이 파일을 <repo>/.agent-factory/runtime.env로 복사하거나 AF_RUNTIME_ENV_FILE을 지정하세요.
 # AF_LLM_PROVIDER=auto 는 AF_VLLM_*가 있으면 vLLM, 없으면 Gemini fallback을 사용합니다.
@@ -208,26 +199,20 @@ export function buildGitignore() {
   return `.env\n.venv/\n.adk/\n__pycache__/\n*.pyc\n`;
 }
 
-export function mockBindingFromModule(module, { adapterConnection }) {
-  const connection = adapterConnection(module);
-  if (module.mock_binding && typeof module.mock_binding === "object") {
-    return {
-      ...module.mock_binding,
-      status: connection === "mcp_connected" ? "linked" : "missing"
-    };
-  }
+export function toolConfigFromAsset(asset, { toolConnection }) {
+  const connection = toolConnection(asset);
   return {
     provider: "mock_lab",
     package_path: "packages/mock-lab",
-    mock_server_id: module.mcp_server ?? null,
-    tool_name: module.mcp_tool_name ?? null,
-    input_schema: module.mcp_schema_ref ?? null,
+    mock_server_id: asset.binding?.server_ref ?? null,
+    tool_name: asset.binding?.tool_name ?? null,
+    input_schema: null,
     output_schema: null,
     sample_response_ref: null,
     status: connection === "mcp_connected" ? "linked" : "missing",
   };
 }
 
-function isAgentModule(module) {
-  return module.module_category === "agent";
+function isLocalAgent(asset) {
+  return asset.asset_type === "agent" && asset.binding?.kind !== "a2a";
 }

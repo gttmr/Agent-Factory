@@ -33,7 +33,7 @@ Evidence for several Agents is not, by itself, evidence for a Workflow. Evidence
 
 Use only Agent, Workflow, and Tool as top-level assets. Keep Graph Nodes separate. A Function Node remains Workflow-private; a Function-bound Tool remains a Tool. Invocation Control is Workflow or Agent only.
 
-Follow [Taxonomy](../taxonomy.md), [Graph IR](../graph-ir.md), and [runtime pattern selection](../runtime-pattern-selection.md). Current canonical JSON goes through [the Compatibility Layer](../compatibility-current-schema.md).
+Follow `_shared/taxonomy.md`, `_shared/graph-ir.md`, and `_shared/target-contract-v2.md` when those decisions are in scope. Use `_shared/runtime-pattern-selection.md` separately when evidence justifies a runtime pattern.
 
 ## Compose Artifact
 

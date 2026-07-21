@@ -1,0 +1,44 @@
+{
+  "id": "req-s08-callback-guardrail",
+  "title": "Synthetic before-tool callback guardrail design",
+  "raw_text": "Review a runner-wide before-tool callback guardrail that allows approved synthetic operations, blocks denied operations before Tool execution, writes a redacted decision to state and audit evidence, and fails closed on callback errors. Do not scaffold runnable source until callback runtime semantics are implemented and verified.",
+  "domain": "synthetic-runtime-control",
+  "requester": {
+    "team": "scenario-fixture-team",
+    "role": "reviewer"
+  },
+  "business_goal": "Review the callback guardrail boundary and preserve a fail-closed generation stop until the generic runtime generator supports its semantics.",
+  "current_process": [
+    "Accept a synthetic operation request",
+    "Evaluate the runner-wide before-tool guardrail",
+    "Continue to the Tool only for an allowed decision",
+    "Return a typed blocked result without invoking the Tool for a denied or failed decision",
+    "Write only a redacted decision to synthetic state and audit evidence"
+  ],
+  "inputs": [
+    {
+      "name": "synthetic_operation_request",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "guarded_operation_outcome",
+      "type": "object",
+      "required": true
+    }
+  ],
+  "systems": [
+    {
+      "name": "synthetic_local_audit_sink",
+      "access": "write"
+    }
+  ],
+  "risk_signals": [
+    "audit_required"
+  ],
+  "missing_information": [],
+  "contradictions": [],
+  "status": "approved"
+}

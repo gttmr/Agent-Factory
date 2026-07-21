@@ -73,7 +73,7 @@ export function VerifyReviewStep({
           onChange={(event) => onDeltaChange(event.target.value)}
           rows={10}
           className="af-markdown-editor af-yaml-editor"
-          placeholder={`proposed_additions:\n  - category: adapter\n    name: …\n    rationale: …\n`}
+          placeholder={`proposed_additions:\n  - category: tool\n    asset_type: tool\n    name: …\n    domain_scope: domain_neutral\n    business_domains: []\n    owner: …\n    reuse_status: publish_candidate\n    capability_tags: []\n    binding: { kind: unresolved, server_ref: null, tool_name: null }\n    connection: { transport: unknown }\n    workflow_profile: null\n    exposure: null\n`}
         />
       </Panel>
     </div>

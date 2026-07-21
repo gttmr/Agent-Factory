@@ -1,15 +1,15 @@
-import { buildDefaultA2ARuntimePolicy } from "../analyzer/a2aNormalize";
-import type { A2AContract, ModuleCandidate } from "../analyzer/types";
-import { a2aContractReadinessIssues, findMatchingA2AContract, remoteA2ACandidates } from "./a2aContractValidator";
+import { buildDefaultA2ARuntimePolicy } from "../analyzer/a2aContracts";
+import type { A2AContract, AssetCandidate } from "../analyzer/types";
+import { a2aAgentAssets, a2aContractReadinessIssues, findMatchingA2AContract } from "./a2aContractValidator";
 
 export interface A2AReviewRow {
-  candidate: ModuleCandidate;
+  candidate: AssetCandidate;
   contract: A2AContract | null;
   issues: string[];
 }
 
-export function buildA2AReviewRows(candidates: ModuleCandidate[], contracts: A2AContract[]): A2AReviewRow[] {
-  return remoteA2ACandidates(candidates).map((candidate) => {
+export function buildA2AReviewRows(candidates: AssetCandidate[], contracts: A2AContract[]): A2AReviewRow[] {
+  return a2aAgentAssets(candidates).map((candidate) => {
     const contract = findMatchingA2AContract(candidate, contracts);
     return {
       candidate,

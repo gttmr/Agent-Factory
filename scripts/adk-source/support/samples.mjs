@@ -1,32 +1,32 @@
 import { yamlScalar } from "../python-literals.mjs";
 import { routeValue } from "../graph/routes.mjs";
 
-export function buildSampleInputsYaml({ modules, normalizedRequirement, packageName, processFlow, terminalOutputIds }) {
-  const lines = buildWorkflowChatSampleYaml({ modules, normalizedRequirement, packageName, processFlow, terminalOutputIds });
+export function buildSampleInputsYaml({ assets, normalizedRequirement, packageName, graph, terminalOutputIds }) {
+  const lines = buildWorkflowChatSampleYaml({ assets, normalizedRequirement, packageName, graph, terminalOutputIds });
   lines.push("samples:");
   let count = 0;
-  for (const module of modules) {
-    const inputs = module.smoke_spec?.synthetic_inputs;
+  for (const asset of assets) {
+    const inputs = asset.smoke_spec?.synthetic_inputs;
     if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) continue;
     count += 1;
-    lines.push(`  - module_id: ${yamlScalar(module.id)}`);
-    lines.push(`    module_name: ${yamlScalar(module.name)}`);
+    lines.push(`  - asset_id: ${yamlScalar(asset.asset_id)}`);
+    lines.push(`    asset_name: ${yamlScalar(asset.name)}`);
     lines.push("    input:");
     for (const [key, value] of Object.entries(inputs)) {
       lines.push(`      ${key}: ${yamlScalar(value)}`);
     }
   }
   if (!count) {
-    lines.push("  - module_id: workflow");
-    lines.push(`    module_name: ${yamlScalar(normalizedRequirement.title || packageName)}`);
+    lines.push("  - asset_id: workflow");
+    lines.push(`    asset_name: ${yamlScalar(normalizedRequirement.title || packageName)}`);
     lines.push("    input:");
-    lines.push(`      user_request: ${yamlScalar(firstSmokeSample({ modules }) || "ADK development UI smoke test sample")}`);
+    lines.push(`      user_request: ${yamlScalar(firstSmokeSample({ assets }) || "ADK development UI smoke test sample")}`);
   }
   return `${lines.join("\n")}\n`;
 }
 
-export function buildRuntimeChatSmoke({ modules, normalizedRequirement, outputMode, packageName }) {
-  const sample = firstSmokeSample({ modules });
+export function buildRuntimeChatSmoke({ assets, normalizedRequirement, outputMode, packageName }) {
+  const sample = firstSmokeSample({ assets });
   const text =
     outputMode === "runnable"
       ? sample || `${normalizedRequirement.title} 워크플로우를 합성 sample input으로 실행하고 결과를 요약하세요.`
@@ -44,9 +44,9 @@ export function buildRuntimeChatSmoke({ modules, normalizedRequirement, outputMo
   };
 }
 
-function firstSmokeSample({ modules }) {
-  for (const module of modules) {
-    const sample = module.smoke_spec?.sample_user_message;
+function firstSmokeSample({ assets }) {
+  for (const asset of assets) {
+    const sample = asset.smoke_spec?.sample_user_message;
     if (typeof sample === "string" && sample.trim()) return sample.trim();
   }
   return "";
@@ -87,19 +87,19 @@ function buildWorkflowChatSampleYaml(context) {
   return lines;
 }
 
-function humanInputSamples({ processFlow, modules }) {
-  return (Array.isArray(processFlow.nodes) ? processFlow.nodes : [])
+function humanInputSamples({ graph, assets }) {
+  return (Array.isArray(graph.nodes) ? graph.nodes : [])
     .filter((node) => node?.node_kind === "human_input")
     .map((node, index) => ({
       prompt: humanInputPrompt(node),
-      response: suggestedHumanInputReply(node, index, { modules, processFlow }),
+      response: suggestedHumanInputReply(node, index, { assets, graph }),
     }));
 }
 
 function suggestedHumanInputReply(node, index, context) {
   const reviewedDefault = reviewedDefaultChoice(node);
   if (reviewedDefault) return reviewedDefault;
-  const routeReply = reviewedRouteReplyAfterNode(node, context.processFlow);
+  const routeReply = reviewedRouteReplyAfterNode(node, context.graph);
   if (routeReply) return routeReply;
   const label = humanInputPrompt(node);
   if (/목적|시나리오/.test(label)) return inferredPurposeText(context);
@@ -121,41 +121,41 @@ function reviewedDefaultChoice(node) {
   return choices[0]?.trim() ?? "";
 }
 
-function reviewedRouteReplyAfterNode(node, processFlow) {
-  const edges = Array.isArray(processFlow?.edges) ? processFlow.edges : [];
-  const nodes = Array.isArray(processFlow?.nodes) ? processFlow.nodes : [];
+function reviewedRouteReplyAfterNode(node, graph) {
+  const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const outgoing = edges.filter((edge) => edge?.from === node.id);
-  const routerIds = new Set(
+  const routeNodeIds = new Set(
     outgoing
       .map((edge) => edge.to)
-      .filter((id) => nodes.some((candidate) => candidate?.id === id && candidate.node_kind === "router"))
+      .filter((id) => nodes.some((candidate) => candidate?.id === id && candidate.node_kind === "function" && candidate.role === "route"))
   );
-  const routes = edges.filter((edge) => routerIds.has(edge?.from) && edge.edge_kind === "route");
-  const selected = routes.find((edge) => edge.is_default_route === true) ?? routes[0];
+  const routes = edges.filter((edge) => routeNodeIds.has(edge?.from) && edge.control?.kind === "condition");
+  const selected = routes.find((edge) => edge.control?.default === true) ?? routes[0];
   if (!selected) return "";
-  const reviewedAlias = Array.isArray(selected.route_aliases)
-    ? selected.route_aliases.find((alias) => typeof alias === "string" && alias.trim())
+  const reviewedAlias = Array.isArray(selected.control?.accepted_aliases)
+    ? selected.control.accepted_aliases.find((alias) => typeof alias === "string" && alias.trim())
     : "";
   return reviewedAlias || routeValue(selected);
 }
 
-function inferredPurposeText({ modules }) {
-  for (const module of modules) {
-    const inputs = module.smoke_spec?.synthetic_inputs;
+function inferredPurposeText({ assets }) {
+  for (const asset of assets) {
+    const inputs = asset.smoke_spec?.synthetic_inputs;
     if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) continue;
     const objective = inputs.objective_text ?? inputs.user_request ?? inputs.request_text;
     if (typeof objective === "string" && objective.trim()) return objective.trim();
   }
-  return firstSmokeSample({ modules }) || "확인";
+  return firstSmokeSample({ assets }) || "확인";
 }
 
-function firstWorkflowPlaceholder({ modules }) {
-  const workflow = modules.find((module) => module.module_category === "workflow" && module.workflow_ref);
-  if (!workflow) return "";
-  return workflow.workflow_ref?.display_name || workflow.workflow_ref?.id || workflow.name || workflow.id || "";
+function firstWorkflowPlaceholder({ graph }) {
+  const node = (graph.nodes ?? []).find((candidate) => candidate.node_kind === "subworkflow" && candidate.workflow_ref);
+  if (!node) return "";
+  return node.workflow_ref || "";
 }
 
-// Generic, artifact-derived sample transcript. Walks the approved process flow
+// Generic, artifact-derived sample transcript. Walks the approved Graph IR
 // (objective → human-input turns → terminal outputs) and stays domain-neutral —
 // no requirement-specific narration is baked into the generator.
 function sampleConversationMessages(context) {

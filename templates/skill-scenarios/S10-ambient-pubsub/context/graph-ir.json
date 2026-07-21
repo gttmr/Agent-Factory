@@ -1,0 +1,97 @@
+{
+  "graph_id": "graph-s10-event-processing",
+  "source_requirement_id": "req-s10-event-processing",
+  "workflow_ref": "workflow-s10-event-processing",
+  "nodes": [
+    {
+      "id": "node-s10-input",
+      "label": "Opaque synthetic delivery",
+      "node_kind": "input"
+    },
+    {
+      "id": "node-s10-validate",
+      "label": "Validate delivery envelope",
+      "node_kind": "function",
+      "role": "validate"
+    },
+    {
+      "id": "node-s10-process",
+      "label": "Process normalized synthetic event",
+      "node_kind": "function",
+      "role": "transform"
+    },
+    {
+      "id": "node-s10-processed-output",
+      "label": "Processed outcome",
+      "node_kind": "output"
+    },
+    {
+      "id": "node-s10-failure-output",
+      "label": "Retry-exhausted failure handoff",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-s10-input-to-validate",
+      "from": "node-s10-input",
+      "to": "node-s10-validate",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s10-validate-to-process",
+      "from": "node-s10-validate",
+      "to": "node-s10-process",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s10-process-to-output",
+      "from": "node-s10-process",
+      "to": "node-s10-processed-output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s10-retry-process",
+      "from": "node-s10-process",
+      "to": "node-s10-process",
+      "control": {
+        "kind": "retry",
+        "condition": "transient failure and attempt < 3",
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s10-exhausted-failure",
+      "from": "node-s10-process",
+      "to": "node-s10-failure-output",
+      "control": {
+        "kind": "error",
+        "condition": "retry attempts exhausted",
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    }
+  ],
+  "regions": []
+}

@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
-import type { ScaffoldPlan, ScaffoldPlanModule } from "../../analyzer/types";
+import type { AssetCandidate, ScaffoldPlan } from "../../analyzer/types";
 import type { MockLabDiscoveryPayload, MockLabDiscoveryServer } from "../../state/useMockLabDiscovery";
-import { buildMockLabRoute, isMcpBoundAdapter, mockLabBindingTargets } from "../../mock-lab/mockLabIntegration";
+import { buildMockLabRoute, isMcpBoundTool, mockLabToolBindingTargets } from "../../mock-lab/mockLabIntegration";
 
 interface MockLabBindingPanelProps {
   readonly discovery: MockLabDiscoveryPayload | null;
   readonly discoveryError: unknown;
   readonly discoveryLoading: boolean;
-  readonly onChange: (module: ScaffoldPlanModule, value: string) => void;
+  readonly onChange: (asset: AssetCandidate, value: string) => void;
   readonly plan: ScaffoldPlan;
   readonly reqId: string;
 }
@@ -27,14 +27,14 @@ export function MockLabBindingPanel({
   plan,
   reqId
 }: MockLabBindingPanelProps) {
-  const adapters = mockLabBindingTargets(plan);
+  const tools = mockLabToolBindingTargets(plan);
   const options = mockLabToolOptions(discovery);
   return (
     <div className="af-mcp-binding-panel">
       <div className="af-mcp-binding-header">
         <div>
           <strong>Mock Lab MCP 바인딩</strong>
-          <p>running Mock Lab tool을 명시적으로 선택해야 generated ADK adapter가 live MCP를 호출합니다.</p>
+          <p>실행 중인 Mock Lab Tool을 명시적으로 선택해야 생성된 ADK Tool binding이 live MCP를 호출합니다.</p>
         </div>
         <Link className="ui-button ui-button-secondary" to={buildMockLabRoute({ reqId })}>
           Mock Lab 열기
@@ -50,8 +50,8 @@ export function MockLabBindingPanel({
         <p className="af-landing-message">실행 중인 Mock Lab tool이 없습니다. Mock Lab에서 server를 start한 뒤 다시 선택하세요.</p>
       ) : null}
       <div className="af-mcp-binding-list">
-        {adapters.map((module) => (
-          <MockLabBindingRow key={module.id} module={module} onChange={onChange} options={options} reqId={reqId} />
+        {tools.map((asset) => (
+          <MockLabBindingRow key={asset.asset_id} asset={asset} onChange={onChange} options={options} reqId={reqId} />
         ))}
       </div>
     </div>
@@ -59,34 +59,35 @@ export function MockLabBindingPanel({
 }
 
 function MockLabBindingRow({
-  module,
+  asset,
   onChange,
   options,
   reqId
 }: {
-  readonly module: ScaffoldPlanModule;
-  readonly onChange: (module: ScaffoldPlanModule, value: string) => void;
+  readonly asset: AssetCandidate;
+  readonly onChange: (asset: AssetCandidate, value: string) => void;
   readonly options: readonly MockLabToolOption[];
   readonly reqId: string;
 }) {
+  const binding = isMcpBoundTool(asset) ? asset.binding : null;
   return (
     <div className="af-mcp-binding-row">
-      <div className="af-mcp-binding-module">
-        <strong>{module.name}</strong>
-        <code>{module.id}</code>
-        {isMcpBoundAdapter(module) ? (
+      <div className="af-mcp-binding-asset">
+        <strong>{asset.name}</strong>
+        <code>{asset.asset_id}</code>
+        {binding ? (
           <span>
-            bound: {module.mcp_server} / {module.mcp_tool_name}
+            bound: {binding.server_ref} / {binding.tool_name}
           </span>
         ) : (
           <span>unconnected synthetic stub</span>
         )}
       </div>
       <select
-        value={selectedMockLabValue(module, options)}
-        onChange={(event) => onChange(module, event.currentTarget.value)}
+        value={selectedMockLabValue(asset, options)}
+        onChange={(event) => onChange(asset, event.currentTarget.value)}
         disabled={options.length === 0}
-        aria-label={`${module.name} Mock Lab MCP tool 선택`}
+        aria-label={`${asset.name} Mock Lab MCP tool 선택`}
       >
         <option value="">선택 안 함</option>
         {options.map((option) => (
@@ -95,7 +96,7 @@ function MockLabBindingRow({
           </option>
         ))}
       </select>
-      <Link className="ui-button ui-button-ghost" to={buildMockLabRoute({ adapterName: module.name, reqId })}>
+      <Link className="ui-button ui-button-ghost" to={buildMockLabRoute({ toolName: asset.name, reqId })}>
         Mock 만들기
       </Link>
     </div>
@@ -115,14 +116,15 @@ function mockLabToolOptions(discovery: MockLabDiscoveryPayload | null): readonly
     );
 }
 
-function selectedMockLabValue(module: ScaffoldPlanModule, options: readonly MockLabToolOption[]): string {
-  if (!module.mcp_server || !module.mcp_tool_name) return "";
+function selectedMockLabValue(asset: AssetCandidate, options: readonly MockLabToolOption[]): string {
+  const binding = asset.binding;
+  if (binding?.kind !== "mcp" || !binding.server_ref || !binding.tool_name) return "";
   const match = options.find(
     (option) =>
-      option.toolName === module.mcp_tool_name &&
-      (option.server.mock_id === module.mcp_server ||
-        option.server.server_name === module.mcp_server ||
-        option.server.catalog_entry_name === module.mcp_server)
+      option.toolName === binding.tool_name &&
+      (option.server.mock_id === binding.server_ref ||
+        option.server.server_name === binding.server_ref ||
+        option.server.catalog_entry_name === binding.server_ref)
   );
   return match?.value ?? "";
 }

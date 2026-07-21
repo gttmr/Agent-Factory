@@ -214,8 +214,6 @@ function anchorHint(anchor: CommentAnchor): string {
       return `노드 ${anchor.node_id} 에 코멘트를 남기세요…`;
     case "edge":
       return `엣지 ${anchor.edge_id} 에 코멘트를 남기세요…`;
-    case "container":
-      return `컨테이너 ${anchor.container_id} 에 코멘트를 남기세요…`;
     case "path":
       return "경로에 코멘트를 남기세요…";
     case "section":
@@ -231,8 +229,6 @@ function anchorTag(anchor: CommentAnchor): string {
       return `node:${anchor.node_id ?? "?"}`;
     case "edge":
       return `edge:${anchor.edge_id ?? "?"}`;
-    case "container":
-      return `container:${anchor.container_id ?? "?"}`;
     case "path":
       return `path:${(anchor.node_path ?? []).join("→") || "?"}`;
     case "section":
@@ -246,7 +242,6 @@ function matchesAnchor(a: CommentAnchor, b: CommentAnchor): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "node") return a.node_id === b.node_id;
   if (a.kind === "edge") return a.edge_id === b.edge_id;
-  if (a.kind === "container") return a.container_id === b.container_id;
   if (a.kind === "section") return a.section === b.section;
   if (a.kind === "path") {
     const ap = a.node_path ?? [];

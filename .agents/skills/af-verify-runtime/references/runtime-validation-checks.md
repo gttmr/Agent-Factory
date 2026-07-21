@@ -32,7 +32,7 @@ Network install은 사용자 승인 없이 수행하지 않는다.
 | Pattern | Required checks |
 | --- | --- |
 | Function/MCP Tool | schema, allow-list, invalid input, timeout, unavailable server, cleanup |
-| A2A | discovery, task lifecycle, auth failure, timeout, fallback, 1:1 contract |
+| A2A | Agent binding/exposure, discovery, task lifecycle, auth failure, timeout, fallback |
 | Callback/Plugin | baseline, Continue, Override, order, exception, duplicate side effect |
 | Event Loop | yield, final commit, partial no-commit, failure before commit, resume |
 | Ambient | normalization, malformed event, duplicate, retry/DLQ, concurrency, output sink |

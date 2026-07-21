@@ -1,33 +1,18 @@
 {
+  "contract_version": "2.0",
   "normalizedRequirement": {
-    "id": "req-route-convergence",
-    "title": "Reviewed route branches converge on one sink",
-    "raw_text": "Route either reviewed decision value to the same downstream sink and preserve the selected decision payload.",
-    "domain": "synthetic-testing",
+    "id": "req-scenario-l",
+    "title": "Route convergence",
+    "raw_text": "Route convergence",
+    "domain": "공통",
     "requester": {
-      "team": "generator-quality",
-      "role": "reviewer"
+      "team": "platform",
+      "role": "developer"
     },
-    "business_goal": "Prove that a legal reviewed route convergence lowers to an importable workflow.",
-    "current_process": [
-      "Read a synthetic request",
-      "Select one reviewed route value",
-      "Send either value to the shared sink"
-    ],
-    "inputs": [
-      {
-        "name": "request_text",
-        "type": "string",
-        "required": true
-      }
-    ],
-    "outputs": [
-      {
-        "name": "sink_result",
-        "type": "object",
-        "required": true
-      }
-    ],
+    "business_goal": "Route convergence",
+    "current_process": [],
+    "inputs": [],
+    "outputs": [],
     "systems": [],
     "risk_signals": [],
     "missing_information": [],
@@ -35,363 +20,99 @@
     "status": "approved"
   },
   "evidence": {
-    "requested_goal": "Lower two reviewed route branches that share one downstream sink.",
-    "business_domain_hint": "synthetic-testing",
-    "user_role": "reviewer",
-    "input_data": [
-      "request_text"
-    ],
-    "output_data": [
-      "sink_result"
-    ],
+    "requested_goal": "Route convergence",
+    "business_domain_hint": "공통",
+    "user_role": "developer",
+    "input_data": [],
+    "output_data": [],
     "systems_mentioned": [],
-    "decisions_implied": [
-      "select path_alpha or path_beta"
-    ],
+    "decisions_implied": [],
     "risk_signals": [],
     "missing_information": [],
     "contradictions": [],
-    "assumptions": [
-      "both reviewed route values intentionally share one runtime target"
-    ]
+    "assumptions": []
   },
-  "moduleCandidates": [
-    {
-      "id": "mod-decision",
-      "source_requirement_id": "req-route-convergence",
-      "name": "synthetic_route_decision",
-      "module_category": "agent",
-      "agent_kind": "specialist",
-      "workflow_kind": null,
-      "adapter_kind": null,
-      "remote_contract_kind": null,
-      "legacy_recommended_type": "specialist_agent",
-      "confidence": 1,
-      "rationale": "A synthetic reasoning node emits one of the reviewed route values.",
-      "adk_hints": {
-        "state_memory": null,
-        "callbacks": null,
-        "artifacts_events": "emits the reviewed decision as event_output",
-        "mcp_a2a": null,
-        "streaming_grounding": null
-      },
-      "inputs": [
-        {
-          "name": "request_text",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "route_decision",
-          "type": "object",
-          "required": true
-        }
-      ],
-      "reuse_candidate": false,
-      "risk_level": "low",
-      "risk_signals": [],
-      "status": "approved",
-      "missing_information": [],
-      "side_effect": "none",
-      "auth_required": false,
-      "audit_required": false,
-      "citation_required": false,
-      "grounding_required": false,
-      "source_acl_required": false,
-      "versioned": false,
-      "effective_date_required": false,
-      "owner_domain": "synthetic-testing",
-      "owner": "generator-quality",
-      "agent_card": null,
-      "auth": null,
-      "task_lifecycle": null,
-      "timeout": null,
-      "retry": null,
-      "fallback": null,
-      "audit": null,
-      "data_policy": null,
-      "a2a_contract_id": null
-    },
-    {
-      "id": "mod-sink",
-      "source_requirement_id": "req-route-convergence",
-      "name": "synthetic_shared_sink",
-      "module_category": "adapter",
-      "agent_kind": null,
-      "workflow_kind": null,
-      "adapter_kind": "computation",
-      "remote_contract_kind": null,
-      "legacy_recommended_type": "local_adapter",
-      "confidence": 1,
-      "rationale": "A deterministic synthetic sink receives either reviewed route result.",
-      "adk_hints": {
-        "state_memory": null,
-        "callbacks": null,
-        "artifacts_events": "returns the received decision payload",
-        "mcp_a2a": null,
-        "streaming_grounding": null
-      },
-      "inputs": [
-        {
-          "name": "route_decision",
-          "type": "object",
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "name": "sink_result",
-          "type": "object",
-          "required": true
-        }
-      ],
-      "reuse_candidate": false,
-      "risk_level": "low",
-      "risk_signals": [],
-      "status": "approved",
-      "missing_information": [],
-      "side_effect": "none",
-      "auth_required": false,
-      "audit_required": false,
-      "citation_required": false,
-      "grounding_required": false,
-      "source_acl_required": false,
-      "versioned": false,
-      "effective_date_required": false,
-      "owner_domain": "synthetic-testing",
-      "owner": "generator-quality",
-      "agent_card": null,
-      "auth": null,
-      "task_lifecycle": null,
-      "timeout": null,
-      "retry": null,
-      "fallback": null,
-      "audit": null,
-      "data_policy": null,
-      "a2a_contract_id": null
-    }
-  ],
+  "assetCandidates": [],
   "a2aContracts": [],
   "runtimeContracts": [],
-  "processFlow": {
-    "requirement_id": "req-route-convergence",
-    "graph_id": "graph-12",
-    "root_workflow_module_id": "mod-decision",
+  "graph": {
+    "graph_id": "graph.scenario-l",
+    "source_requirement_id": "req-scenario-l",
+    "workflow_ref": null,
     "nodes": [
       {
-        "id": "input-001",
-        "module_id": null,
-        "label": "synthetic input",
-        "node_kind": "input",
-        "execution_kind": "io",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "input",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "input",
+        "label": "Input",
+        "node_kind": "input"
       },
       {
-        "id": "decision-001",
-        "module_id": "mod-decision",
-        "label": "synthetic route decision",
-        "node_kind": "agent",
-        "execution_kind": "llm_agent",
-        "adk_node_role": "workflow_node",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "local_graph",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "route",
+        "label": "Route",
+        "node_kind": "function",
+        "role": "route"
       },
       {
-        "id": "router-001",
-        "module_id": null,
-        "label": "reviewed route selector",
-        "node_kind": "router",
-        "execution_kind": "deterministic",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "local_graph",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "merge",
+        "label": "Merge",
+        "node_kind": "function",
+        "role": "merge"
       },
       {
-        "id": "sink-001",
-        "module_id": "mod-sink",
-        "label": "shared synthetic sink",
-        "node_kind": "adapter",
-        "execution_kind": "deterministic",
-        "adk_node_role": "workflow_node",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "adapter",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
-      },
-      {
-        "id": "output-001",
-        "module_id": null,
-        "label": "synthetic output",
-        "node_kind": "output",
-        "execution_kind": "io",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "output",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "output",
+        "label": "Output",
+        "node_kind": "output"
       }
     ],
     "edges": [
       {
-        "id": "edge-001",
-        "from": "input-001",
-        "to": "decision-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "synthetic request",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.input.route",
+        "from": "input",
+        "to": "route",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "id": "edge-002",
-        "from": "decision-001",
-        "to": "router-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "reviewed route decision",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.route.a",
+        "from": "route",
+        "to": "merge",
+        "control": {
+          "kind": "condition",
+          "condition": "a",
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "id": "edge-003",
-        "from": "router-001",
-        "to": "sink-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "route",
-        "execution_semantics": "conditional",
-        "data_label": "path alpha",
-        "schema_ref": null,
-        "route_condition": "choice == path_alpha",
-        "route_aliases": [
-          "alpha_alias"
-        ],
-        "is_default_route": false,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.route.b",
+        "from": "route",
+        "to": "merge",
+        "control": {
+          "kind": "condition",
+          "condition": "b",
+          "accepted_aliases": [],
+          "default": true
+        },
+        "channel": null
       },
       {
-        "id": "edge-004",
-        "from": "router-001",
-        "to": "sink-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "route",
-        "execution_semantics": "conditional",
-        "data_label": "path beta default",
-        "schema_ref": null,
-        "route_condition": "choice == path_beta",
-        "route_aliases": [
-          "beta_alias"
-        ],
-        "is_default_route": true,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
-      },
-      {
-        "id": "edge-005",
-        "from": "sink-001",
-        "to": "output-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "synthetic sink result",
-        "schema_ref": null,
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.merge.output",
+        "from": "merge",
+        "to": "output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       }
     ],
-    "containers": [
-      {
-        "id": "container-root",
-        "module_id": null,
-        "label": "Route convergence graph",
-        "container_kind": "graph_workflow",
-        "adk_mapping": "GraphWorkflow",
-        "contains_node_ids": [
-          "input-001",
-          "decision-001",
-          "router-001",
-          "sink-001",
-          "output-001"
-        ],
-        "entry_node_ids": [
-          "input-001"
-        ],
-        "exit_node_ids": [
-          "output-001"
-        ],
-        "layout_policy": "dag_with_routes",
-        "parent_container_id": null
-      }
-    ],
-    "lanes": [
-      {
-        "id": "input",
-        "label": "input"
-      },
-      {
-        "id": "local_graph",
-        "label": "local graph"
-      },
-      {
-        "id": "adapter",
-        "label": "adapter"
-      },
-      {
-        "id": "output",
-        "label": "output"
-      }
-    ],
-    "validation": {
-      "ok": true,
-      "errors": [],
-      "warnings": []
-    }
+    "regions": []
   }
 }

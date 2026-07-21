@@ -1,0 +1,51 @@
+{
+  "graph_id": "graph-s15-private-data-safety-smoke",
+  "source_requirement_id": "req-s15-private-data-safety",
+  "workflow_ref": "workflow-s15-private-data-safety-smoke",
+  "nodes": [
+    {
+      "id": "node-s15-input",
+      "label": "Synthetic service query",
+      "node_kind": "input"
+    },
+    {
+      "id": "node-s15-service-tool",
+      "label": "Use reviewed environment-backed service boundary",
+      "node_kind": "tool",
+      "tool_ref": "tool-s15-environment-backed-service",
+      "invocation_control": "workflow"
+    },
+    {
+      "id": "node-s15-output",
+      "label": "Synthetic no-network result",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-s15-input-to-tool",
+      "from": "node-s15-input",
+      "to": "node-s15-service-tool",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    },
+    {
+      "id": "edge-s15-tool-to-output",
+      "from": "node-s15-service-tool",
+      "to": "node-s15-output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": "event"
+    }
+  ],
+  "regions": []
+}

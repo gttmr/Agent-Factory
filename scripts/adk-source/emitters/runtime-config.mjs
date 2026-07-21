@@ -2,7 +2,7 @@ import { GEMINI_FALLBACK_MODEL } from "../context.mjs";
 import { toPyStr } from "../python-literals.mjs";
 
 export function buildRuntimeConfigSection({ componentContractLiteral }) {
-  return `# Reviewed contract data for each approved module (synthetic test doubles only).
+  return `# Reviewed contract data for each approved asset (synthetic test doubles only).
 COMPONENT_CONTRACTS: dict[str, dict] = ${componentContractLiteral}
 
 # Shared secrets live in <repo>/.agent-factory/runtime.env, or in the file
@@ -88,20 +88,23 @@ def _load_config() -> dict:
 _CONFIG = _load_config()
 
 
-def _override(section: str, module_id: str, key: str, default: Any) -> Any:
+def _override(section: str, asset_id: str, key: str, default: Any) -> Any:
     for entry in _CONFIG.get(section, []) or []:
-        if isinstance(entry, dict) and entry.get("id") == module_id:
+        if not isinstance(entry, dict):
+            continue
+        entry_id = entry.get("asset_id") if section in {"tools", "workflows"} else entry.get("id")
+        if entry_id == asset_id:
             value = entry.get(key)
             if value is not None:
                 return value
     return default
 
 
-def _agent_cfg(module_id: str, key: str, default: Any) -> Any:
-    return _override("agents", module_id, key, default)
+def _agent_cfg(asset_id: str, key: str, default: Any) -> Any:
+    return _override("agents", asset_id, key, default)
 
 
-def _agent_cfg_for_node(node_id: str, module_id: str, key: str, default: Any) -> Any:
+def _agent_cfg_for_node(node_id: str, asset_id: str, key: str, default: Any) -> Any:
     for entry in _CONFIG.get("agents", []) or []:
         if not isinstance(entry, dict):
             continue
@@ -110,7 +113,7 @@ def _agent_cfg_for_node(node_id: str, module_id: str, key: str, default: Any) ->
         value = entry.get(key)
         if value is not None:
             return value
-    return _agent_cfg(module_id, key, default)
+    return _agent_cfg(asset_id, key, default)
 
 
 def _llm_cfg() -> dict:
@@ -123,8 +126,8 @@ def _cfg_env(name: str, default: str) -> str:
     return str(value) if value else default
 
 
-def _model_seed(module_id: str, seed: str) -> str:
-    per_agent = _override("agents", module_id, "model", None)
+def _model_seed(asset_id: str, seed: str) -> str:
+    per_agent = _override("agents", asset_id, "model", None)
     if per_agent:
         return str(per_agent)
     default_model = _llm_cfg().get("default_model") or _CONFIG.get("default_model")
@@ -151,7 +154,7 @@ def _vllm_model_name(model: str) -> str:
     return model if model.startswith("hosted_vllm/") else f"hosted_vllm/{model}"
 
 
-def _vllm_model(module_id: str, seed: str) -> Any:
+def _vllm_model(asset_id: str, seed: str) -> Any:
     from google.adk.models.lite_llm import LiteLlm
 
     llm = _llm_cfg()
@@ -161,7 +164,7 @@ def _vllm_model(module_id: str, seed: str) -> Any:
     api_base = os.environ.get(api_base_env) or llm.get("api_base")
     if not api_base:
         raise RuntimeError(f"{api_base_env} is required when AF_LLM_PROVIDER resolves to vLLM.")
-    model = os.environ.get(model_env) or _model_seed(module_id, seed)
+    model = os.environ.get(model_env) or _model_seed(asset_id, seed)
     kwargs: dict[str, Any] = {
         "model": _vllm_model_name(str(model)),
         "api_base": str(api_base),
@@ -172,29 +175,29 @@ def _vllm_model(module_id: str, seed: str) -> Any:
     return LiteLlm(**kwargs)
 
 
-def _gemini_model(module_id: str, seed: str) -> str:
-    model = _model_seed(module_id, seed)
+def _gemini_model(asset_id: str, seed: str) -> str:
+    model = _model_seed(asset_id, seed)
     if str(model).startswith("hosted_vllm/"):
         return str(_llm_cfg().get("gemini_model") or ${toPyStr(GEMINI_FALLBACK_MODEL)})
     return str(model)
 
 
-def _model_for(module_id: str, seed: str) -> Any:
+def _model_for(asset_id: str, seed: str) -> Any:
     provider = _selected_llm_provider()
     if provider == "vllm":
-        return _vllm_model(module_id, seed)
-    return _gemini_model(module_id, seed)
+        return _vllm_model(asset_id, seed)
+    return _gemini_model(asset_id, seed)
 
 
-def _adapter_cfg(module_id: str, key: str, default: Any) -> Any:
-    return _override("adapters", module_id, key, default)
+def _tool_cfg(asset_id: str, key: str, default: Any) -> Any:
+    return _override("tools", asset_id, key, default)
 
 
-def _mcp_url(module_id: str, mcp_server: str) -> str:
-    configured = _adapter_cfg(module_id, "mcp_url", None)
+def _mcp_url(asset_id: str, server_ref: str) -> str:
+    configured = _tool_cfg(asset_id, "url", None)
     if configured:
         return str(configured)
     base = os.environ.get("AF_MOCK_LAB_MCP_URL", "http://127.0.0.1:5173/api/mock-lab/mcp").rstrip("/")
-    return f"{base}/{mcp_server}"
+    return f"{base}/{server_ref}"
 `;
 }

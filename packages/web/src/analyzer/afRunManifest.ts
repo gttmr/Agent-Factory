@@ -9,7 +9,6 @@ export type AfRunValidationResult = (typeof afRunValidationResults)[number];
 export type AfStageRunStatus = (typeof afStageRunStatuses)[number];
 
 export interface AfRunStage {
-  readonly [key: string]: unknown;
   status: AfRunStageStatus;
   outputs: string[];
 }
@@ -88,20 +87,27 @@ export function parseAfRunManifest(source: string, fileName = "af-run-manifest.j
   }
 
   const parsed = parseJsonObject(source, fileName);
+  assertExactKeys(
+    parsed,
+    ["requirement_id", "artifact_root", "current_stage", "stages", "approvals", "validation", "stage_runs"],
+    fileName
+  );
   const requirementId = stringField(parsed, "requirement_id", fileName);
   if (!requirementId.trim()) {
     throw new Error(`${fileName} requirement_id가 비어 있습니다.`);
   }
-  const currentStage = normalizeStageId(parsed.current_stage);
+  const artifactRoot = requiredNonEmptyString(parsed.artifact_root, `${fileName} artifact_root`);
+  const currentStage = requiredEnum(parsed.current_stage, afRunStageIds, `${fileName} current_stage`);
 
+  const stageRuns = parseStageRuns(parsed.stage_runs, fileName);
   return {
     requirement_id: requirementId,
-    artifact_root: optionalString(parsed.artifact_root) || `artifacts/af/${requirementId}`,
+    artifact_root: artifactRoot,
     current_stage: currentStage,
-    stages: normalizeStages(parsed.stages),
-    approvals: normalizeApprovals(parsed.approvals),
-    validation: normalizeValidation(parsed.validation),
-    stage_runs: normalizeStageRuns(parsed.stage_runs)
+    stages: parseStages(parsed.stages, fileName),
+    approvals: parseApprovals(parsed.approvals, fileName),
+    validation: parseValidation(parsed.validation, fileName),
+    ...(stageRuns ? { stage_runs: stageRuns } : {})
   };
 }
 
@@ -126,115 +132,154 @@ export function serializeAfRunManifest(manifest: AfRunManifest): string {
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
-function normalizeStages(value: unknown): Record<AfRunStageId, AfRunStage> {
-  const record = isRecord(value) ? value : {};
+function parseStages(value: unknown, fileName: string): Record<AfRunStageId, AfRunStage> {
+  const record = requiredRecord(value, `${fileName} stages`);
+  assertExactKeys(record, afRunStageIds, `${fileName} stages`);
   return {
-    analyze: normalizeStage(record.analyze),
-    design: normalizeStage(record.design),
-    build: normalizeStage(record.build),
-    verify: normalizeStage(record.verify)
+    analyze: parseStage(record.analyze, `${fileName} stages.analyze`),
+    design: parseStage(record.design, `${fileName} stages.design`),
+    build: parseStage(record.build, `${fileName} stages.build`),
+    verify: parseStage(record.verify, `${fileName} stages.verify`)
   };
 }
 
-function normalizeStage(value: unknown): AfRunStage {
-  const record = isRecord(value) ? value : {};
+function parseStage(value: unknown, label: string): AfRunStage {
+  const record = requiredRecord(value, label);
+  assertExactKeys(record, ["status", "outputs"], label);
   return {
-    ...record,
-    status: normalizeStageStatus(record.status),
-    outputs: Array.isArray(record.outputs) ? record.outputs.filter((item): item is string => typeof item === "string") : []
+    status: requiredEnum(record.status, afRunStageStatuses, `${label}.status`),
+    outputs: requiredStringArray(record.outputs, `${label}.outputs`)
   };
 }
 
-function normalizeApprovals(value: unknown): AfRunManifest["approvals"] {
-  const record = isRecord(value) ? value : {};
+function parseApprovals(value: unknown, fileName: string): AfRunManifest["approvals"] {
+  const record = requiredRecord(value, `${fileName} approvals`);
+  assertExactKeys(
+    record,
+    ["analysis_reviewed", "boundaries_approved", "runtime_contracts_approved", "stub_ready_for_followup"],
+    `${fileName} approvals`
+  );
+  const approvals: AfRunManifest["approvals"] = {
+    analysis_reviewed: requiredBoolean(record.analysis_reviewed, `${fileName} approvals.analysis_reviewed`),
+    boundaries_approved: requiredBoolean(record.boundaries_approved, `${fileName} approvals.boundaries_approved`),
+    runtime_contracts_approved: requiredBoolean(
+      record.runtime_contracts_approved,
+      `${fileName} approvals.runtime_contracts_approved`
+    ),
+    stub_ready_for_followup: requiredBoolean(
+      record.stub_ready_for_followup,
+      `${fileName} approvals.stub_ready_for_followup`
+    )
+  };
+  if (approvals.boundaries_approved && !approvals.analysis_reviewed) {
+    throw new Error(`${fileName} approvals.boundaries_approved=true에는 analysis_reviewed=true가 필요합니다.`);
+  }
+  if (approvals.runtime_contracts_approved && !approvals.boundaries_approved) {
+    throw new Error(`${fileName} approvals.runtime_contracts_approved=true에는 boundaries_approved=true가 필요합니다.`);
+  }
+  if (approvals.stub_ready_for_followup && !approvals.runtime_contracts_approved) {
+    throw new Error(`${fileName} approvals.stub_ready_for_followup=true에는 runtime_contracts_approved=true가 필요합니다.`);
+  }
+  return approvals;
+}
+
+function parseValidation(value: unknown, fileName: string): AfRunManifest["validation"] {
+  const record = requiredRecord(value, `${fileName} validation`);
+  assertExactKeys(record, ["commands", "last_result"], `${fileName} validation`);
   return {
-    analysis_reviewed: record.analysis_reviewed === true,
-    boundaries_approved: record.boundaries_approved === true,
-    runtime_contracts_approved: record.runtime_contracts_approved === true,
-    stub_ready_for_followup: record.stub_ready_for_followup === true
+    commands: requiredStringArray(record.commands, `${fileName} validation.commands`),
+    last_result: requiredEnum(record.last_result, afRunValidationResults, `${fileName} validation.last_result`)
   };
 }
 
-function normalizeValidation(value: unknown): AfRunManifest["validation"] {
-  const record = isRecord(value) ? value : {};
-  return {
-    commands: Array.isArray(record.commands) ? record.commands.filter((item): item is string => typeof item === "string") : [],
-    last_result: normalizeValidationResult(record.last_result)
-  };
-}
-
-function normalizeStageRuns(value: unknown): AfRunManifest["stage_runs"] | undefined {
-  if (!isRecord(value)) return undefined;
+function parseStageRuns(value: unknown, fileName: string): AfRunManifest["stage_runs"] | undefined {
+  if (value === undefined) return undefined;
+  const record = requiredRecord(value, `${fileName} stage_runs`);
+  assertExactKeys(record, afRunStageIds, `${fileName} stage_runs`);
   const result: Partial<Record<AfRunStageId, AfStageRunManifestEntry>> = {};
   for (const stage of afRunStageIds) {
-    const entry = normalizeStageRunEntry(value[stage]);
+    if (record[stage] === undefined) continue;
+    const entry = parseStageRunEntry(record[stage], `${fileName} stage_runs.${stage}`);
     if (entry) result[stage] = entry;
   }
-  return Object.keys(result).length ? result : undefined;
+  return result;
 }
 
-function normalizeStageRunEntry(value: unknown): AfStageRunManifestEntry | null {
-  if (!isRecord(value)) return null;
-  const latestRunId = optionalString(value.latest_run_id);
-  const status = normalizeStageRunStatus(value.status);
-  const startedAt = optionalString(value.started_at);
-  const skillName = optionalString(value.skill_name);
-  const model = optionalString(value.model);
-  if (!latestRunId || !startedAt || !skillName || !model) return null;
+function parseStageRunEntry(value: unknown, label: string): AfStageRunManifestEntry {
+  const record = requiredRecord(value, label);
+  assertExactKeys(
+    record,
+    ["latest_run_id", "status", "started_at", "finished_at", "skill_name", "model", "output_artifacts", "last_error", "codex"],
+    label
+  );
   const entry: AfStageRunManifestEntry = {
-    latest_run_id: latestRunId,
-    status,
-    started_at: startedAt,
-    finished_at: typeof value.finished_at === "string" ? value.finished_at : null,
-    skill_name: skillName,
-    model,
-    output_artifacts: Array.isArray(value.output_artifacts)
-      ? value.output_artifacts.filter((item): item is string => typeof item === "string")
-      : [],
-    last_error: typeof value.last_error === "string" ? value.last_error : null
+    latest_run_id: requiredNonEmptyString(record.latest_run_id, `${label}.latest_run_id`),
+    status: requiredEnum(record.status, afStageRunStatuses, `${label}.status`),
+    started_at: requiredNonEmptyString(record.started_at, `${label}.started_at`),
+    finished_at: requiredNullableString(record.finished_at, `${label}.finished_at`),
+    skill_name: requiredNonEmptyString(record.skill_name, `${label}.skill_name`),
+    model: requiredNonEmptyString(record.model, `${label}.model`),
+    output_artifacts: requiredStringArray(record.output_artifacts, `${label}.output_artifacts`),
+    last_error: requiredNullableString(record.last_error, `${label}.last_error`)
   };
-  const codex = normalizeStageRunCodex(value.codex);
+  const codex = parseStageRunCodex(record.codex, `${label}.codex`);
   if (codex) entry.codex = codex;
   return entry;
 }
 
-function normalizeStageRunCodex(value: unknown): AfStageRunCodexMetadata | undefined {
-  if (!isRecord(value)) return undefined;
-  const backend = value.backend === "sdk" || value.backend === "fake" ? value.backend : null;
-  if (!backend) return undefined;
-  const eventCount =
-    typeof value.event_count === "number" && Number.isInteger(value.event_count) && value.event_count >= 0
-      ? value.event_count
-      : 0;
+function parseStageRunCodex(value: unknown, label: string): AfStageRunCodexMetadata | undefined {
+  if (value === undefined) return undefined;
+  const record = requiredRecord(value, label);
+  assertExactKeys(record, ["backend", "thread_id", "event_count"], label);
+  const backend = requiredEnum(record.backend, ["sdk", "fake"] as const, `${label}.backend`);
+  if (!Number.isInteger(record.event_count) || (record.event_count as number) < 0) {
+    throw new Error(`${label}.event_count 필드는 0 이상의 정수여야 합니다.`);
+  }
   return {
     backend,
-    thread_id: typeof value.thread_id === "string" ? value.thread_id : null,
-    event_count: eventCount
+    thread_id: requiredNullableString(record.thread_id, `${label}.thread_id`),
+    event_count: record.event_count as number
   };
 }
 
-function normalizeStageId(value: unknown): AfRunStageId {
-  return typeof value === "string" && afRunStageIds.includes(value as AfRunStageId)
-    ? (value as AfRunStageId)
-    : "analyze";
+function requiredRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`${label} 필드는 객체여야 합니다.`);
+  return value;
 }
 
-function normalizeStageStatus(value: unknown): AfRunStageStatus {
-  return typeof value === "string" && afRunStageStatuses.includes(value as AfRunStageStatus)
-    ? (value as AfRunStageStatus)
-    : "pending";
+function assertExactKeys(record: Record<string, unknown>, allowed: readonly string[], label: string): void {
+  const allowedKeys = new Set(allowed);
+  const unknown = Object.keys(record).filter((key) => !allowedKeys.has(key));
+  if (unknown.length) throw new Error(`${label}에 알 수 없는 필드가 있습니다: ${unknown.join(", ")}`);
 }
 
-function normalizeValidationResult(value: unknown): AfRunValidationResult {
-  return typeof value === "string" && afRunValidationResults.includes(value as AfRunValidationResult)
-    ? (value as AfRunValidationResult)
-    : "not_run";
+function requiredNonEmptyString(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} 필드는 비어 있지 않은 문자열이어야 합니다.`);
+  return value;
 }
 
-function normalizeStageRunStatus(value: unknown): AfStageRunStatus {
-  return typeof value === "string" && afStageRunStatuses.includes(value as AfStageRunStatus)
-    ? (value as AfStageRunStatus)
-    : "running";
+function requiredNullableString(value: unknown, label: string): string | null {
+  if (value === null || typeof value === "string") return value;
+  throw new Error(`${label} 필드는 문자열 또는 null이어야 합니다.`);
+}
+
+function requiredBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") throw new Error(`${label} 필드는 boolean이어야 합니다.`);
+  return value;
+}
+
+function requiredStringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`${label} 필드는 문자열 배열이어야 합니다.`);
+  }
+  return [...value];
+}
+
+function requiredEnum<const T extends readonly string[]>(value: unknown, values: T, label: string): T[number] {
+  if (typeof value !== "string" || !values.includes(value)) {
+    throw new Error(`${label} 값이 올바르지 않습니다: ${String(value)}`);
+  }
+  return value as T[number];
 }
 
 function parseJsonObject(source: string, fileName: string): Record<string, unknown> {
@@ -256,10 +301,6 @@ function stringField(value: Record<string, unknown>, field: string, fileName: st
     throw new Error(`${fileName} ${field} 필드가 필요합니다.`);
   }
   return fieldValue;
-}
-
-function optionalString(value: unknown): string {
-  return typeof value === "string" ? value : "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

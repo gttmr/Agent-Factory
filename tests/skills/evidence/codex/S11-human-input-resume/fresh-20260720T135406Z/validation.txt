@@ -1,0 +1,31 @@
+# Validation
+
+## Deterministic structure
+
+- Skill validator: PASS, 5 Skills, 0 errors, 0 warnings.
+- Scenario JSON parsing: PASS.
+- Target Contract v2 / approved async-resume contract assertion: PASS.
+- Artifact validation: PASS.
+- Human Input response mapping/choice/alias search: PASS.
+- Runtime handoff existence: PASS.
+- Compile: PASS.
+- Required source marker search: PASS.
+
+## Generated tests
+
+- System Python: `6 passed, 1 skipped` because ADK was unavailable there.
+- Shared runtime venv (`google-adk 2.3.0`): `7 passed`.
+
+## Runtime observations
+
+- Output-local HTTP prototype: pause, wrong-ID rejection, invalid response rejection, approve, duplicate response, reject, and restart persistence observed.
+- Duplicate/restart kept `apply_count=1`.
+- Abandoned invocation stayed `pending_approval`; no expiry/timeout transition exists.
+- ADK Runner emitted `adk_request_input` and resumed successfully with its emitted UUID.
+- Emitted UUID did not equal approved `synthetic-approval-001`; using the approved ID failed lookup.
+- ADK Workflow Tool is still an unconnected TODO stub; the HTTP idempotency store is a separate path.
+
+## Residual uncertainty
+
+- Production persistence, identity, deployment, and non-synthetic payloads were not tested or authorized.
+- The scenario does not prove integrated at-most-once behavior on the generated ADK Tool path.

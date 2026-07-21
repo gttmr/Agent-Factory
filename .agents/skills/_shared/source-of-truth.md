@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use a single evidence hierarchy when Agent Factory Target concepts, current product contracts, ADK documentation, and installed runtime behavior differ. Keep every conclusion labeled as Target Contract, Current Implementation, Compatibility Output, or Blocker.
+Use a single evidence hierarchy when Agent Factory Target concepts, current product contracts, ADK documentation, and installed runtime behavior differ. Keep every conclusion labeled as Target Contract, Current Implementation, or Blocker.
 
 ## When to read
 
@@ -22,16 +22,16 @@ Use this order, scoped to the question being answered:
 3. Official ADK documentation owns documented framework semantics.
 4. Installed `google-adk` source and execution own version-specific availability and signatures.
 5. Local Google Agents CLI skills are structural and workflow examples, not Agent Factory authority.
-6. Existing Agent Factory skills are salvage sources only.
+6. Retired or pre-vNext Agent Factory skills are salvage sources only; the canonical five-skill tree is active procedure.
 7. Archive and handoff material are historical evidence, never active authority.
 
-Do not use the order to force a false agreement. For example, official docs may describe a feature that is absent or different in the installed package. In that case, preserve the documented intent, block unsupported scaffold code, and record the compatibility gap.
+Do not use the order to force a false agreement. For example, official docs may describe a feature that is absent or different in the installed package. In that case, preserve the documented intent, block unsupported scaffold code, and record the implementation gap.
 
 ## Required evidence
 
 Record enough evidence for another coding agent to reproduce the decision:
 
-- authority class: Target, Current, Compatibility, or Blocker;
+- authority class: Target, Current, or Blocker;
 - repository path and stable symbol or schema key for product behavior;
 - official URL and checked date for framework behavior;
 - installed package version and import/signature probe for emitted Python;
@@ -42,17 +42,17 @@ Do not present inference as verification. A handbook locator is a navigation aid
 
 ## Artifact implications
 
-- Standalone design notes outside current validators may use Target vocabulary.
-- Stage Runner proposals and current canonical artifacts must use the Compatibility Layer in [compatibility-current-schema.md](compatibility-current-schema.md).
-- Preserve Target rationale or notes alongside compatibility output so a `legacy` serialization does not erase the intended design.
-- Record unrepresentable or ambiguous mappings as a Blocker in `docs/migration/skill-vnext-status.md`; do not invent a new current enum.
+- Standalone design notes outside validators may use Target vocabulary.
+- New Stage Runner proposals and canonical artifacts write only strict Target v2 fields from [target-contract-v2.md](target-contract-v2.md).
+- Reject pre-v2 artifact shapes; there is no read fallback or projection path.
+- Record unrepresentable or ambiguous Target data as a Blocker; do not invent an enum or selector.
 
 ## Scaffold implications
 
 - Generate runtime code only from reviewed and approved artifacts.
 - Treat the installed package as a hard availability gate for exact imports and signatures.
 - Do not freehand unsupported APIs from official examples or memory.
-- Keep product-schema migration, generator expansion, and runtime deployment outside a skill-only change unless separately authorized.
+- Keep generator expansion and runtime deployment outside a skill-only change unless separately authorized.
 
 ## Verification
 
@@ -71,7 +71,7 @@ Stop and report a Blocker when:
 - the artifact target or operating mode is ambiguous;
 - current source and schema disagree on a load-bearing field;
 - an exact ADK symbol or signature was not verified in the installed package;
-- a Target concept cannot be represented without lossy or misleading compatibility output;
+- a Target concept cannot be represented without loss in the strict v2 contract;
 - approval, private data, credentials, or deployment authority would need to be invented.
 
 ## Official sources checked
@@ -84,7 +84,7 @@ Stop and report a Blocker when:
 
 ## Checked date
 
-- Checked date: 2026-07-18
+- Checked date: 2026-07-20
 - Official sources: Agent Factory active docs and `https://adk.dev/`
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Product schemas still serialize `legacy` contracts; Target documentation does not prove Current Implementation support.
+- Contract note: Canonical skills read and write strict Target Contract v2 only.

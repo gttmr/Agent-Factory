@@ -2,35 +2,40 @@
 
 ## Scope
 
-This directory renders Graph IR inside `GraphCanvas`. It owns layout, node
-appearance, edge appearance, container overlays, and validation banners. Pure
-Graph IR helpers live outside this tree under `src/graph`.
+This directory renders strict Target Graph IR inside `GraphCanvas`. It owns
+layout, node appearance, edge appearance, region overlays, and validation
+banners. Pure Graph IR helpers live under `src/graph`.
 
-Target node, edge, and asset-reference meanings are canonical in [Graph IR](../../../../../docs/workbench/graph-ir.md) and [Taxonomy](../../../../../docs/workbench/taxonomy.md); renderer identifiers that retain Adapter or Remote A2A categories are Current Implementation (`legacy`).
+Node, edge, region, and asset-reference meanings are canonical in
+[Graph IR](../../../../../docs/workbench/graph-ir.md) and
+[Taxonomy](../../../../../docs/workbench/taxonomy.md).
 
 ## Where To Look
 
 | Task | Files |
 | --- | --- |
-| Layout and persisted positions | `layout.ts` |
-| Node category/marker rendering | `nodeTypes.tsx` |
-| Edge style and semantics | `edgeTypes.tsx` |
-| Workflow/region overlays | `containerOverlay.tsx` |
-| Soft/hard validation display | `validationBanner.tsx` |
+| Layout and presentation positions | `layout.ts` |
+| Node-kind and protocol rendering | `nodeTypes.tsx` |
+| Edge control and channel rendering | `edgeTypes.tsx` |
+| Parallel and loop region overlays | `containerOverlay.tsx` |
+| Graph element tabs | `GraphElementTabs.tsx` |
+| Validation display | `validationBanner.tsx` |
 
 ## Local Rules
 
-- Graph meaning comes from canonical `docs/workbench/graph-ir.md` and the Current Implementation analyzer/schema contracts, not renderer convenience; `process-flow.md` is a compatibility pointer.
-- Edit mode must preserve finite `node.position` values and avoid moving unrelated saved nodes.
-- Container overlays are visual regions only; they must not rewrite graph membership.
-- New marker semantics require docs, validator/analyzer, rendering, CSS, and regression coverage together.
-- Keep the Current Implementation `legacy` Remote A2A boundary styling visually distinct from local Workflow and Adapter rendering.
+- Render exactly `input`, `agent`, `tool`, `function`, `human_input`, `subworkflow`, `join`, and `output` nodes.
+- Edge labels and styles must derive from `control` and optional `channel` without collapsing the two axes.
+- Region overlays represent only `parallel` and `loop`; they must not rewrite region membership.
+- Layout coordinates are presentation-only because strict Graph nodes do not serialize `position`.
+- Keep A2A visually distinct as a protocol boundary on an Agent node, not as another node or asset category.
+- New Graph semantics require docs, schema/analyzer validation, rendering, CSS, and regression coverage together.
 
 ## Anti-Patterns
 
-- Do not make layout changes that silently drop saved reviewer positions.
-- Do not let edge labels or overlays obscure the graph.
-- Do not implement behavior-only validation in this render layer.
+- Do not add retired node, edge, region, or category identifiers.
+- Do not let edge labels or overlays obscure the Graph.
+- Do not implement behavior validation only in this render layer.
+- Do not persist layout-only coordinates into Graph IR.
 
 ## Verification
 

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchArtifactJson, putArtifactJson, type FetchWithEtagResult } from "./apiClient";
+import { parseTargetAnalysisResult } from "../analyzer/targetAnalysisResult";
 import type { AnalysisResult } from "../analyzer/types";
 
 type AnalysisFetchResult = FetchWithEtagResult<AnalysisResult> | null;
@@ -9,7 +10,8 @@ export function useAnalysisArtifact(reqId: string | undefined) {
     queryKey: ["af", reqId, "analysis-result"] as const,
     queryFn: async () => {
       if (!reqId) return null;
-      return await fetchArtifactJson<AnalysisResult>(reqId, "analysis-result.json");
+      const result = await fetchArtifactJson<AnalysisResult>(reqId, "analysis-result.json");
+      return result ? { ...result, data: parseTargetAnalysisResult(result.data) } : null;
     },
     enabled: Boolean(reqId)
   });

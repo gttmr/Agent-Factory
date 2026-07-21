@@ -15,7 +15,7 @@ Read only the cards justified by current evidence:
 | Requirement or design evidence | Pattern candidate | Read |
 | --- | --- | --- |
 | External event starts execution | ambient entry contract | [ambient-agents.md](adk/ambient-agents.md) |
-| Independently owned or deployed Agent service crosses a network boundary | A2A connection/exposure | [a2a.md](adk/a2a.md) |
+| Independently owned or deployed Agent service crosses a network boundary | A2A Agent binding/exposure | [a2a.md](adk/a2a.md) |
 | Policy or observation must run before/after agent, inference, or Tool execution | callback or Plugin | [callbacks.md](adk/callbacks.md) |
 | State or artifact commit timing affects correctness | event loop semantics | [event-loop.md](adk/event-loop.md) |
 | External Tool server or protocol discovery is required | Function/MCP Tool binding | [function-and-mcp-tools.md](adk/function-and-mcp-tools.md) |
@@ -46,7 +46,7 @@ In discovery, record candidates as hints only. Composition owns the final patter
 - Add only pattern-specific contracts and annotations justified by evidence.
 - Do not create MCP, A2A, Callback, Event Loop, Ambient Agent, state, artifact, Human Input, or Join as new top-level asset types.
 - Keep Invocation Control as Workflow or Agent.
-- Route current canonical writes through [compatibility-current-schema.md](compatibility-current-schema.md).
+- Route canonical writes through [target-contract-v2.md](target-contract-v2.md).
 
 ## Scaffold implications
 
@@ -75,4 +75,4 @@ Stop when evidence is insufficient, the simpler design has not been considered, 
 - Checked date: 2026-07-18
 - Official sources: Agent Factory active docs and selected Google ADK pattern pages
 - Installed package version: `google-adk 2.3.0`
-- Known compatibility note: Pattern selection is Target design evidence; current artifacts may require `legacy` compatibility serialization and may not support every selected pattern.
+- Contract note: Pattern selection is design evidence; unsupported strict v2 patterns remain Blockers.

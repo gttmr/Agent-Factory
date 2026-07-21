@@ -16,13 +16,19 @@ export function AnalysisResult({
   onToggleAcceptedMissing
 }: AnalysisResultProps) {
   const { evidence, normalizedRequirement } = analysis;
-  const remoteA2ACount = analysis.moduleCandidates.filter((candidate) => candidate.module_category === "remote_a2a").length;
+  const assetCounts = analysis.assetCandidates.reduce(
+    (counts, candidate) => {
+      counts[candidate.asset_type] += 1;
+      return counts;
+    },
+    { agent: 0, workflow: 0, tool: 0 }
+  );
   const missingItems = uniqueValues(evidence.missing_information);
   const acceptedSet = new Set(acceptedMissing);
   const acceptedCount = missingItems.filter((item) => acceptedSet.has(item)).length;
   const metrics = [
-    { label: "후보 모듈", value: `${analysis.moduleCandidates.length}개` },
-    { label: "Remote A2A", value: `${remoteA2ACount}개` },
+    { label: "자산 후보", value: `${analysis.assetCandidates.length}개` },
+    { label: "Agent · Workflow · Tool", value: `${assetCounts.agent} · ${assetCounts.workflow} · ${assetCounts.tool}` },
     { label: "누락 정보", value: `${missingItems.length}건 / 수용 ${acceptedCount}건` }
   ];
   const contractRows = [
@@ -55,13 +61,13 @@ export function AnalysisResult({
 
   return (
     <div className="stack">
-      <section className="panel analysis-brief">
+      <section className="ui-panel analysis-brief">
         <div className="analysis-brief-hero">
           <div>
             <p className="eyebrow">이해 확인</p>
             <h2>분석 이해 확인</h2>
             <p className="analysis-brief-copy">
-              아래 계약이 요구사항과 맞으면 모듈 검토로 이동합니다. 위험 신호와 가정은 보조 근거에서 확인할 수 있습니다.
+              아래 계약이 요구사항과 맞으면 자산 검토로 이동합니다. 위험 신호와 가정은 보조 근거에서 확인할 수 있습니다.
             </p>
           </div>
           <div className="analysis-brief-actions">
@@ -69,7 +75,7 @@ export function AnalysisResult({
               다시 분석
             </button>
             <button type="button" className="primary" onClick={onContinue}>
-              모듈 검토로 이동
+              자산 검토로 이동
             </button>
           </div>
         </div>
@@ -90,7 +96,7 @@ export function AnalysisResult({
         </div>
       </section>
 
-      <section className="panel evidence-drawer">
+      <section className="ui-panel evidence-drawer">
         <div className="section-heading">
           <p className="eyebrow">보조 근거</p>
           <h2>검토자가 필요할 때 펼쳐보는 정보</h2>
@@ -198,7 +204,7 @@ function MissingInfoDetail({
         )}
         {items.length ? (
           <p className="review-muted">
-            "수용"은 reviewer attestation입니다. 모듈 후보의 missing_information은 모듈 검토에서 직접 정리해야 승인할 수 있습니다.
+            "수용"은 reviewer attestation입니다. 자산 후보의 missing_information은 자산 검토에서 직접 정리해야 승인할 수 있습니다.
           </p>
         ) : null}
       </div>

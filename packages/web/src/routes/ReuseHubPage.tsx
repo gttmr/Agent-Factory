@@ -5,19 +5,16 @@ import { CatalogCard } from "../catalog-hub/CatalogCard";
 import { PinTargetDialog } from "../catalog-hub/PinTargetDialog";
 import { PublishApprovalDrawer } from "../catalog-hub/PublishApprovalDrawer";
 import { RegisterProposalDrawer } from "../catalog-hub/RegisterProposalDrawer";
-import { WorkflowA2aConversionDrawer } from "../catalog-hub/WorkflowA2aConversionDrawer";
-import { getWorkflowA2aActionState } from "../catalog-hub/workflowA2aConversionDrawerModel";
-import type { CatalogCategory, CatalogHubEntry } from "../catalog/catalogIndex";
+import type { CatalogHubEntry, TargetCatalogCategory } from "../catalog/catalogIndex";
 import { useCatalog } from "../state/useCatalog";
 import { useArtifactRoots } from "../state/useArtifactRoot";
 import { useRecentRoots } from "../state/useRecentRoots";
 import { buildMockLabRoute } from "../mock-lab/mockLabIntegration";
 
-const CATEGORY_TABS: Array<{ id: CatalogCategory; label: string }> = [
+const CATEGORY_TABS: Array<{ id: TargetCatalogCategory; label: string }> = [
   { id: "agent", label: "Agent" },
   { id: "workflow", label: "Workflow" },
-  { id: "adapter", label: "Adapter" },
-  { id: "remote_a2a", label: "Remote A2A" }
+  { id: "tool", label: "Tool" }
 ];
 
 export default function ReuseHubPage() {
@@ -34,11 +31,10 @@ export default function ReuseHubPage() {
     return "";
   }, [searchParams, recent, roots]);
 
-  const [tab, setTab] = useState<CatalogCategory>("agent");
+  const [tab, setTab] = useState<TargetCatalogCategory>("agent");
   const [query, setQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<string>("");
   const [pinTarget, setPinTarget] = useState<CatalogHubEntry | null>(null);
-  const [a2aConversionTarget, setA2aConversionTarget] = useState<CatalogHubEntry | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [approvalDrawerOpen, setApprovalDrawerOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,14 +43,13 @@ export default function ReuseHubPage() {
     if (!catalog.data) return [];
     if (tab === "agent") return catalog.data.agents;
     if (tab === "workflow") return catalog.data.workflows;
-    if (tab === "adapter") return catalog.data.adapters;
-    return catalog.data.remoteA2A;
+    return catalog.data.tools ?? [];
   }, [catalog.data, tab]);
 
   const owners = useMemo(() => {
     const set = new Set<string>();
     bucket.forEach((entry) => {
-      if (entry.owner_domain) set.add(entry.owner_domain);
+      set.add(entry.owner);
     });
     return Array.from(set).sort();
   }, [bucket]);
@@ -62,9 +57,9 @@ export default function ReuseHubPage() {
   const filtered = useMemo(() => {
     const lower = query.trim().toLowerCase();
     return bucket.filter((entry) => {
-      if (ownerFilter && entry.owner_domain !== ownerFilter) return false;
+      if (ownerFilter && entry.owner !== ownerFilter) return false;
       if (!lower) return true;
-      const haystack = [entry.name, entry.responsibility, entry.subtype, entry.owner_domain]
+      const haystack = [entry.name, entry.responsibility, entry.owner, ...entry.business_domains, ...entry.capability_tags]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -82,7 +77,7 @@ export default function ReuseHubPage() {
         <SectionHeader
           eyebrow="Reuse Hub"
           title="공통 카탈로그 탐색"
-          description="등록된 Agent/Workflow/Adapter/Remote A2A 컴포넌트를 검색·재사용 핀으로 활성 root 에 바인딩하고, 신규 등록 제안과 승인 publish 를 관리합니다."
+          description="등록된 Agent/Workflow/Tool 자산을 검색해 활성 root에 바인딩하고, 신규 등록 제안과 승인 publish를 관리합니다. A2A는 Agent의 Binding 또는 Exposure로 표시됩니다."
           action={
             <div className="af-action-row">
               <label className="af-active-root-picker">
@@ -152,7 +147,7 @@ export default function ReuseHubPage() {
               value={ownerFilter}
               onChange={(event) => setOwnerFilter(event.target.value)}
               className="af-catalog-filter"
-              aria-label="owner_domain 필터"
+              aria-label="owner 필터"
             >
               <option value="">owner 전체</option>
               {owners.map((owner) => (
@@ -169,35 +164,23 @@ export default function ReuseHubPage() {
           <p className="af-landing-error">catalog 조회 실패: {(catalog.error as Error).message}</p>
         ) : null}
         {!catalog.isLoading && filtered.length === 0 ? (
-          tab === "remote_a2a" ? (
-            <EmptyState
-              title="등록된 Remote A2A contract 가 없습니다"
-              description="신규 등록 제안으로 첫 항목을 만들거나, templates/regression-scenarios/scenario-e-true-remote-a2a/ 의 예시를 참고하세요."
-            />
-          ) : (
-            <EmptyState title="조건에 맞는 catalog 항목이 없습니다" description="검색어/필터를 비우고 다시 시도하세요." />
-          )
+          <EmptyState title="조건에 맞는 catalog 항목이 없습니다" description="검색어/필터를 비우고 다시 시도하세요." />
         ) : null}
 
         <div className="af-catalog-grid">
-          {filtered.map((entry) => {
-            const a2aAction = getWorkflowA2aActionState(entry, activeReqId);
-            return (
-              <CatalogCard
-                key={entry.id}
-                entry={entry}
-                onPin={(item) => setPinTarget(item)}
-                onConvertA2a={a2aAction.visible ? (item) => setA2aConversionTarget(item) : undefined}
-                pinDisabledReason={pinDisabledReason}
-                a2aConversionDisabledReason={a2aAction.disabledReason}
-                mockLabHref={
-                  entry.category === "adapter"
-                    ? buildMockLabRoute({ adapterName: entry.name, reqId: activeReqId || null })
-                    : undefined
-                }
-              />
-            );
-          })}
+          {filtered.map((entry) => (
+            <CatalogCard
+              key={entry.asset_id}
+              entry={entry}
+              onPin={(item) => setPinTarget(item)}
+              pinDisabledReason={pinDisabledReason}
+              mockLabHref={
+                entry.asset_type === "tool"
+                  ? buildMockLabRoute({ toolName: entry.name, reqId: activeReqId || null })
+                  : undefined
+              }
+            />
+          ))}
         </div>
       </Panel>
 
@@ -206,15 +189,6 @@ export default function ReuseHubPage() {
           reqId={activeReqId}
           entry={pinTarget}
           onClose={() => setPinTarget(null)}
-          onSaved={(msg) => setMessage(msg)}
-        />
-      ) : null}
-      {a2aConversionTarget && activeReqId ? (
-        <WorkflowA2aConversionDrawer
-          reqId={activeReqId}
-          entry={a2aConversionTarget}
-          roots={roots}
-          onClose={() => setA2aConversionTarget(null)}
           onSaved={(msg) => setMessage(msg)}
         />
       ) : null}

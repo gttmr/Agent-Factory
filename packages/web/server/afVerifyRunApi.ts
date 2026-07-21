@@ -1,13 +1,18 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ArtifactRootStore } from "./artifactRootStore";
 import { isRecord, readJsonBody, sendJson } from "./httpApi";
-import { writeManifestValidationResult } from "./manifestValidation";
+import { writeVerifyManifestResult } from "./manifestValidation";
 import { beginSse, flushBufferedProcessOutput, runProcess, shouldStreamProcess, writeSseEvent } from "./processStreaming";
+import { assertVerifyReady } from "./verifyReadiness";
 
 export const VERIFY_COMMANDS = {
   validate_artifact_root: {
     argv: ["node", "scripts/validate-artifacts.mjs"],
     description: "validate-artifacts.mjs against the artifact root"
+  },
+  validate_generated_runtime: {
+    argv: ["node", "scripts/validate-generated-runtime.mjs"],
+    description: "compile and run generated runtime contract/import tests"
   },
   build_web: {
     argv: ["npm", "run", "build", "--prefix", "packages/web"],
@@ -30,6 +35,7 @@ export interface VerifyCommandInput {
   readonly onStdout?: (chunk: string) => void;
   readonly onStderr?: (chunk: string) => void;
   readonly onError?: (error: Error) => void;
+  readonly recordManifest?: boolean;
 }
 
 export interface VerifyCommandResult {
@@ -71,6 +77,7 @@ export async function handleVerifyRun(
     sendJson(res, 400, { error: `허용되지 않은 명령입니다: ${key}` });
     return;
   }
+  await assertVerifyReady(store, reqId);
   const argv = verifyCommandArgv(store, reqId, commandKey);
   if (shouldStreamProcess(req, body)) {
     await handleVerifyRunSse(repoRoot, store, reqId, commandKey, argv, res);
@@ -94,7 +101,7 @@ export function normalizeVerifyCommandKey(value: string | undefined | null): Ver
 
 export function verifyCommandArgv(store: ArtifactRootStore, reqId: string, commandKey: VerifyCommandKey): string[] {
   const command = VERIFY_COMMANDS[commandKey];
-  return commandKey === "validate_artifact_root"
+  return commandKey === "validate_artifact_root" || commandKey === "validate_generated_runtime"
     ? [...command.argv, store.resolveRootDir(reqId)]
     : [...command.argv];
 }
@@ -104,6 +111,7 @@ export async function runVerifyCommand(input: VerifyCommandInput): Promise<Verif
   if (!commandKey) {
     throw new Error(`허용되지 않은 명령입니다: ${input.commandKey}`);
   }
+  await assertVerifyReady(input.store, input.reqId);
   const argv = verifyCommandArgv(input.store, input.reqId, commandKey);
   const command = argv.join(" ");
   const result = await runProcess(input.repoRoot, argv[0], argv.slice(1), {
@@ -113,7 +121,9 @@ export async function runVerifyCommand(input: VerifyCommandInput): Promise<Verif
     onError: input.onError
   });
   const passed = result.code === 0;
-  await writeManifestValidationResult(input.store, input.reqId, command, passed);
+  if (input.recordManifest !== false) {
+    await writeVerifyManifestResult(input.store, input.reqId, commandKey, command, passed);
+  }
   return {
     ok: passed,
     exit_code: result.code,

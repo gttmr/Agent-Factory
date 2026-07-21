@@ -4,7 +4,7 @@
 
 Mock Lab은 합성 `MockSpec`을 편집·저장하고, 저장된 spec으로 MCP stdio runtime을 실행하며, smoke와 network MCP discovery를 수행하는 로컬 검토 표면이다. Mock은 Tool 계약의 개발·검증용 대역이며 실제 backend, 실제 고객 데이터, production business logic을 구현하지 않는다.
 
-MCP는 Tool의 연결 방식이지 자산 유형이 아니다. 따라서 이 문서는 legacy `Adapter`를 새 택소노미 유형으로 정의하지 않고, 현재 구현에 남은 이름으로만 설명한다.
+MCP는 Tool의 연결 방식이지 자산 유형이 아니다. Mock Lab의 Catalog 입력과 Reuse Hub 이동 경로도 strict Tool 계약만 사용한다.
 
 ## Target 역할
 
@@ -19,11 +19,9 @@ Mock Lab은 다음 책임만 가진다.
 
 Mock Lab 성공은 Tool의 Catalog 승인, 실제 backend 연결, 운영 준비 또는 production 배포를 뜻하지 않는다. Catalog와 승인 단계의 관계는 [Operating Model](../workbench/operating-model.md#5-catalog재사용-거버넌스)을 따른다.
 
-## Current Implementation(`legacy`)
+## Current Implementation
 
-현재 UI와 source는 legacy `Adapter` 어휘를 사용한다. read-only prefill source는 `catalog/adapters.yaml`이고, 통합 route는 `/mock-lab`이며, Reuse Hub 이동 query도 `adapter` 이름을 사용한다. 이 파일·route·query는 이번 문서 정합화에서 변경하지 않는다.
-
-현재 legacy `Adapter` row를 Target Tool로 자동 해석하지 않는다. Mock Lab에 나타난 항목이 실제로 구조화된 호출 기능인지 확인하고, 데이터·지식·외부 시스템 자체라면 Resource 또는 Dependency로 판별한다. 구현 gap은 [Migration Status](../migration/taxonomy-vnext-status.md)를 따른다.
+현재 UI는 Tool을 표시하고 read-only prefill은 `catalog/tools.yaml`만 읽는다. Prefill loader는 `asset_type: tool`, `binding.kind: mcp`, `connection.transport: stdio`를 요구하며 제거된 역사 입력을 변환하거나 보정하지 않는다.
 
 ### 실행 경로
 
@@ -36,7 +34,7 @@ npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
 
 기본 URL은 `http://127.0.0.1:5173/mock-lab`이다. 이 route가 일상적인 Mock Lab 편집·실행·검증 표면이다.
 
-`packages/mock-lab` standalone 앱은 패키지 개발과 과도기 호환을 위해 유지한다.
+`packages/mock-lab` standalone 앱은 패키지 개발과 독립 실행 검증에 사용한다.
 
 ```bash
 cd packages/mock-lab
@@ -46,15 +44,15 @@ npm run dev
 
 standalone 개발 앱 URL은 `http://127.0.0.1:5176/`이다. 5176 앱은 별도 자산 유형이나 별도 운영 Mock 서비스를 뜻하지 않는다.
 
-### Catalog Prefill(`legacy`)
+### Catalog Prefill
 
-`GET /api/mock-lab/catalog-prefill`은 legacy `catalog/adapters.yaml`을 읽기 전용으로 파싱한다. 현행 표시 대상은 `contract_status == "mock_ready"`, `runtime_mock` 존재, 또는 `component_source == "stub"` 중 하나를 만족하는 row다.
+`GET /api/mock-lab/catalog-prefill`은 `catalog/tools.yaml`을 읽기 전용으로 파싱한다. `status: deprecated`가 아닌 각 `asset_id`의 최신 version을 고른 뒤 `contract_status == "mock_ready"` 또는 `runtime_mock` 존재 조건을 만족하는 Tool만 표시한다. 응답의 `source_file`도 `catalog/tools.yaml`이다.
 
 좌측 패널은 저장된 Mock server 목록을 표시한다. 저장된 Mock은 선택해 편집하거나 삭제할 수 있으며, 삭제는 실행 중 saved-spec process의 stop을 시도한 뒤 `artifacts/mock-lab/<mock-id>/`의 해당 로컬 artifact를 제거한다.
 
-Catalog prefill은 Mock Spec Editor의 `+ tool` 선택 창에서 사용한다. 첫 `new` 항목은 빈 Tool mock을 만들고, legacy `Adapter` row를 고르면 현행 `inputSchema`, `outputSchema`, `successResponse`, `riskSignals`, `auditRequired` 초안을 채운다. 선택 창은 3×3과 pagination 흐름을 유지한다.
+Catalog prefill은 Mock Spec Editor의 `+ tool` 선택 창에서 사용한다. 첫 `new` 항목은 빈 Tool mock을 만들고, Catalog Tool을 고르면 `inputSchema`, `outputSchema`, `successResponse`, `riskSignals`, `auditRequired` 초안을 채운다. 선택 창은 3×3과 pagination 흐름을 유지한다.
 
-Reuse Hub의 legacy `Adapter` 카드에서 Mock Lab을 열면 `/mock-lab?adapter=<catalog-name>&req=<reqId>`로 이동한다. Prefill은 편집 시작점일 뿐 승인된 Tool 계약이 아니며, Mock Lab은 `catalog/*.yaml`을 저장하거나 수정하지 않는다.
+Reuse Hub의 Tool 카드에서 Mock Lab을 열면 `/mock-lab?tool=<catalog-name>&req=<reqId>`로 이동한다. Mock Lab은 `URLSearchParams`의 `tool` 값으로 Catalog Tool 이름을 찾고 해당 prefill을 적용한다. Prefill은 편집 시작점일 뿐 승인된 Tool 계약이 아니며, Mock Lab은 `catalog/*.yaml`을 저장하거나 수정하지 않는다.
 
 ### MockSpec 편집과 저장
 
@@ -103,7 +101,19 @@ Server control API는 저장되고 schema-valid한 `mock-spec.json`을 읽어 pa
 - discovery의 connected 판단은 in-memory process가 실행 중이고 요청한 Tool이 live `tools/list`에 있을 때만 참이다. persisted `server-state.json`의 running 값만으로 연결됨을 주장하지 않는다.
 - runtime이 실행 중이지 않으면 network bridge는 사용 가능한 Tool endpoint로 취급하지 않는다.
 
-생성된 Current Implementation runnable bundle은 `AF_MOCK_LAB_MCP_URL`과 server 식별자를 사용하거나 현행 runtime config의 legacy `Adapter` MCP URL override를 통해 이 bridge에 연결할 수 있다. 이 연결은 synthetic local 검증 전용이며 Target에서 Tool + MCP Binding + HTTP Transport로 해석한다.
+생성된 runnable bundle은 `AF_MOCK_LAB_MCP_URL`과 server 식별자를 사용해 이 bridge에 연결할 수 있다. 이 연결은 synthetic local 검증 전용이며 Tool + MCP Binding + HTTP Transport로 해석한다.
+
+## Current source locators
+
+| 행동 | Path | Stable anchor |
+| --- | --- | --- |
+| `tools.yaml` 전용 prefill load·filter | [catalogPrefillLoader.ts](../../packages/mock-lab/server/catalogPrefillLoader.ts) | `loadCatalogPrefill`, `readCatalogTools`, `isPrefillCandidate` |
+| `tool` query 적용 | [App.tsx](../../packages/mock-lab/src/App.tsx) | `refreshInitial`, `readRequestedToolName` |
+| 이름 기반 prefill 선택 | [catalogPrefillSelection.ts](../../packages/mock-lab/src/catalogPrefillSelection.ts) | `resolveCatalogPrefillSpec` |
+| Reuse Hub 이동 URL | [mockLabIntegration.ts](../../packages/web/src/mock-lab/mockLabIntegration.ts) | `buildMockLabRoute` |
+| Tool 카드에서 Mock Lab 연결 | [ReuseHubPage.tsx](../../packages/web/src/routes/ReuseHubPage.tsx) | `mockLabHref` |
+| Mock Lab API route | [mockLabApi.ts](../../packages/mock-lab/server/mockLabApi.ts) | `createMockLabMiddleware` |
+| generated MCP base URL | [runtime-config.mjs](../../scripts/adk-source/emitters/runtime-config.mjs) | `AF_MOCK_LAB_MCP_URL` |
 
 ## 로컬 입력 보안
 
@@ -121,7 +131,7 @@ runtime secret이 필요하면 ignored local env 경계를 사용하며 MockSpec
 
 ## Non-goals
 
-- legacy `Adapter`를 Target의 새 자산 유형으로 정의
+- MCP를 Tool과 별도의 자산 유형으로 정의
 - Reuse Hub Catalog 거버넌스를 Mock Lab으로 이전
 - `catalog/*.yaml` 직접 수정 또는 `catalog-delta.yaml` 생성
 - 실제 은행 endpoint나 External Dependency 연결

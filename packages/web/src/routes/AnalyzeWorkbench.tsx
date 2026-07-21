@@ -55,17 +55,16 @@ export default function AnalyzeWorkbench() {
   const analyzeDomain = domainDraft.trim() || domain;
   const catalog = flattenCatalogForAnalyzer(catalogIndex);
   const catalogCounts = {
-    agent: catalog.filter((entry) => entry.module_category === "agent").length,
-    workflow: catalog.filter((entry) => entry.module_category === "workflow").length,
-    adapter: catalog.filter((entry) => entry.module_category === "adapter").length,
-    remote_a2a: catalog.filter((entry) => entry.module_category === "remote_a2a").length
+    agent: catalog.filter((entry) => entry.asset_type === "agent").length,
+    workflow: catalog.filter((entry) => entry.asset_type === "workflow").length,
+    tool: catalog.filter((entry) => entry.asset_type === "tool").length
   };
 
   const missingInfo = analysis?.evidence?.missing_information ?? [];
   // 수용 상태는 analysis-result.json(evidence.accepted_missing_information)에 영속화한다 —
   // 컴포넌트 메모리에만 두면 리로드 시 초기화된다.
   const acceptedMissing = analysis?.evidence?.accepted_missing_information ?? [];
-  const needsInfoCount = analysis?.moduleCandidates.filter((candidate) => candidate.status === "needs_info").length ?? 0;
+  const needsInfoCount = analysis?.assetCandidates.filter((candidate) => candidate.status === "needs_info").length ?? 0;
   const hasAnalysis = Boolean(analysis);
   const reviewReady = canToggleAnalysisReviewedGate({
     hasAnalysis,
@@ -112,7 +111,10 @@ export default function AnalyzeWorkbench() {
       setRequirementText(parsed.input.rawText);
       setDomainDraft(parsed.input.domain || "공통");
       setActionMessage(`Imported ${file.name}`);
-      await queryClient.invalidateQueries({ queryKey: ["af", reqId, "analysis-result"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["af", reqId, "analysis-result"] }),
+        queryClient.invalidateQueries({ queryKey: ["af", reqId, "manifest"] })
+      ]);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "Import 실패");
     }
@@ -178,7 +180,7 @@ export default function AnalyzeWorkbench() {
       onStepChange={setActiveStep}
       summary={
         <>
-          <AnalyzeSummaryItem label="후보 모듈" value={analysis ? `${analysis.moduleCandidates.length}개` : "—"} />
+          <AnalyzeSummaryItem label="자산 후보" value={analysis ? `${analysis.assetCandidates.length}개` : "—"} />
           <AnalyzeSummaryItem label="needs_info" value={`${needsInfoCount}개`} />
           <AnalyzeSummaryItem label="누락 정보" value={`${missingInfo.length}건 / 수용 ${acceptedMissing.length}`} />
           <AnalyzeSummaryItem label="catalog" value={`${catalog.length}개`} />
@@ -201,7 +203,7 @@ export default function AnalyzeWorkbench() {
           analyzeDomain={analyzeDomain}
           catalog={catalog}
           catalogCounts={catalogCounts}
-          currentCandidateCount={analysis?.moduleCandidates.length ?? null}
+          currentCandidateCount={analysis?.assetCandidates.length ?? null}
           onRequirementTextChange={setRequirementText}
           onDomainDraftChange={setDomainDraft}
           onImport={handleImport}

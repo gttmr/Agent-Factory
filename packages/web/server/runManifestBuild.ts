@@ -1,6 +1,19 @@
 import type { AfRunManifest } from "../src/analyzer/afRunManifest";
-import type { ArtifactRootStore } from "./artifactRootStore";
+import { ArtifactValidationError, type ArtifactRootStore } from "./artifactRootStore";
 import type { RuntimeStubFile } from "./runtimeStubFiles";
+
+const REQUIRED_BUILD_APPROVALS = ["analysis_reviewed", "boundaries_approved", "runtime_contracts_approved"] as const;
+
+export async function assertBuildApprovals(store: ArtifactRootStore, reqId: string): Promise<void> {
+  const { manifest } = await store.readManifest(reqId);
+  const missing = REQUIRED_BUILD_APPROVALS.filter((approval) => manifest.approvals[approval] !== true);
+  if (missing.length > 0) {
+    throw new ArtifactValidationError(
+      409,
+      `Build 실행 전 Analyze/Compose 승인이 필요합니다: ${missing.join(", ")}`
+    );
+  }
+}
 
 export function updateRunManifest(
   manifest: AfRunManifest,

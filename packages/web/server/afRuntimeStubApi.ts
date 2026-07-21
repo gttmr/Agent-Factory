@@ -4,7 +4,7 @@ import { join, resolve, sep } from "node:path";
 import type { ArtifactRootStore } from "./artifactRootStore";
 import { readJsonBody, sendJson } from "./httpApi";
 import { beginSse, flushBufferedProcessOutput, runProcess, shouldStreamProcess, writeSseEvent } from "./processStreaming";
-import { recordRuntimeStubBuild } from "./runManifestBuild";
+import { assertBuildApprovals, recordRuntimeStubBuild } from "./runManifestBuild";
 import { collectRuntimeStubFiles, isIgnoredRuntimeStubPath, type RuntimeStubFile } from "./runtimeStubFiles";
 
 export interface RuntimeStubBuildInput {
@@ -86,6 +86,7 @@ export async function handleBuildRuntimeStub(
   res: ServerResponse
 ): Promise<void> {
   const body = await readJsonBody(req).catch(() => ({}));
+  await assertBuildApprovals(store, reqId);
   const rootDir = store.resolveRootDir(reqId);
   const stubDir = join(rootDir, "runtime-stub");
   const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];
@@ -115,6 +116,7 @@ export async function handleBuildRuntimeStub(
 }
 
 export async function runRuntimeStubBuild(input: RuntimeStubBuildInput): Promise<RuntimeStubBuildResult> {
+  await assertBuildApprovals(input.store, input.reqId);
   const rootDir = input.store.resolveRootDir(input.reqId);
   const stubDir = join(rootDir, "runtime-stub");
   const args = ["scripts/generate-adk-source.mjs", rootDir, stubDir];

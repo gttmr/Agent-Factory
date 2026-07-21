@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/af-run-manifest.schema.json",
+  "title": "Agent Factory Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requirement_id", "artifact_root", "current_stage", "stages", "approvals", "validation"],
+  "properties": {
+    "requirement_id": { "type": "string", "minLength": 1 },
+    "artifact_root": { "type": "string", "minLength": 1 },
+    "current_stage": { "$ref": "#/$defs/stageId" },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["analyze", "design", "build", "verify"],
+      "properties": {
+        "analyze": { "$ref": "#/$defs/stage" },
+        "design": { "$ref": "#/$defs/stage" },
+        "build": { "$ref": "#/$defs/stage" },
+        "verify": { "$ref": "#/$defs/stage" }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["analysis_reviewed", "boundaries_approved", "runtime_contracts_approved", "stub_ready_for_followup"],
+      "allOf": [
+        {
+          "if": { "properties": { "boundaries_approved": { "const": true } } },
+          "then": { "properties": { "analysis_reviewed": { "const": true } } }
+        },
+        {
+          "if": { "properties": { "runtime_contracts_approved": { "const": true } } },
+          "then": { "properties": { "boundaries_approved": { "const": true } } }
+        },
+        {
+          "if": { "properties": { "stub_ready_for_followup": { "const": true } } },
+          "then": { "properties": { "runtime_contracts_approved": { "const": true } } }
+        }
+      ],
+      "properties": {
+        "analysis_reviewed": { "type": "boolean" },
+        "boundaries_approved": { "type": "boolean" },
+        "runtime_contracts_approved": { "type": "boolean" },
+        "stub_ready_for_followup": { "type": "boolean" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "last_result"],
+      "properties": {
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "last_result": { "type": "string", "enum": ["not_run", "passed", "failed"] }
+      }
+    },
+    "stage_runs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analyze": { "$ref": "#/$defs/stageRun" },
+        "design": { "$ref": "#/$defs/stageRun" },
+        "build": { "$ref": "#/$defs/stageRun" },
+        "verify": { "$ref": "#/$defs/stageRun" }
+      }
+    }
+  },
+  "$defs": {
+    "stageId": { "type": "string", "enum": ["analyze", "design", "build", "verify"] },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "outputs"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "complete", "blocked"] },
+        "outputs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stageRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latest_run_id", "status", "started_at", "finished_at", "skill_name", "model", "output_artifacts", "last_error"],
+      "properties": {
+        "latest_run_id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["running", "completed", "failed", "applied", "canceled"] },
+        "started_at": { "type": "string", "minLength": 1 },
+        "finished_at": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "skill_name": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "output_artifacts": { "type": "array", "items": { "type": "string" } },
+        "last_error": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+        "codex": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["backend", "thread_id", "event_count"],
+          "properties": {
+            "backend": { "type": "string", "enum": ["sdk", "fake"] },
+            "thread_id": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+            "event_count": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    }
+  }
+}

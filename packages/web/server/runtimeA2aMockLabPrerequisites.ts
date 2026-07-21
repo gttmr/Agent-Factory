@@ -25,7 +25,7 @@ async function requiredMockLabServerIds(input: MockLabPrerequisiteInput): Promis
       .sort()
       .map(async (mockServerId) => {
         if (await isFile(join(input.repoRoot, "artifacts/mock-lab", mockServerId, "mock-spec.json"))) return mockServerId;
-        return hasExplicitMockLabBinding(scaffoldPlan, mockServerId) ? mockServerId : null;
+        return mockServerId;
       })
   );
   return localIds.filter((mockServerId): mockServerId is string => mockServerId !== null);
@@ -38,24 +38,21 @@ function collectMockLabServerIds(value: unknown, discovered: Set<string>): void 
   }
   if (!isRecord(value)) return;
 
-  const mockBinding = value.mock_binding;
-  if (isRecord(mockBinding) && mockBinding.provider === "mock_lab" && typeof mockBinding.mock_server_id === "string") {
-    discovered.add(mockBinding.mock_server_id);
-  }
-  if (value.access_protocol === "mcp" && typeof value.mcp_server === "string") {
-    discovered.add(value.mcp_server);
+  const binding = value.binding;
+  const connection = value.connection;
+  if (
+    value.asset_type === "tool" &&
+    isRecord(binding) &&
+    binding.kind === "mcp" &&
+    typeof binding.server_ref === "string" &&
+    binding.server_ref.trim() &&
+    isRecord(connection) &&
+    connection.transport === "stdio"
+  ) {
+    discovered.add(binding.server_ref);
   }
 
   for (const child of Object.values(value)) collectMockLabServerIds(child, discovered);
-}
-
-function hasExplicitMockLabBinding(value: unknown, mockServerId: string): boolean {
-  if (Array.isArray(value)) return value.some((item) => hasExplicitMockLabBinding(item, mockServerId));
-  if (!isRecord(value)) return false;
-
-  const mockBinding = value.mock_binding;
-  if (isRecord(mockBinding) && mockBinding.provider === "mock_lab" && mockBinding.mock_server_id === mockServerId) return true;
-  return Object.values(value).some((child) => hasExplicitMockLabBinding(child, mockServerId));
 }
 
 async function mockLabPrerequisite(repoRoot: string, mockServerId: string): Promise<RuntimeA2aMockLabPrerequisite> {

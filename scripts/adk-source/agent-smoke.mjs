@@ -5,11 +5,11 @@ import { escapePythonString, toPythonEdgeTupleLiteral, toPythonLiteral } from ".
 import { componentContracts } from "./agent-contracts.mjs";
 
 export function buildSmokeAgentPy(context) {
-  const { graphContext, modules, packageName } = context;
+  const { assets, graphContext, packageName } = context;
   const collection = collectGenerationNodes(graphContext, { mode: "smoke" });
   const functions = [
-    ...modules.map(buildTodoFunction),
-    ...collection.moduleSpecsInDeclarationOrder.map(buildNodeFunction)
+    ...assets.map(buildTodoFunction),
+    ...collection.assetSpecsInDeclarationOrder.map(buildNodeFunction)
   ].join("\n\n");
   const graphEdges = buildSmokeGraphWorkflowEdges(graphContext, collection);
 
@@ -29,14 +29,13 @@ GRAPH_EDGES = ${toPythonEdgeTupleLiteral(graphEdges)}
 TERMINAL_OUTPUTS = ${toPythonLiteral(collection.terminalOutputNodes.map((node) => node.id))}
 
 
-def _event_output(module_id: str, module_name: str, node_input: Any = None):
-    contract = COMPONENT_CONTRACTS[module_id]
+def _event_output(asset_id: str, asset_name: str, node_input: Any = None):
+    contract = COMPONENT_CONTRACTS[asset_id]
     return {
-        "module_id": module_id,
-        "module_name": module_name,
+        "asset_id": asset_id,
+        "asset_name": asset_name,
         "input": node_input,
-        "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
-        "runtime_mock": contract.get("runtime_mock"),
+        "status": "todo_implementation_required",
     }
 
 
@@ -48,30 +47,27 @@ def emit_workflow_result(node_input: Any = None):
         "node_id": "workflow_result",
         "terminal_outputs": TERMINAL_OUTPUTS,
         "input": node_input,
-        "status": "runtime_mock_smoke",
+        "status": "synthetic_smoke",
     }
 
 
-def _synthetic_module_outputs():
+def _synthetic_asset_outputs():
     return {
-        module_id: {
-            "module_name": contract["catalog_binding"]["name"] if contract.get("catalog_binding") else module_id,
-            "status": "runtime_mock_smoke" if contract.get("runtime_mock") is not None else "todo_implementation_required",
-            "runtime_mock": contract.get("runtime_mock"),
+        asset_id: {
+            "asset_name": asset_id,
+            "status": "todo_implementation_required",
             "developer_todos": contract["developer_todos"],
         }
-        for module_id, contract in COMPONENT_CONTRACTS.items()
+        for asset_id, contract in COMPONENT_CONTRACTS.items()
     }
 
 
 def _build_smoke_text(user_text: str = ""):
-    mock_count = sum(1 for contract in COMPONENT_CONTRACTS.values() if contract.get("runtime_mock") is not None)
     terminal_outputs = ", ".join(TERMINAL_OUTPUTS) if TERMINAL_OUTPUTS else "none"
     user_note = f" 받은 메시지: {user_text[:160]}" if user_text else ""
     return (
         "${packageName} ADK 런타임 smoke: "
-        f"승인된 모듈 {len(COMPONENT_CONTRACTS)}개를 불러왔고, "
-        f"합성 런타임 mock {mock_count}개를 사용할 수 있습니다. "
+        f"승인된 자산 {len(COMPONENT_CONTRACTS)}개를 불러왔고, "
         f"최종 출력: {terminal_outputs}. "
         "이 응답은 검토된 합성 테스트 더블만 사용하며 실제 업무 로직이 아닙니다."
         f"{user_note}"
@@ -105,7 +101,7 @@ class SyntheticRuntimeSmokeAgent(BaseAgent):
                 parts=[types.Part(text=_build_smoke_text(_latest_user_text(ctx)))],
             ),
             output={
-                "status": "runtime_mock_smoke",
+                "status": "synthetic_smoke",
                 "guardrails": {
                     "raw_requirement_to_code": False,
                     "generated_business_logic": False,
@@ -113,7 +109,7 @@ class SyntheticRuntimeSmokeAgent(BaseAgent):
                 },
                 "graph_edges": GRAPH_EDGES,
                 "terminal_outputs": TERMINAL_OUTPUTS,
-                "module_outputs": _synthetic_module_outputs(),
+                "asset_outputs": _synthetic_asset_outputs(),
             },
         )
 
@@ -125,18 +121,18 @@ root_agent = SyntheticRuntimeSmokeAgent(
 `;
 }
 
-function buildTodoFunction(module) {
-  return `def ${todoFunctionName(module)}(node_input: Any = None):
-    """TODO_IMPLEMENT_HERE: implement this approved module after filling the reviewed handoff."""
-    raise NotImplementedError("${escapePythonString(module.name)} requires developer implementation")`;
+function buildTodoFunction(asset) {
+  return `def ${todoFunctionName(asset)}(node_input: Any = None):
+    """TODO_IMPLEMENT_HERE: implement this approved asset after filling the reviewed handoff."""
+    raise NotImplementedError("${escapePythonString(asset.name)} requires developer implementation")`;
 }
 
 function buildNodeFunction(target) {
-  const module = target.module ?? target;
+  const asset = target.asset ?? target;
   return `def ${nodeFunctionName(target)}(node_input: Any = None):
-    contract = COMPONENT_CONTRACTS["${module.id}"]
-    output = _event_output("${module.id}", "${escapePythonString(module.name)}", node_input)
+    contract = COMPONENT_CONTRACTS["${asset.asset_id}"]
+    output = _event_output("${asset.asset_id}", "${escapePythonString(asset.name)}", node_input)
     output["developer_todos"] = contract["developer_todos"]
-    output["todo_function"] = "${todoFunctionName(module)}"
+    output["todo_function"] = "${todoFunctionName(asset)}"
     return output`;
 }

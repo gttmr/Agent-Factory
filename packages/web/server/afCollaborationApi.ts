@@ -19,7 +19,7 @@ const COMMENT_STATUSES = new Set(["open", "resolved", "wontfix"]);
 const AUTHOR_ROLES = new Set(["developer", "business", "reviewer", "unknown"]);
 
 const HIGHLIGHT_KINDS = new Set(["path", "node_group", "edge_group", "container_focus"]);
-const HIGHLIGHT_COLOR_TOKENS = new Set(["agent", "workflow", "adapter", "remote", "neutral"]);
+const HIGHLIGHT_COLOR_TOKENS = new Set(["agent", "workflow", "tool", "a2a", "neutral"]);
 
 interface CommentAnchor {
   kind: "node" | "edge" | "container" | "path" | "section";

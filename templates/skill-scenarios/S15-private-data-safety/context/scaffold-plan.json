@@ -1,0 +1,250 @@
+{
+  "contract_version": "2.0",
+  "requirement_id": "req-s15-private-data-safety",
+  "package_name": "s15_private_data_safety_smoke",
+  "source": "approved_workbench_artifact",
+  "raw_requirement_to_code": false,
+  "output_mode": "smoke",
+  "assets": [
+    {
+      "asset_id": "workflow-s15-private-data-safety-smoke",
+      "source_requirement_id": "req-s15-private-data-safety",
+      "catalog_entry_id": null,
+      "name": "Private Data Safety Smoke Workflow",
+      "asset_type": "workflow",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "private-data-safety",
+        "no-network-smoke",
+        "fail-closed"
+      ],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": {
+        "representation": "graph",
+        "coordination": "explicit",
+        "template_ref": null
+      },
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The reviewed flow owns the synthetic input, external-connection boundary, and explicit no-network terminal outcome.",
+      "inputs": [
+        {
+          "name": "synthetic_query",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "synthetic_service_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": []
+    },
+    {
+      "asset_id": "tool-s15-environment-backed-service",
+      "source_requirement_id": "req-s15-private-data-safety",
+      "catalog_entry_id": null,
+      "name": "Environment-backed Synthetic Service Tool",
+      "asset_type": "tool",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "Scenario Fixture Team",
+      "reuse_status": "project_only",
+      "capability_tags": [
+        "environment-configuration",
+        "external-connection",
+        "secret-non-propagation"
+      ],
+      "binding": {
+        "kind": "function"
+      },
+      "connection": {
+        "transport": "http"
+      },
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 1,
+      "rationale": "The approved design requires a custom environment-backed HTTP Tool seam, but source generation remains blocked until that seam is supported without embedding endpoint or credential values.",
+      "inputs": [
+        {
+          "name": "synthetic_query",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "synthetic_service_result",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "risk_level": "medium",
+      "risk_signals": [
+        "audit_required"
+      ],
+      "status": "approved",
+      "missing_information": [],
+      "side_effect": "read",
+      "auth_required": true,
+      "audit_required": true,
+      "developer_todos": [
+        "Add reviewed generator support for an environment-backed external HTTP Tool before enabling source generation.",
+        "Keep the smoke path local, synthetic, and network-disabled until that support is verified."
+      ]
+    }
+  ],
+  "runtime_contracts": [
+    {
+      "contract_id": "rtc-s15-environment-backed-service",
+      "contract_kind": "external_connection",
+      "asset_id": "tool-s15-environment-backed-service",
+      "title": "Private-data-safe external service boundary",
+      "contract_status": "approved",
+      "summary": "Define a future environment-backed HTTP connection while authorizing only a deterministic local synthetic no-network smoke; the current generator must not emit the external connector.",
+      "required_review_fields": [],
+      "reviewer_notes": "The boundary is approved, but Runtime Handoff generation remains blocked until the strict generator supports this connector without value propagation.",
+      "runtime_support": {
+        "context_manager_required": false,
+        "callback_broker_required": false,
+        "human_approval_required": false,
+        "idempotency_required": false,
+        "audit_required": true,
+        "compensation_required": false
+      },
+      "operation": {
+        "operation_type": "read",
+        "side_effect_level": "read_only",
+        "callback_expected": false,
+        "async_resume_required": false
+      },
+      "identifiers": [
+        "AF_SYNTHETIC_SERVICE_URL",
+        "AF_SYNTHETIC_SERVICE_CREDENTIAL"
+      ],
+      "policies": {
+        "auth_policy": "Read authentication only from AF_SYNTHETIC_SERVICE_CREDENTIAL at runtime; never persist, default, echo, or fixture its value.",
+        "timeout_policy": "Network access is disabled for this smoke contract, so no external timeout path is executed.",
+        "retry_policy": "Perform zero external attempts and zero retries in smoke mode.",
+        "fallback_policy": "Return the fixed local synthetic response for the no-network smoke; fail closed if an actual external connection is requested.",
+        "masking_policy": "Never log or serialize values read through AF_SYNTHETIC_SERVICE_URL or AF_SYNTHETIC_SERVICE_CREDENTIAL.",
+        "data_policy": "Fixed synthetic query and response only; no private endpoint, credential value, customer data, or production connectivity."
+      },
+      "graph_ir_annotations": {
+        "tool_node_id": "node-s15-service-tool",
+        "endpoint_env": "AF_SYNTHETIC_SERVICE_URL",
+        "credential_env": "AF_SYNTHETIC_SERVICE_CREDENTIAL",
+        "smoke_network_access": "disabled"
+      },
+      "synthetic_examples": [
+        {
+          "query": "synthetic-status",
+          "fixture_response": {
+            "status": "synthetic-ok"
+          },
+          "network_access": "disabled"
+        }
+      ],
+      "developer_todos": [
+        "Implement and verify a strict env-backed external HTTP Tool emitter before changing scaffold readiness.",
+        "Add negative tests proving endpoint and credential values cannot enter generated files or logs."
+      ]
+    }
+  ],
+  "excluded_assets": [],
+  "graph": {
+    "graph_id": "graph-s15-private-data-safety-smoke",
+    "source_requirement_id": "req-s15-private-data-safety",
+    "workflow_ref": "workflow-s15-private-data-safety-smoke",
+    "nodes": [
+      {
+        "id": "node-s15-input",
+        "label": "Synthetic service query",
+        "node_kind": "input"
+      },
+      {
+        "id": "node-s15-service-tool",
+        "label": "Use reviewed environment-backed service boundary",
+        "node_kind": "tool",
+        "tool_ref": "tool-s15-environment-backed-service",
+        "invocation_control": "workflow"
+      },
+      {
+        "id": "node-s15-output",
+        "label": "Synthetic no-network result",
+        "node_kind": "output"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-s15-input-to-tool",
+        "from": "node-s15-input",
+        "to": "node-s15-service-tool",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      },
+      {
+        "id": "edge-s15-tool-to-output",
+        "from": "node-s15-service-tool",
+        "to": "node-s15-output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": "event"
+      }
+    ],
+    "regions": []
+  },
+  "manifest": {
+    "catalog_bound_assets": [],
+    "new_code_required": [
+      {
+        "asset_id": "workflow-s15-private-data-safety-smoke",
+        "asset_name": "Private Data Safety Smoke Workflow",
+        "reason": "Generate the reviewed no-network smoke orchestration only after its Tool boundary is supported.",
+        "developer_todos": [
+          "Keep generated behavior local and synthetic."
+        ]
+      },
+      {
+        "asset_id": "tool-s15-environment-backed-service",
+        "asset_name": "Environment-backed Synthetic Service Tool",
+        "reason": "Implement the reviewed env-backed external HTTP seam without persisting endpoint or credential values.",
+        "developer_todos": [
+          "Do not generate this Tool until the strict generator has a reviewed external HTTP emitter.",
+          "Retain zero-network smoke behavior and secret non-propagation tests."
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "can_generate_source": false,
+    "blockers": [
+      "The current strict generator has no reviewed env-backed arbitrary external HTTP Tool emitter; generating its function placeholder would misrepresent the approved connection."
+    ],
+    "warnings": [
+      "Only the environment-variable names and fixed local synthetic no-network fixture are approved.",
+      "No external connectivity, credential value, deployment, or production readiness is authorized."
+    ]
+  }
+}

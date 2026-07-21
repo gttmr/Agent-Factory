@@ -176,7 +176,7 @@ export default function RunSandbox() {
             title="ADK 웹 UI"
             description={
               a2aProviderTarget
-                ? "ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. Remote A2A input-required 는 ADK Web 텍스트 채팅이 아니라 아래 Workbench resume 으로 같은 task 에 응답합니다."
+                ? "ADK가 제공하는 공식 dev UI입니다. 채팅·세션·이벤트·트레이스를 모두 지원합니다. 원격 A2A Agent의 input-required 요청에는 ADK Web 텍스트 채팅이 아니라 아래 Workbench resume으로 같은 task에 응답합니다."
                 : "ADK 가 제공하는 공식 dev UI 입니다. 채팅·세션·이벤트·트레이스로 현재 artifact runtime 을 확인합니다."
             }
           />

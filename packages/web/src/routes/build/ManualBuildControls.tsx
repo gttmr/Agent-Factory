@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { ScaffoldOutputMode, ScaffoldPlan, ScaffoldPlanModule } from "../../analyzer/types";
+import type { AssetCandidate, ScaffoldOutputMode, ScaffoldPlan } from "../../analyzer/types";
 import type { MockLabBindingSelection } from "../../mock-lab/mockLabIntegration";
 import type { BuildRuntimeStubResult } from "../../state/useScaffoldPlan";
 import type { MockLabDiscoveryPayload } from "../../state/useMockLabDiscovery";
@@ -8,13 +8,13 @@ import { ManualScaffoldPanel } from "./ManualScaffoldPanel";
 import type { AdkGraphReadiness } from "./buildReadiness";
 import type { StreamLogEntry } from "./processLog";
 
-interface AdapterConnections {
-  readonly connected: readonly ScaffoldPlanModule[];
-  readonly unconnected: readonly ScaffoldPlanModule[];
+interface ToolConnections {
+  readonly connected: readonly AssetCandidate[];
+  readonly unconnected: readonly AssetCandidate[];
 }
 
 interface ManualBuildControlsProps {
-  readonly adapterConnections: AdapterConnections;
+  readonly toolConnections: ToolConnections;
   readonly adkGraphReadiness: AdkGraphReadiness;
   readonly artifactSyncPending: boolean;
   readonly blockers: readonly string[];
@@ -31,7 +31,7 @@ interface ManualBuildControlsProps {
   };
   readonly modeDirty: boolean;
   readonly onBuildStub: () => void;
-  readonly onMockLabBinding: (module: ScaffoldPlanModule, value: string) => void;
+  readonly onMockLabBinding: (asset: AssetCandidate, value: string) => void;
   readonly onOutputModeChange: (mode: ScaffoldOutputMode) => void;
   readonly onSavePlan: () => void;
   readonly outputMode: ScaffoldOutputMode;
@@ -47,7 +47,7 @@ interface ManualBuildControlsProps {
 }
 
 export function ManualBuildControls({
-  adapterConnections,
+  toolConnections,
   adkGraphReadiness,
   artifactSyncPending,
   blockers,
@@ -82,7 +82,7 @@ export function ManualBuildControls({
       </div>
       <div className="af-build-advanced-grid">
         <ManualScaffoldPanel
-          adapterConnections={adapterConnections}
+          toolConnections={toolConnections}
           adkGraphReadiness={adkGraphReadiness}
           blockers={blockers}
           designGatesReady={designGatesReady}

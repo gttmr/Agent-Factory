@@ -1,38 +1,38 @@
 import { dump as dumpYaml, load as parseYaml } from "js-yaml";
 import {
-  adapterKinds,
-  agentKinds,
-  moduleCategories,
-  remoteContractKinds,
-  workflowKinds,
-  type AdapterKind,
-  type AgentKind,
-  type ComponentSource,
+  assetTypes,
+  domainScopes,
+  reuseStatuses,
+  type AssetBinding,
+  type AssetConnection,
+  type AssetExposure,
+  type AssetType,
+  type DomainScope,
   type FieldSpec,
-  type ModuleCategory,
-  type RemoteContractKind,
-  type WorkflowKind
+  type ReuseStatus,
+  type WorkflowProfile
 } from "../analyzer/types";
-import { runtimeBindings, type RuntimeBinding } from "./types";
-
-const componentSources = ["mcp", "remote_a2a", "stub"] as const;
+import { parseCatalogDocument } from "./catalogIndex";
 
 export interface ProposedAddition {
-  module_category: ModuleCategory;
+  asset_id: string;
+  asset_type: AssetType;
   name: string;
-  agent_kind?: AgentKind;
-  workflow_kind?: WorkflowKind;
-  adapter_kind?: AdapterKind;
-  remote_contract_kind?: RemoteContractKind;
-  owner_domain?: string;
-  component_source?: ComponentSource;
-  runtime_binding?: RuntimeBinding;
-  a2a_provider_req_id?: string;
+  domain_scope: DomainScope;
+  business_domains: string[];
+  owner: string;
+  reuse_status: ReuseStatus;
+  capability_tags: string[];
+  binding: AssetBinding | null;
+  connection: AssetConnection | null;
+  workflow_profile: WorkflowProfile | null;
+  exposure: AssetExposure | null;
   responsibility?: string;
   inputs?: FieldSpec[];
   outputs?: FieldSpec[];
   composition?: string[];
   risk_signals?: string[];
+  runtime_mock?: Record<string, unknown> | null;
   required_before_approval?: string[];
   contract_status?: string;
   notes?: string;
@@ -52,12 +52,9 @@ export function parseCatalogDelta(yamlText: string): CatalogDeltaParseResult {
   try {
     const doc = parseYaml(yamlText);
     if (!isRecord(doc) || !Array.isArray(doc.proposed_additions)) return { proposals: [], error: null };
-    return { proposals: doc.proposed_additions.flatMap((entry) => parseProposedAddition(entry)), error: null };
+    return { proposals: doc.proposed_additions.flatMap(parseProposedAddition), error: null };
   } catch (error) {
-    return {
-      proposals: [],
-      error: error instanceof Error ? error.message : "catalog-delta.yaml 파싱 실패"
-    };
+    return { proposals: [], error: error instanceof Error ? error.message : "catalog-delta.yaml 파싱 실패" };
   }
 }
 
@@ -71,62 +68,96 @@ export function appendCatalogDeltaProposal(existing: string, proposal: object): 
     }
   }
   if (parsed === null || parsed === undefined) parsed = {};
-  if (!isRecord(parsed)) {
-    throw new Error("catalog-delta.yaml 은 YAML 객체여야 합니다.");
-  }
-  const additions = parsed.proposed_additions;
-  if (additions !== undefined && !Array.isArray(additions)) {
+  if (!isRecord(parsed)) throw new Error("catalog-delta.yaml 은 YAML 객체여야 합니다.");
+  if (parsed.proposed_additions !== undefined && !Array.isArray(parsed.proposed_additions)) {
     throw new Error("proposed_additions 는 배열이어야 합니다.");
   }
-  parsed.proposed_additions = [...(Array.isArray(additions) ? additions : []), proposal];
+  parsed.proposed_additions = [...(Array.isArray(parsed.proposed_additions) ? parsed.proposed_additions : []), proposal];
   return dumpYaml(parsed, { lineWidth: -1, noRefs: true });
 }
 
-function parseProposedAddition(entry: unknown): ProposedAddition[] {
-  if (!isRecord(entry)) return [];
-  const category = normalizeCategory(entry.module_category ?? entry.category);
-  const name = readString(entry.name);
-  if (!category || !name) return [];
+function parseProposedAddition(value: unknown): ProposedAddition[] {
+  if (!isRecord(value)) return [];
+  const assetId = readString(value.asset_id);
+  const assetType = normalizeEnum(value.asset_type, assetTypes);
+  const name = readString(value.name);
+  const domainScope = normalizeEnum(value.domain_scope, domainScopes);
+  const businessDomains = readStringArray(value.business_domains);
+  const owner = readString(value.owner);
+  const reuseStatus = normalizeEnum(value.reuse_status, reuseStatuses);
+  const capabilityTags = readStringArray(value.capability_tags);
+  if (
+    !assetId ||
+    !assetType ||
+    !name ||
+    !domainScope ||
+    businessDomains === null ||
+    !owner ||
+    !reuseStatus ||
+    capabilityTags === null ||
+    !("binding" in value) ||
+    !("connection" in value) ||
+    !("workflow_profile" in value) ||
+    !("exposure" in value)
+  ) {
+    return [];
+  }
+  if (
+    !nullableRecord(value.binding) ||
+    !nullableRecord(value.connection) ||
+    !nullableRecord(value.workflow_profile) ||
+    !nullableRecord(value.exposure) ||
+    ("runtime_mock" in value && !nullableRecord(value.runtime_mock))
+  ) {
+    return [];
+  }
+  const key = assetType === "agent" ? "agents" : assetType === "workflow" ? "workflows" : "tools";
+  const catalogEntry = { ...value };
+  delete catalogEntry.rationale;
+  delete catalogEntry.proposed_by;
+  delete catalogEntry.proposed_at;
+  try {
+    parseCatalogDocument({ [key]: [catalogEntry] }, key, assetType);
+  } catch {
+    return [];
+  }
   const parsed: ProposedAddition = {
-    module_category: category,
-    name
+    asset_id: assetId,
+    asset_type: assetType,
+    name,
+    domain_scope: domainScope,
+    business_domains: businessDomains,
+    owner,
+    reuse_status: reuseStatus,
+    capability_tags: capabilityTags,
+    binding: value.binding as AssetBinding | null,
+    connection: value.connection as AssetConnection | null,
+    workflow_profile: value.workflow_profile as WorkflowProfile | null,
+    exposure: value.exposure as AssetExposure | null
   };
-  copyString(parsed, "owner_domain", entry.owner_domain);
-  copyEnum(parsed, "component_source", entry.component_source, componentSources);
-  copyEnum(parsed, "runtime_binding", entry.runtime_binding, runtimeBindings);
-  copyString(parsed, "a2a_provider_req_id", entry.a2a_provider_req_id);
-  copyString(parsed, "responsibility", entry.responsibility);
-  copyString(parsed, "notes", entry.notes);
-  copyString(parsed, "source_candidate_id", entry.source_candidate_id);
-  copyString(parsed, "rationale", entry.rationale);
-  copyString(parsed, "proposed_by", entry.proposed_by);
-  copyString(parsed, "proposed_at", entry.proposed_at);
-  copyArray(parsed, "inputs", entry.inputs);
-  copyArray(parsed, "outputs", entry.outputs);
-  copyStringArray(parsed, "composition", entry.composition);
-  copyStringArray(parsed, "risk_signals", entry.risk_signals);
-  copyStringArray(parsed, "required_before_approval", entry.required_before_approval);
-  copyString(parsed, "contract_status", entry.contract_status);
-
-  const agentKind = normalizeEnum(entry.agent_kind, agentKinds);
-  const workflowKind = normalizeEnum(entry.workflow_kind, workflowKinds);
-  const adapterKind = normalizeEnum(entry.adapter_kind, adapterKinds);
-  const remoteContractKind = normalizeEnum(entry.remote_contract_kind, remoteContractKinds);
-  if (agentKind) parsed.agent_kind = agentKind;
-  if (workflowKind) parsed.workflow_kind = workflowKind;
-  if (adapterKind) parsed.adapter_kind = adapterKind;
-  if (remoteContractKind) parsed.remote_contract_kind = remoteContractKind;
+  for (const key of [
+    "responsibility",
+    "contract_status",
+    "notes",
+    "source_candidate_id",
+    "rationale",
+    "proposed_by",
+    "proposed_at"
+  ] as const) copyString(parsed, key, value[key]);
+  for (const key of ["composition", "risk_signals", "required_before_approval"] as const) {
+    const strings = readStringArray(value[key]);
+    if (strings !== null) parsed[key] = strings;
+  }
+  if (Array.isArray(value.inputs)) parsed.inputs = value.inputs as FieldSpec[];
+  if (Array.isArray(value.outputs)) parsed.outputs = value.outputs as FieldSpec[];
+  if ("runtime_mock" in value) parsed.runtime_mock = value.runtime_mock as Record<string, unknown> | null;
   return [parsed];
-}
-
-function normalizeCategory(value: unknown): ModuleCategory | null {
-  return normalizeEnum(value, moduleCategories);
 }
 
 function normalizeEnum<T extends readonly string[]>(value: unknown, allowed: T): T[number] | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return (allowed as readonly string[]).includes(trimmed) ? trimmed : null;
+  return (allowed as readonly string[]).includes(trimmed) ? (trimmed as T[number]) : null;
 }
 
 function readString(value: unknown): string | null {
@@ -134,30 +165,18 @@ function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function copyString(target: Partial<ProposedAddition>, key: keyof ProposedAddition, value: unknown): void {
+function readStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || !entry.trim())) return null;
+  return value.map((entry) => entry.trim());
+}
+
+function copyString(target: ProposedAddition, key: keyof ProposedAddition, value: unknown): void {
   const next = readString(value);
-  if (next) (target as Record<string, unknown>)[key] = next;
+  if (next) (target as unknown as Record<string, unknown>)[key] = next;
 }
 
-function copyEnum<T extends readonly string[]>(
-  target: Partial<ProposedAddition>,
-  key: keyof ProposedAddition,
-  value: unknown,
-  allowed: T
-): void {
-  const next = normalizeEnum(value, allowed);
-  if (next) (target as Record<string, unknown>)[key] = next;
-}
-
-function copyArray(target: Partial<ProposedAddition>, key: keyof ProposedAddition, value: unknown): void {
-  if (Array.isArray(value)) (target as Record<string, unknown>)[key] = value;
-}
-
-function copyStringArray(target: Partial<ProposedAddition>, key: keyof ProposedAddition, value: unknown): void {
-  if (Array.isArray(value)) {
-    const strings = value.filter((item): item is string => typeof item === "string");
-    if (strings.length > 0) (target as Record<string, unknown>)[key] = strings;
-  }
+function nullableRecord(value: unknown): boolean {
+  return value === null || isRecord(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

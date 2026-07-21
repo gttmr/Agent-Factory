@@ -54,13 +54,13 @@ node scripts/validate-artifacts.mjs
 node scripts/validate-artifacts.mjs path/to/artifacts
 ```
 
-The validator checks Current Implementation contracts. Its success does not mean that the Target Contract taxonomy has been migrated into code.
+The validator checks the strict Target Contract v2 artifact contracts.
 
 ## Current Implementation
 
 The route layer starts under `packages/web/src/routes`, server middleware and API behavior live under `packages/web/server`, and client query and mutation hooks live under `packages/web/src/state`. Use the Handbook stage pages for current behavior, artifacts, calls, and verified symbols instead of repeating that detail here.
 
-The implementation still serializes the `legacy` `module_category` values `agent`, `workflow`, `adapter`, and `remote_a2a`, plus `legacy` identifiers such as `adapter_kind`, `agent_kind`, `workflow_kind`, and `selected_by_llm`. Code, schemas, validators, and Catalog files have not been migrated to the Target Contract. The skill tree is partially migrated to `af-workflow` plus four canonical Work Skills; current artifact writes pass through a Compatibility Layer and the four former stage IDs remain shims. Follow [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md) and [Skills vNext Migration Status](docs/migration/skill-vnext-status.md); do not change the `legacy` Product contracts incidentally.
+The implementation serializes and consumes strict Target Contract v2 only. Asset categories are Agent, Workflow, and Tool; Graph IR uses the canonical Target node/edge contract; Catalog files are `agents.yaml`, `workflows.yaml`, and `tools.yaml`. Legacy-only fields, roots, file names, Catalog buckets, normalization, and lowering projection are unsupported. The skill tree is `af-workflow` plus four canonical Work Skills with no former-stage shims. Follow [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md) and [Skills vNext Migration Status](docs/migration/skill-vnext-status.md).
 
 The current workbench routes and servers remain under the paths above. Detailed Analyze, Design, Build, Verify, Catalog, local runtime, and Mock Lab behavior belongs in the Handbook and [Operating Model](docs/workbench/operating-model.md), not in this root guide.
 

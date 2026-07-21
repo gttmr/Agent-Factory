@@ -1,4 +1,4 @@
-import { EDGE_KIND_HANDLERS } from "./edge-kinds.mjs";
+import { EDGE_CONTROL_HANDLERS } from "./edge-controls.mjs";
 import {
   NODE_KIND_HANDLERS,
   syntheticJoinCollisionTarget
@@ -11,11 +11,11 @@ import {
   resolveNodeEndpointForMode,
   runtimeNodeNameForMode
 } from "./modes.mjs";
+import { nodeAssetRef } from "../graph/indexes.mjs";
 
-const DEFAULT_EDGE_KIND = "event_output";
-const DEFAULT_EXECUTION_SEMANTICS = "normal_transition";
+const DEFAULT_CONTROL_KIND = "next";
 
-export { EDGE_KIND_HANDLERS, NODE_KIND_HANDLERS };
+export { EDGE_CONTROL_HANDLERS, NODE_KIND_HANDLERS };
 
 export function handlerForNode(node) {
   const kind = typeof node === "string" ? node : node?.node_kind;
@@ -25,29 +25,30 @@ export function handlerForNode(node) {
 }
 
 export function handlerForEdge(edge) {
-  const kind = typeof edge === "string" ? edge : edge?.edge_kind;
-  const handler = EDGE_KIND_HANDLERS[kind];
-  if (!handler) throw new Error(`ADK graph dispatch has no edge handler for ${kind ?? "missing edge_kind"}.`);
+  const kind = typeof edge === "string" ? edge : edge?.control?.kind;
+  const handler = EDGE_CONTROL_HANDLERS[kind];
+  if (!handler) throw new Error(`ADK graph dispatch has no edge handler for ${kind ?? "missing control kind"}.`);
   return handler;
 }
 
 export function collectNodeTarget(node, context) {
   const handler = handlerForNode(node);
-  const module = typeof node.module_id === "string" ? context.graph.moduleById.get(node.module_id) ?? null : null;
-  const target = module
-    ? { node, module, moduleNodeCount: context.counts.get(module.id) ?? 1 }
+  const ref = nodeAssetRef(node);
+  const asset = ref ? context.graph.assetById.get(ref) ?? null : null;
+  const target = asset
+    ? { node, asset, assetNodeCount: context.counts.get(asset.asset_id) ?? 1 }
     : node;
-  const capability = nodeCapabilityForMode(handler, { ...context, node, module, target });
+  const capability = nodeCapabilityForMode(handler, { ...context, node, asset, target });
   const deliberatelyExcluded = Boolean(
-    module && context.mode !== "smoke" && (context.exclusions.has(module.id) || context.exclusions.has(node.id))
+    asset && context.mode !== "smoke" && (context.exclusions.has(asset.asset_id) || context.exclusions.has(node.id))
   );
   const collisionTargets = capability.supported && !deliberatelyExcluded
-    ? handler.collisionTargets(target, { seenModuleIds: context.seenCollisionModuleIds })
+    ? handler.collisionTargets(target, { seenAssetIds: context.seenCollisionAssetIds })
     : [];
   return Object.freeze({
     handler,
     target,
-    module,
+    asset,
     capability,
     deliberatelyExcluded,
     collectionRole: deliberatelyExcluded ? "toolset_exclusion" : handler.collectionRole,
@@ -59,34 +60,38 @@ export function collectNodeTarget(node, context) {
 
 export function nodeCapability(node, context) {
   const handler = handlerForNode(node);
-  const module = typeof node?.module_id === "string" ? context.graph.moduleById.get(node.module_id) ?? null : null;
-  const target = module
-    ? { node, module, moduleNodeCount: context.counts.get(module.id) ?? 1 }
+  const ref = nodeAssetRef(node);
+  const asset = ref ? context.graph.assetById.get(ref) ?? null : null;
+  const target = asset
+    ? { node, asset, assetNodeCount: context.counts.get(asset.asset_id) ?? 1 }
     : node;
-  return nodeCapabilityForMode(handler, { ...context, node, module, target });
+  return nodeCapabilityForMode(handler, { ...context, node, asset, target });
 }
 
 export function nodeForcesDynamic(node, graph) {
   const handler = handlerForNode(node);
-  const module = typeof node?.module_id === "string" ? graph.moduleById.get(node.module_id) ?? null : null;
-  return handler.forcesDynamic({ node, module });
+  const ref = nodeAssetRef(node);
+  const asset = ref ? graph.assetById.get(ref) ?? null : null;
+  return handler.forcesDynamic({ node, asset });
 }
 
 export function resolveRuntimeEndpoint(nodeId, { mode, side, graph, counts, exclusions = new Set() }) {
   const node = graph.nodesById.get(nodeId);
   if (!node) return null;
   const handler = handlerForNode(node);
-  const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) ?? null : null;
-  const target = module ? { node, module, moduleNodeCount: counts.get(module.id) ?? 1 } : node;
-  return resolveNodeEndpointForMode(handler, { mode, side, graph, counts, exclusions, node, module, target });
+  const ref = nodeAssetRef(node);
+  const asset = ref ? graph.assetById.get(ref) ?? null : null;
+  const target = asset ? { node, asset, assetNodeCount: counts.get(asset.asset_id) ?? 1 } : node;
+  return resolveNodeEndpointForMode(handler, { mode, side, graph, counts, exclusions, node, asset, target });
 }
 
 export function resolveRuntimeName(node, { mode, graph, counts }) {
   if (!node) throw new Error(`${mode} runnable internal plan error: runtime-name node is missing from Graph IR.`);
   const handler = handlerForNode(node);
-  const module = typeof node.module_id === "string" ? graph.moduleById.get(node.module_id) ?? null : null;
-  const target = module ? { node, module, moduleNodeCount: counts.get(module.id) ?? 1 } : node;
-  const name = runtimeNodeNameForMode(handler, { mode, graph, counts, node, module, target });
+  const ref = nodeAssetRef(node);
+  const asset = ref ? graph.assetById.get(ref) ?? null : null;
+  const target = asset ? { node, asset, assetNodeCount: counts.get(asset.asset_id) ?? 1 } : node;
+  const name = runtimeNodeNameForMode(handler, { mode, graph, counts, node, asset, target });
   if (!name) throw new Error(`${mode} runnable internal plan error: no runtime name for ${node.id}.`);
   return name;
 }
@@ -94,8 +99,8 @@ export function resolveRuntimeName(node, { mode, graph, counts }) {
 export function emissionForNode(target, { mode, context }) {
   const node = target.node ?? target;
   const handler = handlerForNode(node);
-  const module = target.module ?? null;
-  const capability = nodeCapabilityForMode(handler, { mode, node, module, target, graph: context.graphContext });
+  const asset = target.asset ?? null;
+  const capability = nodeCapabilityForMode(handler, { mode, node, asset, target, graph: context.graphContext });
   if (!capability.supported) {
     throw new Error(`${mode} runnable codegen cannot emit ${node.id}: ${capability.reason}.`);
   }
@@ -115,8 +120,8 @@ export function normalizeDispatchEdge(edge, index = 0) {
   }
   return Object.freeze({
     ...edge,
-    edge_kind: edge.edge_kind ?? DEFAULT_EDGE_KIND,
-    execution_semantics: edge.execution_semantics ?? DEFAULT_EXECUTION_SEMANTICS,
+    control: edge.control ?? Object.freeze({ kind: DEFAULT_CONTROL_KIND }),
+    channel: edge.channel ?? null,
     key: typeof edge.id === "string" && edge.id.trim() ? edge.id : `edge:${index}:${edge.from}->${edge.to}`
   });
 }
@@ -153,7 +158,7 @@ export function validateAndLowerEdge(edge, { mode, graph, counts, exclusions = n
   if (!dispatch.capability.supported) {
     throw new Error(
       `${mode} graph edge handler cannot lower ${dispatch.edge.from ?? "?"}->${dispatch.edge.to ?? "?"} ` +
-      `(${dispatch.edge.edge_kind}/${dispatch.edge.execution_semantics}): ${dispatch.capability.reason}.`
+      `(${dispatch.edge.control.kind}/${dispatch.edge.channel ?? "control"}): ${dispatch.capability.reason}.`
     );
   }
   const fromNode = graph.nodesById.get(dispatch.edge.from);

@@ -12,33 +12,33 @@ import {
   terminalFuncName
 } from "../naming.mjs";
 import { toPyStr } from "../python-literals.mjs";
-import { emitAgentNode, moduleLoweringRole } from "../emitters/agent-node.mjs";
-import { emitConnectedAdapterFunc } from "../emitters/connected-adapter.mjs";
+import { assetLoweringRole, emitAgentNode } from "../emitters/agent-node.mjs";
+import { emitConnectedToolFunc } from "../emitters/connected-tool.mjs";
 import { emitFunctionNodeDecl, emitStubFunc } from "../emitters/function-node.mjs";
 import { emitHumanInputFunc, emitHumanInputNodeDecl } from "../emitters/hitl.mjs";
-import { emitRouteFunc, emitRouterNodeDecl } from "../emitters/router.mjs";
+import { emitRouteFunc, emitRouteNodeDecl } from "../emitters/route-function.mjs";
 import { emitTerminalOutputFunc, emitTerminalOutputNodeDecl } from "../emitters/terminal-output.mjs";
 
-const MODULE_EMISSION_HANDLERS = Object.freeze({
+const ASSET_EMISSION_HANDLERS = Object.freeze({
   agent: Object.freeze({ emitFunc: () => null, emitDecl: (target, context) => emitAgentNode(target, context) }),
-  connected_adapter: Object.freeze({
-    emitFunc: (target, context) => emitConnectedAdapterFunc(target, context),
+  connected_tool: Object.freeze({
+    emitFunc: (target, context) => emitConnectedToolFunc(target, context),
     emitDecl: emitFunctionNodeDecl
   }),
   stub_function: Object.freeze({
     emitFunc: (target, context) => emitStubFunc(target, context),
     emitDecl: emitFunctionNodeDecl
   }),
-  remote_a2a: Object.freeze({
+  a2a_agent: Object.freeze({
     emitFunc: () => null,
     emitDecl: (target, context) => emitRemoteA2aNode({ analysisResult: context.analysisResult, target })
   })
 });
 
 const ALL_MODES = Object.freeze({
-  smoke: moduleCapability,
-  static: staticModuleCapability,
-  dynamic: moduleCapability
+  smoke: assetCapability,
+  static: staticAssetCapability,
+  dynamic: assetCapability
 });
 
 export const NODE_KIND_HANDLERS = Object.freeze({
@@ -70,11 +70,18 @@ export const NODE_KIND_HANDLERS = Object.freeze({
     collisionTargets: terminalCollisionTargets,
     emission: terminalEmission
   }),
-  agent: moduleHandler(),
-  function: moduleHandler(),
-  tool: moduleHandler(),
-  adapter: moduleHandler(),
-  adapter_call: moduleHandler(),
+  agent: assetHandler(),
+  function: syntheticHandler({
+    collectionRole: "function",
+    collectionBucket: "functionNodes",
+    featureFlags: ["functions"],
+    planRole: "run",
+    modes: { smoke: supportedMode, static: supportedMode, dynamic: supportedMode },
+    resolveEndpoint: syntheticRunnableEndpoint,
+    collisionTargets: functionCollisionTargets,
+    emission: functionEmission
+  }),
+  tool: assetHandler(),
   human_input: syntheticHandler({
     collectionRole: "human_input",
     collectionBucket: "humanInputNodes",
@@ -89,18 +96,7 @@ export const NODE_KIND_HANDLERS = Object.freeze({
     collisionTargets: humanInputCollisionTargets,
     emission: humanInputEmission
   }),
-  callback_wait: syntheticHandler({
-    collectionRole: "unsupported",
-    modes: {
-      smoke: unsupportedMode("smoke mode has no callback_wait runtime endpoint"),
-      static: unsupportedMode("static runnable mode has no callback_wait lowerer"),
-      dynamic: unsupportedMode("dynamic runnable mode has no callback_wait lowerer")
-    }
-  }),
-  workflow: moduleHandler({ forcesDynamic: ({ module }) => module?.workflow_kind === "dynamic" }),
-  workflow_call: moduleHandler(),
-  remote_a2a: moduleHandler({ featureFlags: ["remote_a2a"] }),
-  remote_agent_call: moduleHandler({ featureFlags: ["remote_a2a"] }),
+  subworkflow: assetHandler({ forcesDynamic: ({ asset }) => asset?.workflow_profile?.representation === "dynamic" }),
   join: syntheticHandler({
     collectionRole: "join",
     collectionBucket: "explicitJoinNodes",
@@ -113,50 +109,21 @@ export const NODE_KIND_HANDLERS = Object.freeze({
     resolveEndpoint: ({ mode, node }) => (mode === "static" ? syntheticNodeSymbol(node) : null),
     collisionTargets: joinCollisionTargets
   }),
-  router: syntheticHandler({
-    collectionRole: "router",
-    collectionBucket: "routerNodes",
-    featureFlags: ["routes"],
-    planRole: "router",
-    modes: {
-      smoke: unsupportedMode("smoke mode has no router runtime endpoint"),
-      static: supportedMode,
-      dynamic: unsupportedMode("dynamic runnable mode has no conditional router lowerer")
-    },
-    resolveEndpoint: ({ mode, node }) => (mode === "static" ? syntheticNodeSymbol(node) : null),
-    collisionTargets: routerCollisionTargets,
-    emission: routerEmission
-  }),
-  loop_control: syntheticHandler({
-    collectionRole: "loop_control",
-    collectionBucket: "loopControlNodes",
-    featureFlags: ["loops"],
-    planRole: "loop_control",
-    forcesDynamic: () => true,
-    modes: {
-      smoke: unsupportedMode("smoke mode has no loop_control runtime endpoint"),
-      static: unsupportedMode("static runnable mode has no loop_control lowerer"),
-      dynamic: supportedMode
-    },
-    resolveEndpoint: ({ mode, node, side }) => (mode === "dynamic" && side === "run" ? syntheticNodeSymbol(node) : null),
-    collisionTargets: loopControlCollisionTargets,
-    emission: loopControlEmission
-  })
 });
 
-function moduleHandler({ featureFlags = [], forcesDynamic = () => false } = {}) {
+function assetHandler({ featureFlags = [], forcesDynamic = () => false } = {}) {
   return Object.freeze({
-    moduleBinding: "required",
-    collectionRole: "module",
-    collectionBucket: "moduleSpecsInDeclarationOrder",
+    assetBinding: "required",
+    collectionRole: "asset",
+    collectionBucket: "assetSpecsInDeclarationOrder",
     featureFlags: Object.freeze(featureFlags),
     planRole: "run",
     modes: ALL_MODES,
     forcesDynamic,
-    resolveEndpoint: moduleEndpoint,
+    resolveEndpoint: assetEndpoint,
     runtimeName: ({ target }) => pyNodeName(target),
-    collisionTargets: moduleCollisionTargets,
-    emission: moduleEmission
+    collisionTargets: assetCollisionTargets,
+    emission: assetEmission
   });
 }
 
@@ -172,7 +139,7 @@ function syntheticHandler({
   emission = null
 }) {
   return Object.freeze({
-    moduleBinding: "forbidden",
+    assetBinding: "forbidden",
     collectionRole,
     collectionBucket,
     featureFlags: Object.freeze(featureFlags),
@@ -186,23 +153,23 @@ function syntheticHandler({
   });
 }
 
-function supportedMode({ node, module }) {
-  if (module) return unsupported("synthetic node must not bind to a module", "module_binding");
+function supportedMode({ node, asset }) {
+  if (asset) return unsupported("synthetic node must not bind to an asset", "asset_binding");
   if (!node) return unsupported("node record is missing", "node_shape");
   return supported();
 }
 
-function moduleCapability({ node, module }) {
+function assetCapability({ node, asset }) {
   if (!node) return unsupported("node record is missing", "node_shape");
-  if (!module) return unsupported(`${node.node_kind} requires a reviewed module_id`, "module_binding");
+  if (!asset) return unsupported(`${node.node_kind} requires a reviewed Target asset ref`, "asset_binding");
   return supported();
 }
 
-function staticModuleCapability(context) {
-  const capability = moduleCapability(context);
+function staticAssetCapability(context) {
+  const capability = assetCapability(context);
   if (!capability.supported) return capability;
-  if (context.module.module_category === "workflow" && context.module.workflow_kind === "dynamic") {
-    return unsupported("dynamic workflow modules require dynamic runnable mode", "dynamic_workflow");
+  if (context.asset.asset_type === "workflow" && context.asset.workflow_profile?.representation === "dynamic") {
+    return unsupported("dynamic Workflow assets require dynamic runnable mode", "dynamic_workflow");
   }
   return capability;
 }
@@ -232,10 +199,10 @@ function unsupported(reason, code) {
   return Object.freeze({ supported: false, reason, code });
 }
 
-function moduleEndpoint({ mode, side, target, exclusions }) {
-  const moduleId = target.module.id;
+function assetEndpoint({ mode, side, target, exclusions }) {
+  const assetId = target.asset.asset_id;
   const nodeId = target.node.id;
-  if (exclusions?.has(moduleId) || exclusions?.has(nodeId)) return null;
+  if (exclusions?.has(assetId) || exclusions?.has(nodeId)) return null;
   if (mode === "smoke") return nodeFunctionName(target);
   if (mode === "static" || (mode === "dynamic" && side === "run")) return nodeSymbol(target);
   return null;
@@ -247,8 +214,8 @@ function syntheticRunnableEndpoint({ mode, node, side }) {
   return null;
 }
 
-function moduleCollisionTargets(target, { seenModuleIds }) {
-  const owner = target.node?.id ?? target.module.id;
+function assetCollisionTargets(target, { seenAssetIds }) {
+  const owner = target.node?.id ?? target.asset.asset_id;
   const rows = [
     collisionTarget(owner, [
       ["node symbol", nodeSymbol(target)],
@@ -256,9 +223,9 @@ function moduleCollisionTargets(target, { seenModuleIds }) {
       ["node name", pyNodeName(target)]
     ])
   ];
-  if (!seenModuleIds.has(target.module.id)) {
-    seenModuleIds.add(target.module.id);
-    rows.push(collisionTarget(target.module.id, [["state key", stateKey(target.module)]]));
+  if (!seenAssetIds.has(target.asset.asset_id)) {
+    seenAssetIds.add(target.asset.asset_id);
+    rows.push(collisionTarget(target.asset.asset_id, [["state key", stateKey(target.asset)]]));
   }
   return rows;
 }
@@ -273,7 +240,18 @@ function humanInputCollisionTargets(node) {
   ];
 }
 
-function routerCollisionTargets(node) {
+function functionCollisionTargets(node) {
+  if (node.role === "route") return routeCollisionTargets(node);
+  return [
+    collisionTarget(node.id, [
+      ["node symbol", syntheticNodeSymbol(node)],
+      ["function name", `_function_${node.id}`],
+      ["node name", pyGraphNodeName(node)]
+    ])
+  ];
+}
+
+function routeCollisionTargets(node) {
   return [
     collisionTarget(node.id, [
       ["node symbol", syntheticNodeSymbol(node)],
@@ -297,10 +275,6 @@ function joinCollisionTargets(node) {
   return [collisionTarget(node.id, [["node symbol", syntheticNodeSymbol(node)], ["node name", pyGraphNodeName(node)]])];
 }
 
-function loopControlCollisionTargets(node) {
-  return [collisionTarget(node.id, [["node symbol", syntheticNodeSymbol(node)], ["node name", pyGraphNodeName(node)]])];
-}
-
 export function syntheticJoinCollisionTarget(join) {
   return collisionTarget(join.sym, [["node symbol", join.sym], ["node name", join.name]]);
 }
@@ -309,33 +283,34 @@ function collisionTarget(owner, symbols) {
   return Object.freeze({ owner, symbols: Object.freeze(symbols.map((row) => Object.freeze(row))) });
 }
 
-function moduleEmission(target, context) {
-  const role = moduleLoweringRole(target);
-  const handler = MODULE_EMISSION_HANDLERS[role];
-  if (!handler) throw new Error(`runnable codegen: no module-lowering handler for role "${role}".`);
+function assetEmission(target, context) {
+  const role = assetLoweringRole(target);
+  const handler = ASSET_EMISSION_HANDLERS[role];
+  if (!handler) throw new Error(`runnable codegen: no asset-lowering handler for role "${role}".`);
   return emissionResult(handler.emitFunc(target, context), handler.emitDecl(target, context));
+}
+
+function functionEmission(node, context) {
+  if (node.role === "route") return routeEmission(node, context);
+  const functionName = `_function_${node.id.replaceAll(/[^A-Za-z0-9_]/g, "_")}`;
+  return emissionResult(
+    `async def ${functionName}(ctx: Context, node_input=None):\n    return _json_safe_node_value(node_input)`,
+    `${syntheticNodeSymbol(node)} = FunctionNode(func=${functionName}, name=${toPyStr(pyGraphNodeName(node))})`
+  );
 }
 
 function humanInputEmission(node, context) {
   return emissionResult(emitHumanInputFunc(node, context), emitHumanInputNodeDecl(node));
 }
 
-function routerEmission(node, context) {
-  return emissionResult(emitRouteFunc(node, context), emitRouterNodeDecl(node));
+function routeEmission(node, context) {
+  return emissionResult(emitRouteFunc(node, context), emitRouteNodeDecl(node));
 }
 
 function terminalEmission(node) {
   return emissionResult(emitTerminalOutputFunc(node), emitTerminalOutputNodeDecl(node));
 }
 
-function loopControlEmission(node) {
-  return emissionResult(
-    null,
-    `@node(name=${toPyStr(pyGraphNodeName(node))})\ndef ${syntheticNodeSymbol(node)}(node_input=None):\n    return node_input`,
-    "loopControlBlocks"
-  );
-}
-
-function emissionResult(func, decl, section = "nodeBlocks") {
-  return Object.freeze({ func, decl, section });
+function emissionResult(func, decl) {
+  return Object.freeze({ func, decl });
 }

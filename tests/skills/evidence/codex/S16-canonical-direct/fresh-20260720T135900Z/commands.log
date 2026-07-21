@@ -1,0 +1,18 @@
+# Ordered command log
+
+## Test agent
+
+| Command | Exit | Bounded result |
+| --- | ---: | --- |
+| Read canonical discovery Skill and required references | 0 | Direct Skill path loaded once |
+| Read public context and documentation indexes | 0 | No extra scenario/evaluator input read |
+
+## Evaluator
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `node scripts/validate-skills.mjs` | 0 | 5 Skills, 0 errors, 0 warnings |
+| Parse `expected-skill.json` | 0 | Valid JSON |
+| Check canonical `name: af-discover-assets` | 0 | Match at line 2 |
+| Check four retired Skill directories are absent | 0 | All absent |
+| Check scenario inventory is 16 | 0 | Exact count 16 |

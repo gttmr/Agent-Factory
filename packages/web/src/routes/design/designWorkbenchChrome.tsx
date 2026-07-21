@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
-import type { ModuleCandidate } from "../../analyzer/types";
+import type { AssetCandidate } from "../../analyzer/types";
 import type { AuthorRole } from "../../state/useAuthor";
 import type { CommentAnchor, CommentStage } from "../../state/useCollaboration";
 import { EmptyState, Panel } from "../../ui/primitives";
 import { DesignSummaryItem, GRAPH_IR_SAVE_SUCCESS_MESSAGE } from "./designStageModel";
 
 interface DesignSummaryProps {
-  analysis: { moduleCandidates: ModuleCandidate[] } | null;
+  analysis: { assetCandidates: AssetCandidate[] } | null;
   graphNodes: number;
   errorCount: number;
   runtimeCount: number;
@@ -29,10 +29,10 @@ export function DesignSummary({
   boundariesApproved,
   runtimeApproved
 }: DesignSummaryProps) {
-  const approved = analysis?.moduleCandidates.filter((item) => item.status === "approved").length ?? 0;
+  const approved = analysis?.assetCandidates.filter((item) => item.status === "approved").length ?? 0;
   return (
     <>
-      <DesignSummaryItem label="모듈" value={analysis ? `approved ${approved}/${analysis.moduleCandidates.length}` : "—"} />
+      <DesignSummaryItem label="Assets" value={analysis ? `approved ${approved}/${analysis.assetCandidates.length}` : "—"} />
       <DesignSummaryItem label="Graph IR" value={`nodes ${graphNodes} · err ${errorCount}`} />
       <DesignSummaryItem label="Runtime/A2A" value={`runtime ${runtimeCount} · A2A ${a2aCount}`} />
       <DesignSummaryItem

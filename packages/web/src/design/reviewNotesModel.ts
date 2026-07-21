@@ -13,7 +13,6 @@ export function describeHighlightTarget(highlight: HighlightRecord): string {
   if (highlight.target.node_path?.length) return `path:${highlight.target.node_path.join(" -> ")}`;
   if (highlight.target.node_ids?.length) return `nodes:${highlight.target.node_ids.join(", ")}`;
   if (highlight.target.edge_ids?.length) return `edges:${highlight.target.edge_ids.join(", ")}`;
-  if (highlight.target.container_id) return `container:${highlight.target.container_id}`;
   return highlight.kind;
 }
 

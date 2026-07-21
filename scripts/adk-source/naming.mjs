@@ -6,20 +6,20 @@ export function toPythonIdentifier(value) {
   return /^[\p{L}_]/u.test(identifier) ? identifier || "workflow" : `node_${identifier}`;
 }
 
-export function nodeSymbol(module) {
-  const resolvedModule = targetModule(module);
-  return `${resolvedModule.module_category === "agent" ? "agent_" : "node_"}${targetIdentifier(module)}`;
+export function nodeSymbol(asset) {
+  const resolvedAsset = targetAsset(asset);
+  return `${resolvedAsset.asset_type === "agent" ? "agent_" : "node_"}${targetIdentifier(asset)}`;
 }
 
-export function funcName(module) {
-  return `_fn_${targetIdentifier(module)}`;
+export function funcName(asset) {
+  return `_fn_${targetIdentifier(asset)}`;
 }
 
-export function pyNodeName(module) {
-  const resolvedModule = targetModule(module);
-  const name = toPythonIdentifier(resolvedModule.name || resolvedModule.id);
-  const node = targetNode(module);
-  return node && targetModuleNodeCount(module) > 1 ? `${name}__${pyGraphNodeName(node)}` : name;
+export function pyNodeName(asset) {
+  const resolvedAsset = targetAsset(asset);
+  const name = toPythonIdentifier(resolvedAsset.name || resolvedAsset.asset_id);
+  const node = targetNode(asset);
+  return node && targetAssetNodeCount(asset) > 1 ? `${name}__${pyGraphNodeName(node)}` : name;
 }
 
 export function syntheticNodeSymbol(node) {
@@ -43,34 +43,34 @@ export function pyGraphNodeName(node) {
   return toPythonIdentifier(node.id);
 }
 
-export function stateKey(module) {
-  return `${toPythonIdentifier(targetModule(module).id)}_output`;
+export function stateKey(asset) {
+  return `${toPythonIdentifier(targetAsset(asset).asset_id)}_output`;
 }
 
-export function nodeFunctionName(module) {
-  return `node_${targetIdentifier(module)}`;
+export function nodeFunctionName(asset) {
+  return `node_${targetIdentifier(asset)}`;
 }
 
-export function todoFunctionName(module) {
-  return `TODO_IMPLEMENT_HERE_${toPythonIdentifier(targetModule(module).id)}`;
+export function todoFunctionName(asset) {
+  return `TODO_IMPLEMENT_HERE_${toPythonIdentifier(targetAsset(asset).asset_id)}`;
 }
 
-function targetModule(target) {
-  return target?.module ?? target;
+function targetAsset(target) {
+  return target?.asset ?? target;
 }
 
 function targetNode(target) {
   return target?.node ?? null;
 }
 
-function targetModuleNodeCount(target) {
-  return Number.isInteger(target?.moduleNodeCount) && target.moduleNodeCount > 0 ? target.moduleNodeCount : 1;
+function targetAssetNodeCount(target) {
+  return Number.isInteger(target?.assetNodeCount) && target.assetNodeCount > 0 ? target.assetNodeCount : 1;
 }
 
 function targetIdentifier(target) {
-  const module = targetModule(target);
-  const base = toPythonIdentifier(module.id);
+  const asset = targetAsset(target);
+  const base = toPythonIdentifier(asset.asset_id);
   const node = targetNode(target);
-  if (!node || targetModuleNodeCount(target) <= 1) return base;
+  if (!node || targetAssetNodeCount(target) <= 1) return base;
   return `${base}__${toPythonIdentifier(node.id)}`;
 }

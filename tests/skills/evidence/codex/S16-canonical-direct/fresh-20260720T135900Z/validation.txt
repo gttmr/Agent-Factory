@@ -1,0 +1,14 @@
+# Validation
+
+- Explicit canonical ID recognized: PASS.
+- `af-discover-assets/SKILL.md` read: PASS.
+- Discovery procedure executed once: PASS.
+- Explanation-only/read-only boundary: PASS.
+- Top-level candidate types restricted to Agent, Workflow, Tool: PASS.
+- Resource kept outside asset candidates: PASS.
+- Missing Information and Stop before design: PASS.
+- Alternate/retired Skill entrypoint: none.
+- Output files: none.
+- Five deterministic evaluator commands: PASS.
+
+Residual uncertainty: this scenario checks direct discovery routing and classification only; it does not assert downstream composition, scaffold, or runtime behavior.

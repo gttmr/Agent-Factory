@@ -2,33 +2,39 @@
 
 ## Scope
 
-This directory maps seed catalog YAML into UI/search/scaffold structures and
-manages per-root catalog-delta proposals and publish metadata.
+This directory parses strict Agent, Workflow, and Tool seed Catalogs into
+UI/search/scaffold structures and manages per-root `catalog-delta.yaml`
+proposals and publish metadata.
 
-Target Catalog asset terminology is canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md); current seed categories and fields such as `adapter` and `remote_a2a` are Current Implementation (`legacy`), with gaps tracked in `docs/migration/taxonomy-vnext-status.md`.
+Catalog asset terminology is canonical in [Taxonomy](../../../../docs/workbench/taxonomy.md).
 
 ## Where To Look
 
 | Task | Files |
 | --- | --- |
-| Catalog entry types | `types.ts` |
-| Seed catalog hydration | `seed.ts`, `catalogIndex.ts` |
-| Catalog binding into scaffold plans | `runtimeBinding.ts`, `scaffoldCatalog.ts` |
+| Strict Catalog types and parsing | `catalogIndex.ts`, `types.ts` |
+| Seed Catalog loading | `seed.ts` |
+| Catalog pinning into analysis | `catalogPin.ts` |
+| Catalog binding into scaffold plans | `scaffoldCatalog.ts` |
 | Proposal shape and delta parsing | `catalogDelta.ts`, `catalogPublishProposal.ts` |
-| Versioning/deprecation logic | `catalogVersioning.ts` |
+| Versioning and deprecation | `catalogVersioning.ts` |
 
 ## Local Rules
 
-- Seed catalogs are runtime contract inputs; proposal edits start in active-root `catalog-delta.yaml`.
-- Preserve the Current Implementation (`legacy`) category separation: Agent, Workflow, Adapter, and Remote A2A; Target Catalog assets are Agent, Workflow, and Tool.
+- Accept exactly the `agents`, `workflows`, and `tools` buckets.
+- Require each row's `asset_type` to match its bucket and reject retired keys.
+- Preserve Agent, Workflow, and Tool identity when pinning or binding Catalog entries.
+- Represent A2A only through Agent binding or exposure; represent MCP through Tool binding.
+- Seed Catalogs are runtime contract inputs; proposal edits start in the active root's `catalog-delta.yaml`.
 - Runtime mocks are synthetic smoke test doubles only.
 - Publish logic may canonicalize YAML formatting, but it must preserve semantics and target only reviewed proposals.
 
 ## Anti-Patterns
 
+- Do not add alternate buckets or accept rows from another asset category.
 - Do not write directly to `catalog/*.yaml` outside the approval-gated publish path or human seed PR work.
-- Do not mix Mock Lab spec editing responsibility into catalog helpers.
-- Do not treat catalog reuse as module approval; review gates stay in the artifact root.
+- Do not mix Mock Lab spec editing responsibility into Catalog helpers.
+- Do not treat Catalog reuse as asset approval; review gates stay in the artifact root.
 
 ## Verification
 
@@ -37,4 +43,4 @@ cd packages/web
 npm run test:analyzer
 ```
 
-Also run `node scripts/validate-artifacts.mjs` when catalog shape affects templates.
+Also run `node scripts/validate-artifacts.mjs` when Catalog shape affects templates.

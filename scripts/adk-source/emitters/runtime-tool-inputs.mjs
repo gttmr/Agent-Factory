@@ -11,14 +11,14 @@ const GENERIC_PAYLOAD_WRAPPER_KEYS = [
   "payload",
   "data",
   "response",
-  "runtime_mock"
+  "content_text"
 ];
 
-export function reviewedPayloadWrapperKeys(modules) {
+export function reviewedPayloadWrapperKeys(assets) {
   const genericKeys = new Set(GENERIC_PAYLOAD_WRAPPER_KEYS);
   const reviewedKeys = new Set();
-  for (const module of Array.isArray(modules) ? modules : []) {
-    for (const output of Array.isArray(module?.outputs) ? module.outputs : []) {
+  for (const asset of Array.isArray(assets) ? assets : []) {
+    for (const output of Array.isArray(asset?.outputs) ? asset.outputs : []) {
       const outputType = typeof output?.type === "string" ? output.type.trim().toLowerCase() : "";
       if (outputType !== "object" && outputType !== "array") continue;
       const outputName = typeof output?.name === "string" ? output.name.trim() : "";
@@ -28,8 +28,8 @@ export function reviewedPayloadWrapperKeys(modules) {
   return [...GENERIC_PAYLOAD_WRAPPER_KEYS, ...[...reviewedKeys].sort()];
 }
 
-export function buildRuntimeToolInputsSection({ modules }) {
-  const payloadWrapperKeys = reviewedPayloadWrapperKeys(modules)
+export function buildRuntimeToolInputsSection({ assets }) {
+  const payloadWrapperKeys = reviewedPayloadWrapperKeys(assets)
     .map((key) => `    ${toPyStr(key)},`)
     .join("\n");
   return `
@@ -173,22 +173,24 @@ def _payload_user_text(payload: Any, depth: int = 0) -> str:
     return ""
 
 
-def _first_resume_input(ctx: Context) -> Any:
+def _resume_input_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        for key in ("result", "response", "text", "message", "value"):
+            if value.get(key) is not None:
+                return value.get(key)
+    return value
+
+
+def _resume_input_for(ctx: Context, interrupt_id: str) -> Any:
     resume_inputs = getattr(ctx, "resume_inputs", None) or {}
-    if not isinstance(resume_inputs, dict):
+    if not isinstance(resume_inputs, dict) or interrupt_id not in resume_inputs:
         return None
-    for value in resume_inputs.values():
-        if isinstance(value, dict):
-            for key in ("response", "text", "message", "value"):
-                if value.get(key) is not None:
-                    return value.get(key)
-        return value
-    return None
+    return _resume_input_value(resume_inputs.get(interrupt_id))
 
 
 def _collect_tool_inputs(
-    ctx: Context, module_id: str, input_names: list[str], required_names: list[str],
-    channel_keys: list[str] | None = None, extra_payloads: list[dict] | None = None,
+    ctx: Context, asset_id: str, input_names: list[str], required_names: list[str],
+    data_channel_ids: list[str] | None = None, extra_payloads: list[dict] | None = None,
     node_input: Any = None,
 ) -> tuple[dict, dict]:
     # Resolve each reviewed tool input from (1) an explicit agents.config.yaml
@@ -198,21 +200,20 @@ def _collect_tool_inputs(
     # the reviewed smoke_spec.synthetic_inputs seed. The fallback keeps runnable
     # scaffolds executable without inventing private data or hard-coding business
     # values in generated code.
-    contract = COMPONENT_CONTRACTS.get(module_id, {})
-    reviewed_mapping = contract.get("input_mapping") if isinstance(contract.get("input_mapping"), dict) else {}
-    overrides = _adapter_cfg(module_id, "input_map", {}) or {}
+    contract = COMPONENT_CONTRACTS.get(asset_id, {})
+    overrides = _tool_cfg(asset_id, "input_map", {}) or {}
     smoke_spec = contract.get("smoke_spec") if isinstance(contract, dict) else {}
     synthetic_inputs = smoke_spec.get("synthetic_inputs", {}) if isinstance(smoke_spec, dict) else {}
     channel_payloads = [
-        ctx.state.get(channel_key)
-        for channel_key in (channel_keys or [])
-        if ctx.state.get(channel_key) is not None
+        ctx.state.get(data_channel_id)
+        for data_channel_id in (data_channel_ids or [])
+        if ctx.state.get(data_channel_id) is not None
     ]
     channel_payloads.extend(payload for payload in (extra_payloads or []) if isinstance(payload, dict))
     args: dict = {}
     input_resolution: dict = {}
     for name in input_names:
-        source_key = reviewed_mapping.get(name) or overrides.get(name, name)
+        source_key = overrides.get(name, name)
         if not isinstance(source_key, str) or not source_key.strip():
             source_key = name
         if ctx.state.get(source_key) is not None:
@@ -252,8 +253,8 @@ def _collect_tool_inputs(
     missing = [name for name in required_names if name not in args]
     if missing:
         raise RuntimeError(
-            f"{module_id}: required MCP tool inputs missing from node input / session state / upstream outputs: {missing}. "
-            "Set an input_map for this adapter in agents.config.yaml."
+            f"{asset_id}: required MCP tool inputs missing from node input / session state / upstream outputs: {missing}. "
+            "Set an input_map for this Tool in agents.config.yaml."
         )
     return args, input_resolution
 `;

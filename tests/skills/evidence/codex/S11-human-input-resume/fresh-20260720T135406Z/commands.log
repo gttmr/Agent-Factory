@@ -1,0 +1,25 @@
+# Ordered command log
+
+## Test agent
+
+| Command | Exit | Bounded result |
+| --- | ---: | --- |
+| Read `af-workflow`, `af-scaffold-runtime` | 0 | Both Skill files loaded |
+| Read canonical docs/shared/scaffold references | 0 | Selected reference set loaded |
+| Read public context | 0 | Approved v2 analysis/manifest/plan inspected |
+| `node scripts/validate-artifacts.mjs scenario-input/context` | 0 | `Artifact validation OK` |
+| `node scripts/generate-adk-source.mjs scenario-input/context scenario-output/runtime` | 0 | Runnable bundle generated |
+| First system-Python compile/pytest | 2 | Import-time dependency coupling blocked collection |
+| Second system-Python compile/pytest | 2 | Generated contract test still imported ADK eagerly |
+| Third system-Python compile/pytest | 0 | `6 passed, 1 skipped` after output-local lazy import |
+| Final combined validation/inventory | 129 | Artifact validation passed; `git diff --check` failed because the isolated harness was not a Git repository |
+
+The test agent also attempted a TCP smoke, but its nested workspace sandbox rejected socket creation. The evaluator repeated that check from the host.
+
+## Evaluator
+
+- All 9 commands from `verification-commands.txt`: exit `0`.
+- Runtime-venv compile/pytest: exit `0`, `7 passed`, 4 deprecation warnings.
+- Host HTTP checks on `127.0.0.1:18787`: all curl commands exit `0`; listener stopped afterward.
+- Installed ADK 2.3 Runner pause/resume probe: process exit `0` when using the emitted function-call ID.
+- Resume with approved `synthetic-approval-001`: rejected with `Function call not found`.

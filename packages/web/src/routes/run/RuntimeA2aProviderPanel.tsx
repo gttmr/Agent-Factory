@@ -34,7 +34,7 @@ export function RuntimeA2aProviderPanel({ consumerReqId, target, status, inputRe
     pending: resumeA2a.isPending
   });
   const targetSource =
-    target?.source === "remote_a2a_contract" ? "linked Remote A2A provider" : target ? "current artifact" : "확인 중";
+    target?.source === "a2a_contract" ? "linked A2A provider" : target ? "current artifact" : "확인 중";
 
   function handleStartA2a() {
     onActionMessage(null);
@@ -70,7 +70,7 @@ export function RuntimeA2aProviderPanel({ consumerReqId, target, status, inputRe
     <Panel>
       <SectionHeader
         title="ADK A2A provider"
-        description="현재 Run artifact 가 호출할 ADK A2A endpoint 상태입니다. Remote A2A 계약이 local artifact 를 가리키면 그 provider artifact 를 대상으로 시작·중지합니다."
+        description="현재 Run artifact가 호출할 ADK A2A endpoint 상태입니다. A2A 계약이 local artifact를 가리키면 그 provider artifact를 대상으로 시작·중지합니다."
       />
       {error ? <p className="af-landing-error">{error.message}</p> : null}
       <ul className="af-gate-summary">
@@ -95,7 +95,7 @@ export function RuntimeA2aProviderPanel({ consumerReqId, target, status, inputRe
             <form className="af-run-resume-form" onSubmit={handleResumeSubmit}>
               <TextareaField
                 label="Workbench resume 응답"
-                hint="ADK Web 텍스트 채팅이 아니라 Remote A2A task resume endpoint 로 function_response DataPart 를 전송합니다."
+                hint="ADK Web 텍스트 채팅이 아니라 원격 A2A task의 resume endpoint로 function_response DataPart를 전송합니다."
                 value={resumeText}
                 rows={3}
                 onChange={(event) => setResumeText(event.target.value)}

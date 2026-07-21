@@ -15,6 +15,11 @@ export const VERIFY_COMMANDS: VerifyCommandInfo[] = [
     description: "현재 artifact root 의 모든 산출물을 schema 로 검증합니다."
   },
   {
+    key: "validate_generated_runtime",
+    label: "generated runtime smoke",
+    description: "생성 Python을 compile하고 bundle의 계약·import pytest를 실행합니다."
+  },
+  {
     key: "build_web",
     label: "npm run build (packages/web)",
     description: "tsc --noEmit 과 vite build 를 실행하여 TS 회귀를 잡습니다."

@@ -1,15 +1,15 @@
 # Skills vNext Migration Status
 
-이 문서는 Agent Factory coding-agent skill 재편의 현재 상태를 기록한다. 새 skill은 Target Contract로 판단하지만 현재 Product artifact를 쓸 때는 Compatibility Layer를 거쳐 `legacy` 직렬화 계약을 지킨다. 따라서 이번 상태는 Full Integration이 아니라 **Partial migration**이다.
+이 문서는 Agent Factory coding-agent skill 재편의 현재 상태를 기록한다. 2026-07-21 strict cutover 후속 검증 기준에서 skill 계층은 `af-workflow`와 네 canonical Work Skill만 사용하며, Product v2 artifact에 Target fields를 직접 쓴다. 구 stage ID shim과 legacy projection 계약은 제거됐다. Product generator가 아직 실행 코드로 내리지 못하는 ADK pattern은 별도 기능 범위이며 skill migration 완료 여부와 섞어 판단하지 않는다.
 
 ## 1. Source Snapshot
 
 - Repository: `gttmr/Agent-Factory`
 - Branch: `main`
-- Base commit: `7deea452e73f63828fc14402b7e16dcf40e753ac`
-- Date: `2026-07-18~19`
+- Product migration baseline: `0cdcb829480def3c0a8ba4afdefb37913721f6d2` (2026-07-19 worktree, commit 전)
+- Date: `2026-07-18~21`
 - Skill tree state: 승격 완료 — docs `0ee7784` → skills `b3911fd` → code `a4f55a0` 순서로 `main`에 반영
-- Codex 실행 기록: `codex-companion 1.0.6`, 기본 모델 `gpt-5.6`; 문서 갱신 시 로컬 `codex --version`은 `codex-cli 0.144.5`
+- Codex 실행 기록: `codex-companion 1.0.6`, 기본 모델 `gpt-5.6`; 최신 격리 검증은 `codex-cli 0.144.6`, `gpt-5.6-luna`
 - Claude Code 실행 기록: Fable 기반 5 sessions; 문서 갱신 시 로컬 `claude --version`은 `2.1.214`
 - ADK: `.agent-factory/runtime/.venv`의 `google-adk 2.3.0` 설치를 `pip show`와 설치 소스로 확인
 - Google Agents CLI reference: `~/.agents/skills/google-agents-cli-*` 로컬 사본을 구조 참고 자료로 사용했다. 이 사본이 어느 upstream repository commit에서 왔는지는 확인되지 않았다.
@@ -18,12 +18,14 @@
 
 ## 2. Migration Mode
 
-판정은 **Partial**이다.
+판정은 **Complete — strict Target v2**다.
 
-- Skill layer는 `af-workflow`와 네 canonical Work Skill, Compatibility Layer, version-neutral shared references, legacy shim으로 재편됐다.
-- Product Contract는 여전히 `legacy` `module_category`, 현재 Graph enum, runtime/A2A contract shape만 직렬화·검증한다.
-- 새 skill은 Target의 Agent·Workflow·Tool, Invocation Control, Binding, Workflow Profile, Reuse 판단을 먼저 수행하지만 current proposed/canonical artifact에는 Compatibility Layer를 적용한다.
-- Product schema, validator, analyzer, generator, Catalog, UI가 Target 직렬화를 지원하지 않으므로 Full Integration으로 판정할 수 없다. 영향 영역은 [Taxonomy vNext Migration Status](taxonomy-vnext-status.md)의 구현 gap과 함께 본다.
+이 판정은 canonical tree·contract·legacy 제거 상태에 대한 구조적 migration 판정이다. Fresh behavior campaign의 전체 완료 주장은 별도다. 2026-07-21 S11 재검증에서 Product/runtime 계약은 통과했지만 explicit scaffold 요청이 `af-workflow`를 먼저 읽은 routing deviation, output root 밖 transient probe, 필수 reference read 증거 부족이 남아 `AFV2-014`는 Moderate partial로 유지한다. 따라서 historical 16-scenario 완료율을 current 완료 증거로 복원하지 않는다.
+
+- Skill layer는 `af-workflow`와 네 canonical Work Skill, version-neutral shared references로 구성된다.
+- Product Contract v2는 Agent·Workflow·Tool, Invocation Control, Binding, Workflow Profile, Domain/Owner/Reuse를 직접 직렬화·검증한다.
+- 새 skill은 strict Target fields만 proposed/canonical artifact에 쓰며 legacy field를 만들거나 보완하지 않는다.
+- 구 stage ID shim과 legacy-only artifact 해석은 지원하지 않는다. generator가 아직 지원하지 않는 ADK runtime pattern은 [Taxonomy vNext Migration Status](taxonomy-vnext-status.md)의 별도 기능 gap으로 추적한다.
 
 ## 3. Old → New Mapping
 
@@ -50,7 +52,7 @@
 | `_shared/artifact-root-and-stage-runner.md` | `artifact-root-stage-runner.md` | 승계·개명 |
 | `_shared/taxonomy.md` | `taxonomy-boundaries.md`의 Target 판단을 canonical Taxonomy 링크 중심으로 재편 | 통합·재구성 |
 | `_shared/graph-ir.md` | canonical Graph IR routing reference | 신규 |
-| `_shared/compatibility-current-schema.md` | `taxonomy-boundaries.md`의 current serialization과 `runtime-contracts.md`의 current contract 경계 | 통합·신규 |
+| `_shared/target-contract-v2.md` | strict Target v2 artifact와 승인 경계를 한곳에 정리 | 신규 |
 | `_shared/missing-information.md` | `missing-information-gates.md` | 승계·개명 |
 | `_shared/security-and-data.md` | 공통 private data·credential·synthetic fixture 경계 | 신규 |
 | `_shared/catalog-and-reuse.md` | `catalog-feedback.md` | 승계·확장 |
@@ -66,51 +68,56 @@
 | `_shared/adk/human-input-and-resume.md` | `adk-2.3-human-input.md` | 승계·resume 확장 |
 | `_shared/adk/graph-and-dynamic-workflows.md` | `adk-2.3-routes.md` + `adk-2.3-dynamic.md` | 통합 |
 
-구 `runtime-contracts.md`는 독립 파일로 유지하지 않았다. Target pattern 계약은 Compose와 ADK cards로, current artifact 표현은 Compatibility Layer로 분산했다.
+구 `runtime-contracts.md`는 독립 파일로 유지하지 않았다. Target pattern 계약은 Compose, strict Target v2 reference, ADK cards로 나눠 소유한다.
 
 ### Artifact, Stage Runner, Trigger, Compatibility
 
 | 항목 | vNext 상태 |
 | --- | --- |
-| Artifact | 산출물 계약과 approval semantics는 현행을 유지한다. Stage Runner 또는 current canonical write는 Compatibility Layer를 거쳐 `legacy` artifact를 생산·검증한다. |
-| Stage Runner | (2026-07-18 코드 단계에서 갱신) `STAGE_DEFINITIONS`의 `skillName`·`skillPath`가 canonical ID/경로(`af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime`)로 이행됐다. Analyze·Design은 canonical SKILL.md를 직접 읽는다. Build·Verify는 여전히 server primitive가 실행 주체다. 기존 manifest의 구 `skill_name` 이력은 자유형 문자열로 그대로 읽힌다. |
+| Artifact | 산출물 계약과 approval semantics는 유지한다. Stage Runner와 canonical write는 strict Target v2만 생산·검증한다. |
+| Stage Runner | `STAGE_DEFINITIONS`의 `skillName`·`skillPath`는 canonical ID/경로(`af-discover-assets`, `af-compose-solution`, `af-scaffold-runtime`, `af-verify-runtime`)만 가리킨다. Analyze·Design은 canonical SKILL.md를 직접 읽고 Build·Verify는 server primitive가 실행 주체다. |
 | Trigger | canonical 5개 skill은 frontmatter `description`에 should-trigger와 should-not-trigger 경계를 둔다. `_shared`는 trigger 대상이 아니다. |
-| Compatibility | 전략 B의 legacy shim 4개는 유지하되, Stage Runner는 더 이상 shim 경로를 읽지 않는다. shim은 direct/manual legacy 호출 호환 전용이 됐다. 제거는 §8 기준으로 별도 판정한다. |
+| Compatibility | 구 stage ID shim 4개와 compatibility reference를 삭제했다. validator는 구 ID가 다시 생기면 실패하며, S16은 canonical direct 호출과 shim 부재를 확인한다. |
 
-## 4. Product Contract Compatibility
+## 4. Product Contract Integration
 
 ### Supported
 
-- current `legacy` `analysis-result.json`과 Stage Runner proposal path의 생산·parse·validator 적용
+- strict Target v2 `analysis-result.json`의 생산·parse·validator 적용
+- Target `asset_type`, `invocation_control`, `binding`, `workflow_profile`, `domain_scope`, `owner`, `reuse_status`의 Product 직렬화와 직접 소비
+- Target-only generator input의 직접 lowering
+- Agent/Workflow/Tool Reuse Hub와 `catalog/tools.yaml` publish
 - Analyze 한 파일, Design 두 파일, Build server-owned canonical `runtime-stub/`, Verify 두 proposal이라는 현행 artifact 계약
 - 현행 approval 불변, proposed-first apply, Catalog delta proposal-only 경계
-- canonical skill의 Target rationale를 current artifact의 rationale/notes에 보존하는 Compatibility Output
+- Workbench Build는 두 Design approval과 complete manifest를 요구하고 Verify는 complete Build handoff와 non-empty Runtime Handoff를 요구한다. canonical analysis가 바뀌면 downstream approval과 stale validation을 무효화한다.
+- canonical skill의 Target 판단을 structured fields에 보존하는 strict output
 
-### Unsupported
+### Intentionally unsupported
 
-- Target `asset_type`, `invocation_control`, `binding`, `workflow_profile`, `reuse_status`의 Product 직렬화
-- 위 Target 필드를 직접 소비하는 schema, validator, analyzer types, generator dispatch, Catalog projection, Workbench UI
-- skill migration만으로 새로운 Product enum이나 canonical Target artifact를 도입하는 것
+- 구 Graph node/edge/container envelope와 legacy generator selector
+- legacy-only artifact root와 구 split artifact 파일. 별도 정본에서 제외한 `commonization-notes.json`도 skill validator가 재도입을 거부한다.
+- `catalog/adapters.yaml`, `catalog/remote-a2a-contracts.yaml`, Adapter/Remote A2A 분류
+- 삭제된 stage ID shim을 통한 direct/manual 호출
 
-### Partial
+### Separate capability gap
 
-- canonical skill은 Target Contract로 분류·설계하고, current proposed/canonical artifact를 쓸 때만 Compatibility Layer로 `legacy` 값을 직렬화한다.
-- Standalone validator 비대상 design note는 Target 어휘를 사용할 수 있지만, 이것이 Product 지원을 뜻하지 않는다.
+- Product v2 field 지원과 특정 ADK pattern의 runnable generator 지원은 별도다. Pattern card 존재만으로 lowering 지원을 주장하지 않는다.
 
-### Blockers
+### Resolved blockers
 
-1. **Target Product schema 부재**: Target `asset_type`, `invocation_control`, `binding`, `workflow_profile`, `reuse_status`를 저장·검증할 Product schema가 없다. 영향 영역은 schema, analyzer, validator, generator, Catalog, UI다.
-2. **~~Stage Runner legacy ID 하드코딩~~ (2026-07-18 해결)**: `STAGE_DEFINITIONS`·UI label·fake output·테스트 fixture가 canonical ID/경로로 이행됐다. `packages/web/src`·`server` 전역 rg에서 legacy ID 0건, 구 manifest `skill_name` 이력은 자유형 문자열로 하위 호환 유지(왕복 회귀 테스트 포함). 잔여: 시각적 라벨 확인은 텍스트 치환 수준으로 테스트가 커버하며 스크린샷 검증은 미수행(WSL debug endpoint 부재 — 정직 기록).
+1. **~~Target Product schema 부재~~ (2026-07-19 해결)**: strict v2 schema, Stage Runner validation, Target-only generator 입력, 3자산 Catalog/UI를 함께 구현했다.
+2. **~~Stage Runner legacy ID 하드코딩~~ (2026-07-18 해결)**: `STAGE_DEFINITIONS`·UI label·fake output·테스트 fixture가 canonical ID/경로로 이행됐다. 2026-07-19에는 direct/manual 호출용 shim도 삭제했다.
 3. **~~Design 두 파일 계약의 약한 강제~~ (2026-07-18 해결)**: 등록된 필수 proposed artifact가 하나라도 누락되면 run이 `failed`가 되고 누락 파일 목록 진단과 `diagnostics.md`를 남긴다(RED→GREEN 회귀 포함). Analyze(1파일) 행동은 불변.
-4. **실패한 Verify command의 proposal apply 가능성**: `packages/web/server/stageRunner.ts:643-666`의 apply gate는 run status와 diff validity를 보지만 command-level `validation.ok`를 gate로 사용하지 않는다. 영향 영역은 validation report/Catalog delta의 적용 의미와 UI 완료 해석이다.
-5. **넓은 SDK sandbox write 범위**: Stage Runner SDK는 `workspace-write`라 `proposed-artifacts/` 밖 쓰기를 기술적으로 허용하고 diff builder는 extra file을 탐지하지 않는다. 영향 영역은 repository write safety와 run evidence completeness다.
+4. **~~실패한 Verify command의 Catalog proposal apply 가능성~~ (2026-07-19 해결)**: validation 실패 시 `validation-report.md`만 적용하고 `catalog-delta.yaml`은 건너뛴다. 모든 적용 대상 ETag를 실제 write 전에 검사한다.
+5. **~~넓은 SDK write 범위~~ (2026-07-19 해결)**: 실행 전후 workspace content snapshot을 비교해 proposal과 run ledger 밖의 생성·수정·삭제를 실패로 기록한다.
+6. **~~Product gate와 skill 선행 조건 불일치~~ (2026-07-20 해결)**: 모든 Build server entrypoint와 scaffold plan save가 두 Design approval을 검사하고, Verify command/Stage Runner는 Build complete·handoff approval·non-empty stub을 검사한다. 네 canonical Work Skill과 shared references도 같은 predecessor·complete manifest 계약으로 맞췄다.
 
 ## 5. Documentation Alignment Follow-ups
 
-이번 단계에서 허용되지 않은 `docs/workbench/**`는 수정하지 않고 다음 정합화 입력으로 남긴다.
+Product Target v2 이행과 함께 아래 active `docs/workbench/**` 정합화 항목을 현재 구현 기준으로 반영했다.
 
-- `docs/workbench/operating-model.md:42-45`: legacy `af-analyze-requirement`·`af-design-boundaries`가 shim 경유 Current Implementation이라는 설명과 canonical `af-discover-assets`·`af-compose-solution` 병기가 필요하다. **2026-07-19 반영 완료.**
-- `docs/workbench/analysis-guide.md:123`: legacy Analyze skill ID 옆에 canonical discovery skill과 Compatibility Layer 관계를 병기해야 한다. **2026-07-19 반영 완료.**
+- `docs/workbench/operating-model.md`: Stage Runner가 canonical Work Skill만 호출하는 현재 계약으로 갱신했다. **2026-07-19 반영 완료.**
+- `docs/workbench/analysis-guide.md`: Analyze가 `af-discover-assets`를 직접 사용하는 현재 계약으로 갱신했다. **2026-07-19 반영 완료.**
 - `docs/workbench/skill-refresh-evidence-2026-07.md`: 구 4-skill 체계를 기준으로 한 역사 원장이다. 현재 규칙으로 덮어쓰지 말고 historical evidence 표지를 유지한다.
 - Handbook은 이번 단계에서 Analyze·Design shim→canonical locator, Build·Verify server-primitive/direct-manual 경계, Index/Coverage를 갱신했다. 새 commit이 생기면 `docs/handbook/README.md`와 `overview.md`의 worktree 주석을 commit snapshot으로 바꾸고 관련 stage locator를 다시 확인해야 한다.
 - `docs/handbook/registers.md`에는 skill ID를 소유하는 register가 없어 이번 단계에서 수정하지 않았다. 향후 Stage Runner canonical ID migration이 일어나면 `reg.stage-run-evidence`의 producer·metadata locator를 재검증해야 한다.
@@ -127,9 +134,9 @@ baseline은 legacy 4-skill 절차와 당시 존재하던 vNext 문서를 함께 
 | [S03 Agent-selected MCP](../../tests/skills/evidence/baseline/S03-agent-selected-mcp/result-summary.md) | `PASS` | Invocation Control을 Agent로 두고 OCR Tool을 고정 Tool Node로 만들지 않았다. 당시 vNext 문서의 기여 가능성이 있다. |
 | [S13 raw scaffold refusal](../../tests/skills/evidence/baseline/S13-raw-scaffold-refusal/result-summary.md) | `PASS` | approved artifact 없는 raw requirement→code 요청을 거부하고 gate를 안내했다. read-only 실행이라 실제 write 차단은 관찰 범위 밖이다. |
 
-### New / Forward (2026-07-18 실행분)
+### Historical New / Forward (2026-07-18 실행분)
 
-canonical 5-skill tree 대상 forward 실행은 시나리오 16종 중 대표 집합을 두 도구에서 수행했다. 세부는 [Codex evidence](../../tests/skills/evidence/codex/forward-2026-07-18.md)와 [Claude Code evidence](../../tests/skills/evidence/claude-code/forward-2026-07-18.md)를 따른다.
+아래 실행은 당시 canonical 전환 중이던 tree와 fixture를 대상으로 한 historical evidence다. 이후 legacy shim 제거, S07/S11 positive predecessor 보강, S16 canonical-direct 전환이 있었으므로 현재 five-skill tree의 완료 증거로 사용하지 않는다. 세부는 [Codex evidence](../../tests/skills/evidence/codex/forward-2026-07-18.md)와 [Claude Code evidence](../../tests/skills/evidence/claude-code/forward-2026-07-18.md)를 따른다.
 
 | 커버 | Codex | Claude Code |
 | --- | --- | --- |
@@ -141,7 +148,7 @@ canonical 5-skill tree 대상 forward 실행은 시나리오 16종 중 대표 �
 | workflow 라우팅(상태 확인) | PASS | PASS |
 | should-not(비-AF 요청) | PASS — 스킬 미사용 | PASS — 스킬 미사용 |
 
-(2026-07-19 갱신) 잔여 시나리오 forward run을 완료했다: Codex는 S01–S16 전수(16/16, 전부 PASS — S07·S11은 fixture의 승인 artifact 불충분에 대한 게이트 STOP이 정답 경로), Claude Code는 10종(S01, S03 상당, S04, S05, S13, S14, S16 + 라우팅·should-not·verify) 전부 행동 PASS. 단 Claude S05 1건은 에이전트가 시나리오 fixture(rubric·기대 파일)를 자체 열람해 참조 누설로 오염 — 클린 증거에서 제외(클린 증거는 Codex S05). 상세와 fixture 보강 후속(S07·S11 완전 승인 artifact 세트, fixture 격리 worktree 실행 규약)은 [Codex evidence](../../tests/skills/evidence/codex/forward-2026-07-18.md)와 [Claude Code evidence](../../tests/skills/evidence/claude-code/forward-2026-07-18.md)에 기록했다. S08·S10 프로토타입은 오케스트레이터가 독립 재실행으로 테스트 통과를 확인했다(S08 pytest 2 passed, S10 unittest OK + 중복 전달 멱등성).
+(2026-07-19 historical 갱신) 잔여 시나리오를 당시 fixture 기준으로 실행했다. Codex의 16/16에는 S07·S11의 승인 artifact 부족 STOP과 legacy shim을 사용한 S16이 포함되며, Claude S05 1건은 rubric/기대 파일 노출로 오염됐다. 따라서 이 수치는 현재 target의 positive-path 완료율이 아니다. S08·S10 프로토타입의 독립 실행 결과도 해당 시점 artifact 증거로만 보존한다.
 
 ### Codex
 
@@ -157,21 +164,23 @@ Claude Code는 `.agents/skills`를 자동 발견하지 않으므로(공식 문�
 
 ## 7. Remaining Gap
 
-### Product migration
+### Product migration (2026-07-19 해결)
 
-Product schema와 Stage Runner·validator·generator·Catalog·UI가 Target Contract를 직렬화하고 소비하지 않는다. 상세 영향은 §4 Blockers와 [Taxonomy vNext Migration Status](taxonomy-vnext-status.md)를 따른다.
+Product schema, Stage Runner validator, analyzer, root validator, generator, Catalog publish와 Reuse Hub가 strict Target Contract v2를 직렬화하고 소비한다. legacy field·file·reader·projection은 지원하지 않는다. 상세 범위는 [Taxonomy vNext Migration Status](taxonomy-vnext-status.md)를 따른다.
 
-### UI integration
+### UI integration (2026-07-19 해결)
 
-Workbench는 새 canonical skill 이름을 표시하지 않고 Stage Runner Analyze·Design metadata와 화면 label에 legacy ID를 유지한다. Build·Verify는 server primitive이므로 canonical direct/manual skill 이름이 Stage Runner 실행 surface에 나타나지 않는다.
+Stage Runner metadata는 canonical skill ID를 사용하고 Reuse Hub·분석 요약·badge·주요 Build copy는 Agent/Workflow/Tool을 표시한다. Build·Verify의 실행 주체는 server primitive이며, 삭제된 shim 호출 경로는 제공하지 않는다.
 
-### Schema
+### Schema (2026-07-19 해결)
 
-current JSON Schema와 TypeScript types에는 Target `asset_type`, `invocation_control`, `binding`, `workflow_profile`, `reuse_status`를 독립적으로 저장할 계약이 없다. Compatibility Layer가 이 부재를 해결하는 것은 아니다.
+JSON Schema와 TypeScript types는 Target `asset_type`, `invocation_control`, `binding`, `workflow_profile`, `reuse_status`만 저장한다. legacy projection과 old-root 해석은 없다.
 
 ### Runtime pattern
 
 Ambient, Callback/Plugin, Event Loop, MCP, A2A, Human Input/Resume 등의 판단 규칙과 ADK cards는 skill layer에 존재한다. Product generator는 이 전체 pattern set을 지원하지 않으며, card 존재를 runnable lowering 지원으로 해석하면 안 된다.
+
+2026-07-21 current S11은 approved async-resume stable ID, expiry, restart replay, duplicate/conflict 처리와 guarded at-most-once synthetic Tool을 installed ADK 2.3.0에서 통과했다. 다만 fresh Codex behavior 자체는 direct routing·output boundary·reference evidence 때문에 FAIL이며, 이는 Product/runtime Blocker `AFV2-031`과 분리된 Skill discipline finding `AFV2-014`다.
 
 ### Generator route-convergence 결함 (2026-07-18 smoke 발견)
 
@@ -199,15 +208,16 @@ Claude Code 공식 발견 경로에는 `.agents/skills`가 포함되지 않아 f
 
 또한 official `ResumabilityConfig` surface는 설치 package probe에 포함되지 않았으므로 scaffold code emission 전에 재확인이 필요하다.
 
-## 8. Legacy Removal Criteria
+## 8. Legacy Removal Result
 
-legacy shim은 다음 조건이 모두 충족된 뒤에만 제거할 수 있다.
+2026-07-19 strict cutover에서 다음 조건을 확인하고 legacy shim을 제거했다.
 
-- Stage Runner `STAGE_DEFINITIONS`의 `skillName`과 exact `skillPath`가 canonical ID/path를 가리킨다.
-- Analyze·Design UI label, run manifest metadata, fake output과 test fixture가 canonical ID로 이행됐다.
-- Build·Verify의 direct/manual legacy caller가 canonical skill로 이행됐다.
-- 활성 외부 문서, automation, 호출 script에서 legacy skill ID 참조가 소거됐다.
-- canonical path로 Stage Runner artifact 계약, trigger matrix와 S16 legacy-shim 전환 결과가 검증됐다.
-- 기존 run history를 읽는 호환 요구와 rollback 조건이 별도로 판정됐다.
+- Stage Runner `STAGE_DEFINITIONS`의 `skillName`과 exact `skillPath`는 canonical ID/path만 가리킨다.
+- Analyze·Design UI label, run manifest metadata, fake output과 test fixture는 canonical ID를 사용한다.
+- Build·Verify의 direct/manual 안내는 canonical skill을 사용한다.
+- 활성 automation과 호출 script에는 구 skill 경로가 없다. validator에 남은 구 ID 문자열은 재도입을 막는 deny-list다.
+- `S16-canonical-direct`가 canonical direct 호출과 구 shim 디렉터리 부재를 검증한다.
+- 사용자는 기존 run history와 rollback 호환을 요구하지 않았고, 기존 artifact는 별도 백업 후 active input에서 제외하기로 결정했다.
+- skill validator는 canonical 다섯 directory와 required markers·relative references·legacy deny-list를 검사한다.
 
-이 목록은 제거 가능 조건만 기록하며 코드 수정 절차를 정의하지 않는다.
+과거 ID는 이 문서의 이전→현재 표와 historical evidence에서만 볼 수 있으며 실행 가능한 호환 표면이 아니다.

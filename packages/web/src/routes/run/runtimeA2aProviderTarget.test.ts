@@ -1,96 +1,87 @@
 import assert from "node:assert/strict";
-import type { AnalysisResult, ModuleCandidate } from "../../analyzer/types";
+import { buildContract } from "../../analyzer/a2aContracts.ts";
+import { assetCandidate, strictAnalysisFixture } from "../../analyzer/targetContract.testFixture.ts";
+import type { A2AContract, AnalysisResult, AssetCandidate } from "../../analyzer/types";
 import { runtimeA2aProviderTarget } from "./runtimeA2aProviderTarget";
 
-const approvedRemoteCandidate = candidate({
-  id: "mod-provider-approved",
+const approvedA2AAgent = candidate({
+  asset_id: "agent.provider-approved",
   owner: "local artifact:req-page-recommendation-required",
-  status: "approved"
+  status: "approved",
+  binding: { kind: "a2a", contract_ref: "a2a-provider-approved" }
 });
 
-const draftRemoteCandidate = candidate({
-  id: "mod-provider-draft",
+const draftA2AAgent = candidate({
+  asset_id: "agent.provider-draft",
   owner: "local artifact:req-page-recommendation-draft",
-  status: "needs_info"
+  status: "needs_info",
+  binding: { kind: "a2a", contract_ref: "a2a-provider-draft" }
 });
 
-assert.deepEqual(runtimeA2aProviderTarget(analysis([draftRemoteCandidate, approvedRemoteCandidate])), {
+assert.deepEqual(runtimeA2aProviderTarget(analysis(
+  [draftA2AAgent, approvedA2AAgent],
+  [contract(draftA2AAgent), contract(approvedA2AAgent)]
+)), {
   reqId: "req-page-recommendation-required",
-  source: "remote_a2a_contract",
-  remoteModuleId: "mod-provider-approved"
+  source: "a2a_contract",
+  agentAssetId: "agent.provider-approved",
+  contractId: "a2a-provider-approved"
 });
 
-assert.equal(runtimeA2aProviderTarget(analysis([draftRemoteCandidate])), null);
+const exposedA2AAgent = candidate({
+  asset_id: "agent.provider-exposed",
+  owner: "local artifact:req-exposed-provider",
+  status: "approved",
+  exposure: { protocol: "a2a", contract_ref: "a2a-provider-exposed" }
+});
 
-assert.equal(runtimeA2aProviderTarget(analysis([])), null);
+assert.deepEqual(runtimeA2aProviderTarget(analysis([exposedA2AAgent], [contract(exposedA2AAgent)])), {
+  reqId: "req-exposed-provider",
+  source: "a2a_contract",
+  agentAssetId: "agent.provider-exposed",
+  contractId: "a2a-provider-exposed"
+});
 
-function candidate(input: Pick<ModuleCandidate, "id" | "owner" | "status">): ModuleCandidate {
+assert.equal(runtimeA2aProviderTarget(analysis([draftA2AAgent], [contract(draftA2AAgent)])), null);
+
+assert.equal(runtimeA2aProviderTarget(analysis([approvedA2AAgent], [])), null);
+
+const mismatchedContract = { ...contract(approvedA2AAgent), agent_ref: "agent.someone-else" };
+assert.equal(runtimeA2aProviderTarget(analysis([approvedA2AAgent], [mismatchedContract])), null);
+
+const unboundAgent = candidate({ asset_id: "agent.unbound", status: "approved" });
+assert.equal(
+  runtimeA2aProviderTarget(analysis([unboundAgent], [{ ...buildContract(unboundAgent, "a2a-unbound"), contract_status: "approved" }])),
+  null
+);
+
+assert.equal(runtimeA2aProviderTarget(analysis([], [])), null);
+
+function candidate(overrides: Partial<AssetCandidate>): AssetCandidate {
+  return assetCandidate({
+    name: "Local provider Agent",
+    owner: "local artifact:req-provider",
+    binding: null,
+    exposure: null,
+    ...overrides
+  });
+}
+
+function contract(agent: AssetCandidate): A2AContract {
+  const contractRef = agent.binding?.kind === "a2a"
+    ? agent.binding.contract_ref
+    : agent.exposure?.contract_ref;
+  assert.ok(contractRef);
   return {
-    id: input.id,
-    source_requirement_id: "consumer",
-    name: "req_page_recommendation_required_adk",
-    module_category: "remote_a2a",
-    agent_kind: null,
-    workflow_kind: null,
-    adapter_kind: null,
-    remote_contract_kind: "a2a",
-    confidence: 0.95,
-    rationale: "Local provider import.",
-    inputs: [{ name: "message", type: "string", required: true }],
-    outputs: [{ name: "response", type: "string", required: true }],
-    reuse_candidate: true,
-    risk_level: "high",
-    risk_signals: ["audit_required"],
-    status: input.status,
-    missing_information: [],
-    owner: input.owner,
-    a2a_contract_id: "a2a-001"
+    ...buildContract(agent, contractRef),
+    contract_status: "approved"
   };
 }
 
-function analysis(moduleCandidates: ModuleCandidate[]): AnalysisResult {
+function analysis(assetCandidates: AssetCandidate[], a2aContracts: A2AContract[]): AnalysisResult {
   return {
-    normalizedRequirement: {
-      id: "consumer",
-      title: "Consumer",
-      raw_text: "run a remote provider",
-      domain: "test",
-      requester: { team: "qa", role: "reviewer" },
-      business_goal: "test",
-      current_process: [],
-      inputs: [],
-      outputs: [],
-      systems: [],
-      risk_signals: [],
-      missing_information: [],
-      contradictions: [],
-      status: "reviewed"
-    },
-    evidence: {
-      requested_goal: "test",
-      business_domain_hint: "test",
-      user_role: "reviewer",
-      input_data: [],
-      output_data: [],
-      systems_mentioned: [],
-      decisions_implied: [],
-      risk_signals: [],
-      missing_information: [],
-      contradictions: [],
-      assumptions: []
-    },
-    moduleCandidates,
-    a2aContracts: [],
-    runtimeContracts: [],
-    processFlow: {
-      requirement_id: "consumer",
-      graph_id: "graph-consumer",
-      root_workflow_module_id: null,
-      nodes: [],
-      edges: [],
-      containers: [],
-      lanes: [],
-      validation: { ok: true, errors: [], warnings: [] }
-    }
+    ...strictAnalysisFixture(),
+    assetCandidates,
+    a2aContracts
   };
 }

@@ -16,7 +16,7 @@ node scripts/validate-skills.mjs
 node scripts/validate-skills.mjs skills-staging
 ```
 
-기본 root는 `.agents/skills`다. root 이름에 `staging`이 있거나 `legacy-shims/`가 존재하면 staging mode로 보고, 구 ID 네 개는 `<root>/legacy-shims/<legacy-id>/SKILL.md`에서 검사한다. error가 하나라도 있으면 종료 코드는 1이며 warning만 있으면 0이다.
+기본 root는 `.agents/skills`다. validator는 canonical skill 다섯 개, retired skill directory 부재, strict Target Contract v2 reference, 금지된 artifact/field vocabulary를 검사한다. error가 하나라도 있으면 종료 코드는 1이며 warning만 있으면 0이다.
 
 ## 2. Trigger Matrix 사용법
 
@@ -35,11 +35,12 @@ Scenario source는 `templates/skill-scenarios/S01-*`부터 `S16-*`까지다. 각
 1. 이전 대화와 artifact가 없는 fresh session을 시작한다.
 2. Codex forward test는 `gpt-5.6-luna --effort low`, Claude Code는 `sonnet`을 사용한다. 지정 모델을 쓸 수 없으면 실제 fallback을 `environment.md`에 기록한다.
 3. runner에는 해당 `prompt.md`와 `context/`만 제공한다. `expected-skill.json`, `expected-artifacts.md`, `forbidden-outcomes.md`, `verification-commands.txt`, `rubric.md`는 실행 종료 전까지 숨긴다.
-4. Claude Code가 `.agents/skills`를 발견하지 못하면 test-only explicit load로 필요한 `SKILL.md` 경로만 알려준다. skill 내용을 별도 mirror로 복제하지 않는다.
-5. run별 빈 임시 디렉터리를 만들고 `SCENARIO_OUTPUT_ROOT`로 전달한다. scenario가 허용한 이 root 밖에는 쓰지 않으며 source scenario 디렉터리 자체를 실행 artifact로 사용하지 않는다.
-6. context의 `${SCENARIO_OUTPUT_ROOT}` 표기는 실제 절대 경로로 해석하되 source fixture를 수정하지 않는다.
-7. `verification-commands.txt`의 비어 있지 않고 `#`로 시작하지 않는 각 줄을 저장소 root에서 개별 실행하고 command, exit code, bounded output을 기록한다.
-8. exact prose가 아니라 선택, gate, 구조, write inventory, 금지 결과, fresh command evidence를 rubric으로 평가한다.
+4. Agent가 source scenario 디렉터리의 숨겨진 평가 파일을 직접 읽을 수 없게 한다. 격리 worktree를 쓰면 evaluator 원본은 worktree 밖에 보관하고 해당 worktree의 scenario 입력에는 `prompt.md`와 `context/`만 남긴다. 그렇지 않으면 빈 임시 입력 디렉터리에 두 항목만 복사해 실행한다. fixture root를 cwd나 탐색 가능한 입력 경로로 넘기지 않는다.
+5. Claude Code가 `.agents/skills`를 발견하지 못하면 test-only explicit load로 필요한 `SKILL.md` 경로만 알려준다. skill 내용을 별도 mirror로 복제하지 않는다.
+6. run별 빈 임시 디렉터리를 만들고 `SCENARIO_OUTPUT_ROOT`로 전달한다. scenario가 허용한 이 root 밖에는 쓰지 않으며 source scenario 디렉터리 자체를 실행 artifact로 사용하지 않는다.
+7. context의 `${SCENARIO_OUTPUT_ROOT}` 표기는 실제 절대 경로로 해석하되 source fixture를 수정하지 않는다.
+8. `verification-commands.txt`의 비어 있지 않고 `#`로 시작하지 않는 각 줄을 저장소 root에서 개별 실행하고 command, exit code, bounded output을 기록한다.
+9. exact prose가 아니라 선택, gate, 구조, write inventory, 금지 결과, fresh command evidence를 rubric으로 평가한다.
 
 ## 4. Evidence 저장 형식
 

@@ -1,0 +1,490 @@
+tools:
+  - asset_id: tool.page-recommendation.search-page-candidates
+    asset_type: tool
+    name: Page Metadata RAG 조회 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - retrieval
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: search_page_candidates
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: product_hint
+        type: string
+        required: false
+      - name: journey_stage
+        type: string
+        required: false
+      - name: event_type
+        type: string
+        required: false
+      - name: keywords
+        type: array
+        required: false
+    outputs:
+      - name: page_candidates
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      page_candidates:
+        - page_id: NWDID00019_002M
+          page_name: 예금/적금 가입 - 이자 시뮬레이션(STEP01)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+          product_event_area: 1
+          rag_score: 0.93
+          description: 상품가입_B 시 이자 시뮬레이션 페이지입니다. 이자 수익을 미리 예측합니다.
+          match_reason: 예적금 가입 퍼널 진입 단계로 이탈 고객 재유도 직접 대상
+        - page_id: NWDID00019_003M
+          page_name: 예금/적금 가입 - 가입정보 확인(STEP02)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인
+          product_event_area: 1
+          rag_score: 0.91
+          description: 상품가입_B의 가입정보 확인 단계입니다. 입력한 정보를 다시 한번 확인합니다.
+          match_reason: 가입 정보 확인 단계 이탈이 잦은 핵심 퍼널 구간
+        - page_id: NWDID00019_004M
+          page_name: 예금/적금 가입 - 약관동의(STEP03)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의
+          product_event_area: 1
+          rag_score: 0.9
+          description: '예금/적금 상품 가입 시, 약관 동의 단계로, 가입 전 필수 확인이 필요해요. 핵심키워드: 약관동의, 상품가입, 예금, 적금, 가입절차'
+          match_reason: 약관동의 필수 단계로 가입 직전 이탈 방지 대상
+        - page_id: NWDID00019_005M
+          page_name: 예금/적금 가입 - 가입완료/실패(STEP04)
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패
+          product_event_area: 1
+          rag_score: 0.88
+          description: '장병내일준비적금 가입 완료 또는 실패 후 안내되는 페이지입니다. 핵심키워드: 가입완료, 실패, 안내'
+          match_reason: 가입 완료/실패 분기 단계로 실패 이탈 고객 회수 대상
+        - page_id: NWMMH00051_001M
+          page_name: 입출금/예금/적금 상품 상세
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+          product_event_area: 1
+          rag_score: 0.86
+          description: 입출금/예금/적금 상품의 상세 정보를 확인하는 페이지입니다. 상품명, 금리, 최소가입금액, 만기일, 이자 지급 방식, 가입 조건 등을 상세히 안내합니다.
+          match_reason: 상품 상세 조회 후 미가입 이탈 고객의 가입 전환 유도 대상
+        - page_id: NWMMH00023_001M
+          page_name: 예적금 상품몰 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 수신상품
+          action_category_medium: 예적금
+          page_path: 메인(상품) > 예적금(입출금, 예금, 적금)
+          product_event_area: 0
+          rag_score: 0.78
+          description: 예금, 적금 상품을 확인하고, 가입할 수 있는 메인 화면입니다. 상품명, 금리, 기간, 이자 계산 방식 등을 확인하며, 선택을 결정합니다.
+          match_reason: 예적금 탐색 진입 메인으로 상위 퍼널 후보
+        - page_id: NWMMH00021_001M
+          page_name: 상품몰 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 상품메인
+          action_category_medium: NA
+          page_path: 메인(상품)
+          product_event_area: 0
+          rag_score: 0.62
+          description: 상품몰의 메인 화면입니다. 다양한 금융상품(예금, 적금, 펀드, 대출, 보험 등)을 한눈에 확인하고, 원하는 상품으로 이동할 수 있습니다.
+          match_reason: 전체 상품 진입 메인으로 광범위 후보
+        - page_id: NWMMH00057_001M
+          page_name: 대출 가입 안내
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 여신상품
+          action_category_medium: NA
+          page_path: 금융상품 > 대출 > 가입하기 > 안내
+          product_event_area: 1
+          rag_score: 0.41
+          description: 대출 가입 안내 페이지. 대출 상품, 조건, 신청 절차 설명.
+          match_reason: 여신 상품 페이지로 예적금 목적과는 약한 연관
+        - page_id: NWMMH00034_001M
+          page_name: 개인사업자 상품 메인
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          action_category_large: 개인사업자상품
+          action_category_medium: 개인사업자대출
+          page_path: 메인(상품) > 개인사업자
+          product_event_area: 0
+          rag_score: 0.33
+          description: 메인(상품) > 개인사업자 페이지입니다. 개인사업자 전용 상품을 확인할 수 있습니다.
+          match_reason: 개인사업자 전용 영역으로 예적금 목적과 연관 낮음
+        - page_id: NWMMH00040_003M
+          page_name: 내 꿀머니
+          screen_category_large: 메인
+          screen_category_medium: 홈/메뉴
+          action_category_large: 꿀머니조회
+          action_category_medium: 꿀머니
+          page_path: 메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니
+          product_event_area: 0
+          rag_score: 0.94
+          description: 내 꿀머니 메인. 포인트, 캐시백, 혜택을 한 눈에 확인.
+          match_reason: 꿀머니 혜택 잔액·포인트 조회 목적과 직접 연결된 페이지로 이탈률 분석 대상
+    notes: Mock Lab wf-page-recommendation-mock/search_page_candidates synthetic MCP tool에 고정된 Tool 계약이다.
+  - asset_id: tool.page-recommendation.run-userflow-analysis
+    asset_type: tool
+    name: UserFlow 분석 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - computation
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: run_userflow_analysis
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: selected_page_ids
+        type: array
+        required: true
+      - name: objective_text
+        type: string
+        required: true
+    outputs:
+      - name: funnel_dropoff_pages
+        type: array
+        required: true
+      - name: insight
+        type: string
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      funnel_dropoff_pages:
+        - page_id: NWMMH00040_003M
+          page_name: 내 꿀머니
+          dropoff_rate: 0.41
+          reason: 꿀머니 혜택 조회 화면에서 이탈률 높음
+      major_previous_pages:
+        - NWMMH00021_001M
+      major_next_pages:
+        - NWMMH00040_003M
+      insight: 혜택·이벤트 탭에서 내 꿀머니 화면 진입 후 이탈이 가장 큼
+    notes: Mock Lab wf-page-recommendation-mock/run_userflow_analysis synthetic MCP tool에 고정된 Tool 계약이다.
+  - asset_id: tool.page-recommendation.recommend-scenario-by-behavior-type
+    asset_type: tool
+    name: 행동유형 기반 시나리오 추천 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - computation
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: recommend_scenario_by_behavior_type
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: selected_page_ids
+        type: array
+        required: true
+      - name: customer_behavior_hint
+        type: string
+        required: true
+    outputs:
+      - name: recommended_scenarios
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      recommended_scenarios:
+        - scenario_id: SCN_KKULMONEY_DROPOFF_001
+          scenario_name: 꿀머니 혜택 조회 중단 고객 재유도
+          related_page_ids:
+            - NWMMH00040_003M
+          score: 0.88
+          basis: 혜택 조회 중단 행동유형 기반 추천
+        - scenario_id: SCN_DEPOSIT_DETAIL_REVISIT_002
+          scenario_name: 상품 상세 열람 후 미가입 고객 재방문 유도
+          related_page_ids:
+            - NWMMH00051_001M
+          score: 0.81
+          basis: 상품 상세 조회 행동유형 기반 추천
+    notes: Mock Lab wf-page-recommendation-mock/recommend_scenario_by_behavior_type synthetic MCP tool에 고정된 Tool 계약이다.
+  - asset_id: tool.page-recommendation.analyze-page-customer-relation
+    asset_type: tool
+    name: T2S 분석 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - computation
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: analyze_page_customer_relation
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: selected_page_ids
+        type: array
+        required: true
+      - name: objective_text
+        type: string
+        required: true
+    outputs:
+      - name: page_customer_relations
+        type: array
+        required: true
+      - name: insight
+        type: string
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      page_customer_relations:
+        - page_id: NWMMH00040_003M
+          target_customer_count: 5634
+          signal: high_dropoff
+          recommendation_score: 0.91
+      insight: 내 꿀머니(NWMMH00040_003M) 페이지가 고객 규모·이탈 신호 기준 우선 분석 대상
+    notes: Mock Lab wf-page-recommendation-mock/analyze_page_customer_relation synthetic MCP tool에 고정된 Tool 계약이다.
+  - asset_id: tool.page-recommendation.get-scenario-taxonomy
+    asset_type: tool
+    name: 시나리오 목적 분류체계 조회 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - retrieval
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: get_scenario_taxonomy
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+    outputs:
+      - name: categories
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      categories:
+        - category_large: 상품
+          category_medium: IRP
+          category_small: 신규
+        - category_large: 상품
+          category_medium: ISA
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 노란우산
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 신용대출
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 예금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 외화예금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 요구불
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 적금
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 청약
+          category_small: 신규
+        - category_large: 상품
+          category_medium: 펀드
+          category_small: 신규
+        - category_large: 혜택
+          category_medium: 꿀머니
+          category_small: 이탈률분석
+    notes: Mock Lab wf-page-recommendation-mock/get_scenario_taxonomy synthetic MCP tool에 고정된 Tool 계약이다.
+  - asset_id: tool.page-recommendation.search-page-products
+    asset_type: tool
+    name: 페이지×상품 매핑 조회 Tool
+    domain_scope: domain_specific
+    business_domains:
+      - 페이지추천
+    owner: AI공통플랫폼팀
+    reuse_status: reuse_existing
+    capability_tags:
+      - retrieval
+    status: approved
+    binding:
+      kind: mcp
+      server_ref: wf-page-recommendation-mock
+      tool_name: search_page_products
+    connection:
+      transport: stdio
+    workflow_profile: null
+    exposure: null
+    contract_status: mock_ready
+    inputs:
+      - name: objective_text
+        type: string
+        required: true
+      - name: product_class
+        type: string
+        required: false
+    outputs:
+      - name: page_products
+        type: array
+        required: true
+    risk_signals:
+      - customer_impact
+      - audit_required
+    runtime_mock:
+      synthetic: true
+      source: agent-factory-mock-lab
+      base_date: '20260526'
+      page_products:
+        - page_id: NWMMH00040_003M
+          product_code: BENEFIT_KKULMONEY
+          product_name: 꿀머니 혜택
+          product_class: 혜택
+          screen_category_large: 메인
+          screen_category_medium: 홈/메뉴
+          page_path: 메인(혜택) > (TAB)혜택·이벤트 > 내 꿀머니
+        - page_id: NWMMH00051_001M
+          product_code: P010002584
+          product_name: 우리 빙고 적금
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+        - page_id: NWDID00019_002M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+        - page_id: NWDID00019_003M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP02)가입정보 확인
+        - page_id: NWDID00019_004M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP03)약관동의
+        - page_id: NWDID00019_005M
+          product_code: P010002491
+          product_name: WON플러스 예금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP04)가입완료/실패
+        - page_id: NWDID00019_002M
+          product_code: P010002353
+          product_name: WON 적금
+          product_class: 수신
+          screen_category_large: 예/적금
+          screen_category_medium: 입출금/예금/적금 가입
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품가입_B > (STEP01)이자 시뮬레이션
+        - page_id: NWMMH00051_001M
+          product_code: P010002590
+          product_name: 우리 T-WON 적금
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+        - page_id: NWMMH00057_001M
+          product_code: P020000121
+          product_name: 예금담보대출
+          product_class: 여신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 대출 > 가입하기 > 안내
+        - page_id: NWMMH00051_001M
+          product_code: P010002562
+          product_name: 우월한 월급 통장
+          product_class: 수신
+          screen_category_large: 메인
+          screen_category_medium: 상품몰
+          page_path: 금융상품 > 입출금/예금/적금 > 가입하기 > 상품 상세
+    notes: Mock Lab wf-page-recommendation-mock/search_page_products synthetic MCP tool에 고정된 Tool 계약이다.

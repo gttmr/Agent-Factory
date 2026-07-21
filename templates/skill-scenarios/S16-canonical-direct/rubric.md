@@ -1,0 +1,6 @@
+- explicit canonical ID를 인식하고 해당 `SKILL.md`를 읽는다.
+- discovery procedure와 사용자 응답을 한 번만 수행한다.
+- read-only boundary와 canonical stop conditions를 유지한다.
+- Agent, Workflow, Tool만 top-level asset 후보로 사용한다.
+- A2A가 필요하면 Agent binding 또는 exposure로만 표현한다.
+- canonical direct invocation과 write 부재를 evidence에 남긴다.

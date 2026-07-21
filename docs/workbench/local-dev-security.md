@@ -3,7 +3,7 @@
 This note covers local Agent Factory development surfaces. It is not a
 deployment guide.
 
-Target 자산과 경계 용어의 기준은 [Taxonomy](taxonomy.md)이며, 로컬 artifact에 남아 있는 Adapter 또는 Remote A2A 필드는 Current Implementation(`legacy`) 표현이다.
+Target 자산과 경계 용어의 기준은 [Taxonomy](taxonomy.md)다. 로컬 artifact도 Agent·Workflow·Tool과 strict Target v2 필드만 허용하며, A2A는 Agent의 protocol binding으로 표현한다.
 
 ## Local Surfaces
 
@@ -11,6 +11,11 @@ Target 자산과 경계 용어의 기준은 [Taxonomy](taxonomy.md)이며, 로�
 - Standalone Mock Lab package: `http://127.0.0.1:5176/`.
 - ADK runtime/dev UI smoke server: usually `http://127.0.0.1:8765/`.
 - Chrome DevTools automation gate: `http://127.0.0.1:9222/json/version`.
+
+수동 Workbench 검증은 저장소 root에서
+`./scripts/start-manual-web-test.sh`로 시작한다. 이 launcher는 실제 npm
+package가 있는 `packages/web`으로 이동하고 Vite runner config loader와 고정
+port를 사용한다. artifact root를 만들거나 초기화하거나 삭제하지는 않는다.
 
 The workbench command uses `--host 0.0.0.0` for WSL/browser reachability, but
 these servers are local development tools. Do not expose them to untrusted

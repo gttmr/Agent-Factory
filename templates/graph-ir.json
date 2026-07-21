@@ -1,0 +1,51 @@
+{
+  "graph_id": "graph.template",
+  "source_requirement_id": "req-template",
+  "workflow_ref": null,
+  "nodes": [
+    {
+      "id": "input",
+      "label": "Input",
+      "node_kind": "input"
+    },
+    {
+      "id": "agent",
+      "label": "Template Agent",
+      "node_kind": "agent",
+      "agent_ref": "agent.template",
+      "available_tools": []
+    },
+    {
+      "id": "output",
+      "label": "Output",
+      "node_kind": "output"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge.input.agent",
+      "from": "input",
+      "to": "agent",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": null
+    },
+    {
+      "id": "edge.agent.output",
+      "from": "agent",
+      "to": "output",
+      "control": {
+        "kind": "next",
+        "condition": null,
+        "accepted_aliases": [],
+        "default": false
+      },
+      "channel": null
+    }
+  ],
+  "regions": []
+}

@@ -1,16 +1,16 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { Selection } from "../../components/GraphCanvas";
 import type { LocalA2AProviderImport } from "../../analyzer/localA2aProvider";
-import { approveCandidate, resolveMissingItem, setCandidateStatus } from "../../analyzer/moduleReview";
-import type { AnalysisResult, GraphIR, ModuleCandidate, ModuleStatus, RuntimeContract } from "../../analyzer/types";
-import { DESIGN_BOTTOM_TABS, nextDesignBottomTabAfterModuleSelect } from "../../design/designWorkbenchTabs";
+import { approveCandidate, resolveMissingItem, setCandidateStatus } from "../../analyzer/assetReview";
+import type { AnalysisResult, AssetCandidate, GraphIR, RuntimeContract } from "../../analyzer/types";
+import { DESIGN_BOTTOM_TABS, nextDesignBottomTabAfterAssetSelect } from "../../design/designWorkbenchTabs";
 import { ReviewNotesPanel } from "../../design/ReviewNotesPanel";
 import { RuntimeContractInspector, RuntimeContractSidebar } from "../../design/RuntimeContractPanel";
 import { reviewNotesBadgeCount } from "../../design/reviewNotesModel";
 import type { CommentAnchor, CommentRecord, CommentStage, HighlightRecord, CreateHighlightInput } from "../../state/useCollaboration";
 import type { AuthorRole } from "../../state/useAuthor";
 import { DesignA2ATab, type DesignA2AReviewRow } from "./DesignA2ATab";
-import { ModuleReviewDetail, ModuleSidebar } from "./DesignModuleReview";
+import { AssetReviewDetail, AssetSidebar } from "./DesignAssetReview";
 import type { SidebarTab } from "./designStageModel";
 
 interface DesignBottomPanelProps {
@@ -19,7 +19,7 @@ interface DesignBottomPanelProps {
   setActiveTab: Dispatch<SetStateAction<SidebarTab>>;
   analysis: AnalysisResult;
   graphIR: GraphIR | null;
-  selectedReviewCandidate: ModuleCandidate | null;
+  selectedReviewAsset: AssetCandidate | null;
   selectedContract: RuntimeContract | null;
   selectedContractId: string | null;
   selectedA2ARow: DesignA2AReviewRow | null;
@@ -33,13 +33,13 @@ interface DesignBottomPanelProps {
   saving: boolean;
   commentPending: boolean;
   highlightPending: boolean;
-  onSelectReviewModule: (moduleId: string) => void;
+  onSelectReviewAsset: (assetId: string) => void;
   onSelectionChange: (selection: Selection) => void;
-  onSaveCandidate: (candidateId: string, candidate: ModuleCandidate, syncStatus?: ModuleStatus) => void;
+  onSaveAsset: (assetId: string, asset: AssetCandidate) => void;
   onSelectContract: (contractId: string) => void;
   onSaveRuntimeContract: (contract: RuntimeContract) => void;
-  onSelectA2AModule: (moduleId: string) => void;
-  onCreateA2AContract: (candidate: ModuleCandidate) => void;
+  onSelectA2AAsset: (assetId: string) => void;
+  onCreateA2AContract: (candidate: AssetCandidate) => void;
   onImportLocalA2AProvider: (provider: LocalA2AProviderImport) => void;
   onSaveA2AContract: (contract: AnalysisResult["a2aContracts"][number]) => void;
   onAuthorNameChange: (value: string) => void;
@@ -51,16 +51,16 @@ interface DesignBottomPanelProps {
   onDeleteHighlight: (id: string) => void;
 }
 
-type ModuleReviewTabProps = Pick<
+type AssetReviewTabProps = Pick<
   DesignBottomPanelProps,
   | "analysis"
   | "graphIR"
-  | "selectedReviewCandidate"
+  | "selectedReviewAsset"
   | "saving"
-  | "onSelectReviewModule"
+  | "onSelectReviewAsset"
   | "onSelectionChange"
   | "setActiveTab"
-  | "onSaveCandidate"
+  | "onSaveAsset"
 >;
 
 export function DesignBottomPanel({
@@ -69,7 +69,7 @@ export function DesignBottomPanel({
   setActiveTab,
   analysis,
   graphIR,
-  selectedReviewCandidate,
+  selectedReviewAsset,
   selectedContract,
   selectedContractId,
   selectedA2ARow,
@@ -83,12 +83,12 @@ export function DesignBottomPanel({
   saving,
   commentPending,
   highlightPending,
-  onSelectReviewModule,
+  onSelectReviewAsset,
   onSelectionChange,
-  onSaveCandidate,
+  onSaveAsset,
   onSelectContract,
   onSaveRuntimeContract,
-  onSelectA2AModule,
+  onSelectA2AAsset,
   onCreateA2AContract,
   onImportLocalA2AProvider,
   onSaveA2AContract,
@@ -101,7 +101,7 @@ export function DesignBottomPanel({
   onDeleteHighlight
 }: DesignBottomPanelProps) {
   return (
-    <div className="af-design-bottom" aria-label="모듈·계약·검토 메모 패널">
+    <div className="af-design-bottom" aria-label="Assets·계약·검토 메모 패널">
       <nav className="af-design-tabs" role="tablist">
         {DESIGN_BOTTOM_TABS.map((tab) => (
           <button
@@ -119,17 +119,17 @@ export function DesignBottomPanel({
           </button>
         ))}
       </nav>
-      <div className={`af-design-sidebar-body${activeTab === "modules" ? " af-design-sidebar-body--modules" : ""}`}>
-        {activeTab === "modules" ? (
-          <ModuleReviewTab
+      <div className={`af-design-sidebar-body${activeTab === "assets" ? " af-design-sidebar-body--assets" : ""}`}>
+        {activeTab === "assets" ? (
+          <AssetReviewTab
             analysis={analysis}
             graphIR={graphIR}
-            selectedReviewCandidate={selectedReviewCandidate}
+            selectedReviewAsset={selectedReviewAsset}
             saving={saving}
-            onSelectReviewModule={onSelectReviewModule}
+            onSelectReviewAsset={onSelectReviewAsset}
             onSelectionChange={onSelectionChange}
             setActiveTab={setActiveTab}
-            onSaveCandidate={onSaveCandidate}
+            onSaveAsset={onSaveAsset}
           />
         ) : null}
         {activeTab === "runtime" ? (
@@ -155,7 +155,7 @@ export function DesignBottomPanel({
             a2aContracts={a2aContracts}
             selectedA2ARow={selectedA2ARow}
             saving={saving}
-            onSelectA2AModule={onSelectA2AModule}
+            onSelectA2AAsset={onSelectA2AAsset}
             onCreateA2AContract={onCreateA2AContract}
             onImportLocalA2AProvider={onImportLocalA2AProvider}
             onSaveA2AContract={onSaveA2AContract}
@@ -187,43 +187,50 @@ export function DesignBottomPanel({
   );
 }
 
-function ModuleReviewTab({
+function AssetReviewTab({
   analysis,
   graphIR,
-  selectedReviewCandidate,
+  selectedReviewAsset,
   saving,
-  onSelectReviewModule,
+  onSelectReviewAsset,
   onSelectionChange,
   setActiveTab,
-  onSaveCandidate
-}: ModuleReviewTabProps) {
+  onSaveAsset
+}: AssetReviewTabProps) {
   return (
-    <div className="af-module-review-layout">
-      <div className="af-module-review-list-pane">
-        <ModuleSidebar
-          candidates={analysis.moduleCandidates}
-          selectedModuleId={selectedReviewCandidate?.id ?? null}
-          onSelectModule={(moduleId) => {
-            onSelectReviewModule(moduleId);
+    <div className="af-asset-review-layout">
+      <div className="af-asset-review-list-pane">
+        <AssetSidebar
+          assets={analysis.assetCandidates}
+          selectedAssetId={selectedReviewAsset?.asset_id ?? null}
+          onSelectAsset={(assetId) => {
+            onSelectReviewAsset(assetId);
             if (!graphIR) return;
-            const node = graphIR.nodes?.find((item) => item.module_id === moduleId);
+            const node = graphIR.nodes.find((item) => nodeAssetRef(item) === assetId);
             onSelectionChange({ nodeId: node?.id ?? null, edgeId: null });
-            setActiveTab((currentTab) => nextDesignBottomTabAfterModuleSelect(currentTab));
+            setActiveTab((currentTab) => nextDesignBottomTabAfterAssetSelect(currentTab));
           }}
         />
       </div>
-      <ModuleReviewDetail
-        key={selectedReviewCandidate?.id ?? "none"}
-        candidate={selectedReviewCandidate}
+      <AssetReviewDetail
+        key={selectedReviewAsset?.asset_id ?? "none"}
+        asset={selectedReviewAsset}
         saving={saving}
-        onResolveMissing={(candidate, item, note) => onSaveCandidate(candidate.id, resolveMissingItem(candidate, item, note))}
+        onResolveMissing={(asset, item, note) => onSaveAsset(asset.asset_id, resolveMissingItem(asset, item, note))}
         onApprove={(candidate) => {
           const nextCandidate = approveCandidate(candidate);
-          onSaveCandidate(candidate.id, nextCandidate, nextCandidate.status === "approved" ? "approved" : undefined);
+          onSaveAsset(candidate.asset_id, nextCandidate);
         }}
-        onDefer={(candidate) => onSaveCandidate(candidate.id, setCandidateStatus(candidate, "deferred"), "deferred")}
-        onReject={(candidate) => onSaveCandidate(candidate.id, setCandidateStatus(candidate, "rejected"), "rejected")}
+        onDefer={(candidate) => onSaveAsset(candidate.asset_id, setCandidateStatus(candidate, "deferred"))}
+        onReject={(candidate) => onSaveAsset(candidate.asset_id, setCandidateStatus(candidate, "rejected"))}
       />
     </div>
   );
+}
+
+function nodeAssetRef(node: GraphIR["nodes"][number]): string | null {
+  if (node.node_kind === "agent") return node.agent_ref;
+  if (node.node_kind === "tool") return node.tool_ref;
+  if (node.node_kind === "subworkflow") return node.workflow_ref;
+  return null;
 }

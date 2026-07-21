@@ -1,355 +1,115 @@
 {
+  "contract_version": "2.0",
   "normalizedRequirement": {
-    "id": "req-001",
-    "title": "Delegate analysis to a remote partner agent with incomplete owner info",
-    "raw_text": "We want to delegate part of the work to a remote agent owned by a partner. Some details about the partner organization are still unknown.",
-    "domain": "customer-service",
+    "id": "req-scenario-f",
+    "title": "Deterministic regression",
+    "raw_text": "Deterministic regression",
+    "domain": "공통",
     "requester": {
-      "team": "support-operations",
-      "role": "business-user"
+      "team": "platform",
+      "role": "developer"
     },
-    "business_goal": "Use a partner-owned remote agent for specialist work even though full ownership details are pending review.",
-    "current_process": [
-      "Receive the request locally",
-      "Delegate to the remote partner agent",
-      "Receive the remote outcome"
-    ],
-    "inputs": [
-      { "name": "delegated_request", "type": "object", "required": true }
-    ],
-    "outputs": [
-      { "name": "remote_outcome", "type": "object", "required": true }
-    ],
-    "systems": [
-      { "name": "partner_remote_agent", "access": "unknown" }
-    ],
-    "risk_signals": ["customer_impact", "audit_required"],
-    "missing_information": [
-      "owner",
-      "Agent Card version",
-      "Skill list"
-    ],
+    "business_goal": "Deterministic regression",
+    "current_process": [],
+    "inputs": [],
+    "outputs": [],
+    "systems": [],
+    "risk_signals": [],
+    "missing_information": [],
     "contradictions": [],
-    "status": "draft"
+    "status": "approved"
   },
   "evidence": {
-    "requested_goal": "Delegate to a remote partner agent without confirmed ownership details.",
-    "business_domain_hint": "customer-service",
-    "user_role": "business-user",
-    "input_data": ["delegated_request"],
-    "output_data": ["remote_outcome"],
-    "systems_mentioned": ["partner_remote_agent"],
-    "decisions_implied": ["delegate to remote partner"],
-    "risk_signals": ["customer_impact", "audit_required"],
-    "missing_information": [
-      "owner",
-      "Agent Card version",
-      "Skill list"
-    ],
+    "requested_goal": "Deterministic regression",
+    "business_domain_hint": "공통",
+    "user_role": "developer",
+    "input_data": [],
+    "output_data": [],
+    "systems_mentioned": [],
+    "decisions_implied": [],
+    "risk_signals": [],
+    "missing_information": [],
     "contradictions": [],
-    "assumptions": ["partner organization will own and operate the remote agent"]
+    "assumptions": []
   },
-  "moduleCandidates": [
+  "assetCandidates": [
     {
-      "id": "mod-001",
-      "source_requirement_id": "req-001",
-      "name": "remote_partner_agent",
-      "module_category": "remote_a2a",
-      "agent_kind": null,
-      "workflow_kind": null,
-      "adapter_kind": null,
-      "remote_contract_kind": "a2a",
-      "legacy_recommended_type": "remote_a2a_contract",
-      "confidence": 0.6,
-      "rationale": "Partner-owned remote agent reached through A2A; ownership details still pending review.",
-      "adk_hints": {
-        "state_memory": null,
-        "callbacks": null,
-        "artifacts_events": null,
-        "mcp_a2a": "remote A2A peer; partner Agent Card pending",
-        "streaming_grounding": null
-      },
-      "inputs": [
-        { "name": "delegated_task", "type": "object", "required": true }
-      ],
-      "outputs": [
-        { "name": "remote_outcome", "type": "object", "required": true }
-      ],
-      "reuse_candidate": false,
-      "risk_level": "high",
-      "risk_signals": ["customer_impact", "audit_required"],
-      "status": "needs_info",
-      "missing_information": [
-        "owner",
-        "Agent Card version",
-        "Skill list"
-      ],
-      "side_effect": "read_write",
-      "auth_required": true,
-      "audit_required": true,
-      "citation_required": false,
-      "grounding_required": false,
-      "source_acl_required": false,
-      "versioned": false,
-      "effective_date_required": false,
-      "owner_domain": "customer-service",
-      "owner": "needs_info",
-      "agent_card": "needs_info",
-      "auth": "needs_info",
-      "task_lifecycle": "needs_info",
-      "timeout": "needs_info",
-      "retry": "needs_info",
-      "fallback": "needs_info",
-      "audit": "needs_info",
-      "data_policy": "needs_info",
-      "a2a_contract_id": "a2a-001"
+      "asset_id": "agent.scenario-f",
+      "source_requirement_id": "req-scenario-f",
+      "catalog_entry_id": null,
+      "name": "Regression Agent",
+      "asset_type": "agent",
+      "domain_scope": "domain_neutral",
+      "business_domains": [],
+      "owner": "platform",
+      "reuse_status": "project_only",
+      "capability_tags": [],
+      "binding": null,
+      "connection": null,
+      "workflow_profile": null,
+      "exposure": null,
+      "confidence": 0.9,
+      "rationale": "Reviewed agent responsibility for Regression Agent",
+      "inputs": [],
+      "outputs": [],
+      "risk_level": "low",
+      "risk_signals": [],
+      "status": "approved",
+      "missing_information": [],
+      "developer_todos": []
     }
   ],
-  "a2aContracts": [
-    {
-      "contract_id": "a2a-001",
-      "remote_module_id": "mod-001",
-      "target_agent_name": "needs_info",
-      "target_agent_purpose": "needs_info",
-      "contract_status": "needs_info",
-      "agent_card": {
-        "discovery_method": "needs_info",
-        "agent_card_url": "needs_info",
-        "version": "needs_info",
-        "notes": "Owner and Agent Card details still being agreed with the partner."
-      },
-      "supported_interfaces": [],
-      "input_modes": ["application/json"],
-      "output_modes": ["application/json"],
-      "security_schemes": [],
-      "security_requirements": [],
-      "skills": [],
-      "extensions": [],
-      "message_contract": {
-        "allowed_part_fields": ["text", "data"],
-        "allowed_roles": ["ROLE_USER", "ROLE_AGENT"]
-      },
-      "task_lifecycle": {
-        "states": [
-          "TASK_STATE_SUBMITTED",
-          "TASK_STATE_WORKING",
-          "TASK_STATE_COMPLETED",
-          "TASK_STATE_FAILED"
-        ],
-        "allowed_transitions": [
-          { "from": "TASK_STATE_SUBMITTED", "to": "TASK_STATE_WORKING" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_COMPLETED" },
-          { "from": "TASK_STATE_WORKING", "to": "TASK_STATE_FAILED" }
-        ],
-        "terminal_states": [
-          "TASK_STATE_COMPLETED",
-          "TASK_STATE_FAILED"
-        ],
-        "input_required_followup": "needs_info",
-        "auth_required_followup": "needs_info"
-      },
-      "streaming": {
-        "supported": false,
-        "wrappers": [],
-        "non_streaming_fallback": "use SendMessage and poll GetTask until terminal outcome"
-      },
-      "operations": ["SendMessage", "GetTask"],
-      "http_paths": ["/message:send", "/tasks/{id}"],
-      "artifact_contract": {
-        "mutation_rules": "needs_info",
-        "chunking_policy": "needs_info"
-      },
-      "adk_host_mapping": "needs_info",
-      "adk_runtime_policy": {
-        "timeout_seconds": null,
-        "auth": {
-          "mode": "bearer_env",
-          "env_var": null,
-          "metadata_key": null
-        },
-        "retry_handoff": {
-          "max_attempts": null,
-          "backoff_seconds": null,
-          "retry_on": []
-        },
-        "fallback_handoff": {
-          "mode": "manual_review",
-          "message": null
-        }
-      },
-      "timeout": "needs_info",
-      "retry": "needs_info",
-      "fallback": "needs_info",
-      "cancellation": "needs_info",
-      "unsupported_operation": "needs_info",
-      "get_task_fallback": "needs_info",
-      "push_notification_policy": null,
-      "auth": "needs_info",
-      "token_handling": "needs_info",
-      "audit": "needs_info",
-      "data_policy": "needs_info"
-    }
-  ],
+  "a2aContracts": [],
   "runtimeContracts": [],
-  "processFlow": {
-    "requirement_id": "req-001",
-    "graph_id": "graph-001",
-    "root_workflow_module_id": null,
+  "graph": {
+    "graph_id": "graph.scenario-f",
+    "source_requirement_id": "req-scenario-f",
+    "workflow_ref": null,
     "nodes": [
       {
-        "id": "delegated_request",
-        "module_id": null,
-        "label": "delegated_request",
-        "node_kind": "input",
-        "execution_kind": "io",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "input",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "input",
+        "label": "Input",
+        "node_kind": "input"
       },
       {
-        "id": "local_dispatcher",
-        "module_id": null,
-        "label": "local_dispatcher",
-        "node_kind": "function",
-        "execution_kind": "deterministic",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "local_graph",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "agent",
+        "label": "Regression Agent",
+        "node_kind": "agent",
+        "agent_ref": "agent.scenario-f",
+        "available_tools": []
       },
       {
-        "id": "mod-001",
-        "module_id": "mod-001",
-        "label": "remote_partner_agent",
-        "node_kind": "remote_a2a",
-        "execution_kind": "remote_a2a",
-        "adk_node_role": "boundary",
-        "owner_scope": "remote",
-        "container_id": "container-remote",
-        "lane_id": "remote_boundary",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "needs_info"
-      },
-      {
-        "id": "remote_outcome",
-        "module_id": null,
-        "label": "remote_outcome",
-        "node_kind": "output",
-        "execution_kind": "io",
-        "adk_node_role": "synthetic",
-        "owner_scope": "local",
-        "container_id": "container-root",
-        "lane_id": "output",
-        "input_ports": [],
-        "output_ports": [],
-        "schema_refs": [],
-        "review_status": "approved"
+        "id": "output",
+        "label": "Output",
+        "node_kind": "output"
       }
     ],
     "edges": [
       {
-        "id": "edge-001",
-        "from": "delegated_request",
-        "to": "local_dispatcher",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "delegated request payload",
-        "schema_ref": "DelegatedRequest",
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.input.agent",
+        "from": "input",
+        "to": "agent",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       },
       {
-        "id": "edge-002",
-        "from": "local_dispatcher",
-        "to": "mod-001",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "remote_a2a",
-        "execution_semantics": "boundary_crossing",
-        "data_label": "delegated task payload",
-        "schema_ref": "DelegatedTask",
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": "a2a-001",
-        "is_remote_boundary_crossing": true
-      },
-      {
-        "id": "edge-003",
-        "from": "mod-001",
-        "to": "remote_outcome",
-        "from_port": null,
-        "to_port": null,
-        "edge_kind": "event_output",
-        "execution_semantics": "normal_transition",
-        "data_label": "remote outcome",
-        "schema_ref": "RemoteOutcome",
-        "route_condition": null,
-        "state_key": null,
-        "artifact_key": null,
-        "a2a_contract_id": null,
-        "is_remote_boundary_crossing": false
+        "id": "edge.agent.output",
+        "from": "agent",
+        "to": "output",
+        "control": {
+          "kind": "next",
+          "condition": null,
+          "accepted_aliases": [],
+          "default": false
+        },
+        "channel": null
       }
     ],
-    "containers": [
-      {
-        "id": "container-root",
-        "module_id": null,
-        "label": "Root graph workflow",
-        "container_kind": "graph_workflow",
-        "adk_mapping": "GraphWorkflow",
-        "contains_node_ids": ["delegated_request", "local_dispatcher", "remote_outcome"],
-        "entry_node_ids": ["delegated_request"],
-        "exit_node_ids": ["remote_outcome"],
-        "layout_policy": "dag_with_routes",
-        "parent_container_id": null
-      },
-      {
-        "id": "container-remote",
-        "module_id": "mod-001",
-        "label": "Remote A2A boundary",
-        "container_kind": "remote_boundary",
-        "adk_mapping": "RemoteBoundary",
-        "contains_node_ids": ["mod-001"],
-        "entry_node_ids": ["mod-001"],
-        "exit_node_ids": ["mod-001"],
-        "layout_policy": "free",
-        "parent_container_id": null
-      }
-    ],
-    "lanes": [
-      { "id": "input", "label": "input" },
-      { "id": "local_graph", "label": "local_graph" },
-      { "id": "output", "label": "output" },
-      { "id": "remote_boundary", "label": "remote_boundary" }
-    ],
-    "validation": {
-      "ok": true,
-      "errors": [],
-      "warnings": [
-        {
-          "code": "remote_owner_unknown",
-          "message": "Remote A2A candidate is missing owner; review the contract.",
-          "target_kind": "node",
-          "target_id": "mod-001"
-        }
-      ]
-    }
+    "regions": []
   }
 }

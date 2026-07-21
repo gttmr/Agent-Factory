@@ -29,17 +29,17 @@ Do not duplicate or redefine a canonical taxonomy or Graph enum in this file. Li
 - Handbook locators are navigation aids, not authority over source. Before using a locator, open the current file and re-verify its symbol, callers, inputs, outputs, and side effects.
 - When documentation and code differ, state **Target Contract** and **Current Implementation** separately. Do not present a documentation target as implemented behavior.
 
-## Current Implementation Boundary (`legacy`)
+## Current Implementation Contract
 
-The current code, schemas, validators, generator, Catalog data, and skill Compatibility Layer still serialize the `legacy` field `module_category` with the `legacy` values `agent`, `workflow`, `adapter`, and `remote_a2a`. They also use `legacy` identifiers including `adapter_kind`, `agent_kind`, `workflow_kind`, `selected_by_llm`, `decision_owner`, and current Graph node and edge values. The skill tree is organized as `af-workflow` plus four canonical Work Skills; the four former stage IDs remain compatibility shims. Follow [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md) for the current map.
+Analyze, Design, scaffold, Catalog publish, validator, generator, and UI paths use strict Target Contract v2 fields such as `asset_type`, `binding`, `workflow_profile`, `domain_scope`, `owner`, `reuse_status`, asset refs, and `invocation_control`. Stage Runner writes require `contract_version: "2.0"`. Legacy-only roots, fields, split artifact names, and in-memory lowering projections are not supported.
 
-When editing source, do not casually rename, remove, or reinterpret these `legacy` contracts. Their alignment is a separate follow-up migration, not part of documentation wording changes. Record and interpret the gap through [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md). A current identifier must be formatted as code and explicitly marked `legacy` whenever an active document discusses it.
+Graph IR uses the canonical Target node/edge envelope. Catalog publication and reads use `agents.yaml`, `workflows.yaml`, and `tools.yaml`; Adapter and Remote A2A are not asset categories or Catalog buckets. A2A remains a protocol binding for Agent assets. The skill tree is `af-workflow` plus four canonical Work Skills with no former-stage shims. Strict cutover state is tracked in [docs/migration/taxonomy-vnext-status.md](docs/migration/taxonomy-vnext-status.md) and [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md).
 
 ## Local AGENTS.md Hierarchy
 
 This root file carries repository-wide policy. More specific guidance lives near active ownership boundaries:
 
-- [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md): DLC skill authoring, canonical skill map, compatibility shims, and shared references.
+- [.agents/skills/AGENTS.md](.agents/skills/AGENTS.md): DLC skill authoring, canonical skill map, strict Target v2 contract, and shared references.
 - `packages/web/AGENTS.md`: web workbench package, routes, UI, server middleware, and verification entrypoints.
 - `packages/mock-lab/AGENTS.md`: standalone Mock Lab package and MCP runtime.
 - `docs/AGENTS.md`: active docs versus historical and status snapshots.
@@ -83,7 +83,7 @@ Agent Factory is an operational workbench, not a marketing surface. Prefer:
 - English technical terms where clearer, such as `Agent`, `Workflow`, `Tool`, `Graph IR`, and `Runtime Handoff`
 - cards only when the card is the interaction surface
 
-The Current Implementation UI can still render the `legacy` labels `Adapter` and `Remote A2A`. When documenting or editing those current labels, identify them as `legacy` UI vocabulary; do not present them as Target Contract asset types.
+The Current Implementation UI presents only Agent, Workflow, and Tool as asset categories. A2A may appear only as an Agent protocol binding or exposure, never as an asset category.
 
 When changing a screen, verify that removed UI does not still render from a parent shell, context panel, inspector, or shared layout component.
 

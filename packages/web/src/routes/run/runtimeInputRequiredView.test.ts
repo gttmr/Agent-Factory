@@ -46,10 +46,10 @@ const status: RuntimeA2aStatus = {
 
 assert.deepEqual(remoteInputRequiredView(status), {
   visible: true,
-  title: "Remote A2A 입력 대기",
+  title: "A2A Agent 입력 대기",
   prompt: "<script>alert('x')</script>목적/시나리오 분류 확인",
   detail:
-    "원격 Agent 가 input-required 상태로 사람 입력을 기다립니다. Workbench resume 은 같은 Remote A2A task 에 function_response DataPart 를 전송합니다.",
+    "원격 A2A Agent가 input-required 상태로 사람 입력을 기다립니다. Workbench resume은 같은 task에 function_response DataPart를 전송합니다.",
   taskState: "input-required",
   resume: {
     supported: true,
@@ -58,7 +58,7 @@ assert.deepEqual(remoteInputRequiredView(status), {
     interruptId: "interrupt-1",
     functionName: "adk_request_input",
     responseSchema: { type: "string" },
-    note: "provider probe 가 생성한 Remote A2A task 를 Workbench resume 으로 이어갈 수 있습니다."
+    note: "provider probe가 생성한 원격 A2A task를 Workbench resume으로 이어갈 수 있습니다."
   }
 });
 
@@ -93,20 +93,20 @@ const eventInputRequired: RuntimeChatRemoteInputRequired = {
   remote_path: "consumer@1/provider@1",
   response_schema: { type: "string" },
   resume_supported: false,
-  resume_note: "현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다."
+  resume_note: "현재 Workbench/ADK Web 텍스트 채팅은 같은 원격 A2A task의 resume 경로로 검증되지 않았습니다."
 };
 
 assert.deepEqual(remoteInputRequiredView(eventInputRequired, status), {
   visible: true,
-  title: "Remote A2A 입력 대기",
+  title: "A2A Agent 입력 대기",
   prompt: "목적/시나리오 분류 확인",
   detail:
-    "원격 Agent 가 input-required 상태로 사람 입력을 기다립니다. 현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다.",
+    "원격 A2A Agent가 input-required 상태로 사람 입력을 기다립니다. 현재 Workbench/ADK Web 텍스트 채팅은 같은 task의 resume 경로로 검증되지 않았습니다.",
   taskState: "input-required",
   payload: "<script>alert('x')</script>분류체계와 맞지 않습니다.",
   resume: {
     supported: false,
-    note: "현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다."
+    note: "현재 Workbench/ADK Web 텍스트 채팅은 같은 원격 A2A task의 resume 경로로 검증되지 않았습니다."
   }
 });
 
@@ -116,14 +116,14 @@ const resumableInputRequired: RuntimeChatRemoteInputRequired = {
   task_id: "task-2",
   context_id: "ctx-2",
   resume_supported: true,
-  resume_note: "Remote A2A task resume bridge 로 이어갈 수 있습니다."
+  resume_note: "원격 A2A task의 resume 경로로 이어갈 수 있습니다."
 };
 
 const resumableView = remoteInputRequiredView(resumableInputRequired, status);
 assert.equal(resumableView.resume?.supported, true);
 assert.equal(
   resumableView.detail,
-  "Remote A2A task resume bridge 로 이어갈 수 있습니다."
+  "원격 A2A task의 resume 경로로 이어갈 수 있습니다."
 );
 assert.deepEqual(runtimeResumeFormView(resumableView, { providerReqId: "provider-1", responseText: "확인했습니다", pending: false }), {
   visible: true,
@@ -160,7 +160,7 @@ assert.deepEqual(
     submitDisabled: true,
     submitLabel: "Workbench resume 전송",
     request: null,
-    warning: "resume task metadata 를 확인한 뒤 Workbench resume 을 전송할 수 있습니다."
+    warning: "resume task metadata를 확인한 뒤 Workbench resume을 전송할 수 있습니다."
   }
 );
 
@@ -171,5 +171,5 @@ assert.deepEqual(runtimeResumeFormView(unsupportedView, { providerReqId: "provid
   submitDisabled: true,
   submitLabel: "Workbench resume 전송",
   request: null,
-  warning: "현재 Workbench/ADK Web 텍스트 채팅은 같은 Remote A2A task resume bridge 로 검증되지 않았습니다."
+  warning: "현재 Workbench/ADK Web 텍스트 채팅은 같은 원격 A2A task의 resume 경로로 검증되지 않았습니다."
 });

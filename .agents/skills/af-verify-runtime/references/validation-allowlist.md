@@ -12,13 +12,16 @@ Workbench Verify command를 선택하거나 Stage Runner Verify evidence를 해�
 
 | Key | Server argv | Proves |
 | --- | --- | --- |
-| `validate_artifact_root` | `node scripts/validate-artifacts.mjs <artifact-root>` | current artifact parse/schema/gates |
+| `validate_artifact_root` | `node scripts/validate-artifacts.mjs <artifact-root>` | strict v2 artifact parse/schema/gates |
+| `validate_generated_runtime` | `node scripts/validate-generated-runtime.mjs <artifact-root>` | generated Python compile와 bundle pytest/ADK import |
 | `build_web` | `npm run build --prefix packages/web` | web typecheck/build |
 | `test_analyzer` | `npm run test:analyzer --prefix packages/web` | analyzer/generator test suite |
 
-세 key 밖 command는 Workbench allow-list command로 표현하지 않는다.
+네 key 밖 command는 Workbench allow-list command로 표현하지 않는다.
 
 가장 가벼운 충분한 command를 선택한다.
+
+Verify completion에는 `validate_artifact_root`와 `validate_generated_runtime`의 최신 pass가 모두 필요하다. 둘 중 하나가 없으면 `pending`, 하나라도 실패하면 `blocked`다. `build_web`과 `test_analyzer` 단독 성공은 Verify completion evidence가 아니다.
 
 ## Required evidence
 
@@ -34,7 +37,7 @@ Workbench Verify command를 선택하거나 Stage Runner Verify evidence를 해�
 
 Artifact validator pass는 web build 또는 runtime behavior를 증명하지 않는다.
 
-Stage Runner run `completed`는 command `ok=true`를 의미하지 않는다.
+Stage Runner run `completed`는 aggregate Verify pass를 의미하지 않는다. manifest의 required command ledger를 함께 확인한다.
 
 ## Scaffold implications
 
@@ -46,6 +49,7 @@ Manual equivalents:
 
 ```bash
 node scripts/validate-artifacts.mjs <artifact-root>
+node scripts/validate-generated-runtime.mjs <artifact-root>
 npm run build --prefix packages/web
 npm run test:analyzer --prefix packages/web
 ```
@@ -67,5 +71,5 @@ npm run test:analyzer --prefix packages/web
 
 ## Checked date
 
-- Checked date: 2026-07-18
-- Current allow-list: exactly three keys.
+- Checked date: 2026-07-20
+- Current allow-list: exactly four keys; artifact-root and generated-runtime checks are required for completion.

@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/graph.schema.json",
+  "title": "Target Graph IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["graph_id", "source_requirement_id", "workflow_ref", "nodes", "edges", "regions"],
+  "properties": {
+    "graph_id": { "type": "string", "minLength": 1 },
+    "source_requirement_id": { "type": "string", "minLength": 1 },
+    "workflow_ref": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "null" }
+      ]
+    },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "regions": { "type": "array", "items": { "$ref": "#/$defs/region" } }
+  },
+  "$defs": {
+    "nodeBase": {
+      "type": "object",
+      "required": ["id", "label", "node_kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "node_kind": { "type": "string", "enum": ["input", "agent", "tool", "function", "human_input", "subworkflow", "join", "output"] }
+      }
+    },
+    "node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "type": "string", "enum": ["input", "join", "output"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind", "agent_ref", "available_tools"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "const": "agent" },
+            "agent_ref": { "type": "string", "minLength": 1 },
+            "available_tools": { "type": "array", "items": { "$ref": "#/$defs/availableTool" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind", "tool_ref", "invocation_control"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "const": "tool" },
+            "tool_ref": { "type": "string", "minLength": 1 },
+            "invocation_control": { "const": "workflow" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind", "role"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "const": "function" },
+            "role": { "type": "string", "enum": ["transform", "validate", "route", "merge", "prepare_input", "format_output"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind", "human_input_contract"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "const": "human_input" },
+            "human_input_contract": { "$ref": "#/$defs/humanInputContract" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "label", "node_kind", "workflow_ref"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "label": { "type": "string", "minLength": 1 },
+            "node_kind": { "const": "subworkflow" },
+            "workflow_ref": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "availableTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_ref", "invocation_control"],
+      "properties": {
+        "tool_ref": { "type": "string", "minLength": 1 },
+        "invocation_control": { "const": "agent" }
+      }
+    },
+    "humanInputContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message", "payload_schema_ref", "response_schema_ref", "response_mapping"],
+      "properties": {
+        "message": { "type": "string", "minLength": 1 },
+        "payload_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_schema_ref": { "$ref": "#/$defs/nullableString" },
+        "response_mapping": { "oneOf": [{ "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }, { "type": "null" }] },
+        "choice_options": { "oneOf": [{ "type": "array", "items": { "type": "string", "minLength": 1 } }, { "type": "null" }] },
+        "accepted_aliases": { "oneOf": [{ "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 } } }, { "type": "null" }] },
+        "default_choice": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "control", "channel"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "control": { "$ref": "#/$defs/control" },
+        "channel": { "oneOf": [{ "type": "string", "enum": ["event", "state", "artifact"] }, { "type": "null" }] }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "condition", "accepted_aliases", "default"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["next", "condition", "fan_out", "fan_in", "loop_back", "loop_exit", "retry", "fallback", "error", "callback", "resume", "cancel", "timeout"] },
+        "condition": { "$ref": "#/$defs/nullableString" },
+        "accepted_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "default": { "type": "boolean" }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "node_ids", "entry_node_ids", "exit_node_ids", "parent_region_id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["parallel", "loop"] },
+        "node_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "entry_node_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "exit_node_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "parent_region_id": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "nullableString": { "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+  }
+}

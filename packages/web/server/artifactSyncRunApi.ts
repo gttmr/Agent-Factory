@@ -13,7 +13,7 @@ import {
 } from "./artifactSyncProcessSteps";
 import { isRecord, readJsonBody, sendJson } from "./httpApi";
 import { beginSse, shouldStreamProcess, writeSseEvent } from "./processStreaming";
-import { recordRuntimeStubBuild } from "./runManifestBuild";
+import { assertBuildApprovals, recordRuntimeStubBuild } from "./runManifestBuild";
 
 interface ArtifactSyncRunBody {
   readonly outputMode?: ScaffoldOutputMode;
@@ -37,6 +37,7 @@ export async function handleArtifactSyncRun(
 ): Promise<void> {
   const rawBody = await readJsonBody(req);
   const body = parseArtifactSyncRunBody(rawBody);
+  await assertBuildApprovals(store, reqId);
   if (shouldStreamProcess(req, body)) {
     await handleArtifactSyncRunSse(repoRoot, store, reqId, body, res);
     return;
